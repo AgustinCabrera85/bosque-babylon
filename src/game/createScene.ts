@@ -1,0 +1,251 @@
+import { Engine } from "@babylonjs/core/Engines/engine";
+import { Scene } from "@babylonjs/core/scene";
+import { Color3, Vector3, Color4 } from "@babylonjs/core";
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { RockLibrary } from "./RockLibrary";
+import { createTerrain } from "./Terrain";
+import { PlayerController } from "./PlayerController";
+import { Segments } from "./Segments";
+import { TreeLibrary } from "./TreeLibrary";
+import { GrassLibrary } from "./GrassLibrary";
+import { InteractSystem } from "./InteractSystem";
+import { createRainSystem } from "./Rain";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
+import { PhotoDome } from "@babylonjs/core/Helpers/photoDome";
+import { SpotLight } from "@babylonjs/core/Lights/spotLight";
+import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"; 
+import { Light } from "@babylonjs/core/Lights/light";
+
+
+
+// ✅ Vite url imports (desde src/assets)
+import pathUrl from "../assets/terrain/ground_camino/ground.jpg?url";
+import skyUrl from "../assets/hdr/hdr_high.png?url";
+
+export async function createScene(engine: Engine, canvas: HTMLCanvasElement) {
+  const scene = new Scene(engine);
+
+  // =========================
+  // Fog lúgubre (NOCHE)
+  // =========================
+  // EXP2: densa y natural PERO con densidad baja (0.05 era demasiado)
+  scene.fogMode = Scene.FOGMODE_EXP2;
+  scene.fogColor = new Color3(0.02, 0.025, 0.03); // casi negro azulado
+  scene.fogDensity = 0.018; // 🔥 probá 0.010..0.018
+
+  // Para que el "horizonte" no se vea raro detrás de todo
+  scene.clearColor = new Color4(
+    scene.fogColor.r,
+    scene.fogColor.g,
+    scene.fogColor.b,
+    1
+  );
+
+// =========================
+// LUCES (NOCHE)
+// =========================
+const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
+hemi.intensity = 0.03; // MUY bajo
+hemi.groundColor = new Color3(0.01, 0.01, 0.01);
+
+const moon = new DirectionalLight("moon", new Vector3(-0.35, -1, 0.25), scene);
+moon.position = new Vector3(60, 120, 40);
+moon.intensity = 0.08; // suave
+moon.diffuse = new Color3(0.6, 0.65, 0.9);
+moon.specular = new Color3(0, 0, 0);
+
+
+  // =========================
+  // Terreno
+  // =========================
+const terrain = createTerrain(scene, {
+  size: 1200,
+  segments: 260,        // bajamos un poco resolución (antes 400)
+  pathHalfWidth: 4,
+
+  mountainStart: 55,    // antes 26
+  mountainEnd: 95,      // antes 48
+  mountainHeight: 34,   // un poco más alto
+  playableHalfWidth: 52 // antes de montaña
+});
+
+
+  // =========================
+  // Sendero plano (opcional)
+  // =========================
+  const path = MeshBuilder.CreateGround(
+    "path",
+    { width: 9, height: 1200, subdivisions: 1 },
+    scene
+  );
+  path.position.y = 0.03; // evitar z-fighting
+  path.isPickable = false;
+
+  const pathMat = new StandardMaterial("pathMat", scene);
+  const pathTex = new Texture(pathUrl, scene);
+  pathTex.wrapU = Texture.WRAP_ADDRESSMODE;
+  pathTex.wrapV = Texture.WRAP_ADDRESSMODE;
+  pathTex.anisotropicFilteringLevel = 4;
+  pathTex.uScale = 1;
+  pathTex.vScale = 80;
+
+  pathMat.diffuseTexture = pathTex;
+  pathMat.specularColor = new Color3(0, 0, 0);
+  // Oscurecer un toque el camino para que no “brille”
+  pathMat.diffuseColor = new Color3(0.75, 0.75, 0.75);
+  path.material = pathMat;
+
+  // =========================
+  // SKY (PhotoDome PNG 360)
+  // =========================
+  const photoDome = new PhotoDome(
+    "skyDome",
+    skyUrl,
+    {
+      resolution: 64,
+      size: 3000,
+    },
+    scene
+  );
+
+  photoDome.mesh.infiniteDistance = true;
+  photoDome.mesh.isPickable = false;
+  photoDome.mesh.renderingGroupId = 0;
+
+  // ✅ el cielo NO debe recibir fog
+  // (PhotoDome.material no siempre tipa fogEnabled, por eso el cast)
+  (photoDome.material as any).fogEnabled = false;
+
+  // ✅ “bajar” la potencia visual del cielo (si está muy brillante)
+  // (depende del material que use internamente)
+  const m: any = photoDome.material as any;
+  if (m.emissiveColor?.set) m.emissiveColor.set(0.55, 0.55, 0.55);
+  if (m.diffuseColor?.set) m.diffuseColor.set(0, 0, 0);
+  if (m.specularColor?.set) m.specularColor.set(0, 0, 0);
+
+  photoDome.onLoadObservable.add(() => {
+    console.log("✔ PhotoDome loaded:", skyUrl);
+  });
+
+  // =========================
+  // Player
+  // =========================
+  const player = new PlayerController(scene, canvas, {
+    eyeHeight: 1.7,
+    walkSpeed: 2.8,
+    runSpeed: 6.8,
+    jumpSpeed: 6.2,
+    gravity: -18.0,
+  });
+
+// =========================
+// 🔦 FLASHLIGHT (SpotLight)
+// =========================
+const flashlight = new SpotLight(
+  "flashlight",
+  player.camera.globalPosition.clone(),
+  player.camera.getDirection(Vector3.Forward()),
+  Math.PI / 8, // cono
+  35,          // exponent (centro más fuerte)
+  scene
+);
+
+// Falloff más “físico”
+flashlight.falloffType = Light.FALLOFF_GLTF;
+
+flashlight.intensity = 3.2;
+flashlight.range = 26;
+
+flashlight.diffuse = new Color3(1.0, 0.96, 0.88); // cálida
+flashlight.specular = new Color3(0, 0, 0);
+
+// Sombras (opcional pero suma MUCHO)
+const shadows = new ShadowGenerator(1024, flashlight);
+shadows.useBlurExponentialShadowMap = true;
+shadows.blurKernel = 16;
+shadows.darkness = 0.65;
+
+// Si tenés meshes importantes:
+scene.meshes.forEach(m => {
+  if (m.name === "terrain") shadows.addShadowCaster(m, true);
+  // y tus árboles/rocas si querés:
+  // shadows.addShadowCaster(m, true);
+});
+
+// Update por frame + flicker muy leve
+let t = 0;
+scene.onBeforeRenderObservable.add(() => {
+  const pos = player.camera.globalPosition;
+  const dir = player.camera.getDirection(Vector3.Forward());
+
+  flashlight.position.copyFrom(pos);
+  flashlight.direction.copyFrom(dir);
+
+  // micro flicker (casi imperceptible)
+  t += scene.getEngine().getDeltaTime() * 0.001;
+  flashlight.intensity = 3.2 + Math.sin(t * 17.0) * 0.03 + Math.sin(t * 7.0) * 0.02;
+});
+
+
+  // =========================
+  // Libraries
+  // =========================
+  const treeLibrary = new TreeLibrary();
+  const grassLibrary = new GrassLibrary();
+  const rockLibrary = new RockLibrary();
+
+  await rockLibrary.load(scene);
+  await treeLibrary.load(scene);
+  await grassLibrary.load(scene);
+
+  // =========================
+  // Segmentos
+  // =========================
+  const segments = new Segments(scene, terrain, treeLibrary, grassLibrary, rockLibrary, {
+    segmentLength: 70,
+    behind: 1,
+    ahead: 2,
+  });
+
+  // =========================
+  // UI hints + Interacción (E)
+  // =========================
+  const hints = {
+    set(text: string | null) {
+      const el = document.getElementById("hint");
+      if (!el) return;
+      if (!text) {
+        el.classList.add("hidden");
+        el.textContent = "";
+        return;
+      }
+      el.textContent = text;
+      el.classList.remove("hidden");
+    },
+  };
+  new InteractSystem(scene, player.camera, hints);
+
+  // =========================
+  // Lluvia
+  // =========================
+  createRainSystem(scene, terrain);
+  segments.spawnDemoInteractables();
+
+  // =========================
+  // Loop
+  // =========================
+  scene.onBeforeRenderObservable.add(() => {
+    const dt = engine.getDeltaTime() / 1000;
+    player.update(dt, terrain, segments);
+    segments.update(player.position.z);
+
+    const looking = segments.peekInteractable(player.camera);
+    hints.set(looking ? "E: interactuar" : null);
+  });
+
+  return scene;
+}

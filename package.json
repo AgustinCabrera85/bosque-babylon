@@ -1,0 +1,19 @@
+{
+  "name": "bosque-babylon",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^7.22.0",
+    "@babylonjs/loaders": "^7.22.0"
+  }
+}

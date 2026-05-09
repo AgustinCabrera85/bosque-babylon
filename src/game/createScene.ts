@@ -16,6 +16,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { PhotoDome } from "@babylonjs/core/Helpers/photoDome";
+import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"; 
 import { Light } from "@babylonjs/core/Lights/light";

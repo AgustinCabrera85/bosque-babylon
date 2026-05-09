@@ -79,7 +79,7 @@ export const mobileQuality: QualityProfile = {
   rainDrops: 120,
   segmentBehind: 0,
   segmentAhead: 1,
-  treeCount: 28,
+  treeCount: 58,
   rockCount: 7,
   grassBuildCount: 850,
   grassRingCounts: [850, 220, 0],

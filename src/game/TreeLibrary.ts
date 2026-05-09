@@ -131,7 +131,7 @@ export class TreeLibrary {
    */
   constructor(private ultraFoliage: boolean = true) {}
 
-  async load(scene: Scene) {
+  async load(scene: Scene, maxTemplates = Number.POSITIVE_INFINITY) {
     const files = [
       "tree_00.glb",
       "tree_01.glb",
@@ -143,7 +143,7 @@ export class TreeLibrary {
       "tree_07.glb",
     ];
 
-for (const file of files) {
+for (const file of files.slice(0, maxTemplates)) {
   try {
     const res = await SceneLoader.ImportMeshAsync(
       null,

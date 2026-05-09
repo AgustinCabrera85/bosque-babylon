@@ -6,8 +6,9 @@ import type { TerrainHandle } from "./Terrain";
 /**
  * Lightweight rain: one mesh with thin instances instead of hundreds of meshes.
  */
-export function createRainSystem(scene: Scene, terrain: TerrainHandle) {
-  const COUNT = 500;
+export function createRainSystem(scene: Scene, terrain: TerrainHandle, count = 500) {
+  const COUNT = Math.max(0, Math.floor(count));
+  if (COUNT === 0) return;
   const matrices = new Float32Array(COUNT * 16);
   const xs = new Float32Array(COUNT);
   const ys = new Float32Array(COUNT);

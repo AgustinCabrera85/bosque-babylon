@@ -19,7 +19,7 @@ export class GrassLibrary {
   private windMeshes: WindMesh[] = [];
   private windTime = 0;
 
-  async load(scene: Scene) {
+  async load(scene: Scene, maxTemplates = Number.POSITIVE_INFINITY) {
     const files = [
       "grass_00.glb",
       "grass_01.glb",
@@ -28,7 +28,7 @@ export class GrassLibrary {
       "grass_04.glb",
     ];
 
-    for (const file of files) {
+    for (const file of files.slice(0, maxTemplates)) {
       try {
         const res = await SceneLoader.ImportMeshAsync(
           null,

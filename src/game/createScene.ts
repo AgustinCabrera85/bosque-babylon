@@ -29,13 +29,71 @@ import { Light } from "@babylonjs/core/Lights/light";
 const pathUrl = "/assets/models/textures/terrain/ground_camino/ground.jpg";
 const skyUrl = "/assets/hdr/hdr_high.png";
 type LoadingProgress = (value: number, text: string) => void;
+export type QualityProfile = {
+  name: "desktop" | "mobile";
+  terrainSegments: number;
+  pathRows: number;
+  photoDomeResolution: number;
+  shadowMapSize: number;
+  shadowBlurKernel: number;
+  rainDrops: number;
+  segmentBehind: number;
+  segmentAhead: number;
+  treeCount: number;
+  rockCount: number;
+  grassBuildCount: number;
+  grassRingCounts: [number, number, number];
+  grassWindInterval: number;
+  treeTemplateLimit: number;
+  rockTemplateLimit: number;
+  grassTemplateLimit: number;
+};
 
-function createPathMesh(scene: Scene, terrain: ReturnType<typeof createTerrain>) {
+export const desktopQuality: QualityProfile = {
+  name: "desktop",
+  terrainSegments: 180,
+  pathRows: 160,
+  photoDomeResolution: 64,
+  shadowMapSize: 512,
+  shadowBlurKernel: 8,
+  rainDrops: 500,
+  segmentBehind: 1,
+  segmentAhead: 2,
+  treeCount: 60,
+  rockCount: 14,
+  grassBuildCount: 2500,
+  grassRingCounts: [2500, 800, 100],
+  grassWindInterval: 0,
+  treeTemplateLimit: Number.POSITIVE_INFINITY,
+  rockTemplateLimit: Number.POSITIVE_INFINITY,
+  grassTemplateLimit: Number.POSITIVE_INFINITY,
+};
+
+export const mobileQuality: QualityProfile = {
+  name: "mobile",
+  terrainSegments: 110,
+  pathRows: 72,
+  photoDomeResolution: 32,
+  shadowMapSize: 0,
+  shadowBlurKernel: 0,
+  rainDrops: 120,
+  segmentBehind: 0,
+  segmentAhead: 1,
+  treeCount: 28,
+  rockCount: 7,
+  grassBuildCount: 850,
+  grassRingCounts: [850, 220, 0],
+  grassWindInterval: 0.08,
+  treeTemplateLimit: 3,
+  rockTemplateLimit: 3,
+  grassTemplateLimit: 2,
+};
+
+function createPathMesh(scene: Scene, terrain: ReturnType<typeof createTerrain>, rows: number) {
   const width = 9;
   const halfWidth = width / 2;
   const length = terrain.size;
   const halfLength = length / 2;
-  const rows = 160;
   const cols = 4;
 
   const positions: number[] = [];
@@ -85,7 +143,8 @@ function createPathMesh(scene: Scene, terrain: ReturnType<typeof createTerrain>)
 export async function createScene(
   engine: Engine,
   canvas: HTMLCanvasElement,
-  onProgress: LoadingProgress = () => {}
+  onProgress: LoadingProgress = () => {},
+  quality: QualityProfile = desktopQuality
 ) {
   onProgress(0.08, "Creando escena...");
   const scene = new Scene(engine);
@@ -126,7 +185,7 @@ moon.specular = new Color3(0, 0, 0);
 onProgress(0.18, "Generando terreno...");
 const terrain = createTerrain(scene, {
   size: 1200,
-  segments: 180,
+  segments: quality.terrainSegments,
   pathHalfWidth: 4,
 
   mountainStart: 55,    // antes 26
@@ -139,7 +198,7 @@ const terrain = createTerrain(scene, {
   // =========================
   // Sendero plano (opcional)
   // =========================
-  const path = createPathMesh(scene, terrain);
+  const path = createPathMesh(scene, terrain, quality.pathRows);
 
   const pathMat = new StandardMaterial("pathMat", scene);
   const pathTex = new Texture(pathUrl, scene);
@@ -163,7 +222,7 @@ const terrain = createTerrain(scene, {
     "skyDome",
     skyUrl,
     {
-      resolution: 64,
+      resolution: quality.photoDomeResolution,
       size: 3000,
     },
     scene
@@ -221,9 +280,10 @@ flashlight.diffuse = new Color3(1.0, 0.96, 0.88); // cálida
 flashlight.specular = new Color3(0, 0, 0);
 
 // Sombras (opcional pero suma MUCHO)
-const shadows = new ShadowGenerator(512, flashlight);
+if (quality.shadowMapSize > 0) {
+const shadows = new ShadowGenerator(quality.shadowMapSize, flashlight);
 shadows.useBlurExponentialShadowMap = true;
-shadows.blurKernel = 8;
+shadows.blurKernel = quality.shadowBlurKernel;
 shadows.darkness = 0.65;
 
 // Si tenés meshes importantes:
@@ -232,6 +292,7 @@ scene.meshes.forEach(m => {
   // y tus árboles/rocas si querés:
   // shadows.addShadowCaster(m, true);
 });
+}
 
 // Update por frame + flicker muy leve
 let t = 0;
@@ -256,19 +317,23 @@ scene.onBeforeRenderObservable.add(() => {
   const rockLibrary = new RockLibrary();
 
   onProgress(0.45, "Cargando rocas...");
-  await rockLibrary.load(scene);
+  await rockLibrary.load(scene, quality.rockTemplateLimit);
   onProgress(0.62, "Cargando arboles...");
-  await treeLibrary.load(scene);
+  await treeLibrary.load(scene, quality.treeTemplateLimit);
   onProgress(0.78, "Cargando pasto...");
-  await grassLibrary.load(scene);
+  await grassLibrary.load(scene, quality.grassTemplateLimit);
 
   // =========================
   // Segmentos
   // =========================
   const segments = new Segments(scene, terrain, treeLibrary, grassLibrary, rockLibrary, {
     segmentLength: 70,
-    behind: 1,
-    ahead: 2,
+    behind: quality.segmentBehind,
+    ahead: quality.segmentAhead,
+    treeCount: quality.treeCount,
+    rockCount: quality.rockCount,
+    grassBuildCount: quality.grassBuildCount,
+    grassRingCounts: quality.grassRingCounts,
   });
 
   // =========================
@@ -293,17 +358,26 @@ scene.onBeforeRenderObservable.add(() => {
   // =========================
   // Lluvia
   // =========================
-  createRainSystem(scene, terrain);
+  createRainSystem(scene, terrain, quality.rainDrops);
   onProgress(0.92, "Preparando controles...");
 
   // =========================
   // Loop
   // =========================
+  let grassWindTimer = 0;
   scene.onBeforeRenderObservable.add(() => {
     const dt = engine.getDeltaTime() / 1000;
     player.update(dt, terrain, segments);
     segments.update(player.position.z);
-    grassLibrary.updateWind(dt);
+    if (quality.grassWindInterval <= 0) {
+      grassLibrary.updateWind(dt);
+    } else {
+      grassWindTimer += dt;
+      if (grassWindTimer >= quality.grassWindInterval) {
+        grassLibrary.updateWind(grassWindTimer);
+        grassWindTimer = 0;
+      }
+    }
 
     const looking = segments.peekInteractable(player.camera);
     hints.set(looking ? "E: interactuar" : null);

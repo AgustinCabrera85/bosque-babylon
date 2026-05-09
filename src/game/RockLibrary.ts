@@ -39,7 +39,7 @@ function collisionRadiusForMeshes(meshes: Mesh[]) {
 export class RockLibrary {
   private templates: RockTemplate[] = [];
 
-  async load(scene: Scene) {
+  async load(scene: Scene, maxTemplates = Number.POSITIVE_INFINITY) {
     const files = [
       "rock_01.glb",
       "rock_02.glb",
@@ -49,7 +49,7 @@ export class RockLibrary {
       "rock_06.glb",
     ];
 
-    for (const file of files) {
+    for (const file of files.slice(0, maxTemplates)) {
       try {
         const res = await SceneLoader.ImportMeshAsync(
           null,

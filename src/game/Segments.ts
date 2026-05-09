@@ -23,7 +23,15 @@ type Collider = {
   kind: "tree" | "rock";
 };
 type Interactable = { mesh: any; segmentId: number };
-type SegmentCfg = { segmentLength: number; behind: number; ahead: number };
+type SegmentCfg = {
+  segmentLength: number;
+  behind: number;
+  ahead: number;
+  treeCount?: number;
+  rockCount?: number;
+  grassBuildCount?: number;
+  grassRingCounts?: [number, number, number];
+};
 
 type SegTreePack = { nodes: TransformNode[]; lod: 0 | 1 | 2 };
 type SegRockPack = { nodes: TransformNode[] };
@@ -244,7 +252,7 @@ export class Segments {
     const fadeStart = Math.max(minX + 1, grassMaxX - fadeWidth);
 
     // densidad base del segmento (ring 0 real)
-    const COUNT = 2500;
+    const COUNT = this.cfg.grassBuildCount ?? 2500;
     const buffers: Float32Array[] = [];
 
     for (let b = 0; b < this.grassBases.length; b++) {
@@ -332,7 +340,7 @@ export class Segments {
     const rng = this.rngForSegment(segmentId);
     const instances: any[] = [];
 
-    const TREES = 60;
+    const TREES = this.cfg.treeCount ?? 60;
     const segLen = this.cfg.segmentLength;
 
     const pathHalf = 4;
@@ -378,7 +386,7 @@ export class Segments {
   private createRocks(centerZ: number, segmentId: number) {
     const rng = this.rngForSegment(segmentId ^ 0xABCDEF);
     const instances: any[] = [];
-    const ROCKS = 14;
+    const ROCKS = this.cfg.rockCount ?? 14;
 
     for (let i = 0; i < ROCKS; i++) {
       const z = centerZ + (rng() - 0.5) * this.cfg.segmentLength * 2;
@@ -420,9 +428,10 @@ export class Segments {
   }
 
   private grassCountForRing(ring: number) {
-    if (ring === 0) return 2500;
-    if (ring === 1) return 800;
-    if (ring === 2) return 100;
+    const counts = this.cfg.grassRingCounts ?? [2500, 800, 100];
+    if (ring === 0) return counts[0];
+    if (ring === 1) return counts[1];
+    if (ring === 2) return counts[2];
     return 0;
   }
 }

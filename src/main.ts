@@ -16,7 +16,9 @@ function setLoading(value: number, text: string) {
 }
 
 function hideLoading() {
-  loadingScreen?.classList.add("hidden");
+  if (!loadingScreen) return;
+  loadingScreen.classList.add("hidden");
+  loadingScreen.setAttribute("aria-hidden", "true");
 }
 
 const engine = new Engine(renderCanvas, true, {

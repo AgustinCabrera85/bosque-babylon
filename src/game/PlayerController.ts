@@ -11,7 +11,7 @@ type Settings = {
   walkSpeed: number;
   runSpeed: number;
   jumpSpeed: number;
-  gravity: number; // negativo
+  gravity: number;
 };
 
 export class PlayerController {
@@ -21,6 +21,13 @@ export class PlayerController {
   private keys = new Set<string>();
   private velY = 0;
   private grounded = false;
+  private mobileEnabled = false;
+  private mobileMoveX = 0;
+  private mobileMoveY = 0;
+  private mobileRun = false;
+  private jumpQueued = false;
+  private pitch = 0;
+  private yaw = 0;
 
   constructor(private scene: Scene, private canvas: HTMLCanvasElement, private settings: Settings) {
     this.root = new TransformNode("playerRoot", scene);
@@ -30,79 +37,84 @@ export class PlayerController {
     this.camera.parent = this.root;
     this.camera.minZ = 0.1;
     this.camera.fov = 0.9;
-    this.camera.angularSensibility = 8000; // sensibilidad mouse
+    this.camera.angularSensibility = 8000;
 
-    // Mouse look
-//    this.camera.attachControl(canvas, true);
+    this.yaw = this.root.rotation.y;
+    this.pitch = this.camera.rotation.x;
 
-    // Pointer lock “click para entrar”
-    document.addEventListener("click", () => {
-      // si el usuario está interactuando con UI, podés condicionar esto después
+    document.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("#mobileControls")) return;
+      if (this.mobileEnabled) return;
       canvas.requestPointerLock?.();
     });
 
-    // --- Mouse look custom (pointer lock) ---
-// Ajustá sensibilidad (más chico = más lento)
-const SENS_X = 0.0012;
-const SENS_Y = 0.0010;
-
-// Clamp de pitch para que no “se dé vuelta”
-const PITCH_MIN = -1.45;
-const PITCH_MAX =  1.45;
-
-let pitch = 0; // lo aplicamos a la cámara (X)
-let yaw = 0;   // lo aplicamos al root (Y)
-
-// Inicializar yaw/pitch desde rotaciones actuales (por si venís de otra config)
-yaw = this.root.rotation.y;
-pitch = this.camera.rotation.x;
-
-window.addEventListener("mousemove", (e) => {
-  // Solo rotar si estamos en pointer lock
-  if (document.pointerLockElement !== this.canvas) return;
-
-  yaw += e.movementX * SENS_X;
-  pitch += e.movementY * SENS_Y;
-
-  // clamp pitch
-  if (pitch < PITCH_MIN) pitch = PITCH_MIN;
-  if (pitch > PITCH_MAX) pitch = PITCH_MAX;
-
-  // Aplicar: yaw en el root (gira el cuerpo), pitch en cámara (mira arriba/abajo)
-  this.root.rotation.y = yaw;
-  this.camera.rotation.x = pitch;
-
-  // Evitar roll
-  this.camera.rotation.z = 0;
-});
-
+    window.addEventListener("mousemove", (event) => {
+      if (document.pointerLockElement !== this.canvas) return;
+      this.applyLook(event.movementX * 0.0012, event.movementY * 0.001);
+    });
 
     document.addEventListener("pointerlockchange", () => {
       const help = document.getElementById("help");
       const locked = document.pointerLockElement === canvas;
-      if (help) help.style.display = locked ? "none" : "block";
+      if (help) help.style.display = locked || this.mobileEnabled ? "none" : "block";
     });
 
-    // Input keyboard
     scene.onKeyboardObservable.add((kb) => {
       if (kb.type === KeyboardEventTypes.KEYDOWN) this.keys.add(kb.event.code);
       if (kb.type === KeyboardEventTypes.KEYUP) this.keys.delete(kb.event.code);
     });
   }
 
-  get position() { return this.root.position; }
+  get position() {
+    return this.root.position;
+  }
+
+  setMobileEnabled(enabled: boolean) {
+    this.mobileEnabled = enabled;
+    const help = document.getElementById("help");
+    if (help) help.style.display = enabled ? "none" : "block";
+  }
+
+  setMobileMove(x: number, y: number) {
+    this.mobileMoveX = Math.max(-1, Math.min(1, x));
+    this.mobileMoveY = Math.max(-1, Math.min(1, y));
+  }
+
+  setMobileRun(running: boolean) {
+    this.mobileRun = running;
+  }
+
+  queueJump() {
+    this.jumpQueued = true;
+  }
+
+  addMobileLook(deltaX: number, deltaY: number) {
+    this.applyLook(deltaX * 0.0032, deltaY * 0.0027);
+  }
+
+  private applyLook(deltaYaw: number, deltaPitch: number) {
+    this.yaw += deltaYaw;
+    this.pitch += deltaPitch;
+
+    if (this.pitch < -1.45) this.pitch = -1.45;
+    if (this.pitch > 1.45) this.pitch = 1.45;
+
+    this.root.rotation.y = this.yaw;
+    this.camera.rotation.x = this.pitch;
+    this.camera.rotation.z = 0;
+  }
 
   update(dt: number, terrain: TerrainHandle, segments: Segments) {
-    const locked = document.pointerLockElement === this.canvas;
-    if (!locked) return;
+    const active = this.mobileEnabled || document.pointerLockElement === this.canvas;
+    if (!active) return;
 
-const forward = this.camera.getDirection(Vector3.Forward());
-forward.y = 0;
-if (forward.lengthSquared() > 0) forward.normalize();
+    const forward = this.camera.getDirection(Vector3.Forward());
+    forward.y = 0;
+    if (forward.lengthSquared() > 0) forward.normalize();
 
-const right = Vector3.Cross(Vector3.Up(), forward);
-if (right.lengthSquared() > 0) right.normalize();
-
+    const right = Vector3.Cross(Vector3.Up(), forward);
+    if (right.lengthSquared() > 0) right.normalize();
 
     const move = new Vector3(0, 0, 0);
     if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) move.addInPlace(forward);
@@ -110,13 +122,17 @@ if (right.lengthSquared() > 0) right.normalize();
     if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) move.addInPlace(right);
     if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) move.subtractInPlace(right);
 
-    const running = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
+    if (this.mobileEnabled) {
+      move.addInPlace(forward.scale(this.mobileMoveY));
+      move.addInPlace(right.scale(this.mobileMoveX));
+    }
+
+    const running = this.mobileRun || this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
     const speed = running ? this.settings.runSpeed : this.settings.walkSpeed;
 
     if (move.lengthSquared() > 0) {
       move.normalize().scaleInPlace(speed * dt);
 
-      // Colisión simple 2D con colliders (árboles/props)
       const px = this.root.position.x;
       const pz = this.root.position.z;
 
@@ -127,21 +143,14 @@ if (right.lengthSquared() > 0) right.normalize();
       if (!segments.isColliding(this.root.position.x, tryZ)) this.root.position.z = tryZ;
     }
 
-    // ===========================
-    // LIMITE LATERAL DEL BOSQUE
-    // ===========================
-    const maxX = 60;            // ancho jugable desde el centro (ajustalo)
-    const margin = 0.25;        // margen para no “vibrar” en el borde
-
+    const maxX = 60;
+    const margin = 0.25;
     if (this.root.position.x > maxX - margin) this.root.position.x = maxX - margin;
     if (this.root.position.x < -maxX + margin) this.root.position.x = -maxX + margin;
 
-
-    // Gravedad + salto (pegado a terreno)
     const groundY = terrain.getHeightAt(this.root.position.x, this.root.position.z);
     const targetY = groundY + this.settings.eyeHeight;
 
-    // grounded check
     if (this.root.position.y <= targetY + 0.02) {
       this.root.position.y = targetY;
       this.velY = 0;
@@ -150,17 +159,15 @@ if (right.lengthSquared() > 0) right.normalize();
       this.grounded = false;
     }
 
-    // salto
-    if (this.keys.has("Space") && this.grounded) {
+    if ((this.keys.has("Space") || this.jumpQueued) && this.grounded) {
       this.velY = this.settings.jumpSpeed;
       this.grounded = false;
     }
+    this.jumpQueued = false;
 
-    // integrar gravedad
     this.velY += this.settings.gravity * dt;
     this.root.position.y += this.velY * dt;
 
-    // clamp
     if (this.root.position.y < targetY) {
       this.root.position.y = targetY;
       this.velY = 0;

@@ -6,6 +6,16 @@
     <title>Bosque Babylon</title>
   </head>
   <body>
+    <div id="loadingScreen" role="status" aria-live="polite">
+      <div class="loading-panel">
+        <div class="loading-title">Bosque Babylon</div>
+        <div id="loadingText">Preparando escena...</div>
+        <div class="loading-track">
+          <div id="loadingBar"></div>
+        </div>
+      </div>
+    </div>
+
     <div id="hud">
       <div id="help">
         Click para entrar<br/>
@@ -13,6 +23,16 @@
       </div>
       <div id="hint" class="hidden"></div>
       <div id="reticle" aria-hidden="true"></div>
+
+      <div id="mobileControls" aria-hidden="true">
+        <div id="moveStick" class="stick" data-stick="move">
+          <div class="stick-thumb"></div>
+        </div>
+        <div id="lookPad"></div>
+        <button id="runButton" class="mobile-button" type="button" aria-label="Correr">R</button>
+        <button id="jumpButton" class="mobile-button" type="button" aria-label="Saltar">↑</button>
+        <button id="interactButton" class="mobile-button" type="button" aria-label="Interactuar">E</button>
+      </div>
     </div>
 
     <canvas id="renderCanvas"></canvas>

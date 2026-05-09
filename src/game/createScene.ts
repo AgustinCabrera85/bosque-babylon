@@ -11,6 +11,7 @@ import { Segments } from "./Segments";
 import { TreeLibrary } from "./TreeLibrary";
 import { GrassLibrary } from "./GrassLibrary";
 import { InteractSystem } from "./InteractSystem";
+import { setupMobileControls } from "./MobileControls";
 import { createRainSystem } from "./Rain";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
@@ -27,6 +28,7 @@ import { Light } from "@babylonjs/core/Lights/light";
 // ✅ Vite url imports (desde src/assets)
 const pathUrl = "/assets/models/textures/terrain/ground_camino/ground.jpg";
 const skyUrl = "/assets/hdr/hdr_high.png";
+type LoadingProgress = (value: number, text: string) => void;
 
 function createPathMesh(scene: Scene, terrain: ReturnType<typeof createTerrain>) {
   const width = 9;
@@ -80,7 +82,12 @@ function createPathMesh(scene: Scene, terrain: ReturnType<typeof createTerrain>)
   return path;
 }
 
-export async function createScene(engine: Engine, canvas: HTMLCanvasElement) {
+export async function createScene(
+  engine: Engine,
+  canvas: HTMLCanvasElement,
+  onProgress: LoadingProgress = () => {}
+) {
+  onProgress(0.08, "Creando escena...");
   const scene = new Scene(engine);
 
   // =========================
@@ -116,6 +123,7 @@ moon.specular = new Color3(0, 0, 0);
   // =========================
   // Terreno
   // =========================
+onProgress(0.18, "Generando terreno...");
 const terrain = createTerrain(scene, {
   size: 1200,
   segments: 180,
@@ -150,6 +158,7 @@ const terrain = createTerrain(scene, {
   // =========================
   // SKY (PhotoDome PNG 360)
   // =========================
+  onProgress(0.3, "Cargando cielo...");
   const photoDome = new PhotoDome(
     "skyDome",
     skyUrl,
@@ -246,8 +255,11 @@ scene.onBeforeRenderObservable.add(() => {
   const grassLibrary = new GrassLibrary();
   const rockLibrary = new RockLibrary();
 
+  onProgress(0.45, "Cargando rocas...");
   await rockLibrary.load(scene);
+  onProgress(0.62, "Cargando arboles...");
   await treeLibrary.load(scene);
+  onProgress(0.78, "Cargando pasto...");
   await grassLibrary.load(scene);
 
   // =========================
@@ -275,12 +287,14 @@ scene.onBeforeRenderObservable.add(() => {
       el.classList.remove("hidden");
     },
   };
-  new InteractSystem(scene, player.camera, hints);
+  const interactSystem = new InteractSystem(scene, player.camera, hints);
+  setupMobileControls(player, () => interactSystem.tryInteract());
 
   // =========================
   // Lluvia
   // =========================
   createRainSystem(scene, terrain);
+  onProgress(0.92, "Preparando controles...");
 
   // =========================
   // Loop
@@ -295,5 +309,6 @@ scene.onBeforeRenderObservable.add(() => {
     hints.set(looking ? "E: interactuar" : null);
   });
 
+  onProgress(1, "Listo");
   return scene;
 }

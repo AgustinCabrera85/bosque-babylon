@@ -18,7 +18,7 @@ export class InteractSystem {
     });
   }
 
-  private tryInteract() {
+  tryInteract() {
     const origin = this.camera.globalPosition;
     const forward = this.camera.getDirection(Vector3.Forward());
     const ray = new Ray(origin, forward, 3.0);

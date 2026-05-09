@@ -10,6 +10,7 @@ import { PlayerController } from "./PlayerController";
 import { Segments } from "./Segments";
 import { TreeLibrary } from "./TreeLibrary";
 import { GrassLibrary } from "./GrassLibrary";
+import { PlantLibrary } from "./PlantLibrary";
 import { InteractSystem } from "./InteractSystem";
 import { setupMobileControls } from "./MobileControls";
 import { createRainSystem } from "./Rain";
@@ -43,10 +44,13 @@ export type QualityProfile = {
   rockCount: number;
   grassBuildCount: number;
   grassRingCounts: [number, number, number];
+  plantBuildCount: number;
+  plantRingCounts: [number, number, number];
   grassWindInterval: number;
   treeTemplateLimit: number;
   rockTemplateLimit: number;
   grassTemplateLimit: number;
+  plantTemplateLimit: number;
 };
 
 export const desktopQuality: QualityProfile = {
@@ -63,10 +67,13 @@ export const desktopQuality: QualityProfile = {
   rockCount: 14,
   grassBuildCount: 2500,
   grassRingCounts: [2500, 800, 100],
+  plantBuildCount: 220,
+  plantRingCounts: [220, 80, 25],
   grassWindInterval: 0,
   treeTemplateLimit: Number.POSITIVE_INFINITY,
   rockTemplateLimit: Number.POSITIVE_INFINITY,
   grassTemplateLimit: Number.POSITIVE_INFINITY,
+  plantTemplateLimit: Number.POSITIVE_INFINITY,
 };
 
 export const mobileQuality: QualityProfile = {
@@ -83,10 +90,13 @@ export const mobileQuality: QualityProfile = {
   rockCount: 7,
   grassBuildCount: 850,
   grassRingCounts: [850, 220, 0],
+  plantBuildCount: 80,
+  plantRingCounts: [80, 25, 0],
   grassWindInterval: 0.08,
   treeTemplateLimit: 3,
   rockTemplateLimit: 3,
   grassTemplateLimit: 2,
+  plantTemplateLimit: 2,
 };
 
 function createPathMesh(scene: Scene, terrain: ReturnType<typeof createTerrain>, rows: number) {
@@ -314,19 +324,22 @@ scene.onBeforeRenderObservable.add(() => {
   // =========================
   const treeLibrary = new TreeLibrary();
   const grassLibrary = new GrassLibrary();
+  const plantLibrary = new PlantLibrary();
   const rockLibrary = new RockLibrary();
 
   onProgress(0.45, "Cargando rocas...");
   await rockLibrary.load(scene, quality.rockTemplateLimit);
   onProgress(0.62, "Cargando arboles...");
   await treeLibrary.load(scene, quality.treeTemplateLimit);
-  onProgress(0.78, "Cargando pasto...");
+  onProgress(0.74, "Cargando pasto...");
   await grassLibrary.load(scene, quality.grassTemplateLimit);
+  onProgress(0.82, "Cargando plantas...");
+  await plantLibrary.load(scene, quality.plantTemplateLimit);
 
   // =========================
   // Segmentos
   // =========================
-  const segments = new Segments(scene, terrain, treeLibrary, grassLibrary, rockLibrary, {
+  const segments = new Segments(scene, terrain, treeLibrary, grassLibrary, plantLibrary, rockLibrary, {
     segmentLength: 70,
     behind: quality.segmentBehind,
     ahead: quality.segmentAhead,
@@ -334,6 +347,8 @@ scene.onBeforeRenderObservable.add(() => {
     rockCount: quality.rockCount,
     grassBuildCount: quality.grassBuildCount,
     grassRingCounts: quality.grassRingCounts,
+    plantBuildCount: quality.plantBuildCount,
+    plantRingCounts: quality.plantRingCounts,
   });
 
   // =========================

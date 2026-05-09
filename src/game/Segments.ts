@@ -11,6 +11,7 @@ import type { TerrainHandle } from "./Terrain";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
 import type { TreeLibrary } from "./TreeLibrary";
 import type { GrassLibrary } from "./GrassLibrary";
+import type { PlantLibrary } from "./PlantLibrary";
 import type { RockLibrary } from "./RockLibrary";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
@@ -31,6 +32,8 @@ type SegmentCfg = {
   rockCount?: number;
   grassBuildCount?: number;
   grassRingCounts?: [number, number, number];
+  plantBuildCount?: number;
+  plantRingCounts?: [number, number, number];
 };
 
 type SegTreePack = { nodes: TransformNode[]; lod: 0 | 1 | 2 };
@@ -40,22 +43,26 @@ export class Segments {
   private readonly WORLD_SEED = 1337;
 
   private grassInitialized = false;
+  private plantsInitialized = false;
   private lastSegment: number | null = null;
 
   private treeSegments = new Map<number, SegTreePack>();
   private rockSegments = new Map<number, SegRockPack>();
   private grassSegments = new Map<number, Float32Array[]>();
+  private plantSegments = new Map<number, Float32Array[]>();
 
   private colliders: Collider[] = [];
   private interactables: Interactable[] = [];
 
   private grassBases: Mesh[] | null = null;
+  private plantBases: Mesh[] | null = null;
 
   constructor(
     private scene: Scene,
     private terrain: TerrainHandle,
     private treeLibrary: TreeLibrary,
     private grassLibrary: GrassLibrary,
+    private plantLibrary: PlantLibrary,
     private rockLibrary: RockLibrary,
     private cfg: SegmentCfg
   ) {}
@@ -85,6 +92,10 @@ export class Segments {
       this.initGrass();
       this.grassInitialized = true;
     }
+    if (!this.plantsInitialized) {
+      this.initPlants();
+      this.plantsInitialized = true;
+    }
 
     const segLen = this.cfg.segmentLength;
     const currentSeg = Math.floor(camZ / segLen);
@@ -106,6 +117,20 @@ export class Segments {
       }
       if (grassChanged || segmentChanged) {
         this.applyCombinedGrassBuffers(needed, currentSeg);
+      }
+    }
+
+    // ---------- PLANTS ----------
+    if (this.plantBases) {
+      let plantsChanged = false;
+      for (const id of needed) {
+        if (!this.plantSegments.has(id)) {
+          this.buildPlantsForSegment(id);
+          plantsChanged = true;
+        }
+      }
+      if (plantsChanged || segmentChanged) {
+        this.applyCombinedPlantBuffers(needed, currentSeg);
       }
     }
 
@@ -172,6 +197,10 @@ export class Segments {
 
     for (const id of this.grassSegments.keys()) {
       if (!needed.has(id)) this.grassSegments.delete(id);
+    }
+
+    for (const id of this.plantSegments.keys()) {
+      if (!needed.has(id)) this.plantSegments.delete(id);
     }
   }
 
@@ -334,7 +363,104 @@ export class Segments {
   }
 
   // =========================
-  // 🌲 TREES
+  // PLANTS
+  // =========================
+  private initPlants() {
+    const bases = this.plantLibrary.getAll();
+    if (!bases.length) return;
+
+    this.plantBases = bases;
+    for (const b of bases) {
+      b.setEnabled(true);
+      b.isPickable = false;
+      b.alwaysSelectAsActiveMesh = true;
+    }
+  }
+
+  private buildPlantsForSegment(segmentId: number) {
+    if (!this.plantBases) return;
+
+    const rng = this.rngForSegment(segmentId ^ 0x51A7);
+    const segLen = this.cfg.segmentLength;
+    const centerZ = (segmentId + 0.5) * segLen;
+
+    const pathHalf = 4;
+    const minX = pathHalf + 1.2;
+    const wallStart = this.terrain.mountainStart;
+    const playable = this.terrain.playableHalfWidth;
+    const plantMaxX = Math.min(playable, wallStart - 4, 24);
+
+    const COUNT = this.cfg.plantBuildCount ?? 120;
+    const buffers: Float32Array[] = [];
+
+    for (let b = 0; b < this.plantBases.length; b++) {
+      const data: number[] = [];
+
+      for (let i = 0; i < COUNT; i++) {
+        const z = centerZ + (rng() - 0.5) * segLen;
+        const side = rng() < 0.5 ? -1 : 1;
+        const xAbs = minX + rng() * Math.max(1, plantMaxX - minX);
+        const x = side * xAbs;
+        const scale = 0.85 + rng() * 0.75;
+        const y = this.terrain.getHeightAt(x, z) + this.plantLibrary.getGroundOffset(b) * scale + 0.03;
+
+        const rotY = rng() * Math.PI * 2;
+
+        const m = Matrix.Compose(
+          new Vector3(scale, scale, scale),
+          Quaternion.FromEulerAngles(0, rotY, 0),
+          new Vector3(x, y, z)
+        );
+
+        const arr = new Float32Array(16);
+        m.copyToArray(arr);
+        data.push(...arr);
+      }
+
+      buffers.push(new Float32Array(data));
+    }
+
+    this.plantSegments.set(segmentId, buffers);
+  }
+
+  private applyCombinedPlantBuffers(needed: Set<number>, currentSeg: number) {
+    if (!this.plantBases) return;
+
+    for (let b = 0; b < this.plantBases.length; b++) {
+      const parts: Float32Array[] = [];
+
+      for (const segId of needed) {
+        const ring = this.getRing(segId, currentSeg);
+        const want = this.plantCountForRing(ring);
+        if (want <= 0) continue;
+
+        const segBuffers = this.plantSegments.get(segId);
+        if (!segBuffers) continue;
+
+        const buf = segBuffers[b];
+        const max = buf.length / 16;
+        const use = Math.min(want, max);
+
+        parts.push(buf.subarray(0, use * 16));
+      }
+
+      let total = 0;
+      parts.forEach((p) => (total += p.length));
+
+      const combined = new Float32Array(total);
+      let off = 0;
+      for (const p of parts) {
+        combined.set(p, off);
+        off += p.length;
+      }
+
+      this.plantBases[b].thinInstanceSetBuffer("matrix", combined, 16, true);
+      this.plantBases[b].thinInstanceRefreshBoundingInfo(true);
+    }
+  }
+
+  // =========================
+  // TREES
   // =========================
   private createTrees(centerZ: number, segmentId: number, lod: 0 | 1 | 2) {
     const rng = this.rngForSegment(segmentId);
@@ -429,6 +555,14 @@ export class Segments {
 
   private grassCountForRing(ring: number) {
     const counts = this.cfg.grassRingCounts ?? [2500, 800, 100];
+    if (ring === 0) return counts[0];
+    if (ring === 1) return counts[1];
+    if (ring === 2) return counts[2];
+    return 0;
+  }
+
+  private plantCountForRing(ring: number) {
+    const counts = this.cfg.plantRingCounts ?? [120, 40, 10];
     if (ring === 0) return counts[0];
     if (ring === 1) return counts[1];
     if (ring === 2) return counts[2];

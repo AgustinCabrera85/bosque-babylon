@@ -1,6 +1,7 @@
 import "./style.css";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { createScene, desktopQuality, mobileQuality } from "./game/createScene";
+import { setupMusicPlayer } from "./game/MusicPlayer";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement | null;
 if (!canvas) throw new Error("No se encontro #renderCanvas");
@@ -39,6 +40,7 @@ const engine = new Engine(renderCanvas, quality.name === "desktop", {
   antialias: quality.name === "desktop",
 });
 engine.setHardwareScalingLevel(hardwareScaling);
+setupMusicPlayer();
 
 async function start() {
   setLoading(0.02, `Iniciando motor (${quality.name})...`);

@@ -45,6 +45,7 @@ export class PlayerController {
     document.addEventListener("click", (event) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest("#mobileControls")) return;
+      if (target?.closest("#musicControls")) return;
       if (this.mobileEnabled) return;
       canvas.requestPointerLock?.();
     });

@@ -49,7 +49,7 @@ function createPathMesh(scene: Scene, terrain: ReturnType<typeof createTerrain>)
       const y = terrain.getHeightAt(x, z) + 0.08;
 
       positions.push(x, y, z);
-      uvs.push(ix / cols, (z + halfLength) / 8);
+      uvs.push(ix / cols, (z + halfLength) / length);
     }
   }
 
@@ -139,7 +139,7 @@ const terrain = createTerrain(scene, {
   pathTex.wrapV = Texture.WRAP_ADDRESSMODE;
   pathTex.anisotropicFilteringLevel = 4;
   pathTex.uScale = 1;
-  pathTex.vScale = 80;
+  pathTex.vScale = 70;
 
   pathMat.diffuseTexture = pathTex;
   pathMat.specularColor = new Color3(0, 0, 0);

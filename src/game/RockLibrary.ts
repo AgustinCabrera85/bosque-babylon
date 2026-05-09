@@ -10,7 +10,31 @@ type RockTemplate = {
   name: string;
   root: TransformNode;
   meshes: Mesh[];
+  collisionRadius: number;
 };
+
+function clamp(x: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, x));
+}
+
+function collisionRadiusForMeshes(meshes: Mesh[]) {
+  let radius = 0;
+
+  for (const mesh of meshes) {
+    const box = mesh.getBoundingInfo().boundingBox;
+    const min = box.minimum;
+    const max = box.maximum;
+    radius = Math.max(
+      radius,
+      Math.abs(mesh.position.x + min.x),
+      Math.abs(mesh.position.x + max.x),
+      Math.abs(mesh.position.z + min.z),
+      Math.abs(mesh.position.z + max.z)
+    );
+  }
+
+  return clamp(radius || 0.8, 0.45, 2.3);
+}
 
 export class RockLibrary {
   private templates: RockTemplate[] = [];
@@ -53,7 +77,12 @@ export class RockLibrary {
         }
 
         root.setEnabled(false);
-        this.templates.push({ name: file, root, meshes });
+        this.templates.push({
+          name: file,
+          root,
+          meshes,
+          collisionRadius: collisionRadiusForMeshes(meshes),
+        });
       } catch (error) {
         console.warn(`[RockLibrary] Could not load ${file}`, error);
       }
@@ -83,6 +112,12 @@ export class RockLibrary {
 
     const tpl = this.templates[Math.floor(Math.random() * this.templates.length)];
     return this.instantiateFromTemplate(instanceName, scene, tpl);
+  }
+
+  getCollisionRadius(templateIndex: number) {
+    if (!this.templates.length) return 1.0;
+    const idx = ((templateIndex % this.templates.length) + this.templates.length) % this.templates.length;
+    return this.templates[idx].collisionRadius;
   }
 
   private instantiateFromTemplate(instanceName: string, scene: Scene, tpl: RockTemplate): TransformNode {

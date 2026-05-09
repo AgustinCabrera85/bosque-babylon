@@ -14,7 +14,31 @@ type TreeTemplate = {
   root: TransformNode;
   trunkMeshes: Mesh[];
   foliageMeshes: Mesh[];
+  collisionRadius: number;
 };
+
+function clamp(x: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, x));
+}
+
+function collisionRadiusForMeshes(meshes: Mesh[], fallback: number) {
+  let radius = 0;
+
+  for (const mesh of meshes) {
+    const box = mesh.getBoundingInfo().boundingBox;
+    const min = box.minimum;
+    const max = box.maximum;
+    radius = Math.max(
+      radius,
+      Math.abs(mesh.position.x + min.x),
+      Math.abs(mesh.position.x + max.x),
+      Math.abs(mesh.position.z + min.z),
+      Math.abs(mesh.position.z + max.z)
+    );
+  }
+
+  return clamp(radius || fallback, 0.35, 1.15);
+}
 
 function isLikelyFoliage(mesh: AbstractMesh): boolean {
   const mat = mesh.material as any;
@@ -162,7 +186,13 @@ for (const file of files) {
     continue;
   }
 
-    this.templates.push({ name: file, root, trunkMeshes, foliageMeshes });
+    this.templates.push({
+      name: file,
+      root,
+      trunkMeshes,
+      foliageMeshes,
+      collisionRadius: collisionRadiusForMeshes(trunkMeshes.length ? trunkMeshes : foliageMeshes, 0.65),
+    });
   } catch (error) {
     console.warn(`[TreeLibrary] Could not load ${file}`, error);
   }
@@ -232,5 +262,11 @@ for (const file of files) {
     }
 
     return instRoot;
+  }
+
+  getCollisionRadius(templateIndex: number) {
+    if (!this.templates.length) return 0.75;
+    const idx = ((templateIndex % this.templates.length) + this.templates.length) % this.templates.length;
+    return this.templates[idx].collisionRadius;
   }
 }

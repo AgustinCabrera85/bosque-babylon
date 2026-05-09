@@ -104,7 +104,7 @@ export function createTerrain(
       heights[idx] = h;
       positions.push(x, h, z);
 
-      const uvScale = 9; // metros por repetición (ajustable)
+      const uvScale = 18; // metros por repetición (ajustable)
       uvs.push(x / uvScale, z / uvScale);
 
 
@@ -155,8 +155,8 @@ export function createTerrain(
 
   grassTex.wrapU = Texture.WRAP_ADDRESSMODE;
   grassTex.wrapV = Texture.WRAP_ADDRESSMODE;
-  grassTex.uScale = 10;
-  grassTex.vScale = 10;
+  grassTex.uScale = 1;
+  grassTex.vScale = 1;
   grassTex.anisotropicFilteringLevel = 4;
 
   grassMat.diffuseTexture = grassTex;

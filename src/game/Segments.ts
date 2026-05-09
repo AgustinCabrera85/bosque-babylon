@@ -11,10 +11,17 @@ import type { TerrainHandle } from "./Terrain";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
 import type { TreeLibrary } from "./TreeLibrary";
 import type { GrassLibrary } from "./GrassLibrary";
+import type { RockLibrary } from "./RockLibrary";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 
-type Collider = { x: number; z: number; radius: number; segmentId: number };
+type Collider = {
+  x: number;
+  z: number;
+  radius: number;
+  segmentId: number;
+  kind: "tree" | "rock";
+};
 type Interactable = { mesh: any; segmentId: number };
 type SegmentCfg = { segmentLength: number; behind: number; ahead: number };
 
@@ -41,7 +48,7 @@ export class Segments {
     private terrain: TerrainHandle,
     private treeLibrary: TreeLibrary,
     private grassLibrary: GrassLibrary,
-    private rockLibrary: any,
+    private rockLibrary: RockLibrary,
     private cfg: SegmentCfg
   ) {}
 
@@ -106,6 +113,7 @@ export class Segments {
         this.treeSegments.set(id, { nodes, lod: desiredLOD });
       } else if (desiredLOD !== prev.lod) {
         prev.nodes.forEach((n) => n.dispose?.());
+        this.removeColliders(id, "tree");
         const nodes = this.createTrees(centerZ, id, desiredLOD);
         this.treeSegments.set(id, { nodes, lod: desiredLOD });
       }
@@ -157,6 +165,12 @@ export class Segments {
     for (const id of this.grassSegments.keys()) {
       if (!needed.has(id)) this.grassSegments.delete(id);
     }
+  }
+
+  private removeColliders(segmentId: number, kind: Collider["kind"]) {
+    this.colliders = this.colliders.filter(
+      (c) => c.segmentId !== segmentId || c.kind !== kind
+    );
   }
 
   // =========================
@@ -348,6 +362,9 @@ export class Segments {
       tree.scaling.setAll(scale);
       tree.rotation.y = rotY;
 
+      const radius = this.treeLibrary.getCollisionRadius(templateIndex) * scale;
+      this.colliders.push({ x, z, radius, segmentId, kind: "tree" });
+
       tree.freezeWorldMatrix();
       instances.push(tree);
     }
@@ -370,11 +387,10 @@ export class Segments {
       const y = this.terrain.getHeightAt(x, z);
 
       const scale = 0.6 + rng() * 1.8;
-      const radius = Math.min(1.4 * scale, 6);
-
-      this.colliders.push({ x, z, radius, segmentId });
-
       const templateIndex = Math.floor(rng() * 1_000_000);
+      const radius = this.rockLibrary.getCollisionRadius(templateIndex) * scale;
+
+      this.colliders.push({ x, z, radius, segmentId, kind: "rock" });
 
       const r = this.rockLibrary.instantiateByIndex(
         `rock_${segmentId}_${i}`,

@@ -12,7 +12,8 @@ import { TreeLibrary } from "./TreeLibrary";
 import { GrassLibrary } from "./GrassLibrary";
 import { InteractSystem } from "./InteractSystem";
 import { createRainSystem } from "./Rain";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { PhotoDome } from "@babylonjs/core/Helpers/photoDome";
@@ -26,6 +27,58 @@ import { Light } from "@babylonjs/core/Lights/light";
 // ✅ Vite url imports (desde src/assets)
 const pathUrl = "/assets/models/textures/terrain/ground_camino/ground.jpg";
 const skyUrl = "/assets/hdr/hdr_high.png";
+
+function createPathMesh(scene: Scene, terrain: ReturnType<typeof createTerrain>) {
+  const width = 9;
+  const halfWidth = width / 2;
+  const length = terrain.size;
+  const halfLength = length / 2;
+  const rows = 160;
+  const cols = 4;
+
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+
+  for (let iz = 0; iz <= rows; iz++) {
+    const z = -halfLength + (iz / rows) * length;
+
+    for (let ix = 0; ix <= cols; ix++) {
+      const x = -halfWidth + (ix / cols) * width;
+      const y = terrain.getHeightAt(x, z) + 0.08;
+
+      positions.push(x, y, z);
+      uvs.push(ix / cols, (z + halfLength) / 8);
+    }
+  }
+
+  for (let iz = 0; iz < rows; iz++) {
+    for (let ix = 0; ix < cols; ix++) {
+      const a = iz * (cols + 1) + ix;
+      const b = a + 1;
+      const c = a + (cols + 1);
+      const d = c + 1;
+      indices.push(a, b, c, b, d, c);
+    }
+  }
+
+  VertexData.ComputeNormals(positions, indices, normals);
+
+  const path = new Mesh("path", scene);
+  const vertexData = new VertexData();
+  vertexData.positions = positions;
+  vertexData.indices = indices;
+  vertexData.normals = normals;
+  vertexData.uvs = uvs;
+  vertexData.applyToMesh(path);
+
+  path.isPickable = false;
+  path.receiveShadows = true;
+  path.alwaysSelectAsActiveMesh = true;
+
+  return path;
+}
 
 export async function createScene(engine: Engine, canvas: HTMLCanvasElement) {
   const scene = new Scene(engine);
@@ -78,13 +131,7 @@ const terrain = createTerrain(scene, {
   // =========================
   // Sendero plano (opcional)
   // =========================
-  const path = MeshBuilder.CreateGround(
-    "path",
-    { width: 9, height: 1200, subdivisions: 1 },
-    scene
-  );
-  path.position.y = 0.03; // evitar z-fighting
-  path.isPickable = false;
+  const path = createPathMesh(scene, terrain);
 
   const pathMat = new StandardMaterial("pathMat", scene);
   const pathTex = new Texture(pathUrl, scene);
@@ -234,7 +281,6 @@ scene.onBeforeRenderObservable.add(() => {
   // Lluvia
   // =========================
   createRainSystem(scene, terrain);
-  segments.spawnDemoInteractables();
 
   // =========================
   // Loop
@@ -243,6 +289,7 @@ scene.onBeforeRenderObservable.add(() => {
     const dt = engine.getDeltaTime() / 1000;
     player.update(dt, terrain, segments);
     segments.update(player.position.z);
+    grassLibrary.updateWind(dt);
 
     const looking = segments.peekInteractable(player.camera);
     hints.set(looking ? "E: interactuar" : null);

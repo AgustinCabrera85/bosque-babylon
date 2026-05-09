@@ -120,12 +120,13 @@ export class TreeLibrary {
     ];
 
 for (const file of files) {
-  const res = await SceneLoader.ImportMeshAsync(
-    null,
-    "/assets/models/vegetation/",
-    file,
-    scene
-  );
+  try {
+    const res = await SceneLoader.ImportMeshAsync(
+      null,
+      "/assets/models/vegetation/",
+      file,
+      scene
+    );
 
   const root = new TransformNode(`treeRoot_${file}`, scene);
 
@@ -161,7 +162,10 @@ for (const file of files) {
     continue;
   }
 
-  this.templates.push({ name: file, root, trunkMeshes, foliageMeshes });
+    this.templates.push({ name: file, root, trunkMeshes, foliageMeshes });
+  } catch (error) {
+    console.warn(`[TreeLibrary] Could not load ${file}`, error);
+  }
 }
 
 
@@ -183,9 +187,9 @@ for (const file of files) {
     lod: 0 | 1 | 2
   ): TransformNode {
     if (!this.templates.length) {
-      throw new Error("[TreeLibrary] No hay templates cargados. Llamá await treeLibrary.load(scene) antes.");
+      console.warn("[TreeLibrary] No tree templates available.");
+      return new TransformNode(instanceName, scene);
     }
-
     const tpl = this.templates[templateIndex % this.templates.length];
     const instRoot = new TransformNode(instanceName, scene);
 

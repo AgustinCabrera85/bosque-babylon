@@ -1,9 +1,9 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
-import { Color3, Vector3, Color4 } from "@babylonjs/core";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
-import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { RockLibrary } from "./RockLibrary";
 import { createTerrain } from "./Terrain";
 import { PlayerController } from "./PlayerController";
@@ -23,8 +23,8 @@ import { Light } from "@babylonjs/core/Lights/light";
 
 
 // ✅ Vite url imports (desde src/assets)
-import pathUrl from "../assets/terrain/ground_camino/ground.jpg?url";
-import skyUrl from "../assets/hdr/hdr_high.png?url";
+const pathUrl = "/assets/models/textures/terrain/ground_camino/ground.jpg";
+const skyUrl = "/assets/hdr/hdr_high.png";
 
 export async function createScene(engine: Engine, canvas: HTMLCanvasElement) {
   const scene = new Scene(engine);
@@ -64,7 +64,7 @@ moon.specular = new Color3(0, 0, 0);
   // =========================
 const terrain = createTerrain(scene, {
   size: 1200,
-  segments: 260,        // bajamos un poco resolución (antes 400)
+  segments: 180,
   pathHalfWidth: 4,
 
   mountainStart: 55,    // antes 26
@@ -164,9 +164,9 @@ flashlight.diffuse = new Color3(1.0, 0.96, 0.88); // cálida
 flashlight.specular = new Color3(0, 0, 0);
 
 // Sombras (opcional pero suma MUCHO)
-const shadows = new ShadowGenerator(1024, flashlight);
+const shadows = new ShadowGenerator(512, flashlight);
 shadows.useBlurExponentialShadowMap = true;
-shadows.blurKernel = 16;
+shadows.blurKernel = 8;
 shadows.darkness = 0.65;
 
 // Si tenés meshes importantes:

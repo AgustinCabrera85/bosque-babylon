@@ -7,7 +7,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 
 // ✅ Vite assets (IMPORTADOS)
-import grassUrl from "../assets/terrain/ground_grass/wispy-grass-meadow_albedo.png?url";
+const grassUrl = "/assets/models/textures/terrain/ground_grass/wispy-grass-meadow_albedo.png";
 
 export type TerrainHandle = {
   mesh: any;

@@ -73,6 +73,7 @@ export class Segments {
 
     const segLen = this.cfg.segmentLength;
     const currentSeg = Math.floor(camZ / segLen);
+    const segmentChanged = this.lastSegment !== currentSeg;
 
     const needed = new Set<number>();
     for (let o = -this.cfg.behind; o <= this.cfg.ahead; o++) {
@@ -81,12 +82,16 @@ export class Segments {
 
     // ---------- GRASS ----------
     if (this.grassBases) {
+      let grassChanged = false;
       for (const id of needed) {
         if (!this.grassSegments.has(id)) {
           this.buildGrassForSegment(id);
+          grassChanged = true;
         }
       }
-      this.applyCombinedGrassBuffers(needed, currentSeg);
+      if (grassChanged || segmentChanged) {
+        this.applyCombinedGrassBuffers(needed, currentSeg);
+      }
     }
 
     // ---------- TREES + ROCKS ----------
@@ -99,7 +104,7 @@ export class Segments {
       if (!prev) {
         const nodes = this.createTrees(centerZ, id, desiredLOD);
         this.treeSegments.set(id, { nodes, lod: desiredLOD });
-      } else if (desiredLOD < prev.lod) {
+      } else if (desiredLOD !== prev.lod) {
         prev.nodes.forEach((n) => n.dispose?.());
         const nodes = this.createTrees(centerZ, id, desiredLOD);
         this.treeSegments.set(id, { nodes, lod: desiredLOD });
@@ -112,7 +117,7 @@ export class Segments {
     }
 
     // cleanup SOLO al cambiar segmento
-    if (this.lastSegment === currentSeg) return;
+    if (!segmentChanged) return;
     this.lastSegment = currentSeg;
 
     this.cleanup(needed);
@@ -225,7 +230,7 @@ export class Segments {
     const fadeStart = Math.max(minX + 1, grassMaxX - fadeWidth);
 
     // densidad base del segmento (ring 0 real)
-    const COUNT = 4200;
+    const COUNT = 2500;
     const buffers: Float32Array[] = [];
 
     for (let b = 0; b < this.grassBases.length; b++) {
@@ -313,7 +318,7 @@ export class Segments {
     const rng = this.rngForSegment(segmentId);
     const instances: any[] = [];
 
-    const TREES = 90;
+    const TREES = 60;
     const segLen = this.cfg.segmentLength;
 
     const pathHalf = 4;
@@ -399,9 +404,9 @@ export class Segments {
   }
 
   private grassCountForRing(ring: number) {
-    if (ring === 0) return 4200;
-    if (ring === 1) return 1400;
-    if (ring === 2) return 250;
+    if (ring === 0) return 2500;
+    if (ring === 1) return 800;
+    if (ring === 2) return 100;
     return 0;
   }
 }

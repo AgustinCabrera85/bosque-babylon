@@ -28,12 +28,17 @@ type SegmentCfg = {
   segmentLength: number;
   behind: number;
   ahead: number;
+  objectBehind?: number;
+  objectAhead?: number;
+  plantBehind?: number;
+  plantAhead?: number;
   treeCount?: number;
   rockCount?: number;
   grassBuildCount?: number;
   grassRingCounts?: [number, number, number];
   plantBuildCount?: number;
   plantRingCounts?: [number, number, number];
+  plantFarCount?: number;
 };
 
 type SegTreePack = { nodes: TransformNode[]; lod: 0 | 1 | 2 };
@@ -80,8 +85,16 @@ export class Segments {
   private lodFor(segmentId: number, currentSeg: number): 0 | 1 | 2 {
     const d = Math.abs(segmentId - currentSeg);
     if (d === 0) return 0;
-    if (d === 1) return 1;
+    if (d <= 2) return 1;
     return 2;
+  }
+
+  private segmentRange(currentSeg: number, behind: number, ahead: number) {
+    const needed = new Set<number>();
+    for (let o = -behind; o <= ahead; o++) {
+      needed.add(currentSeg + o);
+    }
+    return needed;
   }
 
   // =========================
@@ -101,41 +114,48 @@ export class Segments {
     const currentSeg = Math.floor(camZ / segLen);
     const segmentChanged = this.lastSegment !== currentSeg;
 
-    const needed = new Set<number>();
-    for (let o = -this.cfg.behind; o <= this.cfg.ahead; o++) {
-      needed.add(currentSeg + o);
-    }
+    const grassNeeded = this.segmentRange(currentSeg, this.cfg.behind, this.cfg.ahead);
+    const objectNeeded = this.segmentRange(
+      currentSeg,
+      this.cfg.objectBehind ?? this.cfg.behind,
+      this.cfg.objectAhead ?? this.cfg.ahead
+    );
+    const plantNeeded = this.segmentRange(
+      currentSeg,
+      this.cfg.plantBehind ?? this.cfg.behind,
+      this.cfg.plantAhead ?? this.cfg.ahead
+    );
 
     // ---------- GRASS ----------
     if (this.grassBases) {
       let grassChanged = false;
-      for (const id of needed) {
+      for (const id of grassNeeded) {
         if (!this.grassSegments.has(id)) {
           this.buildGrassForSegment(id);
           grassChanged = true;
         }
       }
       if (grassChanged || segmentChanged) {
-        this.applyCombinedGrassBuffers(needed, currentSeg);
+        this.applyCombinedGrassBuffers(grassNeeded, currentSeg);
       }
     }
 
     // ---------- PLANTS ----------
     if (this.plantBases) {
       let plantsChanged = false;
-      for (const id of needed) {
+      for (const id of plantNeeded) {
         if (!this.plantSegments.has(id)) {
           this.buildPlantsForSegment(id);
           plantsChanged = true;
         }
       }
       if (plantsChanged || segmentChanged) {
-        this.applyCombinedPlantBuffers(needed, currentSeg);
+        this.applyCombinedPlantBuffers(plantNeeded, currentSeg);
       }
     }
 
     // ---------- TREES + ROCKS ----------
-    for (const id of needed) {
+    for (const id of objectNeeded) {
       const centerZ = (id + 0.5) * segLen;
 
       const desiredLOD = this.lodFor(id, currentSeg);
@@ -161,7 +181,7 @@ export class Segments {
     if (!segmentChanged) return;
     this.lastSegment = currentSeg;
 
-    this.cleanup(needed);
+    this.cleanup(grassNeeded, plantNeeded, objectNeeded);
   }
 
   // =========================
@@ -177,30 +197,34 @@ export class Segments {
     return false;
   }
 
-  private cleanup(needed: Set<number>) {
+  private cleanup(
+    grassNeeded: Set<number>,
+    plantNeeded: Set<number>,
+    objectNeeded: Set<number>
+  ) {
     for (const [id, pack] of this.treeSegments) {
-      if (!needed.has(id)) {
+      if (!objectNeeded.has(id)) {
         pack.nodes.forEach((n) => n.dispose?.());
         this.treeSegments.delete(id);
       }
     }
 
     for (const [id, pack] of this.rockSegments) {
-      if (!needed.has(id)) {
+      if (!objectNeeded.has(id)) {
         pack.nodes.forEach((n) => n.dispose?.());
         this.rockSegments.delete(id);
       }
     }
 
-    this.colliders = this.colliders.filter((c) => needed.has(c.segmentId));
-    this.interactables = this.interactables.filter((i) => needed.has(i.segmentId));
+    this.colliders = this.colliders.filter((c) => objectNeeded.has(c.segmentId));
+    this.interactables = this.interactables.filter((i) => objectNeeded.has(i.segmentId));
 
     for (const id of this.grassSegments.keys()) {
-      if (!needed.has(id)) this.grassSegments.delete(id);
+      if (!grassNeeded.has(id)) this.grassSegments.delete(id);
     }
 
     for (const id of this.plantSegments.keys()) {
-      if (!needed.has(id)) this.plantSegments.delete(id);
+      if (!plantNeeded.has(id)) this.plantSegments.delete(id);
     }
   }
 
@@ -566,6 +590,6 @@ export class Segments {
     if (ring === 0) return counts[0];
     if (ring === 1) return counts[1];
     if (ring === 2) return counts[2];
-    return 0;
+    return this.cfg.plantFarCount ?? 0;
   }
 }

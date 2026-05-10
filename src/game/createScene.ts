@@ -41,12 +41,17 @@ export type QualityProfile = {
   rainDrops: number;
   segmentBehind: number;
   segmentAhead: number;
+  objectSegmentBehind: number;
+  objectSegmentAhead: number;
+  plantSegmentBehind: number;
+  plantSegmentAhead: number;
   treeCount: number;
   rockCount: number;
   grassBuildCount: number;
   grassRingCounts: [number, number, number];
   plantBuildCount: number;
   plantRingCounts: [number, number, number];
+  plantFarCount: number;
   grassWindInterval: number;
   treeTemplateLimit: number;
   rockTemplateLimit: number;
@@ -65,12 +70,17 @@ export const desktopQuality: QualityProfile = {
   rainDrops: 500,
   segmentBehind: 1,
   segmentAhead: 2,
+  objectSegmentBehind: 1,
+  objectSegmentAhead: 5,
+  plantSegmentBehind: 1,
+  plantSegmentAhead: 8,
   treeCount: 60,
   rockCount: 14,
   grassBuildCount: 2500,
   grassRingCounts: [2500, 800, 100],
   plantBuildCount: 220,
   plantRingCounts: [220, 80, 25],
+  plantFarCount: 12,
   grassWindInterval: 0,
   treeTemplateLimit: Number.POSITIVE_INFINITY,
   rockTemplateLimit: Number.POSITIVE_INFINITY,
@@ -89,12 +99,17 @@ export const mobileQuality: QualityProfile = {
   rainDrops: 120,
   segmentBehind: 0,
   segmentAhead: 1,
+  objectSegmentBehind: 0,
+  objectSegmentAhead: 3,
+  plantSegmentBehind: 0,
+  plantSegmentAhead: 5,
   treeCount: 58,
   rockCount: 7,
   grassBuildCount: 850,
   grassRingCounts: [850, 220, 0],
   plantBuildCount: 80,
   plantRingCounts: [80, 25, 0],
+  plantFarCount: 6,
   grassWindInterval: 0.08,
   treeTemplateLimit: 3,
   rockTemplateLimit: 3,
@@ -347,12 +362,17 @@ scene.onBeforeRenderObservable.add(() => {
     segmentLength: 70,
     behind: quality.segmentBehind,
     ahead: quality.segmentAhead,
+    objectBehind: quality.objectSegmentBehind,
+    objectAhead: quality.objectSegmentAhead,
+    plantBehind: quality.plantSegmentBehind,
+    plantAhead: quality.plantSegmentAhead,
     treeCount: quality.treeCount,
     rockCount: quality.rockCount,
     grassBuildCount: quality.grassBuildCount,
     grassRingCounts: quality.grassRingCounts,
     plantBuildCount: quality.plantBuildCount,
     plantRingCounts: quality.plantRingCounts,
+    plantFarCount: quality.plantFarCount,
   });
 
   // =========================

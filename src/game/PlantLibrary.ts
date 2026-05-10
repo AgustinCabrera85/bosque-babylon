@@ -58,6 +58,7 @@ export class PlantLibrary {
         merged.setEnabled(false);
         merged.isPickable = false;
         merged.alwaysSelectAsActiveMesh = true;
+        merged.hasVertexAlpha = false;
         this.patchPlantMaterial(merged.material);
         merged.setBoundingInfo(
           new BoundingInfo(new Vector3(-120, -20, -12000), new Vector3(120, 20, 12000))
@@ -95,17 +96,29 @@ export class PlantLibrary {
     for (const mat of materials) {
       if (!mat) continue;
 
+      mat.alphaMode = Material.MATERIAL_ALPHATEST;
       mat.backFaceCulling = false;
+      mat.forceDepthWrite = true;
+      (mat as any).needDepthPrePass = true;
 
       if (mat instanceof PBRMaterial) {
+        mat.disableLighting = false;
+        mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATEST;
         mat.useAlphaFromAlbedoTexture = true;
-        mat.alphaCutOff = 0.45;
-        mat.specularIntensity = 0;
+        mat.alphaCutOff = 0.52;
+        mat.metallic = 0;
+        mat.roughness = 0.75;
+        mat.directIntensity = 1.25;
+        mat.environmentIntensity = 0.35;
+        mat.specularIntensity = 0.2;
+        mat.alpha = 1;
       }
 
       if (mat instanceof StandardMaterial) {
-        mat.alphaCutOff = 0.45;
-        mat.specularColor.set(0, 0, 0);
+        mat.disableLighting = false;
+        mat.alphaCutOff = 0.52;
+        mat.specularColor.set(0.06, 0.06, 0.06);
+        mat.alpha = 1;
       }
     }
   }

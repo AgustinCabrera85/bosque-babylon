@@ -14,6 +14,7 @@ import { PlantLibrary } from "./PlantLibrary";
 import { InteractSystem } from "./InteractSystem";
 import { setupMobileControls } from "./MobileControls";
 import { createRainSystem } from "./Rain";
+import { createFireflies } from "./Fireflies";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -51,6 +52,7 @@ export type QualityProfile = {
   rockTemplateLimit: number;
   grassTemplateLimit: number;
   plantTemplateLimit: number;
+  fireflyCount: number;
 };
 
 export const desktopQuality: QualityProfile = {
@@ -74,6 +76,7 @@ export const desktopQuality: QualityProfile = {
   rockTemplateLimit: Number.POSITIVE_INFINITY,
   grassTemplateLimit: Number.POSITIVE_INFINITY,
   plantTemplateLimit: Number.POSITIVE_INFINITY,
+  fireflyCount: 8,
 };
 
 export const mobileQuality: QualityProfile = {
@@ -97,6 +100,7 @@ export const mobileQuality: QualityProfile = {
   rockTemplateLimit: 3,
   grassTemplateLimit: 2,
   plantTemplateLimit: 2,
+  fireflyCount: 5,
 };
 
 function createPathMesh(scene: Scene, terrain: ReturnType<typeof createTerrain>, rows: number) {
@@ -374,6 +378,7 @@ scene.onBeforeRenderObservable.add(() => {
   // Lluvia
   // =========================
   createRainSystem(scene, terrain, quality.rainDrops);
+  createFireflies(scene, terrain, () => player.position, quality.fireflyCount);
   onProgress(0.92, "Preparando controles...");
 
   // =========================

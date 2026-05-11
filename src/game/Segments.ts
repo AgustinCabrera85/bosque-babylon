@@ -2,6 +2,7 @@ import "@babylonjs/loaders/glTF";
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Matrix, Vector3, Quaternion } from "@babylonjs/core/Maths/math.vector";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Material as BabylonMaterial } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
@@ -9,6 +10,8 @@ import { BoundingInfo } from "@babylonjs/core/Culling/boundingInfo";
 import { Ray } from "@babylonjs/core/Culling/ray";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { SpotLight } from "@babylonjs/core/Lights/spotLight";
 
 import { mulberry32 } from "../utils/seed";
 
@@ -494,6 +497,67 @@ export class Segments {
     };
   }
 
+  private createDoorLamp(doorCenterX: number, doorCenterZ: number, doorTopY: number) {
+    const lampPosition = new Vector3(doorCenterX, doorTopY + 0.34, doorCenterZ - 0.28);
+
+    const bulbMat = new StandardMaterial("endHouseDoorLampBulbMat", this.scene);
+    bulbMat.diffuseColor = new Color3(1.0, 0.72, 0.38);
+    bulbMat.emissiveColor = new Color3(1.0, 0.58, 0.22);
+    bulbMat.specularColor = new Color3(1.0, 0.78, 0.45);
+
+    const capMat = new StandardMaterial("endHouseDoorLampCapMat", this.scene);
+    capMat.diffuseColor = new Color3(0.12, 0.085, 0.055);
+    capMat.emissiveColor = new Color3(0.01, 0.006, 0.003);
+    capMat.specularColor = new Color3(0.16, 0.11, 0.07);
+
+    const backPlate = MeshBuilder.CreateBox(
+      "endHouseDoorLampBackPlate",
+      { width: 0.42, height: 0.22, depth: 0.06 },
+      this.scene
+    );
+    backPlate.position.set(lampPosition.x, lampPosition.y + 0.03, lampPosition.z + 0.04);
+    backPlate.material = capMat;
+    backPlate.isPickable = false;
+
+    const cap = MeshBuilder.CreateCylinder(
+      "endHouseDoorLampCap",
+      { height: 0.14, diameterTop: 0.22, diameterBottom: 0.3, tessellation: 16 },
+      this.scene
+    );
+    cap.position.copyFrom(lampPosition);
+    cap.rotation.x = Math.PI * 0.5;
+    cap.material = capMat;
+    cap.isPickable = false;
+
+    const bulb = MeshBuilder.CreateSphere(
+      "endHouseDoorLampBulb",
+      { diameter: 0.18, segments: 16 },
+      this.scene
+    );
+    bulb.position.set(lampPosition.x, lampPosition.y - 0.08, lampPosition.z - 0.03);
+    bulb.material = bulbMat;
+    bulb.isPickable = false;
+
+    const glow = new PointLight("endHouseDoorLampGlow", bulb.position.clone(), this.scene);
+    glow.diffuse = new Color3(1.0, 0.62, 0.28);
+    glow.specular = new Color3(1.0, 0.58, 0.25);
+    glow.intensity = 0.75;
+    glow.range = 5.5;
+
+    const cone = new SpotLight(
+      "endHouseDoorLampSpot",
+      bulb.position.add(new Vector3(0, -0.02, -0.04)),
+      new Vector3(0, -0.72, -0.45),
+      Math.PI * 0.42,
+      1.8,
+      this.scene
+    );
+    cone.diffuse = new Color3(1.0, 0.58, 0.24);
+    cone.specular = new Color3(1.0, 0.48, 0.18);
+    cone.intensity = 3.1;
+    cone.range = 8.5;
+  }
+
   private isInNoSpawnZone(x: number, z: number, margin = 0) {
     return this.noSpawnZones.some((zone) => {
       const halfW = zone.width * 0.5 + margin;
@@ -620,6 +684,11 @@ export class Segments {
         return open ? "Abrís la puerta." : "Cerrás la puerta.";
       },
     };
+    this.createDoorLamp(
+      doorCenterX,
+      doorCenterZ,
+      doorBounds?.maximumWorld.y ?? doorCenterY + doorHeight * 0.5
+    );
   }
 
   private addFrontWallColliders(

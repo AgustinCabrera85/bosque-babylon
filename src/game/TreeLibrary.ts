@@ -139,7 +139,7 @@ export class TreeLibrary {
       "tree_03.glb",
       "tree_04.glb",
       "tree_05.glb",
-      "tree_06.glb",
+      // tree_06.glb es el mismo tronco caido que tree_08.glb; se reserva solo para el bloqueo inicial.
       "tree_07.glb",
     ];
 

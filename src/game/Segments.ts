@@ -91,7 +91,8 @@ type CandleFlameEntry = {
 const CANDLES_PER_SIDE = 3;
 const CANDLE_PATH_X = 5.75;
 const CANDLE_MODEL_SCALE = 0.12;
-const HOUSE_CANDLE_SCALE = 0.28;
+const HOUSE_CANDLE_HEIGHT_SCALE = 0.25;
+const HOUSE_CANDLE_DIAMETER_SCALE = 0.10;
 const CANDLE_GROUND_SINK = 0.015;
 const CANDLE_RESERVE_RADIUS = 1.35;
 const CANDLE_COLLISION_RADIUS = 0.55;
@@ -101,6 +102,9 @@ const CANDLE_FLAME_HEIGHT = 0.68;
 const CANDLE_FLAME_WICK_TIP_INSET = 1.35;
 const START_BLOCKER_Z = -9.5;
 const START_FOREST_CLOSURE_Z = -18;
+// Asset especial: no se carga en TreeLibrary para que no aparezca en la generacion normal.
+const START_BLOCKER_TREE_PATH = "/assets/models/blockers/";
+const START_BLOCKER_TREE_FILE = "tree_08.glb";
 
 export class Segments {
   private readonly WORLD_SEED = 1337;
@@ -129,6 +133,7 @@ export class Segments {
   private candleGlowMaterial: ReturnType<typeof createGlowMaterial> | null = null;
   private candleLights: CandleFlameEntry[] = [];
   private candleFlickerRegistered = false;
+  private startBlockerLoaded = false;
 
   constructor(
     private scene: Scene,
@@ -409,6 +414,9 @@ export class Segments {
   }
 
   async loadStartBlocker() {
+    if (this.startBlockerLoaded) return;
+    this.startBlockerLoaded = true;
+
     this.noSpawnZones.push({
       x: 0,
       z: (START_BLOCKER_Z + START_FOREST_CLOSURE_Z) * 0.5,
@@ -444,8 +452,8 @@ export class Segments {
   private async createFallenTreeBlocker() {
     const res = await SceneLoader.ImportMeshAsync(
       null,
-      "/assets/models/vegetation/",
-      "tree_08.glb",
+      START_BLOCKER_TREE_PATH,
+      START_BLOCKER_TREE_FILE,
       this.scene
     );
 
@@ -608,7 +616,7 @@ export class Segments {
     return false;
   }
 
-  private instantiateCandle(name: string, scale: number) {
+  private instantiateCandle(name: string, scale: number | Vector3) {
     const root = new TransformNode(name, this.scene);
     const template = this.candleTemplate;
     if (!template) return root;
@@ -630,7 +638,8 @@ export class Segments {
     }
 
     root.setEnabled(true);
-    root.scaling.setAll(scale);
+    if (typeof scale === "number") root.scaling.setAll(scale);
+    else root.scaling.copyFrom(scale);
     return root;
   }
 
@@ -877,24 +886,27 @@ export class Segments {
     const x = (bounds.min.x + bounds.max.x) * 0.5 - Math.min(1.6, width * 0.16);
     const z = bounds.min.z + depth * 0.56;
     const floorY = bounds.min.y + 0.08;
-    const root = this.instantiateCandle("endHouseCandle", HOUSE_CANDLE_SCALE);
+    const root = this.instantiateCandle(
+      "endHouseCandle",
+      new Vector3(HOUSE_CANDLE_DIAMETER_SCALE, HOUSE_CANDLE_HEIGHT_SCALE, HOUSE_CANDLE_DIAMETER_SCALE)
+    );
 
     root.position.set(
       x,
-      floorY - this.candleTemplate.baseOffsetY * HOUSE_CANDLE_SCALE,
+      floorY - this.candleTemplate.baseOffsetY * HOUSE_CANDLE_HEIGHT_SCALE,
       z
     );
     root.rotation.y = Math.PI * 0.22;
 
     const flameY =
       root.position.y +
-      this.candleTemplate.topOffsetY * HOUSE_CANDLE_SCALE -
-      CANDLE_FLAME_WICK_TIP_INSET * HOUSE_CANDLE_SCALE;
+      this.candleTemplate.topOffsetY * HOUSE_CANDLE_HEIGHT_SCALE -
+      CANDLE_FLAME_WICK_TIP_INSET * HOUSE_CANDLE_HEIGHT_SCALE;
     this.createCandleFire(
       "endHouseCandleFlame",
       new Vector3(x, flameY, z),
       root.rotation.y,
-      HOUSE_CANDLE_SCALE,
+      HOUSE_CANDLE_DIAMETER_SCALE,
       1.15,
       14
     );

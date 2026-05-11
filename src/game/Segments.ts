@@ -1,9 +1,14 @@
+import "@babylonjs/loaders/glTF";
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Matrix, Vector3, Quaternion } from "@babylonjs/core/Maths/math.vector";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Material as BabylonMaterial } from "@babylonjs/core/Materials/material";
+import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { BoundingInfo } from "@babylonjs/core/Culling/boundingInfo";
 import { Ray } from "@babylonjs/core/Culling/ray";
+import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
+import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 
 import { mulberry32 } from "../utils/seed";
 
@@ -23,6 +28,24 @@ type Collider = {
   segmentId: number;
   kind: "tree" | "rock";
 };
+
+type BoxCollider = {
+  x: number;
+  z: number;
+  width: number;
+  depth: number;
+  rotation: number;
+  active: boolean;
+  kind: "house" | "door";
+};
+
+type NoSpawnZone = {
+  x: number;
+  z: number;
+  width: number;
+  depth: number;
+};
+
 type Interactable = { mesh: any; segmentId: number };
 type SegmentCfg = {
   segmentLength: number;
@@ -57,6 +80,10 @@ export class Segments {
   private plantSegments = new Map<number, Float32Array[]>();
 
   private colliders: Collider[] = [];
+  private staticBoxColliders: BoxCollider[] = [];
+  private noSpawnZones: NoSpawnZone[] = [
+    { x: 0, z: 70 * 8 + 18, width: 76, depth: 100 },
+  ];
   private interactables: Interactable[] = [];
 
   private grassBases: Mesh[] | null = null;
@@ -194,7 +221,25 @@ export class Segments {
       const dz = z - c.z;
       if (dx * dx + dz * dz < (R + c.radius) ** 2) return true;
     }
+    for (const c of this.staticBoxColliders) {
+      if (!c.active) continue;
+      if (this.isPointInsideBoxCollider(x, z, R, c)) return true;
+    }
     return false;
+  }
+
+  private isPointInsideBoxCollider(x: number, z: number, radius: number, collider: BoxCollider) {
+    const dx = x - collider.x;
+    const dz = z - collider.z;
+    const cos = Math.cos(-collider.rotation);
+    const sin = Math.sin(-collider.rotation);
+    const localX = dx * cos - dz * sin;
+    const localZ = dx * sin + dz * cos;
+
+    return (
+      Math.abs(localX) <= collider.width * 0.5 + radius &&
+      Math.abs(localZ) <= collider.depth * 0.5 + radius
+    );
   }
 
   private cleanup(
@@ -261,6 +306,361 @@ export class Segments {
     return hit?.hit ? hit.pickedMesh : null;
   }
 
+  async loadEndHouse() {
+    const segmentLength = this.cfg.segmentLength;
+    const targetFrontZ = segmentLength * 8;
+    const scale = 0.99;
+
+    const res = await SceneLoader.ImportMeshAsync(
+      null,
+      "/assets/models/house/",
+      "wooden_house.glb",
+      this.scene
+    );
+
+    const root =
+      res.meshes.find((mesh) => mesh.name === "__root__") ??
+      res.meshes.find((mesh) => mesh.parent === null);
+
+    if (!root) {
+      console.warn("[Segments] No se pudo crear la casa: el GLB no trajo root.");
+      return;
+    }
+
+    root.name = "endHouseRoot";
+    root.scaling.setAll(scale);
+    root.rotation.y = Math.PI;
+    root.position.set(0, this.terrain.getHeightAt(0, targetFrontZ), targetFrontZ);
+    root.computeWorldMatrix(true);
+
+    for (const mesh of res.meshes) {
+      mesh.isPickable = false;
+      mesh.receiveShadows = true;
+      mesh.alwaysSelectAsActiveMesh = true;
+      mesh.computeWorldMatrix(true);
+    }
+    this.patchHouseMaterials(res.meshes);
+
+    const firstBounds = this.getHierarchyBounds(res.meshes);
+    if (!firstBounds) return;
+
+    const centerX = (firstBounds.min.x + firstBounds.max.x) * 0.5;
+    root.position.x -= centerX;
+    root.position.z += targetFrontZ - firstBounds.min.z;
+    root.computeWorldMatrix(true);
+
+    for (const mesh of res.meshes) mesh.computeWorldMatrix(true);
+
+    const bounds = this.getHierarchyBounds(res.meshes);
+    if (!bounds) return;
+
+    const groundY = this.terrain.getHeightAt(0, targetFrontZ);
+    const floorBounds = this.getMeshBounds(
+      res.meshes.find((mesh) => mesh.name.toLowerCase().includes("floor"))
+    );
+    const groundAnchorY = floorBounds?.min.y ?? bounds.min.y;
+    root.position.y += groundY - groundAnchorY + 0.02;
+    root.computeWorldMatrix(true);
+
+    for (const mesh of res.meshes) mesh.computeWorldMatrix(true);
+
+    const finalBounds = this.getHierarchyBounds(res.meshes);
+    if (!finalBounds) return;
+
+    this.noSpawnZones.push({
+      x: (finalBounds.min.x + finalBounds.max.x) * 0.5,
+      z: (finalBounds.min.z + finalBounds.max.z) * 0.5,
+      width: finalBounds.max.x - finalBounds.min.x + 10,
+      depth: finalBounds.max.z - finalBounds.min.z + 10,
+    });
+
+    this.createHouseColliders(finalBounds);
+    this.createHouseDoor(res.meshes, finalBounds);
+  }
+
+  private patchHouseMaterials(meshes: AbstractMesh[]) {
+    const patchedSolid = new Set<BabylonMaterial>();
+    const patchedAlpha = new Set<BabylonMaterial>();
+
+    for (const mesh of meshes) {
+      const material = mesh.material as BabylonMaterial | null;
+      if (!material) continue;
+
+      const meshName = mesh.name.toLowerCase();
+      const materialName = material.name.toLowerCase();
+      const isGlass =
+        meshName.includes("window") ||
+        materialName.includes("window") ||
+        materialName === "material.010";
+      const usesCutout =
+        meshName.includes("roof") ||
+        meshName.includes("curtain") ||
+        materialName.includes("curtain") ||
+        material.alphaMode === BabylonMaterial.MATERIAL_ALPHABLEND ||
+        material.transparencyMode === BabylonMaterial.MATERIAL_ALPHABLEND;
+
+      if (isGlass) {
+        if (patchedAlpha.has(material)) continue;
+        patchedAlpha.add(material);
+
+        material.alpha = 0.28;
+        material.alphaMode = BabylonMaterial.MATERIAL_ALPHABLEND;
+        material.transparencyMode = BabylonMaterial.MATERIAL_ALPHABLEND;
+        material.backFaceCulling = false;
+        (material as any).forceDepthWrite = false;
+        (material as any).needDepthPrePass = false;
+        (material as any).alphaIndex = 8;
+
+        if (material instanceof PBRMaterial) {
+          material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+          material.useAlphaFromAlbedoTexture = false;
+          material.metallic = 0;
+          material.roughness = 0.08;
+          material.specularIntensity = 0.85;
+          material.environmentIntensity = 0.55;
+        }
+
+        if (material instanceof StandardMaterial) {
+          material.specularColor.set(0.45, 0.55, 0.65);
+        }
+        continue;
+      }
+
+      if (usesCutout) {
+        if (patchedAlpha.has(material)) continue;
+        patchedAlpha.add(material);
+
+        material.alpha = 1;
+        material.alphaMode = BabylonMaterial.MATERIAL_ALPHATEST;
+        material.transparencyMode = BabylonMaterial.MATERIAL_ALPHATEST;
+        material.backFaceCulling = false;
+        (material as any).forceDepthWrite = true;
+        (material as any).needDepthPrePass = true;
+
+        if (material instanceof PBRMaterial) {
+          material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATEST;
+          material.useAlphaFromAlbedoTexture = true;
+          material.alphaCutOff = 0.12;
+        } else if (material instanceof StandardMaterial) {
+          material.alphaCutOff = 0.12;
+        }
+
+        const alphaTexture = (material as any).albedoTexture ?? (material as any).diffuseTexture;
+        if (alphaTexture) alphaTexture.hasAlpha = true;
+        continue;
+      }
+
+      if (patchedSolid.has(material)) continue;
+      patchedSolid.add(material);
+
+      material.alpha = 1;
+      material.alphaMode = BabylonMaterial.MATERIAL_OPAQUE;
+      material.transparencyMode = BabylonMaterial.MATERIAL_OPAQUE;
+      material.backFaceCulling = false;
+      (material as any).forceDepthWrite = true;
+      (material as any).needDepthPrePass = false;
+
+      if (material instanceof PBRMaterial) {
+        material.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+        material.useAlphaFromAlbedoTexture = false;
+      }
+    }
+  }
+
+  private getHierarchyBounds(meshes: AbstractMesh[]) {
+    const renderable = meshes.filter((mesh) => mesh.getTotalVertices() > 0);
+    if (!renderable.length) return null;
+
+    const min = new Vector3(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
+    const max = new Vector3(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+
+    for (const mesh of renderable) {
+      mesh.refreshBoundingInfo({});
+      const box = mesh.getBoundingInfo().boundingBox;
+      min.copyFrom(Vector3.Minimize(min, box.minimumWorld));
+      max.copyFrom(Vector3.Maximize(max, box.maximumWorld));
+    }
+
+    return { min, max };
+  }
+
+  private getMeshBounds(mesh: AbstractMesh | undefined) {
+    if (!mesh || mesh.getTotalVertices() <= 0) return null;
+    mesh.refreshBoundingInfo({});
+    const box = mesh.getBoundingInfo().boundingBox;
+    return {
+      min: box.minimumWorld.clone(),
+      max: box.maximumWorld.clone(),
+    };
+  }
+
+  private isInNoSpawnZone(x: number, z: number, margin = 0) {
+    return this.noSpawnZones.some((zone) => {
+      const halfW = zone.width * 0.5 + margin;
+      const halfD = zone.depth * 0.5 + margin;
+      return Math.abs(x - zone.x) <= halfW && Math.abs(z - zone.z) <= halfD;
+    });
+  }
+
+  private createHouseColliders(bounds: { min: Vector3; max: Vector3 }) {
+    const wallThickness = 0.65;
+    const minX = bounds.min.x;
+    const maxX = bounds.max.x;
+    const minZ = bounds.min.z;
+    const maxZ = bounds.max.z;
+    const width = maxX - minX;
+    const depth = maxZ - minZ;
+    const centerX = (minX + maxX) * 0.5;
+    const centerZ = (minZ + maxZ) * 0.5;
+
+    this.staticBoxColliders.push(
+      {
+        x: minX + wallThickness * 0.5,
+        z: centerZ,
+        width: wallThickness,
+        depth,
+        rotation: 0,
+        active: true,
+        kind: "house",
+      },
+      {
+        x: maxX - wallThickness * 0.5,
+        z: centerZ,
+        width: wallThickness,
+        depth,
+        rotation: 0,
+        active: true,
+        kind: "house",
+      },
+      {
+        x: centerX,
+        z: maxZ - wallThickness * 0.5,
+        width,
+        depth: wallThickness,
+        rotation: 0,
+        active: true,
+        kind: "house",
+      }
+    );
+  }
+
+  private createHouseDoor(meshes: AbstractMesh[], houseBounds: { min: Vector3; max: Vector3 }) {
+    const doorMesh = meshes.find((mesh) => mesh.name.toLowerCase().includes("door"));
+    const houseCenterX = (houseBounds.min.x + houseBounds.max.x) * 0.5;
+    const doorBounds = doorMesh?.getBoundingInfo().boundingBox;
+    const doorCenterX = doorBounds
+      ? (doorBounds.minimumWorld.x + doorBounds.maximumWorld.x) * 0.5
+      : houseCenterX;
+    const doorCenterZ = doorBounds
+      ? (doorBounds.minimumWorld.z + doorBounds.maximumWorld.z) * 0.5
+      : houseBounds.min.z + 0.22;
+    const doorCenterY = doorBounds
+      ? (doorBounds.minimumWorld.y + doorBounds.maximumWorld.y) * 0.5
+      : this.terrain.getHeightAt(doorCenterX, doorCenterZ) + 1.1;
+    const doorWidth = doorBounds
+      ? Math.max(1.8, Math.min(3.6, doorBounds.maximumWorld.x - doorBounds.minimumWorld.x + 0.85))
+      : 2.4;
+    const doorHeight = doorBounds
+      ? Math.max(2.8, doorBounds.maximumWorld.y - doorBounds.minimumWorld.y + 0.8)
+      : 3.2;
+    const collider: BoxCollider = {
+      x: doorCenterX,
+      z: doorCenterZ,
+      width: doorWidth,
+      depth: 0.7,
+      rotation: 0,
+      active: true,
+      kind: "door",
+    };
+    this.staticBoxColliders.push(collider);
+
+    this.addFrontWallColliders(houseBounds, doorCenterX, doorWidth, doorCenterZ);
+
+    const picker = MeshBuilder.CreateBox(
+      "endHouseDoorInteraction",
+      { width: doorWidth, height: doorHeight, depth: 0.9 },
+      this.scene
+    );
+    picker.position.set(doorCenterX, doorCenterY, doorCenterZ);
+    picker.visibility = 0;
+    picker.isPickable = true;
+
+    const closedPosition = doorMesh?.position.clone();
+    const closedRotation = doorMesh?.rotation.clone();
+    const closedRotationQuaternion = doorMesh?.rotationQuaternion?.clone();
+    let open = false;
+    let amount = 0;
+    let target = 0;
+
+    this.scene.onBeforeRenderObservable.add(() => {
+      const dt = this.scene.getEngine().getDeltaTime() / 1000;
+      const speed = 3.5;
+      amount += (target - amount) * Math.min(1, dt * speed);
+      const angle = -amount * Math.PI * 0.55;
+
+      if (!doorMesh) return;
+      if (closedPosition) doorMesh.position.copyFrom(closedPosition);
+      if (closedRotationQuaternion) {
+        doorMesh.rotationQuaternion = Quaternion.RotationAxis(Vector3.Up(), angle).multiply(
+          closedRotationQuaternion
+        );
+      } else if (closedRotation) {
+        doorMesh.rotation.copyFrom(closedRotation);
+        doorMesh.rotation.y += angle;
+      }
+    });
+
+    picker.metadata = {
+      interactable: true,
+      type: "door",
+      onInteract: () => {
+        open = !open;
+        target = open ? 1 : 0;
+        collider.active = !open;
+        return open ? "Abrís la puerta." : "Cerrás la puerta.";
+      },
+    };
+  }
+
+  private addFrontWallColliders(
+    bounds: { min: Vector3; max: Vector3 },
+    doorCenterX: number,
+    doorWidth: number,
+    doorZ: number
+  ) {
+    const wallThickness = 0.65;
+    const frontZ = doorZ;
+    const gapHalf = Math.max(doorWidth + 1.15, 2.7);
+    const leftMin = bounds.min.x;
+    const leftMax = doorCenterX - gapHalf;
+    const rightMin = doorCenterX + gapHalf;
+    const rightMax = bounds.max.x;
+
+    if (leftMax > leftMin) {
+      this.staticBoxColliders.push({
+        x: (leftMin + leftMax) * 0.5,
+        z: frontZ,
+        width: leftMax - leftMin,
+        depth: wallThickness,
+        rotation: 0,
+        active: true,
+        kind: "house",
+      });
+    }
+
+    if (rightMax > rightMin) {
+      this.staticBoxColliders.push({
+        x: (rightMin + rightMax) * 0.5,
+        z: frontZ,
+        width: rightMax - rightMin,
+        depth: wallThickness,
+        rotation: 0,
+        active: true,
+        kind: "house",
+      });
+    }
+  }
+
   // =========================
   // 🌿 GRASS
   // =========================
@@ -319,6 +719,7 @@ export class Segments {
         const span = Math.max(1, grassMaxX - minX);
         const xAbs = minX + rng() * span;
         const x = side * xAbs;
+        if (this.isInNoSpawnZone(x, z, 1.5)) continue;
 
         // fade de densidad cerca del borde
         let densityMul = 1.0;
@@ -425,6 +826,7 @@ export class Segments {
         const side = rng() < 0.5 ? -1 : 1;
         const xAbs = minX + rng() * Math.max(1, plantMaxX - minX);
         const x = side * xAbs;
+        if (this.isInNoSpawnZone(x, z, 2.5)) continue;
         const scale = 0.85 + rng() * 0.75;
         const y = this.terrain.getHeightAt(x, z) + this.plantLibrary.getGroundOffset(b) * scale + 0.03;
 
@@ -502,6 +904,7 @@ export class Segments {
       const side = rng() < 0.5 ? -1 : 1;
 
       const x = side * (minX + rng() * Math.max(1, maxX - minX));
+      if (this.isInNoSpawnZone(x, z, 4)) continue;
       const y = this.terrain.getHeightAt(x, z);
 
       const scale = 0.9 + rng() * 0.7;
@@ -542,6 +945,7 @@ export class Segments {
       const z = centerZ + (rng() - 0.5) * this.cfg.segmentLength * 2;
       const side = rng() < 0.5 ? -1 : 1;
       const x = side * (6 + rng() * 25);
+      if (this.isInNoSpawnZone(x, z, 3)) continue;
       const y = this.terrain.getHeightAt(x, z);
 
       const scale = 0.6 + rng() * 1.8;

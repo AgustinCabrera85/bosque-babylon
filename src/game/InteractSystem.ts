@@ -6,6 +6,15 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 type Hints = { set(text: string | null): void };
 
+type InteractableMetadata = {
+  interactable?: boolean;
+  type?: string;
+  id?: string;
+  title?: string;
+  locked?: boolean;
+  onInteract?: () => string | void;
+};
+
 export class InteractSystem {
   constructor(private scene: Scene, private camera: Camera, private hints: Hints) {
     scene.onKeyboardObservable.add((kb) => {
@@ -26,7 +35,13 @@ export class InteractSystem {
     const hit = this.scene.pickWithRay(ray, (m) => !!m.metadata?.interactable);
     if (!hit?.hit || !hit.pickedMesh) return;
 
-    const data = hit.pickedMesh.metadata;
+    const data = hit.pickedMesh.metadata as InteractableMetadata | undefined;
+
+    const customMessage = data?.onInteract?.();
+    if (customMessage) {
+      this.hints.set(customMessage);
+      return;
+    }
 
     if (data?.type === "clue") {
       this.hints.set(`Pista: ${data.title ?? data.id}`);

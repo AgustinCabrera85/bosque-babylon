@@ -3,6 +3,9 @@ import { Scene } from "@babylonjs/core/scene";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
+import { Material } from "@babylonjs/core/Materials/material";
+import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 
 type WindMesh = {
   mesh: Mesh;
@@ -20,20 +23,18 @@ export class GrassLibrary {
   private windTime = 0;
 
   async load(scene: Scene, maxTemplates = Number.POSITIVE_INFINITY) {
-    const files = [
-      "grass_00.glb",
-      "grass_01.glb",
-      "grass_02.glb",
-      "grass_03.glb",
-      "grass_04.glb",
+    const sources = [
+      { root: "/assets/models/plants/", file: "plant1.glb", scale: 0.45 },
+      { root: "/assets/models/vegetation/", file: "grass_00.glb", scale: 1 },
+      { root: "/assets/models/vegetation/", file: "grass_01.glb", scale: 1 },
     ];
 
-    for (const file of files.slice(0, maxTemplates)) {
+    for (const source of sources.slice(0, maxTemplates)) {
       try {
         const res = await SceneLoader.ImportMeshAsync(
           null,
-          "/assets/models/vegetation/",
-          file,
+          source.root,
+          source.file,
           scene
         );
 
@@ -54,6 +55,7 @@ export class GrassLibrary {
 
         if (!merged) continue;
 
+        merged.scaling.setAll(source.scale);
         merged.bakeCurrentTransformIntoVertices();
         merged.position.set(0, 0, 0);
         merged.scaling.set(1, 1, 1);
@@ -61,11 +63,12 @@ export class GrassLibrary {
         merged.rotationQuaternion = null;
         merged.setEnabled(false);
         merged.isPickable = false;
+        this.patchGrassMaterial(merged.material);
         this.prepareWindMesh(merged, this.prototypes.length);
 
         this.prototypes.push(merged);
       } catch (error) {
-        console.warn(`[GrassLibrary] Could not load ${file}`, error);
+        console.warn(`[GrassLibrary] Could not load ${source.file}`, error);
       }
     }
 
@@ -129,5 +132,40 @@ export class GrassLibrary {
       minY,
       height: Math.max(0.001, maxY - minY),
     });
+  }
+
+  private patchGrassMaterial(material: Material | null) {
+    if (!material) return;
+
+    const materials = (material as any).subMaterials?.length
+      ? (material as any).subMaterials
+      : [material];
+
+    for (const mat of materials) {
+      if (!mat) continue;
+
+      mat.alpha = 1;
+      mat.alphaMode = Material.MATERIAL_ALPHATEST;
+      mat.backFaceCulling = false;
+      mat.forceDepthWrite = true;
+      (mat as any).needDepthPrePass = true;
+
+      const alphaTexture = mat.albedoTexture ?? mat.diffuseTexture;
+      if (alphaTexture) alphaTexture.hasAlpha = true;
+
+      if (mat instanceof PBRMaterial) {
+        mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATEST;
+        mat.useAlphaFromAlbedoTexture = true;
+        mat.alphaCutOff = 0.45;
+        mat.metallic = 0;
+        mat.roughness = 0.8;
+        mat.specularIntensity = 0.1;
+      }
+
+      if (mat instanceof StandardMaterial) {
+        mat.alphaCutOff = 0.45;
+        mat.specularColor.set(0.02, 0.02, 0.02);
+      }
+    }
   }
 }

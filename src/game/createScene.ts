@@ -15,6 +15,7 @@ import { InteractSystem } from "./InteractSystem";
 import { setupMobileControls } from "./MobileControls";
 import { createRainSystem } from "./Rain";
 import { createFireflies } from "./Fireflies";
+import { createEndTorches } from "./Torches";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -118,11 +119,16 @@ export const mobileQuality: QualityProfile = {
   fireflyCount: 5,
 };
 
-function createPathMesh(scene: Scene, terrain: ReturnType<typeof createTerrain>, rows: number) {
+function createPathMesh(
+  scene: Scene,
+  terrain: ReturnType<typeof createTerrain>,
+  rows: number,
+  startZ = -terrain.size / 2,
+  endZ = terrain.size / 2
+) {
   const width = 9;
   const halfWidth = width / 2;
-  const length = terrain.size;
-  const halfLength = length / 2;
+  const length = endZ - startZ;
   const cols = 4;
 
   const positions: number[] = [];
@@ -131,14 +137,14 @@ function createPathMesh(scene: Scene, terrain: ReturnType<typeof createTerrain>,
   const uvs: number[] = [];
 
   for (let iz = 0; iz <= rows; iz++) {
-    const z = -halfLength + (iz / rows) * length;
+    const z = startZ + (iz / rows) * length;
 
     for (let ix = 0; ix <= cols; ix++) {
       const x = -halfWidth + (ix / cols) * width;
       const y = terrain.getHeightAt(x, z) + 0.08;
 
       positions.push(x, y, z);
-      uvs.push(ix / cols, (z + halfLength) / length);
+      uvs.push(ix / cols, (z - startZ) / length);
     }
   }
 
@@ -183,8 +189,8 @@ export async function createScene(
   // =========================
   // EXP2: densa y natural PERO con densidad baja (0.05 era demasiado)
   scene.fogMode = Scene.FOGMODE_EXP2;
-  scene.fogColor = new Color3(0.02, 0.025, 0.03); // casi negro azulado
-  scene.fogDensity = 0.018; // 🔥 probá 0.010..0.018
+  scene.fogColor = new Color3(0.014, 0.017, 0.022); // casi negro azulado
+  scene.fogDensity = 0.021; // 🔥 probá 0.010..0.018
 
   // Para que el "horizonte" no se vea raro detrás de todo
   scene.clearColor = new Color4(
@@ -198,12 +204,12 @@ export async function createScene(
 // LUCES (NOCHE)
 // =========================
 const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
-hemi.intensity = 0.03; // MUY bajo
+hemi.intensity = 0.015; // MUY bajo
 hemi.groundColor = new Color3(0.01, 0.01, 0.01);
 
 const moon = new DirectionalLight("moon", new Vector3(-0.35, -1, 0.25), scene);
 moon.position = new Vector3(60, 120, 40);
-moon.intensity = 0.08; // suave
+moon.intensity = 0.045; // suave
 moon.diffuse = new Color3(0.6, 0.65, 0.9);
 moon.specular = new Color3(0, 0, 0);
 
@@ -213,9 +219,19 @@ moon.specular = new Color3(0, 0, 0);
   // =========================
 onProgress(0.18, "Generando terreno...");
 const terrain = createTerrain(scene, {
-  size: 1200,
+  size: 1600,
   segments: quality.terrainSegments,
   pathHalfWidth: 4,
+  flatAreas: [
+    {
+      x: 0,
+      z: 70 * 8 + 18,
+      width: 72,
+      depth: 96,
+      height: 0,
+      fade: 22,
+    },
+  ],
 
   mountainStart: 55,    // antes 26
   mountainEnd: 95,      // antes 48
@@ -227,7 +243,7 @@ const terrain = createTerrain(scene, {
   // =========================
   // Sendero plano (opcional)
   // =========================
-  const path = createPathMesh(scene, terrain, quality.pathRows);
+  const path = createPathMesh(scene, terrain, quality.pathRows, undefined, 70 * 8 - 8);
 
   const pathMat = new StandardMaterial("pathMat", scene);
   const pathTex = new Texture(pathUrl, scene);
@@ -268,7 +284,7 @@ const terrain = createTerrain(scene, {
   // ✅ “bajar” la potencia visual del cielo (si está muy brillante)
   // (depende del material que use internamente)
   const m: any = photoDome.material as any;
-  if (m.emissiveColor?.set) m.emissiveColor.set(0.55, 0.55, 0.55);
+  if (m.emissiveColor?.set) m.emissiveColor.set(0.42, 0.42, 0.42);
   if (m.diffuseColor?.set) m.diffuseColor.set(0, 0, 0);
   if (m.specularColor?.set) m.specularColor.set(0, 0, 0);
 
@@ -374,6 +390,10 @@ scene.onBeforeRenderObservable.add(() => {
     plantRingCounts: quality.plantRingCounts,
     plantFarCount: quality.plantFarCount,
   });
+
+  onProgress(0.88, "Cargando casa...");
+  await segments.loadEndHouse();
+  await createEndTorches(scene, terrain);
 
   // =========================
   // UI hints + Interacción (E)

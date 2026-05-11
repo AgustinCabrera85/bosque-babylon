@@ -21,6 +21,15 @@ export type TerrainHandle = {
   mountainStart: number;
 };
 
+type FlatArea = {
+  x: number;
+  z: number;
+  width: number;
+  depth: number;
+  height: number;
+  fade?: number;
+};
+
 function clamp(x: number, a: number, b: number) {
   return Math.max(a, Math.min(b, x));
 }
@@ -48,6 +57,7 @@ export function createTerrain(
     mountainEnd?: number; // donde ya es alto
     mountainHeight?: number;
     playableHalfWidth?: number; // límite de movimiento (antes de montaña)
+    flatAreas?: FlatArea[];
   }
 ): TerrainHandle {
   const size = opts.size;
@@ -61,6 +71,7 @@ export function createTerrain(
 
   // 🧱 Límite jugable (antes de montaña)
   const playableHalfWidth = opts.playableHalfWidth ?? mountainStart - 2;
+  const flatAreas = opts.flatAreas ?? [];
 
   const step = size / segments;
   const half = size / 2;
@@ -100,6 +111,7 @@ export function createTerrain(
 
       // Aplanar el sendero central (ojo: el camino real es el mesh "path" en tu Scene)
       if (absX < pathHalfWidth + 1.2) h = 0;
+      h = applyFlatAreas(x, z, h);
 
       heights[idx] = h;
       positions.push(x, h, z);
@@ -171,6 +183,24 @@ export function createTerrain(
   mesh.material = grassMat;
 
   // ======= HeightAt (bilinear) =======
+  function applyFlatAreas(x: number, z: number, h: number) {
+    let height = h;
+
+    for (const area of flatAreas) {
+      const fade = area.fade ?? 8;
+      const dx = Math.abs(x - area.x);
+      const dz = Math.abs(z - area.z);
+      const halfW = area.width * 0.5;
+      const halfD = area.depth * 0.5;
+      const maskX = 1 - smoothstep(halfW, halfW + fade, dx);
+      const maskZ = 1 - smoothstep(halfD, halfD + fade, dz);
+      const mask = maskX * maskZ;
+      height = height * (1 - mask) + area.height * mask;
+    }
+
+    return height;
+  }
+
   function getHeightAt(x: number, z: number) {
     const sx = (x + half) / size;
     const sz = (z + half) / size;

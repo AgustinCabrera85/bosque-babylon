@@ -27,6 +27,7 @@ const TORCH_GROUND_SINK = 0.1;
 const FLAME_HEIGHT = 2.55;
 const FLAME_WIDTH = 0.82;
 const FLAME_BASE_OVERLAP = 0.32;
+const CANDLE_FLAME_TEXTURE_URL = "/assets/models/textures/fire/candle_flame.png";
 
 function createFireTextureSet(scene: Scene) {
   const diffuse = new DynamicTexture(
@@ -100,7 +101,7 @@ function createFireTextureSet(scene: Scene) {
   return { diffuse, opacity, distortion };
 }
 
-function createFireMaterial(scene: Scene) {
+export function createFireMaterial(scene: Scene) {
   const textures = createFireTextureSet(scene);
   const material = new FireMaterial("torchFireMaterial", scene);
   material.diffuseTexture = textures.diffuse;
@@ -114,7 +115,114 @@ function createFireMaterial(scene: Scene) {
   return material;
 }
 
-function createGlowMaterial(scene: Scene) {
+function createCandleFireSpriteTexture(scene: Scene) {
+  const texture = new DynamicTexture(
+    "candleFireSpriteTexture",
+    { width: 160, height: 320 },
+    scene,
+    false
+  );
+  const ctx = texture.getContext() as CanvasRenderingContext2D;
+  ctx.clearRect(0, 0, 160, 320);
+
+  const drawOuterFlame = () => {
+    ctx.beginPath();
+    ctx.moveTo(80, 306);
+    ctx.bezierCurveTo(49, 269, 50, 217, 59, 178);
+    ctx.bezierCurveTo(66, 129, 72, 67, 80, 18);
+    ctx.bezierCurveTo(103, 67, 113, 128, 107, 178);
+    ctx.bezierCurveTo(116, 219, 110, 269, 80, 306);
+    ctx.closePath();
+  };
+
+  const drawInnerFlame = () => {
+    ctx.beginPath();
+    ctx.moveTo(80, 290);
+    ctx.bezierCurveTo(67, 251, 73, 211, 81, 176);
+    ctx.bezierCurveTo(86, 143, 84, 96, 80, 55);
+    ctx.bezierCurveTo(95, 104, 101, 151, 98, 190);
+    ctx.bezierCurveTo(96, 225, 96, 260, 80, 290);
+    ctx.closePath();
+  };
+
+  ctx.save();
+  ctx.shadowColor = "rgba(255, 124, 12, 0.72)";
+  ctx.shadowBlur = 14;
+  drawOuterFlame();
+  ctx.fillStyle = "rgba(255, 126, 8, 0.42)";
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  drawOuterFlame();
+  ctx.clip();
+
+  const flameGradient = ctx.createLinearGradient(0, 306, 0, 18);
+  flameGradient.addColorStop(0.0, "rgba(18, 31, 120, 0.98)");
+  flameGradient.addColorStop(0.13, "rgba(55, 91, 255, 0.88)");
+  flameGradient.addColorStop(0.24, "rgba(255, 128, 13, 0.96)");
+  flameGradient.addColorStop(0.48, "rgba(255, 197, 35, 0.98)");
+  flameGradient.addColorStop(0.76, "rgba(255, 245, 138, 1)");
+  flameGradient.addColorStop(1.0, "rgba(255, 255, 232, 0.98)");
+  ctx.fillStyle = flameGradient;
+  ctx.fillRect(0, 0, 160, 320);
+
+  const centerGlow = ctx.createRadialGradient(81, 209, 5, 81, 183, 52);
+  centerGlow.addColorStop(0.0, "rgba(255, 255, 245, 0.92)");
+  centerGlow.addColorStop(0.45, "rgba(255, 241, 122, 0.64)");
+  centerGlow.addColorStop(1.0, "rgba(255, 176, 22, 0)");
+  ctx.globalCompositeOperation = "lighter";
+  ctx.fillStyle = centerGlow;
+  ctx.fillRect(0, 76, 160, 226);
+
+  const blueBase = ctx.createRadialGradient(80, 286, 3, 80, 286, 25);
+  blueBase.addColorStop(0.0, "rgba(40, 83, 255, 0.98)");
+  blueBase.addColorStop(0.48, "rgba(27, 55, 210, 0.72)");
+  blueBase.addColorStop(1.0, "rgba(20, 32, 117, 0)");
+  ctx.fillStyle = blueBase;
+  ctx.fillRect(48, 258, 64, 48);
+
+  drawInnerFlame();
+  ctx.fillStyle = "rgba(255, 255, 218, 0.32)";
+  ctx.fill();
+  ctx.restore();
+
+  texture.update();
+  texture.hasAlpha = true;
+  texture.wrapU = Texture.CLAMP_ADDRESSMODE;
+  texture.wrapV = Texture.CLAMP_ADDRESSMODE;
+  return texture;
+}
+
+export function createCandleFireMaterial(scene: Scene) {
+  const texture = new Texture(
+    CANDLE_FLAME_TEXTURE_URL,
+    scene,
+    false,
+    true,
+    Texture.TRILINEAR_SAMPLINGMODE
+  );
+  texture.hasAlpha = true;
+  texture.wrapU = Texture.CLAMP_ADDRESSMODE;
+  texture.wrapV = Texture.CLAMP_ADDRESSMODE;
+
+  const material = new StandardMaterial("candleFireMaterial", scene);
+  material.diffuseTexture = texture;
+  material.emissiveTexture = texture;
+  material.diffuseColor = new Color3(1.0, 0.72, 0.28);
+  material.emissiveColor = new Color3(1.0, 0.56, 0.14);
+  material.specularColor = Color3.Black();
+  material.alpha = 1;
+  material.alphaMode = Engine.ALPHA_ADD;
+  material.disableLighting = true;
+  material.backFaceCulling = false;
+  material.needDepthPrePass = false;
+  material.disableDepthWrite = false;
+  (material as any).useAlphaFromDiffuseTexture = true;
+  return material;
+}
+
+export function createGlowMaterial(scene: Scene) {
   const texture = new DynamicTexture(
     "torchGlowTexture",
     { width: 128, height: 256 },

@@ -392,6 +392,8 @@ scene.onBeforeRenderObservable.add(() => {
   });
 
   onProgress(0.88, "Cargando casa...");
+  await segments.loadCandles();
+  await segments.loadStartBlocker();
   await segments.loadEndHouse();
   await createEndTorches(scene, terrain);
 

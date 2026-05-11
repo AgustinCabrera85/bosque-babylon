@@ -10,10 +10,13 @@ import { BoundingInfo } from "@babylonjs/core/Culling/boundingInfo";
 import { Ray } from "@babylonjs/core/Culling/ray";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 
 import { mulberry32 } from "../utils/seed";
+import { createCandleFireMaterial, createGlowMaterial } from "./Torches";
 
 import type { TerrainHandle } from "./Terrain";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
@@ -21,15 +24,13 @@ import type { TreeLibrary } from "./TreeLibrary";
 import type { GrassLibrary } from "./GrassLibrary";
 import type { PlantLibrary } from "./PlantLibrary";
 import type { RockLibrary } from "./RockLibrary";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
-import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 
 type Collider = {
   x: number;
   z: number;
   radius: number;
   segmentId: number;
-  kind: "tree" | "rock";
+  kind: "tree" | "rock" | "candle";
 };
 
 type BoxCollider = {
@@ -39,7 +40,7 @@ type BoxCollider = {
   depth: number;
   rotation: number;
   active: boolean;
-  kind: "house" | "door";
+  kind: "house" | "door" | "blocker";
 };
 
 type NoSpawnZone = {
@@ -69,6 +70,37 @@ type SegmentCfg = {
 
 type SegTreePack = { nodes: TransformNode[]; lod: 0 | 1 | 2 };
 type SegRockPack = { nodes: TransformNode[] };
+type SegCandlePack = { nodes: TransformNode[]; lights: PointLight[] };
+type CandleTemplate = {
+  meshes: Mesh[];
+  baseOffsetY: number;
+  topOffsetY: number;
+};
+
+type CandleFlameEntry = {
+  root: TransformNode;
+  light: PointLight;
+  baseIntensity: number;
+  phase: number;
+  flame: Mesh;
+  glow: Mesh;
+  sparks: Mesh[];
+  flameHeight: number;
+};
+
+const CANDLES_PER_SIDE = 3;
+const CANDLE_PATH_X = 5.75;
+const CANDLE_MODEL_SCALE = 0.12;
+const HOUSE_CANDLE_SCALE = 0.28;
+const CANDLE_GROUND_SINK = 0.015;
+const CANDLE_RESERVE_RADIUS = 1.35;
+const CANDLE_COLLISION_RADIUS = 0.55;
+const CANDLE_FLAME_WIDTH = 0.34;
+const CANDLE_FLAME_HEIGHT = 0.68;
+// Higher values lower the flame plane; the fire texture has transparent padding at its base.
+const CANDLE_FLAME_WICK_TIP_INSET = 1.35;
+const START_BLOCKER_Z = -9.5;
+const START_FOREST_CLOSURE_Z = -18;
 
 export class Segments {
   private readonly WORLD_SEED = 1337;
@@ -79,6 +111,7 @@ export class Segments {
 
   private treeSegments = new Map<number, SegTreePack>();
   private rockSegments = new Map<number, SegRockPack>();
+  private candleSegments = new Map<number, SegCandlePack>();
   private grassSegments = new Map<number, Float32Array[]>();
   private plantSegments = new Map<number, Float32Array[]>();
 
@@ -91,6 +124,11 @@ export class Segments {
 
   private grassBases: Mesh[] | null = null;
   private plantBases: Mesh[] | null = null;
+  private candleTemplate: CandleTemplate | null = null;
+  private candleFireMaterial: ReturnType<typeof createCandleFireMaterial> | null = null;
+  private candleGlowMaterial: ReturnType<typeof createGlowMaterial> | null = null;
+  private candleLights: CandleFlameEntry[] = [];
+  private candleFlickerRegistered = false;
 
   constructor(
     private scene: Scene,
@@ -188,6 +226,11 @@ export class Segments {
     for (const id of objectNeeded) {
       const centerZ = (id + 0.5) * segLen;
 
+      if (!this.candleSegments.has(id)) {
+        const pack = this.createCandles(centerZ, id);
+        this.candleSegments.set(id, pack);
+      }
+
       const desiredLOD = this.lodFor(id, currentSeg);
       const prev = this.treeSegments.get(id);
 
@@ -264,6 +307,17 @@ export class Segments {
       }
     }
 
+    for (const [id, pack] of this.candleSegments) {
+      if (!objectNeeded.has(id)) {
+        pack.nodes.forEach((n) => n.dispose?.());
+        pack.lights.forEach((light) => {
+          this.candleLights = this.candleLights.filter((entry) => entry.light !== light);
+          light.dispose();
+        });
+        this.candleSegments.delete(id);
+      }
+    }
+
     this.colliders = this.colliders.filter((c) => objectNeeded.has(c.segmentId));
     this.interactables = this.interactables.filter((i) => objectNeeded.has(i.segmentId));
 
@@ -301,6 +355,439 @@ export class Segments {
 
     this.interactables.push({ mesh: note, segmentId: 0 });
     this.interactables.push({ mesh: door, segmentId: 0 });
+  }
+
+  async loadCandles() {
+    const res = await SceneLoader.ImportMeshAsync(
+      null,
+      "/assets/models/objects/",
+      "candle.glb",
+      this.scene
+    );
+
+    const meshes = res.meshes.filter(
+      (mesh): mesh is Mesh => mesh instanceof Mesh && mesh.getTotalVertices() > 0
+    );
+
+    if (!meshes.length) {
+      console.warn("[Segments] candle.glb no trajo meshes renderizables.");
+      return;
+    }
+
+    const root = new TransformNode("candleTemplateRoot", this.scene);
+    for (const mesh of meshes) {
+      mesh.computeWorldMatrix(true);
+      mesh.bakeCurrentTransformIntoVertices();
+      mesh.parent = null;
+      mesh.position.set(0, 0, 0);
+      mesh.rotation.set(0, 0, 0);
+      mesh.rotationQuaternion = null;
+      mesh.scaling.set(1, 1, 1);
+      mesh.setParent(root);
+      mesh.setEnabled(true);
+      mesh.isVisible = false;
+      mesh.isPickable = false;
+      mesh.receiveShadows = true;
+      mesh.alwaysSelectAsActiveMesh = true;
+      this.patchCandleMaterial(mesh);
+      mesh.computeWorldMatrix(true);
+    }
+    res.transformNodes.forEach((node) => node.dispose());
+
+    const bounds = this.getHierarchyBounds(meshes);
+    root.position.set(0, -10000, 0);
+
+    this.candleTemplate = {
+      meshes,
+      baseOffsetY: bounds?.min.y ?? 0,
+      topOffsetY: bounds ? bounds.max.y - bounds.min.y : 1.25,
+    };
+
+    this.candleFireMaterial = createCandleFireMaterial(this.scene);
+    this.candleGlowMaterial = createGlowMaterial(this.scene);
+    this.registerCandleFlicker();
+  }
+
+  async loadStartBlocker() {
+    this.noSpawnZones.push({
+      x: 0,
+      z: (START_BLOCKER_Z + START_FOREST_CLOSURE_Z) * 0.5,
+      width: 30,
+      depth: 30,
+    });
+
+    await this.createFallenTreeBlocker();
+    this.createStartForestClosure();
+
+    this.staticBoxColliders.push(
+      {
+        x: 0,
+        z: START_BLOCKER_Z,
+        width: 12.5,
+        depth: 2.2,
+        rotation: 0,
+        active: true,
+        kind: "blocker",
+      },
+      {
+        x: 0,
+        z: START_FOREST_CLOSURE_Z,
+        width: 28,
+        depth: 5.5,
+        rotation: 0,
+        active: true,
+        kind: "blocker",
+      }
+    );
+  }
+
+  private async createFallenTreeBlocker() {
+    const res = await SceneLoader.ImportMeshAsync(
+      null,
+      "/assets/models/vegetation/",
+      "tree_08.glb",
+      this.scene
+    );
+
+    const root = new TransformNode("startFallenTreeBlockerRoot", this.scene);
+    for (const mesh of res.meshes) {
+      mesh.setParent(root);
+      mesh.isPickable = false;
+      mesh.receiveShadows = true;
+    }
+
+    root.computeWorldMatrix(true);
+    for (const mesh of res.meshes) mesh.computeWorldMatrix(true);
+    const initialBounds = this.getHierarchyBounds(res.meshes);
+    if (!initialBounds) return;
+
+    const initialWidth = initialBounds.max.x - initialBounds.min.x;
+    const initialDepth = initialBounds.max.z - initialBounds.min.z;
+    root.rotation.y = initialDepth > initialWidth ? Math.PI * 0.5 : 0;
+
+    const longAxis = Math.max(initialWidth, initialDepth, 0.001);
+    root.scaling.setAll(10.5 / longAxis);
+    root.computeWorldMatrix(true);
+    for (const mesh of res.meshes) mesh.computeWorldMatrix(true);
+
+    const scaledBounds = this.getHierarchyBounds(res.meshes);
+    if (!scaledBounds) return;
+
+    const centerX = (scaledBounds.min.x + scaledBounds.max.x) * 0.5;
+    const centerZ = (scaledBounds.min.z + scaledBounds.max.z) * 0.5;
+    const groundY = this.terrain.getHeightAt(0, START_BLOCKER_Z);
+    root.position.x -= centerX;
+    root.position.z += START_BLOCKER_Z - centerZ;
+    root.position.y += groundY - scaledBounds.min.y + 0.04;
+  }
+
+  private createStartForestClosure() {
+    const placements = [
+      { x: -10.5, z: -17.2, scale: 1.45, rot: 0.2 },
+      { x: -7.2, z: -18.8, scale: 1.7, rot: 1.8 },
+      { x: -3.8, z: -16.6, scale: 1.5, rot: 2.5 },
+      { x: 0.0, z: -19.4, scale: 1.85, rot: 0.9 },
+      { x: 3.7, z: -16.9, scale: 1.55, rot: 2.9 },
+      { x: 7.4, z: -18.5, scale: 1.7, rot: 1.2 },
+      { x: 10.6, z: -17.0, scale: 1.45, rot: 2.1 },
+    ];
+
+    placements.forEach((placement, index) => {
+      const tree = this.treeLibrary.instantiateByIndex(
+        `startClosureTree_${index}`,
+        this.scene,
+        index,
+        0
+      );
+      tree.position.set(
+        placement.x,
+        this.terrain.getHeightAt(placement.x, placement.z),
+        placement.z
+      );
+      tree.scaling.setAll(placement.scale);
+      tree.rotation.y = placement.rot;
+      tree.freezeWorldMatrix();
+    });
+  }
+
+  private patchCandleMaterial(mesh: Mesh) {
+    const material = mesh.material as BabylonMaterial | null;
+    if (!material) return;
+
+    const cloned = material.clone(`${material.name}_${mesh.name}_candle`);
+    if (!cloned) return;
+    mesh.material = cloned;
+
+    const multi = cloned as any;
+    if (Array.isArray(multi.subMaterials) && multi.subMaterials.length) {
+      multi.subMaterials = multi.subMaterials.map((subMaterial: BabylonMaterial | null, index: number) => {
+        if (!subMaterial) return subMaterial;
+        const subClone = subMaterial.clone(`${subMaterial.name}_${mesh.name}_candle_${index}`);
+        if (!subClone) return subMaterial;
+        this.patchCandleSubMaterial(subClone, this.isCandleWickMaterial(subClone));
+        return subClone;
+      });
+      return;
+    }
+
+    this.patchCandleSubMaterial(cloned, this.isCandleWickMaterial(cloned));
+  }
+
+  private isCandleWickMaterial(material: BabylonMaterial) {
+    const name = material.name.toLowerCase();
+    return name.includes("material.002") || name.includes("wick") || name.includes("mecha");
+  }
+
+  private patchCandleSubMaterial(material: BabylonMaterial, isWick: boolean) {
+    material.backFaceCulling = false;
+
+    if (material instanceof PBRMaterial) {
+      material.metallic = 0;
+      material.roughness = isWick ? 0.95 : 0.72;
+      material.environmentIntensity = isWick ? 0.05 : 0.35;
+      material.directIntensity = isWick ? 0.6 : 1.1;
+      material.specularIntensity = isWick ? 0 : 0.18;
+
+      if (isWick) {
+        material.albedoTexture = null;
+        material.emissiveTexture = null;
+        material.albedoColor = new Color3(0.005, 0.004, 0.003);
+        material.emissiveColor = Color3.Black();
+      } else {
+        material.albedoColor = new Color3(0.95, 0.82, 0.56);
+        material.emissiveColor = new Color3(0.02, 0.012, 0.004);
+      }
+      return;
+    }
+
+    if (material instanceof StandardMaterial) {
+      if (isWick) {
+        material.diffuseTexture = null;
+        material.emissiveColor = Color3.Black();
+        material.diffuseColor = new Color3(0.005, 0.004, 0.003);
+        material.specularColor = Color3.Black();
+      } else {
+        material.diffuseColor = new Color3(0.88, 0.74, 0.49);
+        material.emissiveColor = new Color3(0.015, 0.009, 0.003);
+        material.specularColor = new Color3(0.08, 0.06, 0.04);
+      }
+    }
+  }
+
+  private candlePlacementsForSegment(segmentId: number) {
+    const segLen = this.cfg.segmentLength;
+    const startZ = segmentId * segLen;
+    const rng = this.rngForSegment(segmentId ^ 0xca7d1e);
+    const placements: { x: number; z: number; rotationY: number }[] = [];
+
+    for (let i = 0; i < CANDLES_PER_SIDE; i++) {
+      const z = startZ + segLen * ((i + 0.5) / CANDLES_PER_SIDE);
+      const stagger = (rng() - 0.5) * 0.22;
+      placements.push(
+        { x: -CANDLE_PATH_X - stagger, z, rotationY: rng() * Math.PI * 2 },
+        { x: CANDLE_PATH_X + stagger, z, rotationY: rng() * Math.PI * 2 }
+      );
+    }
+
+    return placements.filter((placement) => !this.isInNoSpawnZone(placement.x, placement.z, 0.6));
+  }
+
+  private isReservedForCandle(x: number, z: number, margin = 0) {
+    const segmentId = Math.floor(z / this.cfg.segmentLength);
+    const radius = CANDLE_RESERVE_RADIUS + margin;
+    const radiusSq = radius * radius;
+
+    for (let id = segmentId - 1; id <= segmentId + 1; id++) {
+      for (const placement of this.candlePlacementsForSegment(id)) {
+        const dx = x - placement.x;
+        const dz = z - placement.z;
+        if (dx * dx + dz * dz <= radiusSq) return true;
+      }
+    }
+
+    return false;
+  }
+
+  private instantiateCandle(name: string, scale: number) {
+    const root = new TransformNode(name, this.scene);
+    const template = this.candleTemplate;
+    if (!template) return root;
+
+    for (const src of template.meshes) {
+      const inst = src.clone(`${name}_${src.name}`, root);
+      if (!inst) continue;
+      inst.setEnabled(true);
+      inst.isVisible = true;
+      inst.visibility = 1;
+      inst.isPickable = false;
+      inst.receiveShadows = true;
+      inst.alwaysSelectAsActiveMesh = true;
+      inst.position.copyFrom(src.position);
+      inst.rotation.copyFrom(src.rotation);
+      if (src.rotationQuaternion) inst.rotationQuaternion = src.rotationQuaternion.clone();
+      inst.scaling.copyFrom(src.scaling);
+      inst.parent = root;
+    }
+
+    root.setEnabled(true);
+    root.scaling.setAll(scale);
+    return root;
+  }
+
+  private createCandles(_centerZ: number, segmentId: number): SegCandlePack {
+    const nodes: TransformNode[] = [];
+    const lights: PointLight[] = [];
+    if (!this.candleTemplate || !this.candleFireMaterial || !this.candleGlowMaterial) {
+      return { nodes, lights };
+    }
+
+    const placements = this.candlePlacementsForSegment(segmentId);
+    for (let i = 0; i < placements.length; i++) {
+      const placement = placements[i];
+      const groundY = this.terrain.getHeightAt(placement.x, placement.z);
+      const root = this.instantiateCandle(`candle_${segmentId}_${i}`, CANDLE_MODEL_SCALE);
+      root.position.set(
+        placement.x,
+        groundY - this.candleTemplate.baseOffsetY * CANDLE_MODEL_SCALE - CANDLE_GROUND_SINK,
+        placement.z
+      );
+      root.rotation.y = placement.rotationY;
+
+      const flameY =
+        root.position.y +
+        this.candleTemplate.topOffsetY * CANDLE_MODEL_SCALE -
+        CANDLE_FLAME_WICK_TIP_INSET * CANDLE_MODEL_SCALE;
+      const fire = this.createCandleFire(
+        `candleFlame_${segmentId}_${i}`,
+        new Vector3(placement.x, flameY, placement.z),
+        placement.rotationY,
+        CANDLE_MODEL_SCALE,
+        0.85,
+        11.5
+      );
+
+      nodes.push(root, fire.root);
+      lights.push(fire.light);
+      this.colliders.push({
+        x: placement.x,
+        z: placement.z,
+        radius: CANDLE_COLLISION_RADIUS,
+        segmentId,
+        kind: "candle",
+      });
+    }
+
+    return { nodes, lights };
+  }
+
+  private createCandleFire(
+    name: string,
+    position: Vector3,
+    rotationY: number,
+    candleScale: number,
+    lightIntensity: number,
+    lightRange: number
+  ) {
+    const size = candleScale / CANDLE_MODEL_SCALE;
+    const flameWidth = CANDLE_FLAME_WIDTH * size;
+    const flameHeight = CANDLE_FLAME_HEIGHT * size;
+    const root = new TransformNode(`${name}Root`, this.scene);
+    root.position.copyFrom(position);
+    root.rotation.y = rotationY;
+
+    const flame = MeshBuilder.CreatePlane(`${name}Plane`, { width: flameWidth, height: flameHeight }, this.scene);
+    flame.parent = root;
+    flame.position.y = flameHeight * 0.5;
+    flame.material = this.candleFireMaterial;
+    flame.isPickable = false;
+    flame.billboardMode = Mesh.BILLBOARDMODE_ALL;
+
+    const glow = MeshBuilder.CreatePlane(`${name}Glow`, { width: flameWidth * 2.4, height: flameHeight * 1.9 }, this.scene);
+    glow.parent = root;
+    glow.position.y = flameHeight * 0.55;
+    glow.material = this.candleGlowMaterial;
+    glow.isPickable = false;
+    glow.billboardMode = Mesh.BILLBOARDMODE_ALL;
+
+    const sparks = Array.from({ length: 3 }, (_, sparkIndex) => {
+      const spark = MeshBuilder.CreatePlane(
+        `${name}Spark_${sparkIndex}`,
+        { width: flameWidth * 0.16, height: flameWidth * 0.16 },
+        this.scene
+      );
+      spark.parent = root;
+      spark.position.set(0, flameHeight * 0.76, 0);
+      spark.material = this.candleGlowMaterial;
+      spark.isPickable = false;
+      spark.billboardMode = Mesh.BILLBOARDMODE_ALL;
+      spark.visibility = 0;
+      return spark;
+    });
+
+    const light = new PointLight(
+      `${name}Light`,
+      position.add(new Vector3(0, flameHeight * 0.55, 0)),
+      this.scene
+    );
+    light.diffuse = new Color3(1.0, 0.55, 0.2);
+    light.specular = new Color3(1.0, 0.42, 0.12);
+    light.intensity = lightIntensity;
+    light.range = lightRange;
+
+    this.candleLights.push({
+      root,
+      light,
+      baseIntensity: lightIntensity,
+      phase: (this.candleLights.length % 17) * 1.37,
+      flame,
+      glow,
+      sparks,
+      flameHeight,
+    });
+
+    return { root, light };
+  }
+
+  private registerCandleFlicker() {
+    if (this.candleFlickerRegistered) return;
+    this.candleFlickerRegistered = true;
+
+    let t = 0;
+    this.scene.onBeforeRenderObservable.add(() => {
+      t += this.scene.getEngine().getDeltaTime() * 0.001;
+      for (const entry of this.candleLights) {
+        const flicker =
+          Math.sin(t * 16.0 + entry.phase) * 0.13 +
+          Math.sin(t * 29.0 + entry.phase * 0.61) * 0.075 +
+          Math.sin(t * 47.0 + entry.phase * 1.23) * 0.04;
+        entry.light.intensity = Math.max(0, entry.baseIntensity + flicker);
+
+        const bend = Math.sin(t * 8.6 + entry.phase) * 0.06 + Math.sin(t * 17.5 + entry.phase * 0.4) * 0.024;
+        const stretch = 1 + Math.sin(t * 11.8 + entry.phase * 0.7) * 0.085 + Math.sin(t * 24.0 + entry.phase) * 0.045;
+        const width = 1 + Math.sin(t * 15.5 + entry.phase * 1.9) * 0.055;
+        entry.root.rotation.z = bend;
+        entry.flame.scaling.set(width, stretch, 1);
+        entry.flame.position.x = 0;
+        entry.flame.position.y = (entry.flameHeight * stretch) * 0.5;
+
+        const glowPulse = 1 + flicker * 1.15;
+        entry.glow.scaling.set(glowPulse, glowPulse, 1);
+        entry.glow.position.x = 0;
+        entry.glow.position.y = entry.flameHeight * (0.54 + (stretch - 1) * 0.25);
+        entry.glow.visibility = Math.max(0.38, Math.min(0.95, 0.64 + flicker * 1.55));
+
+        entry.sparks.forEach((spark, sparkIndex) => {
+          const sparkPhase = entry.phase + sparkIndex * 2.17;
+          const cycle = (Math.sin(t * (4.2 + sparkIndex * 0.7) + sparkPhase) + 1) * 0.5;
+          const pulse = Math.max(0, Math.sin(cycle * Math.PI * 2 - Math.PI * 0.2));
+          const drift = (cycle - 0.5) * 0.12;
+          spark.visibility = pulse > 0.6 ? (pulse - 0.6) * 0.45 : 0;
+          spark.scaling.set(0.42 + pulse * 0.42, 0.42 + pulse * 0.42, 1);
+          spark.position.x = Math.sin(t * 2.4 + sparkPhase) * 0.035 + drift * 0.04;
+          spark.position.y = entry.flameHeight * (0.72 + cycle * 0.32);
+        });
+      }
+    });
   }
 
   peekInteractable(camera: Camera) {
@@ -379,6 +866,38 @@ export class Segments {
 
     this.createHouseColliders(finalBounds);
     this.createHouseDoor(res.meshes, finalBounds);
+    this.createHouseCandle(finalBounds);
+  }
+
+  private createHouseCandle(bounds: { min: Vector3; max: Vector3 }) {
+    if (!this.candleTemplate || !this.candleFireMaterial || !this.candleGlowMaterial) return;
+
+    const width = bounds.max.x - bounds.min.x;
+    const depth = bounds.max.z - bounds.min.z;
+    const x = (bounds.min.x + bounds.max.x) * 0.5 - Math.min(1.6, width * 0.16);
+    const z = bounds.min.z + depth * 0.56;
+    const floorY = bounds.min.y + 0.08;
+    const root = this.instantiateCandle("endHouseCandle", HOUSE_CANDLE_SCALE);
+
+    root.position.set(
+      x,
+      floorY - this.candleTemplate.baseOffsetY * HOUSE_CANDLE_SCALE,
+      z
+    );
+    root.rotation.y = Math.PI * 0.22;
+
+    const flameY =
+      root.position.y +
+      this.candleTemplate.topOffsetY * HOUSE_CANDLE_SCALE -
+      CANDLE_FLAME_WICK_TIP_INSET * HOUSE_CANDLE_SCALE;
+    this.createCandleFire(
+      "endHouseCandleFlame",
+      new Vector3(x, flameY, z),
+      root.rotation.y,
+      HOUSE_CANDLE_SCALE,
+      1.15,
+      14
+    );
   }
 
   private patchHouseMaterials(meshes: AbstractMesh[]) {
@@ -789,6 +1308,7 @@ export class Segments {
         const xAbs = minX + rng() * span;
         const x = side * xAbs;
         if (this.isInNoSpawnZone(x, z, 1.5)) continue;
+        if (this.isReservedForCandle(x, z, 0.35)) continue;
 
         // fade de densidad cerca del borde
         let densityMul = 1.0;
@@ -896,6 +1416,7 @@ export class Segments {
         const xAbs = minX + rng() * Math.max(1, plantMaxX - minX);
         const x = side * xAbs;
         if (this.isInNoSpawnZone(x, z, 2.5)) continue;
+        if (this.isReservedForCandle(x, z, 0.8)) continue;
         const scale = 0.85 + rng() * 0.75;
         const y = this.terrain.getHeightAt(x, z) + this.plantLibrary.getGroundOffset(b) * scale + 0.03;
 
@@ -980,6 +1501,8 @@ export class Segments {
       const rotY = rng() * Math.PI * 2;
 
       const templateIndex = Math.floor(rng() * 1_000_000);
+      const radius = this.treeLibrary.getCollisionRadius(templateIndex) * scale;
+      if (this.isReservedForCandle(x, z, radius)) continue;
 
       const tree = this.treeLibrary.instantiateByIndex(
         `tree_${segmentId}_${i}`,
@@ -992,7 +1515,6 @@ export class Segments {
       tree.scaling.setAll(scale);
       tree.rotation.y = rotY;
 
-      const radius = this.treeLibrary.getCollisionRadius(templateIndex) * scale;
       this.colliders.push({ x, z, radius, segmentId, kind: "tree" });
 
       tree.freezeWorldMatrix();
@@ -1020,6 +1542,7 @@ export class Segments {
       const scale = 0.6 + rng() * 1.8;
       const templateIndex = Math.floor(rng() * 1_000_000);
       const radius = this.rockLibrary.getCollisionRadius(templateIndex) * scale;
+      if (this.isReservedForCandle(x, z, radius)) continue;
 
       this.colliders.push({ x, z, radius, segmentId, kind: "rock" });
 

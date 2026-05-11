@@ -77,8 +77,8 @@ export const desktopQuality: QualityProfile = {
   plantSegmentAhead: 8,
   treeCount: 60,
   rockCount: 14,
-  grassBuildCount: 2500,
-  grassRingCounts: [2500, 800, 100],
+  grassBuildCount: 4200,
+  grassRingCounts: [4200, 1400, 180],
   plantBuildCount: 220,
   plantRingCounts: [220, 80, 25],
   plantFarCount: 12,
@@ -106,8 +106,8 @@ export const mobileQuality: QualityProfile = {
   plantSegmentAhead: 5,
   treeCount: 58,
   rockCount: 7,
-  grassBuildCount: 850,
-  grassRingCounts: [850, 220, 0],
+  grassBuildCount: 1200,
+  grassRingCounts: [1200, 320, 0],
   plantBuildCount: 80,
   plantRingCounts: [80, 25, 0],
   plantFarCount: 6,
@@ -310,19 +310,51 @@ const flashlight = new SpotLight(
   "flashlight",
   player.camera.globalPosition.clone(),
   player.camera.getDirection(Vector3.Forward()),
-  Math.PI / 8, // cono
-  35,          // exponent (centro más fuerte)
+  Math.PI / 3.8,
+  1,
   scene
 );
 
 // Falloff más “físico”
 flashlight.falloffType = Light.FALLOFF_GLTF;
+flashlight.innerAngle = Math.PI / 11;
 
-flashlight.intensity = 3.2;
-flashlight.range = 26;
+flashlight.intensity = 4.4;
+flashlight.range = 40;
 
 flashlight.diffuse = new Color3(1.0, 0.96, 0.88); // cálida
 flashlight.specular = new Color3(0, 0, 0);
+
+const flashlightFill = new SpotLight(
+  "flashlightFill",
+  player.camera.globalPosition.clone(),
+  player.camera.getDirection(Vector3.Forward()),
+  Math.PI / 1.55,
+  1,
+  scene
+);
+
+flashlightFill.falloffType = Light.FALLOFF_GLTF;
+flashlightFill.innerAngle = Math.PI / 6.5;
+flashlightFill.intensity = 0.85;
+flashlightFill.range = 34;
+flashlightFill.diffuse = new Color3(0.82, 0.74, 0.58);
+flashlightFill.specular = new Color3(0, 0, 0);
+
+const flashlightReach = new SpotLight(
+  "flashlightReach",
+  player.camera.globalPosition.clone(),
+  player.camera.getDirection(Vector3.Forward()),
+  Math.PI / 1.35,
+  1,
+  scene
+);
+
+flashlightReach.falloffType = Light.FALLOFF_STANDARD;
+flashlightReach.intensity = 0.62;
+flashlightReach.range = 95;
+flashlightReach.diffuse = new Color3(0.72, 0.70, 0.62);
+flashlightReach.specular = new Color3(0, 0, 0);
 
 // Sombras (opcional pero suma MUCHO)
 if (quality.shadowMapSize > 0) {
@@ -347,10 +379,17 @@ scene.onBeforeRenderObservable.add(() => {
 
   flashlight.position.copyFrom(pos);
   flashlight.direction.copyFrom(dir);
+  flashlightFill.position.copyFrom(pos);
+  flashlightFill.direction.copyFrom(dir);
+  flashlightReach.position.copyFrom(pos);
+  flashlightReach.direction.copyFrom(dir);
 
   // micro flicker (casi imperceptible)
   t += scene.getEngine().getDeltaTime() * 0.001;
-  flashlight.intensity = 3.2 + Math.sin(t * 17.0) * 0.03 + Math.sin(t * 7.0) * 0.02;
+  const flicker = Math.sin(t * 17.0) * 0.05 + Math.sin(t * 7.0) * 0.035;
+  flashlight.intensity = 4.4 + flicker;
+  flashlightFill.intensity = 0.85 + flicker * 0.25;
+  flashlightReach.intensity = 0.62 + flicker * 0.12;
 });
 
 

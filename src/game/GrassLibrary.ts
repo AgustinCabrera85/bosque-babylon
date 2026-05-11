@@ -25,8 +25,7 @@ export class GrassLibrary {
   async load(scene: Scene, maxTemplates = Number.POSITIVE_INFINITY) {
     const sources = [
       { root: "/assets/models/plants/", file: "plant1.glb", scale: 0.45 },
-      { root: "/assets/models/vegetation/", file: "grass_00.glb", scale: 1 },
-      { root: "/assets/models/vegetation/", file: "grass_01.glb", scale: 1 },
+      { root: "/assets/models/plants/", file: "plant2.glb", scale: 0.22 },
     ];
 
     for (const source of sources.slice(0, maxTemplates)) {
@@ -73,7 +72,7 @@ export class GrassLibrary {
     }
 
     if (!this.prototypes.length) {
-      console.warn("[GrassLibrary] No grass loaded. Check /public/assets/models/vegetation/");
+      console.warn("[GrassLibrary] No grass replacement plants loaded. Check /public/assets/models/plants/");
     }
   }
 

@@ -102,6 +102,9 @@ const CANDLE_FLAME_HEIGHT = 0.68;
 const CANDLE_FLAME_WICK_TIP_INSET = 1.35;
 const START_BLOCKER_Z = -9.5;
 const START_FOREST_CLOSURE_Z = -18;
+const END_HOUSE_MODEL_SCALE = 1.55;
+const END_HOUSE_RESERVE_WIDTH = 122;
+const END_HOUSE_RESERVE_DEPTH = 150;
 // Asset especial: no se carga en TreeLibrary para que no aparezca en la generacion normal.
 const START_BLOCKER_TREE_PATH = "/assets/models/blockers/";
 const START_BLOCKER_TREE_FILE = "tree_08.glb";
@@ -122,7 +125,7 @@ export class Segments {
   private colliders: Collider[] = [];
   private staticBoxColliders: BoxCollider[] = [];
   private noSpawnZones: NoSpawnZone[] = [
-    { x: 0, z: 70 * 8 + 18, width: 76, depth: 100 },
+    { x: 0, z: 70 * 8 + 18, width: END_HOUSE_RESERVE_WIDTH, depth: END_HOUSE_RESERVE_DEPTH },
   ];
   private interactables: Interactable[] = [];
 
@@ -279,6 +282,25 @@ export class Segments {
     return false;
   }
 
+  resolveCameraPosition(origin: Vector3, desired: Vector3) {
+    const dir = desired.subtract(origin);
+    const length = dir.length();
+    if (length <= 0.001) return desired.clone();
+
+    const cameraRadius = 0.22;
+    const safety = 0.12;
+    let nearestT = 1;
+
+    for (const collider of this.staticBoxColliders) {
+      if (!collider.active) continue;
+      const hitT = this.raySegmentBoxHitT(origin, desired, collider, cameraRadius);
+      if (hitT !== null && hitT < nearestT) nearestT = hitT;
+    }
+
+    if (nearestT >= 1) return desired.clone();
+    return origin.add(dir.scale(Math.max(0, nearestT - safety / length)));
+  }
+
   private isPointInsideBoxCollider(x: number, z: number, radius: number, collider: BoxCollider) {
     const dx = x - collider.x;
     const dz = z - collider.z;
@@ -291,6 +313,48 @@ export class Segments {
       Math.abs(localX) <= collider.width * 0.5 + radius &&
       Math.abs(localZ) <= collider.depth * 0.5 + radius
     );
+  }
+
+  private raySegmentBoxHitT(
+    origin: Vector3,
+    desired: Vector3,
+    collider: BoxCollider,
+    radius: number
+  ) {
+    const cos = Math.cos(-collider.rotation);
+    const sin = Math.sin(-collider.rotation);
+    const toLocal = (point: Vector3) => {
+      const dx = point.x - collider.x;
+      const dz = point.z - collider.z;
+      return {
+        x: dx * cos - dz * sin,
+        z: dx * sin + dz * cos,
+      };
+    };
+
+    const a = toLocal(origin);
+    const b = toLocal(desired);
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const halfW = collider.width * 0.5 + radius;
+    const halfD = collider.depth * 0.5 + radius;
+    let tMin = 0;
+    let tMax = 1;
+
+    const clip = (start: number, delta: number, min: number, max: number) => {
+      if (Math.abs(delta) < 0.00001) return start >= min && start <= max;
+      const inv = 1 / delta;
+      let t1 = (min - start) * inv;
+      let t2 = (max - start) * inv;
+      if (t1 > t2) [t1, t2] = [t2, t1];
+      tMin = Math.max(tMin, t1);
+      tMax = Math.min(tMax, t2);
+      return tMin <= tMax;
+    };
+
+    if (!clip(a.x, dx, -halfW, halfW)) return null;
+    if (!clip(a.z, dz, -halfD, halfD)) return null;
+    return tMax >= 0 && tMin <= 1 ? Math.max(0, tMin) : null;
   }
 
   private cleanup(
@@ -671,8 +735,8 @@ export class Segments {
         new Vector3(placement.x, flameY, placement.z),
         placement.rotationY,
         CANDLE_MODEL_SCALE,
-        0.85,
-        11.5
+        2.8,
+        28
       );
 
       nodes.push(root, fire.root);
@@ -799,8 +863,12 @@ export class Segments {
     });
   }
 
-  peekInteractable(camera: Camera) {
-    const ray = new Ray(camera.globalPosition, camera.getDirection(Vector3.Forward()), 3);
+  peekInteractable(cameraOrLook: Camera | { origin: Vector3; direction: Vector3 }) {
+    const origin = "globalPosition" in cameraOrLook ? cameraOrLook.globalPosition : cameraOrLook.origin;
+    const direction = "globalPosition" in cameraOrLook
+      ? cameraOrLook.getDirection(Vector3.Forward())
+      : cameraOrLook.direction;
+    const ray = new Ray(origin, direction, 3);
     const hit = this.scene.pickWithRay(ray, (m) => !!m.metadata?.interactable);
     return hit?.hit ? hit.pickedMesh : null;
   }
@@ -808,7 +876,7 @@ export class Segments {
   async loadEndHouse() {
     const segmentLength = this.cfg.segmentLength;
     const targetFrontZ = segmentLength * 8;
-    const scale = 0.99;
+    const scale = END_HOUSE_MODEL_SCALE;
 
     const res = await SceneLoader.ImportMeshAsync(
       null,
@@ -874,6 +942,7 @@ export class Segments {
     });
 
     this.createHouseColliders(finalBounds);
+    this.createHouseMeshColliders(res.meshes);
     this.createHouseDoor(res.meshes, finalBounds);
     this.createHouseCandle(finalBounds);
   }
@@ -1139,6 +1208,90 @@ export class Segments {
     );
   }
 
+  private createHouseMeshColliders(meshes: AbstractMesh[]) {
+    const collisionNames = ["houseleft", "houseright", "houseback"];
+
+    for (const mesh of meshes) {
+      const name = mesh.name.toLowerCase();
+      if (!collisionNames.some((part) => name.includes(part))) continue;
+
+      const bounds = this.getMeshBounds(mesh);
+      if (!bounds) continue;
+
+      const width = bounds.max.x - bounds.min.x;
+      const depth = bounds.max.z - bounds.min.z;
+      const height = bounds.max.y - bounds.min.y;
+      const thinAxis = Math.min(width, depth);
+      if (height < 0.35 || width < 0.08 || depth < 0.08) continue;
+
+      if (thinAxis > 1.8) {
+        if (name.includes("houseleft")) this.addHouseRoomPerimeter(bounds);
+        continue;
+      }
+
+      this.staticBoxColliders.push({
+        x: (bounds.min.x + bounds.max.x) * 0.5,
+        z: (bounds.min.z + bounds.max.z) * 0.5,
+        width: Math.max(width, 0.5),
+        depth: Math.max(depth, 0.5),
+        rotation: 0,
+        active: true,
+        kind: "house",
+      });
+    }
+  }
+
+  private addHouseRoomPerimeter(bounds: { min: Vector3; max: Vector3 }) {
+    const wallThickness = 0.7;
+    const minX = bounds.min.x;
+    const maxX = bounds.max.x;
+    const minZ = bounds.min.z;
+    const maxZ = bounds.max.z;
+    const width = maxX - minX;
+    const depth = maxZ - minZ;
+    const centerX = (minX + maxX) * 0.5;
+    const centerZ = (minZ + maxZ) * 0.5;
+
+    this.staticBoxColliders.push(
+      {
+        x: minX + wallThickness * 0.5,
+        z: centerZ,
+        width: wallThickness,
+        depth,
+        rotation: 0,
+        active: true,
+        kind: "house",
+      },
+      {
+        x: maxX - wallThickness * 0.5,
+        z: centerZ,
+        width: wallThickness,
+        depth,
+        rotation: 0,
+        active: true,
+        kind: "house",
+      },
+      {
+        x: centerX,
+        z: minZ + wallThickness * 0.5,
+        width,
+        depth: wallThickness,
+        rotation: 0,
+        active: true,
+        kind: "house",
+      },
+      {
+        x: centerX,
+        z: maxZ - wallThickness * 0.5,
+        width,
+        depth: wallThickness,
+        rotation: 0,
+        active: true,
+        kind: "house",
+      }
+    );
+  }
+
   private createHouseDoor(meshes: AbstractMesh[], houseBounds: { min: Vector3; max: Vector3 }) {
     const doorMesh = meshes.find((mesh) => mesh.name.toLowerCase().includes("door"));
     const houseCenterX = (houseBounds.min.x + houseBounds.max.x) * 0.5;
@@ -1153,8 +1306,8 @@ export class Segments {
       ? (doorBounds.minimumWorld.y + doorBounds.maximumWorld.y) * 0.5
       : this.terrain.getHeightAt(doorCenterX, doorCenterZ) + 1.1;
     const doorWidth = doorBounds
-      ? Math.max(1.8, Math.min(3.6, doorBounds.maximumWorld.x - doorBounds.minimumWorld.x + 0.85))
-      : 2.4;
+      ? Math.max(2.6, Math.min(5.6, doorBounds.maximumWorld.x - doorBounds.minimumWorld.x + 1.05))
+      : 3.4;
     const doorHeight = doorBounds
       ? Math.max(2.8, doorBounds.maximumWorld.y - doorBounds.minimumWorld.y + 0.8)
       : 3.2;
@@ -1162,7 +1315,7 @@ export class Segments {
       x: doorCenterX,
       z: doorCenterZ,
       width: doorWidth,
-      depth: 0.7,
+      depth: 0.95,
       rotation: 0,
       active: true,
       kind: "door",
@@ -1230,7 +1383,7 @@ export class Segments {
   ) {
     const wallThickness = 0.65;
     const frontZ = doorZ;
-    const gapHalf = Math.max(doorWidth + 1.15, 2.7);
+    const gapHalf = Math.max(doorWidth * 0.5 + 0.85, 1.9);
     const leftMin = bounds.min.x;
     const leftMax = doorCenterX - gapHalf;
     const rightMin = doorCenterX + gapHalf;

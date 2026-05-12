@@ -19,10 +19,18 @@
     <div id="hud">
       <div id="help">
         Click para entrar<br/>
+        <span class="small">V camara · F linterna · botones 1P/3P/FR</span><br/>
         <span class="small">WASD mover · Shift correr · Space saltar · E interactuar · Esc salir</span>
       </div>
       <div id="hint" class="hidden"></div>
       <div id="reticle" aria-hidden="true"></div>
+
+      <div id="viewControls" aria-label="Modo de camara">
+        <button id="firstPersonButton" type="button" aria-label="Primera persona" aria-pressed="false">1P</button>
+        <button id="thirdPersonButton" type="button" aria-label="Tercera persona" aria-pressed="true">3P</button>
+        <button id="frontPersonButton" type="button" aria-label="Ver personaje de frente" aria-pressed="false">FR</button>
+        <button id="flashlightButton" type="button" aria-label="Encender o apagar linterna" aria-pressed="true">F</button>
+      </div>
 
       <div id="musicControls" aria-label="Music volume">
         <button id="musicToggle" type="button" aria-label="Mute music">Music</button>

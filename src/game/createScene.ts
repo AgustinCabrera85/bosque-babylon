@@ -6,7 +6,7 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { RockLibrary } from "./RockLibrary";
 import { createTerrain } from "./Terrain";
-import { PlayerController } from "./PlayerController";
+import { PlayerController, type ViewMode } from "./PlayerController";
 import { Segments } from "./Segments";
 import { TreeLibrary } from "./TreeLibrary";
 import { GrassLibrary } from "./GrassLibrary";
@@ -25,6 +25,7 @@ import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"; 
 import { Light } from "@babylonjs/core/Lights/light";
+import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 
 
 
@@ -118,6 +119,39 @@ export const mobileQuality: QualityProfile = {
   plantTemplateLimit: 2,
   fireflyCount: 5,
 };
+
+function setupViewModeControls(player: PlayerController) {
+  const firstButton = document.getElementById("firstPersonButton") as HTMLButtonElement | null;
+  const thirdButton = document.getElementById("thirdPersonButton") as HTMLButtonElement | null;
+  const frontButton = document.getElementById("frontPersonButton") as HTMLButtonElement | null;
+  const reticle = document.getElementById("reticle");
+  if (!firstButton || !thirdButton || !frontButton) return;
+
+  const setMode = (mode: ViewMode) => {
+    firstButton.classList.toggle("active", mode === "first");
+    thirdButton.classList.toggle("active", mode === "third");
+    frontButton.classList.toggle("active", mode === "front");
+    firstButton.setAttribute("aria-pressed", String(mode === "first"));
+    thirdButton.setAttribute("aria-pressed", String(mode === "third"));
+    frontButton.setAttribute("aria-pressed", String(mode === "front"));
+    reticle?.classList.toggle("hidden", mode === "front");
+  };
+
+  firstButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    player.setViewMode("first");
+  });
+  thirdButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    player.setViewMode("third");
+  });
+  frontButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    player.setViewMode("front");
+  });
+
+  player.onViewModeChange(setMode);
+}
 
 function createPathMesh(
   scene: Scene,
@@ -226,10 +260,10 @@ const terrain = createTerrain(scene, {
     {
       x: 0,
       z: 70 * 8 + 18,
-      width: 72,
-      depth: 96,
+      width: 118,
+      depth: 146,
       height: 0,
-      fade: 22,
+      fade: 32,
     },
   ],
 
@@ -302,14 +336,22 @@ const terrain = createTerrain(scene, {
     jumpSpeed: 6.2,
     gravity: -18.0,
   });
+  setupViewModeControls(player);
+
+  onProgress(0.36, "Cargando personaje...");
+  await player.loadCharacter();
 
 // =========================
 // 🔦 FLASHLIGHT (SpotLight)
 // =========================
+const FLASHLIGHT_BASE_INTENSITY = 4.4;
+const FLASHLIGHT_FILL_BASE_INTENSITY = 0.85;
+const FLASHLIGHT_REACH_BASE_INTENSITY = 0.62;
+const initialLook = player.getFlashlightRay();
 const flashlight = new SpotLight(
   "flashlight",
-  player.camera.globalPosition.clone(),
-  player.camera.getDirection(Vector3.Forward()),
+  initialLook.origin.clone(),
+  initialLook.direction.clone(),
   Math.PI / 3.8,
   1,
   scene
@@ -319,7 +361,7 @@ const flashlight = new SpotLight(
 flashlight.falloffType = Light.FALLOFF_GLTF;
 flashlight.innerAngle = Math.PI / 11;
 
-flashlight.intensity = 4.4;
+flashlight.intensity = FLASHLIGHT_BASE_INTENSITY;
 flashlight.range = 40;
 
 flashlight.diffuse = new Color3(1.0, 0.96, 0.88); // cálida
@@ -327,8 +369,8 @@ flashlight.specular = new Color3(0, 0, 0);
 
 const flashlightFill = new SpotLight(
   "flashlightFill",
-  player.camera.globalPosition.clone(),
-  player.camera.getDirection(Vector3.Forward()),
+  initialLook.origin.clone(),
+  initialLook.direction.clone(),
   Math.PI / 1.55,
   1,
   scene
@@ -336,25 +378,62 @@ const flashlightFill = new SpotLight(
 
 flashlightFill.falloffType = Light.FALLOFF_GLTF;
 flashlightFill.innerAngle = Math.PI / 6.5;
-flashlightFill.intensity = 0.85;
+flashlightFill.intensity = FLASHLIGHT_FILL_BASE_INTENSITY;
 flashlightFill.range = 34;
 flashlightFill.diffuse = new Color3(0.82, 0.74, 0.58);
 flashlightFill.specular = new Color3(0, 0, 0);
 
 const flashlightReach = new SpotLight(
   "flashlightReach",
-  player.camera.globalPosition.clone(),
-  player.camera.getDirection(Vector3.Forward()),
+  initialLook.origin.clone(),
+  initialLook.direction.clone(),
   Math.PI / 1.35,
   1,
   scene
 );
 
 flashlightReach.falloffType = Light.FALLOFF_STANDARD;
-flashlightReach.intensity = 0.62;
+flashlightReach.intensity = FLASHLIGHT_REACH_BASE_INTENSITY;
 flashlightReach.range = 95;
 flashlightReach.diffuse = new Color3(0.72, 0.70, 0.62);
 flashlightReach.specular = new Color3(0, 0, 0);
+
+const frontViewFill = new SpotLight(
+  "frontViewFill",
+  player.camera.globalPosition.clone(),
+  player.getLookRay().direction.clone(),
+  Math.PI / 2.2,
+  1.4,
+  scene
+);
+frontViewFill.falloffType = Light.FALLOFF_GLTF;
+frontViewFill.intensity = 0;
+frontViewFill.range = 9;
+frontViewFill.diffuse = new Color3(0.72, 0.76, 0.68);
+frontViewFill.specular = new Color3(0, 0, 0);
+
+const flashlightLights = [flashlight, flashlightFill, flashlightReach];
+let flashlightEnabled = true;
+const flashlightButton = document.getElementById("flashlightButton") as HTMLButtonElement | null;
+const setFlashlightEnabled = (enabled: boolean) => {
+  flashlightEnabled = enabled;
+  flashlight.intensity = enabled ? FLASHLIGHT_BASE_INTENSITY : 0;
+  flashlightFill.intensity = enabled ? FLASHLIGHT_FILL_BASE_INTENSITY : 0;
+  flashlightReach.intensity = enabled ? FLASHLIGHT_REACH_BASE_INTENSITY : 0;
+  flashlightButton?.classList.toggle("active", enabled);
+  flashlightButton?.setAttribute("aria-pressed", String(enabled));
+};
+
+flashlightButton?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setFlashlightEnabled(!flashlightEnabled);
+});
+
+scene.onKeyboardObservable.add((kb) => {
+  if (kb.type !== KeyboardEventTypes.KEYDOWN) return;
+  const event = kb.event as KeyboardEvent;
+  if (event.code === "KeyF" && !event.repeat) setFlashlightEnabled(!flashlightEnabled);
+});
 
 // Sombras (opcional pero suma MUCHO)
 if (quality.shadowMapSize > 0) {
@@ -374,8 +453,9 @@ scene.meshes.forEach(m => {
 // Update por frame + flicker muy leve
 let t = 0;
 scene.onBeforeRenderObservable.add(() => {
-  const pos = player.camera.globalPosition;
-  const dir = player.camera.getDirection(Vector3.Forward());
+  const look = player.getFlashlightRay();
+  const pos = look.origin;
+  const dir = look.direction;
 
   flashlight.position.copyFrom(pos);
   flashlight.direction.copyFrom(dir);
@@ -384,12 +464,24 @@ scene.onBeforeRenderObservable.add(() => {
   flashlightReach.position.copyFrom(pos);
   flashlightReach.direction.copyFrom(dir);
 
+  const frontFillTarget = player.position.add(new Vector3(0, -0.35, 0));
+  const frontFillDirection = frontFillTarget.subtract(player.camera.globalPosition);
+  if (frontFillDirection.lengthSquared() > 0) frontFillDirection.normalize();
+  frontViewFill.position.copyFrom(player.camera.globalPosition);
+  frontViewFill.direction.copyFrom(frontFillDirection);
+  frontViewFill.intensity = player.currentViewMode === "front" ? 0.55 : 0;
+
+  if (!flashlightEnabled) {
+    flashlightLights.forEach((light) => (light.intensity = 0));
+    return;
+  }
+
   // micro flicker (casi imperceptible)
   t += scene.getEngine().getDeltaTime() * 0.001;
   const flicker = Math.sin(t * 17.0) * 0.05 + Math.sin(t * 7.0) * 0.035;
-  flashlight.intensity = 4.4 + flicker;
-  flashlightFill.intensity = 0.85 + flicker * 0.25;
-  flashlightReach.intensity = 0.62 + flicker * 0.12;
+  flashlight.intensity = FLASHLIGHT_BASE_INTENSITY + flicker;
+  flashlightFill.intensity = FLASHLIGHT_FILL_BASE_INTENSITY + flicker * 0.25;
+  flashlightReach.intensity = FLASHLIGHT_REACH_BASE_INTENSITY + flicker * 0.12;
 });
 
 
@@ -452,7 +544,12 @@ scene.onBeforeRenderObservable.add(() => {
       el.classList.remove("hidden");
     },
   };
-  const interactSystem = new InteractSystem(scene, player.camera, hints);
+  const interactSystem = new InteractSystem(
+    scene,
+    () => player.getLookRay(),
+    hints,
+    (type) => player.playInteractionAction(type)
+  );
   setupMobileControls(player, () => interactSystem.tryInteract());
 
   // =========================
@@ -480,7 +577,7 @@ scene.onBeforeRenderObservable.add(() => {
       }
     }
 
-    const looking = segments.peekInteractable(player.camera);
+    const looking = segments.peekInteractable(player.getLookRay());
     hints.set(looking ? "E: interactuar" : null);
   });
 

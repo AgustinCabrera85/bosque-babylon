@@ -82,6 +82,8 @@ type CandleFlameEntry = {
   light: PointLight;
   baseIntensity: number;
   phase: number;
+  age: number;
+  fadeInSeconds: number;
   flame: Mesh;
   glow: Mesh;
   sparks: Mesh[];
@@ -98,6 +100,8 @@ const CANDLE_RESERVE_RADIUS = 1.35;
 const CANDLE_COLLISION_RADIUS = 0.55;
 const CANDLE_FLAME_WIDTH = 0.34;
 const CANDLE_FLAME_HEIGHT = 0.68;
+const SEGMENT_CANDLE_FADE_SECONDS = 0.85;
+const STREAM_TREE_LOD: 0 | 1 | 2 = 1;
 // Higher values lower the flame plane; the fire texture has transparent padding at its base.
 const CANDLE_FLAME_WICK_TIP_INSET = 1.35;
 const START_BLOCKER_Z = -9.5;
@@ -156,13 +160,12 @@ export class Segments {
   }
 
   // =========================
-  // LOD por distancia (segmento)
+  // LOD estable por segmento
   // =========================
   private lodFor(segmentId: number, currentSeg: number): 0 | 1 | 2 {
-    const d = Math.abs(segmentId - currentSeg);
-    if (d === 0) return 0;
-    if (d <= 2) return 1;
-    return 2;
+    void segmentId;
+    void currentSeg;
+    return STREAM_TREE_LOD;
   }
 
   private segmentRange(currentSeg: number, behind: number, ahead: number) {
@@ -759,7 +762,8 @@ export class Segments {
     rotationY: number,
     candleScale: number,
     lightIntensity: number,
-    lightRange: number
+    lightRange: number,
+    fadeInSeconds = SEGMENT_CANDLE_FADE_SECONDS
   ) {
     const size = candleScale / CANDLE_MODEL_SCALE;
     const flameWidth = CANDLE_FLAME_WIDTH * size;
@@ -774,6 +778,7 @@ export class Segments {
     flame.material = this.candleFireMaterial;
     flame.isPickable = false;
     flame.billboardMode = Mesh.BILLBOARDMODE_ALL;
+    flame.visibility = fadeInSeconds > 0 ? 0 : 1;
 
     const glow = MeshBuilder.CreatePlane(`${name}Glow`, { width: flameWidth * 2.4, height: flameHeight * 1.9 }, this.scene);
     glow.parent = root;
@@ -781,6 +786,7 @@ export class Segments {
     glow.material = this.candleGlowMaterial;
     glow.isPickable = false;
     glow.billboardMode = Mesh.BILLBOARDMODE_ALL;
+    glow.visibility = fadeInSeconds > 0 ? 0 : 0.64;
 
     const sparks = Array.from({ length: 3 }, (_, sparkIndex) => {
       const spark = MeshBuilder.CreatePlane(
@@ -804,7 +810,7 @@ export class Segments {
     );
     light.diffuse = new Color3(1.0, 0.55, 0.2);
     light.specular = new Color3(1.0, 0.42, 0.12);
-    light.intensity = lightIntensity;
+    light.intensity = fadeInSeconds > 0 ? 0 : lightIntensity;
     light.range = lightRange;
 
     this.candleLights.push({
@@ -812,6 +818,8 @@ export class Segments {
       light,
       baseIntensity: lightIntensity,
       phase: (this.candleLights.length % 17) * 1.37,
+      age: fadeInSeconds > 0 ? 0 : fadeInSeconds,
+      fadeInSeconds,
       flame,
       glow,
       sparks,
@@ -827,18 +835,25 @@ export class Segments {
 
     let t = 0;
     this.scene.onBeforeRenderObservable.add(() => {
-      t += this.scene.getEngine().getDeltaTime() * 0.001;
+      const dt = this.scene.getEngine().getDeltaTime() * 0.001;
+      t += dt;
       for (const entry of this.candleLights) {
+        entry.age += dt;
+        const fade =
+          entry.fadeInSeconds > 0
+            ? Math.min(1, entry.age / entry.fadeInSeconds)
+            : 1;
         const flicker =
           Math.sin(t * 16.0 + entry.phase) * 0.13 +
           Math.sin(t * 29.0 + entry.phase * 0.61) * 0.075 +
           Math.sin(t * 47.0 + entry.phase * 1.23) * 0.04;
-        entry.light.intensity = Math.max(0, entry.baseIntensity + flicker);
+        entry.light.intensity = Math.max(0, (entry.baseIntensity + flicker) * fade);
 
         const bend = Math.sin(t * 8.6 + entry.phase) * 0.06 + Math.sin(t * 17.5 + entry.phase * 0.4) * 0.024;
         const stretch = 1 + Math.sin(t * 11.8 + entry.phase * 0.7) * 0.085 + Math.sin(t * 24.0 + entry.phase) * 0.045;
         const width = 1 + Math.sin(t * 15.5 + entry.phase * 1.9) * 0.055;
         entry.root.rotation.z = bend;
+        entry.flame.visibility = fade;
         entry.flame.scaling.set(width, stretch, 1);
         entry.flame.position.x = 0;
         entry.flame.position.y = (entry.flameHeight * stretch) * 0.5;
@@ -847,14 +862,14 @@ export class Segments {
         entry.glow.scaling.set(glowPulse, glowPulse, 1);
         entry.glow.position.x = 0;
         entry.glow.position.y = entry.flameHeight * (0.54 + (stretch - 1) * 0.25);
-        entry.glow.visibility = Math.max(0.38, Math.min(0.95, 0.64 + flicker * 1.55));
+        entry.glow.visibility = Math.max(0.38, Math.min(0.95, 0.64 + flicker * 1.55)) * fade;
 
         entry.sparks.forEach((spark, sparkIndex) => {
           const sparkPhase = entry.phase + sparkIndex * 2.17;
           const cycle = (Math.sin(t * (4.2 + sparkIndex * 0.7) + sparkPhase) + 1) * 0.5;
           const pulse = Math.max(0, Math.sin(cycle * Math.PI * 2 - Math.PI * 0.2));
           const drift = (cycle - 0.5) * 0.12;
-          spark.visibility = pulse > 0.6 ? (pulse - 0.6) * 0.45 : 0;
+          spark.visibility = (pulse > 0.6 ? (pulse - 0.6) * 0.45 : 0) * fade;
           spark.scaling.set(0.42 + pulse * 0.42, 0.42 + pulse * 0.42, 1);
           spark.position.x = Math.sin(t * 2.4 + sparkPhase) * 0.035 + drift * 0.04;
           spark.position.y = entry.flameHeight * (0.72 + cycle * 0.32);
@@ -977,7 +992,8 @@ export class Segments {
       root.rotation.y,
       HOUSE_CANDLE_DIAMETER_SCALE,
       1.15,
-      14
+      14,
+      0
     );
   }
 
@@ -1507,13 +1523,13 @@ export class Segments {
 
   private applyCombinedGrassBuffers(needed: Set<number>, currentSeg: number) {
     if (!this.grassBases) return;
+    void currentSeg;
 
     for (let b = 0; b < this.grassBases.length; b++) {
       const parts: Float32Array[] = [];
 
       for (const segId of needed) {
-        const ring = this.getRing(segId, currentSeg);
-        const want = this.grassCountForRing(ring);
+        const want = this.stableGrassCount();
         if (want <= 0) continue;
 
         const segBuffers = this.grassSegments.get(segId);
@@ -1606,13 +1622,13 @@ export class Segments {
 
   private applyCombinedPlantBuffers(needed: Set<number>, currentSeg: number) {
     if (!this.plantBases) return;
+    void currentSeg;
 
     for (let b = 0; b < this.plantBases.length; b++) {
       const parts: Float32Array[] = [];
 
       for (const segId of needed) {
-        const ring = this.getRing(segId, currentSeg);
-        const want = this.plantCountForRing(ring);
+        const want = this.stablePlantCount();
         if (want <= 0) continue;
 
         const segBuffers = this.plantSegments.get(segId);
@@ -1728,29 +1744,15 @@ export class Segments {
   }
 
   // =========================
-  // LOD HELPERS
+  // STREAMING HELPERS
   // =========================
-  private getRing(segId: number, currentSeg: number) {
-    const d = Math.abs(segId - currentSeg);
-    if (d === 0) return 0;
-    if (d === 1) return 1;
-    if (d === 2) return 2;
-    return 999;
-  }
-
-  private grassCountForRing(ring: number) {
+  private stableGrassCount() {
     const counts = this.cfg.grassRingCounts ?? [2500, 800, 100];
-    if (ring === 0) return counts[0];
-    if (ring === 1) return counts[1];
-    if (ring === 2) return counts[2];
-    return 0;
+    return counts[1] ?? counts[0] ?? 0;
   }
 
-  private plantCountForRing(ring: number) {
+  private stablePlantCount() {
     const counts = this.cfg.plantRingCounts ?? [120, 40, 10];
-    if (ring === 0) return counts[0];
-    if (ring === 1) return counts[1];
-    if (ring === 2) return counts[2];
-    return this.cfg.plantFarCount ?? 0;
+    return counts[1] ?? counts[0] ?? this.cfg.plantFarCount ?? 0;
   }
 }

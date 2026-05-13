@@ -190,7 +190,13 @@ export class PlayerController {
   }
 
   getFlashlightRay(): LookRay {
-    if (this.viewMode !== "front") return this.getLookRay();
+    if (this.viewMode === "first") {
+      const look = this.getLookRay();
+      return {
+        origin: look.origin.add(look.direction.scale(0.45)).add(new Vector3(0, -0.08, 0)),
+        direction: look.direction,
+      };
+    }
 
     this.root.computeWorldMatrix(true);
     const world = this.root.getWorldMatrix();
@@ -202,9 +208,9 @@ export class PlayerController {
     return {
       origin: this.root
         .getAbsolutePosition()
-        .add(forward.scale(1.15))
+        .add(forward.scale(1.35))
         .add(right.scale(0.35))
-        .add(new Vector3(0, -0.2, 0)),
+        .add(new Vector3(0, -0.18, 0)),
       direction: forward,
     };
   }

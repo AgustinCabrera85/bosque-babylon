@@ -40,6 +40,7 @@ const PATH_END_Z = 70 * 8 - 8;
 const PATH_SURFACE_OFFSET = 0.1;
 const ANIMATION_BLEND_TIME = 0.16;
 const ACTION_BLEND_TIME = 0.08;
+const DOOR_OPEN_MOVEMENT_LOCK_SECONDS = 1.7;
 
 export class PlayerController {
   public readonly root: TransformNode;
@@ -66,6 +67,7 @@ export class PlayerController {
   private fadeElapsed = 0;
   private fadeDuration = ANIMATION_BLEND_TIME;
   private actionPlaying = false;
+  private movementLockTimer = 0;
 
   constructor(private scene: Scene, private canvas: HTMLCanvasElement, private settings: Settings) {
     this.root = new TransformNode("playerRoot", scene);
@@ -175,8 +177,18 @@ export class PlayerController {
     this.playAnimation("Idle", true);
   }
 
-  playInteractionAction(type?: string) {
-    this.playAction(type === "door" ? "OpenDoor" : "PickUpItem");
+  playInteractionAction(type?: string, movementLockSeconds = DOOR_OPEN_MOVEMENT_LOCK_SECONDS) {
+    if (type === "door") {
+      this.lockMovement(movementLockSeconds);
+      this.playAction("OpenDoor");
+      return;
+    }
+
+    this.playAction("PickUpItem");
+  }
+
+  private lockMovement(seconds: number) {
+    this.movementLockTimer = Math.max(this.movementLockTimer, seconds);
   }
 
   getLookRay(): LookRay {
@@ -268,6 +280,10 @@ export class PlayerController {
   }
 
   update(dt: number, terrain: TerrainHandle, segments: Segments) {
+    if (this.movementLockTimer > 0) {
+      this.movementLockTimer = Math.max(0, this.movementLockTimer - dt);
+    }
+
     const active = this.mobileEnabled || document.pointerLockElement === this.canvas;
     if (!active) {
       if (!this.actionPlaying) this.playAnimation("Idle", true);
@@ -304,6 +320,12 @@ export class PlayerController {
 
     const running = this.mobileRun || this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
     const speed = running ? this.settings.runSpeed : this.settings.walkSpeed;
+
+    if (this.movementLockTimer > 0) {
+      moveX = 0;
+      moveY = 0;
+      move.set(0, 0, 0);
+    }
 
     if (move.lengthSquared() > 0) {
       move.normalize().scaleInPlace(speed * dt);

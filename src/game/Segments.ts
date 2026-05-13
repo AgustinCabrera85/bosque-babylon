@@ -102,6 +102,10 @@ const CANDLE_FLAME_WIDTH = 0.34;
 const CANDLE_FLAME_HEIGHT = 0.68;
 const SEGMENT_CANDLE_FADE_SECONDS = 0.85;
 const STREAM_TREE_LOD: 0 | 1 | 2 = 1;
+const PLAYER_WORLD_COLLISION_RADIUS = 1.0;
+const PLAYER_HOUSE_COLLISION_RADIUS = 0.42;
+const PLAYER_DOOR_COLLISION_RADIUS = 0.62;
+const PLAYER_BLOCKER_COLLISION_RADIUS = 1.0;
 // Higher values lower the flame plane; the fire texture has transparent padding at its base.
 const CANDLE_FLAME_WICK_TIP_INSET = 1.35;
 const START_BLOCKER_Z = -9.5;
@@ -272,17 +276,22 @@ export class Segments {
   // COLLISION
   // =========================
   isColliding(x: number, z: number) {
-    const R = 1.0;
     for (const c of this.colliders) {
       const dx = x - c.x;
       const dz = z - c.z;
-      if (dx * dx + dz * dz < (R + c.radius) ** 2) return true;
+      if (dx * dx + dz * dz < (PLAYER_WORLD_COLLISION_RADIUS + c.radius) ** 2) return true;
     }
     for (const c of this.staticBoxColliders) {
       if (!c.active) continue;
-      if (this.isPointInsideBoxCollider(x, z, R, c)) return true;
+      if (this.isPointInsideBoxCollider(x, z, this.boxColliderPlayerRadius(c), c)) return true;
     }
     return false;
+  }
+
+  private boxColliderPlayerRadius(collider: BoxCollider) {
+    if (collider.kind === "house") return PLAYER_HOUSE_COLLISION_RADIUS;
+    if (collider.kind === "door") return PLAYER_DOOR_COLLISION_RADIUS;
+    return PLAYER_BLOCKER_COLLISION_RADIUS;
   }
 
   resolveCameraPosition(origin: Vector3, desired: Vector3) {
@@ -1230,6 +1239,7 @@ export class Segments {
     for (const mesh of meshes) {
       const name = mesh.name.toLowerCase();
       if (!collisionNames.some((part) => name.includes(part))) continue;
+      if (mesh instanceof Mesh && this.addHouseTriangleColliders(mesh) > 0) continue;
 
       const bounds = this.getMeshBounds(mesh);
       if (!bounds) continue;
@@ -1240,10 +1250,7 @@ export class Segments {
       const thinAxis = Math.min(width, depth);
       if (height < 0.35 || width < 0.08 || depth < 0.08) continue;
 
-      if (thinAxis > 1.8) {
-        if (name.includes("houseleft")) this.addHouseRoomPerimeter(bounds);
-        continue;
-      }
+      if (thinAxis > 1.8) continue;
 
       this.staticBoxColliders.push({
         x: (bounds.min.x + bounds.max.x) * 0.5,
@@ -1257,55 +1264,49 @@ export class Segments {
     }
   }
 
-  private addHouseRoomPerimeter(bounds: { min: Vector3; max: Vector3 }) {
-    const wallThickness = 0.7;
-    const minX = bounds.min.x;
-    const maxX = bounds.max.x;
-    const minZ = bounds.min.z;
-    const maxZ = bounds.max.z;
-    const width = maxX - minX;
-    const depth = maxZ - minZ;
-    const centerX = (minX + maxX) * 0.5;
-    const centerZ = (minZ + maxZ) * 0.5;
+  private addHouseTriangleColliders(mesh: Mesh) {
+    const positions = mesh.getVerticesData("position");
+    const indices = mesh.getIndices();
+    if (!positions || !indices) return 0;
 
-    this.staticBoxColliders.push(
-      {
-        x: minX + wallThickness * 0.5,
-        z: centerZ,
-        width: wallThickness,
-        depth,
+    mesh.computeWorldMatrix(true);
+    const world = mesh.getWorldMatrix();
+    const wallThickness = 0.26;
+    let added = 0;
+
+    for (let i = 0; i < indices.length; i += 3) {
+      const points = [0, 1, 2].map((offset) => {
+        const vertexIndex = indices[i + offset] * 3;
+        return Vector3.TransformCoordinates(
+          new Vector3(
+            positions[vertexIndex],
+            positions[vertexIndex + 1],
+            positions[vertexIndex + 2]
+          ),
+          world
+        );
+      });
+
+      const min = points.reduce((acc, point) => Vector3.Minimize(acc, point), points[0].clone());
+      const max = points.reduce((acc, point) => Vector3.Maximize(acc, point), points[0].clone());
+      const width = max.x - min.x;
+      const height = max.y - min.y;
+      const depth = max.z - min.z;
+      if (height < 0.45 || (width < 0.08 && depth < 0.08)) continue;
+
+      this.staticBoxColliders.push({
+        x: (min.x + max.x) * 0.5,
+        z: (min.z + max.z) * 0.5,
+        width: Math.max(width, width >= depth ? 0.1 : wallThickness),
+        depth: Math.max(depth, depth > width ? 0.1 : wallThickness),
         rotation: 0,
         active: true,
         kind: "house",
-      },
-      {
-        x: maxX - wallThickness * 0.5,
-        z: centerZ,
-        width: wallThickness,
-        depth,
-        rotation: 0,
-        active: true,
-        kind: "house",
-      },
-      {
-        x: centerX,
-        z: minZ + wallThickness * 0.5,
-        width,
-        depth: wallThickness,
-        rotation: 0,
-        active: true,
-        kind: "house",
-      },
-      {
-        x: centerX,
-        z: maxZ - wallThickness * 0.5,
-        width,
-        depth: wallThickness,
-        rotation: 0,
-        active: true,
-        kind: "house",
-      }
-    );
+      });
+      added++;
+    }
+
+    return added;
   }
 
   private createHouseDoor(meshes: AbstractMesh[], houseBounds: { min: Vector3; max: Vector3 }) {

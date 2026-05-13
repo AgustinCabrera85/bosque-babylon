@@ -5,6 +5,14 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 type Hints = { set(text: string | null): void };
 type LookRay = { origin: Vector3; direction: Vector3 };
+type InteractResult =
+  | string
+  | {
+      message?: string;
+      actionType?: string;
+      movementLockSeconds?: number;
+      suppressAction?: boolean;
+    };
 
 type InteractableMetadata = {
   interactable?: boolean;
@@ -12,7 +20,7 @@ type InteractableMetadata = {
   id?: string;
   title?: string;
   locked?: boolean;
-  onInteract?: () => string | void;
+  onInteract?: () => InteractResult | void;
 };
 
 export class InteractSystem {
@@ -20,7 +28,7 @@ export class InteractSystem {
     private scene: Scene,
     private getLookRay: () => LookRay,
     private hints: Hints,
-    private onAction?: (type?: string) => void
+    private onAction?: (type?: string, movementLockSeconds?: number) => void
   ) {
     scene.onKeyboardObservable.add((kb) => {
       if (kb.type === KeyboardEventTypes.KEYDOWN && kb.event.code === "KeyE") {
@@ -40,9 +48,19 @@ export class InteractSystem {
     if (!hit?.hit || !hit.pickedMesh) return;
 
     const data = hit.pickedMesh.metadata as InteractableMetadata | undefined;
-    this.onAction?.(data?.type);
+    const customResult = data?.onInteract?.();
+    const customMessage =
+      typeof customResult === "string" ? customResult : customResult?.message;
+    const actionType =
+      typeof customResult === "object" ? customResult.actionType ?? data?.type : data?.type;
+    const suppressAction =
+      typeof customResult === "object" ? !!customResult.suppressAction : false;
 
-    const customMessage = data?.onInteract?.();
+    const movementLockSeconds =
+      typeof customResult === "object" ? customResult.movementLockSeconds : undefined;
+
+    if (!suppressAction) this.onAction?.(actionType, movementLockSeconds);
+
     if (customMessage) {
       this.hints.set(customMessage);
       return;

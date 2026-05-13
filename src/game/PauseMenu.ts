@@ -11,7 +11,7 @@ export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
   const menu = document.getElementById("pauseMenu");
   const pauseButton = document.getElementById("pauseButton") as HTMLButtonElement | null;
   const resumeButton = document.getElementById("resumeButton") as HTMLButtonElement | null;
-  const resumeLargeButton = document.getElementById("resumeLargeButton") as HTMLButtonElement | null;
+  const backButton = document.getElementById("backButton") as HTMLButtonElement | null;
 
   let paused = false;
 
@@ -62,7 +62,7 @@ export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
     setPaused(false);
   });
 
-  resumeLargeButton?.addEventListener("click", (event) => {
+  backButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     setPaused(false);
   });

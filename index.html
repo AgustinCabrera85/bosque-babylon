@@ -33,12 +33,6 @@
         <button id="pauseButton" type="button" aria-label="Pausar juego" aria-pressed="false">II</button>
       </div>
 
-      <div id="musicControls" aria-label="Music volume">
-        <button id="musicToggle" type="button" aria-label="Mute music">Music</button>
-        <input id="musicVolume" type="range" min="0" max="100" step="1" value="45" aria-label="Music volume" />
-        <span id="musicVolumeValue">45%</span>
-      </div>
-
       <div id="mobileControls" aria-hidden="true">
         <div id="moveStick" class="stick" data-stick="move">
           <div class="stick-thumb"></div>
@@ -50,35 +44,43 @@
       </div>
     </div>
 
-    <div id="pauseMenu" class="hidden" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
-      <div class="pause-panel">
-        <div class="pause-header">
-          <h1 id="pauseTitle">Pausa</h1>
-          <button id="resumeButton" class="icon-button" type="button" aria-label="Continuar">X</button>
+    <div id="pauseMenu" class="pause-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+      <section class="menu-panel">
+        <span class="corner tl"></span>
+        <span class="corner tr"></span>
+        <span class="corner bl"></span>
+        <span class="corner br"></span>
+
+        <h1 id="pauseTitle" class="menu-title">Pausa</h1>
+        <p class="menu-subtitle">Opciones de sonido</p>
+
+        <div class="settings" aria-label="Audio">
+          <div class="setting-row">
+            <label class="setting-label" for="musicVolume">Musica</label>
+            <input id="musicVolume" type="range" min="0" max="100" step="1" value="70" />
+            <span class="value" id="musicValue">70%</span>
+          </div>
+
+          <div class="setting-row">
+            <label class="setting-label" for="ambientVolume">Ambiente</label>
+            <input id="ambientVolume" type="range" min="0" max="100" step="1" value="85" />
+            <span class="value" id="ambientValue">85%</span>
+          </div>
+
+          <div class="setting-row">
+            <label class="setting-label" for="sfxVolume">SFX</label>
+            <input id="sfxVolume" type="range" min="0" max="100" step="1" value="80" />
+            <span class="value" id="sfxValue">80%</span>
+          </div>
         </div>
 
-        <div class="pause-sliders" aria-label="Audio">
-          <label class="volume-row" for="pauseMusicVolume">
-            <span>Musica</span>
-            <input id="pauseMusicVolume" type="range" min="0" max="100" step="1" value="45" />
-            <strong id="pauseMusicVolumeValue">45%</strong>
-          </label>
-
-          <label class="volume-row" for="pauseAmbientVolume">
-            <span>Ambiente</span>
-            <input id="pauseAmbientVolume" type="range" min="0" max="100" step="1" value="55" />
-            <strong id="pauseAmbientVolumeValue">55%</strong>
-          </label>
-
-          <label class="volume-row" for="pauseSfxVolume">
-            <span>SFX</span>
-            <input id="pauseSfxVolume" type="range" min="0" max="100" step="1" value="70" />
-            <strong id="pauseSfxVolumeValue">70%</strong>
-          </label>
+        <div class="menu-actions">
+          <button class="menu-button" id="resumeButton" type="button">Continuar</button>
+          <button class="menu-button secondary" id="backButton" type="button">Volver</button>
         </div>
 
-        <button id="resumeLargeButton" class="primary-button" type="button">Continuar</button>
-      </div>
+        <div class="pause-hint">ESC para cerrar el menu</div>
+      </section>
     </div>
 
     <canvas id="renderCanvas"></canvas>

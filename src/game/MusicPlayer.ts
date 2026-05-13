@@ -3,10 +3,9 @@ import { asset } from "../utils/asset";
 const MUSIC_VOLUME_KEY = "bosque.musicVolume";
 const AMBIENT_VOLUME_KEY = "bosque.ambientVolume";
 const SFX_VOLUME_KEY = "bosque.sfxVolume";
-const MUTED_VOLUME = 0;
-const DEFAULT_MUSIC_VOLUME = 0.45;
-const DEFAULT_AMBIENT_VOLUME = 0.55;
-const DEFAULT_SFX_VOLUME = 0.7;
+const DEFAULT_MUSIC_VOLUME = 0.7;
+const DEFAULT_AMBIENT_VOLUME = 0.85;
+const DEFAULT_SFX_VOLUME = 0.8;
 
 type VolumeChannel = "music" | "ambient" | "sfx";
 
@@ -44,16 +43,13 @@ function renderBinding(binding: SliderBinding | null, volume: number) {
 }
 
 export function setupMusicPlayer() {
-  const musicControls = document.getElementById("musicControls");
-  const musicToggle = document.getElementById("musicToggle") as HTMLButtonElement | null;
-  const musicHud = getSlider("musicVolume", "musicVolumeValue");
-  const pauseMusic = getSlider("pauseMusicVolume", "pauseMusicVolumeValue");
-  const pauseAmbient = getSlider("pauseAmbientVolume", "pauseAmbientVolumeValue");
-  const pauseSfx = getSlider("pauseSfxVolume", "pauseSfxVolumeValue");
+  const pauseMenu = document.getElementById("pauseMenu");
+  const musicSlider = getSlider("musicVolume", "musicValue");
+  const ambientSlider = getSlider("ambientVolume", "ambientValue");
+  const sfxSlider = getSlider("sfxVolume", "sfxValue");
 
-  if (!musicControls || !musicToggle || !musicHud) return;
+  if (!musicSlider || !ambientSlider || !sfxSlider) return;
 
-  const toggle = musicToggle;
   const music = new Audio(asset("assets/audio/music/Echoes_in_the_Dark_ingame.mp3"));
   music.loop = true;
   music.preload = "auto";
@@ -74,7 +70,6 @@ export function setupMusicPlayer() {
   let started = false;
   let ambientStarted = false;
   let footstepMode: "idle" | "walk" | "run" = "idle";
-  let previousMusicVolume = readSavedVolume(MUSIC_VOLUME_KEY, DEFAULT_MUSIC_VOLUME) || DEFAULT_MUSIC_VOLUME;
   let audioContext: AudioContext | null = null;
   let sfxGain: GainNode | null = null;
 
@@ -85,16 +80,13 @@ export function setupMusicPlayer() {
   };
 
   function renderMusic(volume: number) {
-    renderBinding(musicHud, volume);
-    renderBinding(pauseMusic, volume);
-    toggle.textContent = volume > 0 ? "Music" : "Muted";
-    toggle.setAttribute("aria-pressed", volume > 0 ? "false" : "true");
+    renderBinding(musicSlider, volume);
   }
 
   function renderAll() {
     renderMusic(volumes.music);
-    renderBinding(pauseAmbient, volumes.ambient);
-    renderBinding(pauseSfx, volumes.sfx);
+    renderBinding(ambientSlider, volumes.ambient);
+    renderBinding(sfxSlider, volumes.sfx);
   }
 
   function ensureAudioContext() {
@@ -201,7 +193,6 @@ export function setupMusicPlayer() {
     if (channel === "music") {
       music.volume = next;
       music.muted = next <= 0;
-      if (next > 0) previousMusicVolume = next;
       if (save) localStorage.setItem(MUSIC_VOLUME_KEY, String(next));
       renderMusic(next);
     }
@@ -210,14 +201,14 @@ export function setupMusicPlayer() {
       ambient.volume = next * 0.65;
       ambient.muted = next <= 0;
       if (save) localStorage.setItem(AMBIENT_VOLUME_KEY, String(next));
-      renderBinding(pauseAmbient, next);
+      renderBinding(ambientSlider, next);
     }
 
     if (channel === "sfx") {
       if (sfxGain) sfxGain.gain.value = next;
       setSfxElementVolumes(next);
       if (save) localStorage.setItem(SFX_VOLUME_KEY, String(next));
-      renderBinding(pauseSfx, next);
+      renderBinding(sfxSlider, next);
     }
   }
 
@@ -232,22 +223,14 @@ export function setupMusicPlayer() {
     });
   }
 
-  musicControls.addEventListener("pointerdown", (event) => event.stopPropagation());
-  musicControls.addEventListener("click", (event) => event.stopPropagation());
+  pauseMenu?.addEventListener("pointerdown", (event) => event.stopPropagation());
+  pauseMenu?.addEventListener("click", (event) => event.stopPropagation());
 
-  bindSlider(musicHud, "music");
-  bindSlider(pauseMusic, "music");
-  bindSlider(pauseAmbient, "ambient");
-  bindSlider(pauseSfx, "sfx", true);
+  bindSlider(musicSlider, "music");
+  bindSlider(ambientSlider, "ambient");
+  bindSlider(sfxSlider, "sfx", true);
 
-  toggle.addEventListener("click", () => {
-    const muted = volumes.music > MUTED_VOLUME;
-    setVolume("music", muted ? MUTED_VOLUME : previousMusicVolume);
-    playUiSfx();
-    void start();
-  });
-
-  document.getElementById("pauseMenu")?.addEventListener("click", (event) => {
+  pauseMenu?.addEventListener("click", (event) => {
     if ((event.target as HTMLElement | null)?.closest("button")) playUiSfx();
   });
 

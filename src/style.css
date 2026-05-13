@@ -166,6 +166,11 @@ html, body {
   border-color: rgba(155, 197, 157, 0.45);
 }
 
+#viewControls button.paused {
+  background: rgba(224, 174, 91, 0.28);
+  border-color: rgba(224, 174, 91, 0.5);
+}
+
 #musicToggle {
   height: 30px;
   padding: 0 10px;
@@ -188,6 +193,98 @@ html, body {
 #musicVolumeValue {
   width: 36px;
   color: rgba(229, 239, 231, 0.82);
+  font-size: 12px;
+  text-align: right;
+}
+
+#pauseMenu {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(1, 3, 3, 0.68);
+  color: #e5efe7;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+}
+
+#pauseMenu.hidden {
+  display: none;
+}
+
+.pause-panel {
+  width: min(420px, calc(100vw - 48px));
+  padding: 18px;
+  border: 1px solid rgba(229, 239, 231, 0.14);
+  border-radius: 8px;
+  background: rgba(6, 10, 8, 0.92);
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.42);
+}
+
+.pause-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.pause-header h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.icon-button,
+.primary-button {
+  border: 1px solid rgba(229, 239, 231, 0.2);
+  border-radius: 6px;
+  background: rgba(229, 239, 231, 0.08);
+  color: #e5efe7;
+  font: 800 13px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+.icon-button {
+  width: 34px;
+  height: 34px;
+}
+
+.primary-button {
+  width: 100%;
+  height: 42px;
+  margin-top: 16px;
+}
+
+.icon-button:hover,
+.primary-button:hover {
+  background: rgba(155, 197, 157, 0.22);
+  border-color: rgba(155, 197, 157, 0.42);
+}
+
+.pause-sliders {
+  display: grid;
+  gap: 12px;
+}
+
+.volume-row {
+  display: grid;
+  grid-template-columns: 86px 1fr 44px;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+  color: rgba(229, 239, 231, 0.88);
+  font-size: 13px;
+}
+
+.volume-row input {
+  width: 100%;
+  accent-color: #9bc59d;
+}
+
+.volume-row strong {
+  color: rgba(229, 239, 231, 0.86);
   font-size: 12px;
   text-align: right;
 }

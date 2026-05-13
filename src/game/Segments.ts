@@ -106,6 +106,8 @@ const PLAYER_WORLD_COLLISION_RADIUS = 1.0;
 const PLAYER_HOUSE_COLLISION_RADIUS = 0.42;
 const PLAYER_DOOR_COLLISION_RADIUS = 0.62;
 const PLAYER_BLOCKER_COLLISION_RADIUS = 1.0;
+const DOOR_OPEN_ACTION_DELAY_SECONDS = 1.7;
+const DOOR_CLOSE_COLLIDER_GRACE_SECONDS = 1.0;
 // Higher values lower the flame plane; the fire texture has transparent padding at its base.
 const CANDLE_FLAME_WICK_TIP_INSET = 1.35;
 const START_BLOCKER_Z = -9.5;
@@ -1356,6 +1358,19 @@ export class Segments {
     let open = false;
     let amount = 0;
     let target = 0;
+    let openDelayTimer: number | null = null;
+    let closeColliderTimer: number | null = null;
+
+    const clearDoorTimers = () => {
+      if (openDelayTimer !== null) {
+        window.clearTimeout(openDelayTimer);
+        openDelayTimer = null;
+      }
+      if (closeColliderTimer !== null) {
+        window.clearTimeout(closeColliderTimer);
+        closeColliderTimer = null;
+      }
+    };
 
     this.scene.onBeforeRenderObservable.add(() => {
       const dt = this.scene.getEngine().getDeltaTime() / 1000;
@@ -1379,10 +1394,43 @@ export class Segments {
       interactable: true,
       type: "door",
       onInteract: () => {
-        open = !open;
-        target = open ? 1 : 0;
-        collider.active = !open;
-        return open ? "Abrís la puerta." : "Cerrás la puerta.";
+        if (openDelayTimer !== null) {
+          return {
+            message: "La puerta se esta abriendo.",
+            suppressAction: true,
+          };
+        }
+
+        if (!open) {
+          clearDoorTimers();
+          openDelayTimer = window.setTimeout(() => {
+            open = true;
+            target = 1;
+            collider.active = false;
+            openDelayTimer = null;
+          }, DOOR_OPEN_ACTION_DELAY_SECONDS * 1000);
+
+          return {
+            message: "Abris la puerta.",
+            actionType: "door",
+            movementLockSeconds: DOOR_OPEN_ACTION_DELAY_SECONDS,
+          };
+        }
+
+        clearDoorTimers();
+        open = false;
+        target = 0;
+        collider.active = false;
+        closeColliderTimer = window.setTimeout(() => {
+          collider.active = true;
+          closeColliderTimer = null;
+        }, DOOR_CLOSE_COLLIDER_GRACE_SECONDS * 1000);
+
+        return {
+          message: "Cerras la puerta.",
+          suppressAction: true,
+        };
+
       },
     };
     this.createDoorLamp(

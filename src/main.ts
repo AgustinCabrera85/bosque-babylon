@@ -2,6 +2,7 @@ import "./style.css";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { createScene, desktopQuality, mobileQuality } from "./game/createScene";
 import { setupMusicPlayer } from "./game/MusicPlayer";
+import { setupPauseMenu } from "./game/PauseMenu";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement | null;
 if (!canvas) throw new Error("No se encontro #renderCanvas");
@@ -41,6 +42,7 @@ const engine = new Engine(renderCanvas, quality.name === "desktop", {
 });
 engine.setHardwareScalingLevel(hardwareScaling);
 setupMusicPlayer();
+const pauseMenu = setupPauseMenu({ canvas: renderCanvas });
 
 async function start() {
   setLoading(0.02, `Iniciando motor (${quality.name})...`);
@@ -48,6 +50,7 @@ async function start() {
 
   scene.onAfterRenderObservable.addOnce(hideLoading);
   engine.runRenderLoop(() => {
+    if (pauseMenu.isPaused()) return;
     scene.render();
   });
 }

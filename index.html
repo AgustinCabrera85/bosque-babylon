@@ -20,7 +20,7 @@
       <div id="help">
         Click para entrar<br/>
         <span class="small">V camara · F linterna · botones 1P/3P/FR</span><br/>
-        <span class="small">WASD mover · Shift correr · Space saltar · E interactuar · Esc salir</span>
+        <span class="small">WASD mover · Shift correr · Space saltar · E interactuar · Esc pausa</span>
       </div>
       <div id="hint" class="hidden"></div>
       <div id="reticle" aria-hidden="true"></div>
@@ -30,6 +30,7 @@
         <button id="thirdPersonButton" type="button" aria-label="Tercera persona" aria-pressed="true">3P</button>
         <button id="frontPersonButton" type="button" aria-label="Ver personaje de frente" aria-pressed="false">FR</button>
         <button id="flashlightButton" type="button" aria-label="Encender o apagar linterna" aria-pressed="true">F</button>
+        <button id="pauseButton" type="button" aria-label="Pausar juego" aria-pressed="false">II</button>
       </div>
 
       <div id="musicControls" aria-label="Music volume">
@@ -46,6 +47,37 @@
         <button id="runButton" class="mobile-button" type="button" aria-label="Correr">R</button>
         <button id="jumpButton" class="mobile-button" type="button" aria-label="Saltar">↑</button>
         <button id="interactButton" class="mobile-button" type="button" aria-label="Interactuar">E</button>
+      </div>
+    </div>
+
+    <div id="pauseMenu" class="hidden" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+      <div class="pause-panel">
+        <div class="pause-header">
+          <h1 id="pauseTitle">Pausa</h1>
+          <button id="resumeButton" class="icon-button" type="button" aria-label="Continuar">X</button>
+        </div>
+
+        <div class="pause-sliders" aria-label="Audio">
+          <label class="volume-row" for="pauseMusicVolume">
+            <span>Musica</span>
+            <input id="pauseMusicVolume" type="range" min="0" max="100" step="1" value="45" />
+            <strong id="pauseMusicVolumeValue">45%</strong>
+          </label>
+
+          <label class="volume-row" for="pauseAmbientVolume">
+            <span>Ambiente</span>
+            <input id="pauseAmbientVolume" type="range" min="0" max="100" step="1" value="55" />
+            <strong id="pauseAmbientVolumeValue">55%</strong>
+          </label>
+
+          <label class="volume-row" for="pauseSfxVolume">
+            <span>SFX</span>
+            <input id="pauseSfxVolume" type="range" min="0" max="100" step="1" value="70" />
+            <strong id="pauseSfxVolumeValue">70%</strong>
+          </label>
+        </div>
+
+        <button id="resumeLargeButton" class="primary-button" type="button">Continuar</button>
       </div>
     </div>
 

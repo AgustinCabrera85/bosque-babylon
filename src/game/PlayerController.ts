@@ -68,6 +68,7 @@ export class PlayerController {
   private fadeDuration = ANIMATION_BLEND_TIME;
   private actionPlaying = false;
   private movementLockTimer = 0;
+  private sfxMovementState: "idle" | "walk" | "run" = "idle";
 
   constructor(private scene: Scene, private canvas: HTMLCanvasElement, private settings: Settings) {
     this.root = new TransformNode("playerRoot", scene);
@@ -88,6 +89,7 @@ export class PlayerController {
       if (target?.closest("#mobileControls")) return;
       if (target?.closest("#musicControls")) return;
       if (target?.closest("#viewControls")) return;
+      if (target?.closest("#pauseMenu")) return;
       if (this.mobileEnabled) return;
       canvas.requestPointerLock?.();
     });
@@ -110,6 +112,10 @@ export class PlayerController {
         this.keys.add(kb.event.code);
       }
       if (kb.type === KeyboardEventTypes.KEYUP) this.keys.delete(kb.event.code);
+    });
+
+    window.addEventListener("bosque:pause", () => {
+      this.updateMovementSfx("idle");
     });
   }
 
@@ -287,6 +293,7 @@ export class PlayerController {
     const active = this.mobileEnabled || document.pointerLockElement === this.canvas;
     if (!active) {
       if (!this.actionPlaying) this.playAnimation("Idle", true);
+      this.updateMovementSfx("idle");
       this.updateAnimationFade(dt);
       this.updateThirdPersonCameraCollision(segments);
       return;
@@ -359,6 +366,7 @@ export class PlayerController {
     if ((this.keys.has("Space") || this.jumpQueued) && this.grounded) {
       this.velY = this.settings.jumpSpeed;
       this.grounded = false;
+      this.playSfx("jump");
     }
     this.jumpQueued = false;
 
@@ -373,7 +381,27 @@ export class PlayerController {
 
     this.updateThirdPersonCameraCollision(segments);
     this.updateAvatarAnimation(moveX, moveY, running);
+    const moving = Math.abs(moveX) > 0.12 || Math.abs(moveY) > 0.12;
+    this.updateMovementSfx(moving && this.grounded ? (running ? "run" : "walk") : "idle");
     this.updateAnimationFade(dt);
+  }
+
+  private playSfx(name: "jump" | "walk" | "run") {
+    window.dispatchEvent(new CustomEvent("bosque:sfx", { detail: { name } }));
+  }
+
+  private updateMovementSfx(state: "idle" | "walk" | "run") {
+    if (this.sfxMovementState === state) return;
+    if (this.sfxMovementState !== "idle") {
+      window.dispatchEvent(
+        new CustomEvent("bosque:sfx", {
+          detail: { name: this.sfxMovementState, active: false },
+        })
+      );
+    }
+
+    this.sfxMovementState = state;
+    if (state !== "idle") this.playSfx(state);
   }
 
   private updateThirdPersonCameraCollision(segments: Segments) {

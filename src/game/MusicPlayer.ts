@@ -1,79 +1,264 @@
 import { asset } from "../utils/asset";
 
 const MUSIC_VOLUME_KEY = "bosque.musicVolume";
+const AMBIENT_VOLUME_KEY = "bosque.ambientVolume";
+const SFX_VOLUME_KEY = "bosque.sfxVolume";
 const MUTED_VOLUME = 0;
-const DEFAULT_VOLUME = 0.45;
+const DEFAULT_MUSIC_VOLUME = 0.45;
+const DEFAULT_AMBIENT_VOLUME = 0.55;
+const DEFAULT_SFX_VOLUME = 0.7;
+
+type VolumeChannel = "music" | "ambient" | "sfx";
+
+type SliderBinding = {
+  slider: HTMLInputElement;
+  valueText: HTMLElement;
+};
+
+type GameSfxEvent = CustomEvent<{
+  name?: "jump" | "walk" | "run";
+  active?: boolean;
+}>;
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
-function readSavedVolume() {
-  const saved = Number.parseFloat(localStorage.getItem(MUSIC_VOLUME_KEY) ?? "");
-  return Number.isFinite(saved) ? clamp01(saved) : DEFAULT_VOLUME;
+function readSavedVolume(key: string, fallback: number) {
+  const saved = Number.parseFloat(localStorage.getItem(key) ?? "");
+  return Number.isFinite(saved) ? clamp01(saved) : fallback;
+}
+
+function getSlider(id: string, valueId: string): SliderBinding | null {
+  const slider = document.getElementById(id) as HTMLInputElement | null;
+  const valueText = document.getElementById(valueId);
+  if (!slider || !valueText) return null;
+  return { slider, valueText };
+}
+
+function renderBinding(binding: SliderBinding | null, volume: number) {
+  if (!binding) return;
+  const percent = Math.round(volume * 100);
+  binding.slider.value = String(percent);
+  binding.valueText.textContent = `${percent}%`;
 }
 
 export function setupMusicPlayer() {
-  const controls = document.getElementById("musicControls");
-  const toggle = document.getElementById("musicToggle") as HTMLButtonElement | null;
-  const slider = document.getElementById("musicVolume") as HTMLInputElement | null;
-  const valueText = document.getElementById("musicVolumeValue");
+  const musicControls = document.getElementById("musicControls");
+  const musicToggle = document.getElementById("musicToggle") as HTMLButtonElement | null;
+  const musicHud = getSlider("musicVolume", "musicVolumeValue");
+  const pauseMusic = getSlider("pauseMusicVolume", "pauseMusicVolumeValue");
+  const pauseAmbient = getSlider("pauseAmbientVolume", "pauseAmbientVolumeValue");
+  const pauseSfx = getSlider("pauseSfxVolume", "pauseSfxVolumeValue");
 
-  if (!controls || !toggle || !slider || !valueText) return;
+  if (!musicControls || !musicToggle || !musicHud) return;
 
-  const musicControls = controls;
-  const musicToggle = toggle;
-  const volumeSlider = slider;
-  const volumeValueText = valueText;
-
+  const toggle = musicToggle;
   const music = new Audio(asset("assets/audio/music/Echoes_in_the_Dark_ingame.mp3"));
   music.loop = true;
   music.preload = "auto";
 
-  let started = false;
-  let previousVolume = readSavedVolume() || DEFAULT_VOLUME;
+  const ambient = new Audio(asset("assets/audio/ambience/Gentle_cricket_chirp.mp3"));
+  ambient.loop = true;
+  ambient.preload = "auto";
 
-  function render(volume: number) {
-    const percent = Math.round(volume * 100);
-    volumeSlider.value = String(percent);
-    volumeValueText.textContent = `${percent}%`;
-    musicToggle.textContent = volume > 0 ? "Music" : "Muted";
-    musicToggle.setAttribute("aria-pressed", volume > 0 ? "false" : "true");
+  const walkSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_walking.mp3"));
+  const runSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_running.mp3"));
+  const jumpSfx = new Audio(asset("assets/audio/sfx/jump_on_road.mp3"));
+  walkSfx.loop = true;
+  runSfx.loop = true;
+  walkSfx.preload = "auto";
+  runSfx.preload = "auto";
+  jumpSfx.preload = "auto";
+
+  let started = false;
+  let ambientStarted = false;
+  let footstepMode: "idle" | "walk" | "run" = "idle";
+  let previousMusicVolume = readSavedVolume(MUSIC_VOLUME_KEY, DEFAULT_MUSIC_VOLUME) || DEFAULT_MUSIC_VOLUME;
+  let audioContext: AudioContext | null = null;
+  let sfxGain: GainNode | null = null;
+
+  const volumes: Record<VolumeChannel, number> = {
+    music: readSavedVolume(MUSIC_VOLUME_KEY, DEFAULT_MUSIC_VOLUME),
+    ambient: readSavedVolume(AMBIENT_VOLUME_KEY, DEFAULT_AMBIENT_VOLUME),
+    sfx: readSavedVolume(SFX_VOLUME_KEY, DEFAULT_SFX_VOLUME),
+  };
+
+  function renderMusic(volume: number) {
+    renderBinding(musicHud, volume);
+    renderBinding(pauseMusic, volume);
+    toggle.textContent = volume > 0 ? "Music" : "Muted";
+    toggle.setAttribute("aria-pressed", volume > 0 ? "false" : "true");
   }
 
-  async function start() {
-    if (started) return;
-    started = true;
+  function renderAll() {
+    renderMusic(volumes.music);
+    renderBinding(pauseAmbient, volumes.ambient);
+    renderBinding(pauseSfx, volumes.sfx);
+  }
 
+  function ensureAudioContext() {
+    if (!audioContext) {
+      audioContext = new AudioContext();
+      sfxGain = audioContext.createGain();
+      sfxGain.connect(audioContext.destination);
+      sfxGain.gain.value = volumes.sfx;
+    }
+
+    return audioContext;
+  }
+
+  function playUiSfx() {
+    const context = ensureAudioContext();
+    if (!sfxGain) return;
+
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = 540;
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.035, context.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.08);
+    oscillator.connect(gain);
+    gain.connect(sfxGain);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.09);
+  }
+
+  function setSfxElementVolumes(volume: number) {
+    walkSfx.volume = volume * 0.58;
+    runSfx.volume = volume * 0.62;
+    jumpSfx.volume = volume * 0.7;
+    walkSfx.muted = volume <= 0;
+    runSfx.muted = volume <= 0;
+    jumpSfx.muted = volume <= 0;
+  }
+
+  async function playLoop(audio: HTMLAudioElement) {
     try {
-      await music.play();
+      await audio.play();
     } catch (error) {
-      started = false;
-      console.warn("[MusicPlayer] Music playback was blocked until the next user gesture.", error);
+      console.warn("[MusicPlayer] SFX playback was blocked until the next user gesture.", error);
     }
   }
 
-  function setVolume(volume: number, save = true) {
+  function stopLoop(audio: HTMLAudioElement) {
+    audio.pause();
+    audio.currentTime = 0;
+  }
+
+  function setFootstepMode(mode: "idle" | "walk" | "run") {
+    if (footstepMode === mode) return;
+    footstepMode = mode;
+
+    if (mode !== "walk") stopLoop(walkSfx);
+    if (mode !== "run") stopLoop(runSfx);
+
+    if (mode === "walk") void playLoop(walkSfx);
+    if (mode === "run") void playLoop(runSfx);
+  }
+
+  function playGameSfx(name: "jump" | "walk" | "run") {
+    if (volumes.sfx <= 0) return;
+    if (name === "walk" || name === "run") {
+      setFootstepMode(name);
+      return;
+    }
+
+    jumpSfx.currentTime = 0;
+    void playLoop(jumpSfx);
+  }
+
+  async function start() {
+    ensureAudioContext();
+    if (audioContext?.state === "suspended") await audioContext.resume();
+
+    if (!started) {
+      started = true;
+      try {
+        await music.play();
+      } catch (error) {
+        started = false;
+        console.warn("[MusicPlayer] Music playback was blocked until the next user gesture.", error);
+      }
+    }
+
+    if (!ambientStarted) {
+      ambientStarted = true;
+      try {
+        await ambient.play();
+      } catch (error) {
+        ambientStarted = false;
+        console.warn("[MusicPlayer] Ambient playback was blocked until the next user gesture.", error);
+      }
+    }
+  }
+
+  function setVolume(channel: VolumeChannel, volume: number, save = true) {
     const next = clamp01(volume);
-    music.volume = next;
-    music.muted = next <= 0;
-    if (next > 0) previousVolume = next;
-    if (save) localStorage.setItem(MUSIC_VOLUME_KEY, String(next));
-    render(next);
+    volumes[channel] = next;
+
+    if (channel === "music") {
+      music.volume = next;
+      music.muted = next <= 0;
+      if (next > 0) previousMusicVolume = next;
+      if (save) localStorage.setItem(MUSIC_VOLUME_KEY, String(next));
+      renderMusic(next);
+    }
+
+    if (channel === "ambient") {
+      ambient.volume = next * 0.65;
+      ambient.muted = next <= 0;
+      if (save) localStorage.setItem(AMBIENT_VOLUME_KEY, String(next));
+      renderBinding(pauseAmbient, next);
+    }
+
+    if (channel === "sfx") {
+      if (sfxGain) sfxGain.gain.value = next;
+      setSfxElementVolumes(next);
+      if (save) localStorage.setItem(SFX_VOLUME_KEY, String(next));
+      renderBinding(pauseSfx, next);
+    }
+  }
+
+  function bindSlider(binding: SliderBinding | null, channel: VolumeChannel, previewSfx = false) {
+    binding?.slider.addEventListener("input", () => {
+      setVolume(channel, Number(binding.slider.value) / 100);
+      void start();
+    });
+
+    binding?.slider.addEventListener("change", () => {
+      if (previewSfx) playUiSfx();
+    });
   }
 
   musicControls.addEventListener("pointerdown", (event) => event.stopPropagation());
   musicControls.addEventListener("click", (event) => event.stopPropagation());
 
-  volumeSlider.addEventListener("input", () => {
-    setVolume(Number(volumeSlider.value) / 100);
+  bindSlider(musicHud, "music");
+  bindSlider(pauseMusic, "music");
+  bindSlider(pauseAmbient, "ambient");
+  bindSlider(pauseSfx, "sfx", true);
+
+  toggle.addEventListener("click", () => {
+    const muted = volumes.music > MUTED_VOLUME;
+    setVolume("music", muted ? MUTED_VOLUME : previousMusicVolume);
+    playUiSfx();
     void start();
   });
 
-  musicToggle.addEventListener("click", () => {
-    const muted = music.volume > MUTED_VOLUME;
-    setVolume(muted ? MUTED_VOLUME : previousVolume);
-    void start();
+  document.getElementById("pauseMenu")?.addEventListener("click", (event) => {
+    if ((event.target as HTMLElement | null)?.closest("button")) playUiSfx();
+  });
+
+  window.addEventListener("bosque:sfx", (event) => {
+    const { name, active } = (event as GameSfxEvent).detail ?? {};
+    if (!name) return;
+    if ((name === "walk" || name === "run") && active === false) {
+      setFootstepMode("idle");
+      return;
+    }
+    playGameSfx(name);
   });
 
   const startOnGesture = () => void start();
@@ -81,5 +266,8 @@ export function setupMusicPlayer() {
   window.addEventListener("keydown", startOnGesture);
   window.addEventListener("touchstart", startOnGesture, { passive: true });
 
-  setVolume(readSavedVolume(), false);
+  setVolume("music", volumes.music, false);
+  setVolume("ambient", volumes.ambient, false);
+  setVolume("sfx", volumes.sfx, false);
+  renderAll();
 }

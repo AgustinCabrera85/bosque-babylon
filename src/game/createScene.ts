@@ -548,7 +548,7 @@ scene.onBeforeRenderObservable.add(() => {
     scene,
     () => player.getLookRay(),
     hints,
-    (type) => player.playInteractionAction(type)
+    (type, movementLockSeconds) => player.playInteractionAction(type, movementLockSeconds)
   );
   setupMobileControls(player, () => interactSystem.tryInteract());
 

@@ -14,6 +14,8 @@ export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
   const backButton = document.getElementById("backButton") as HTMLButtonElement | null;
 
   let paused = false;
+  let wasPointerLocked = false;
+  let ignoreEscapeUntil = 0;
 
   const render = () => {
     menu?.classList.toggle("hidden", !paused);
@@ -70,7 +72,17 @@ export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
   window.addEventListener("keydown", (event) => {
     if (event.code !== "Escape" || event.repeat) return;
     event.preventDefault();
+    if (paused && performance.now() < ignoreEscapeUntil) return;
     setPaused(!paused);
+  });
+
+  document.addEventListener("pointerlockchange", () => {
+    const locked = document.pointerLockElement === canvas;
+    if (wasPointerLocked && !locked && !paused) {
+      ignoreEscapeUntil = performance.now() + 250;
+      setPaused(true);
+    }
+    wasPointerLocked = locked;
   });
 
   render();

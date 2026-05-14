@@ -16,6 +16,7 @@ import { setupMobileControls } from "./MobileControls";
 import { createRainSystem } from "./Rain";
 import { createFireflies } from "./Fireflies";
 import { createEndTorches } from "./Torches";
+import { createVintageFilmPostProcess } from "./VintageFilmPostProcess";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -121,33 +122,38 @@ export const mobileQuality: QualityProfile = {
 };
 
 function setupViewModeControls(player: PlayerController) {
-  const firstButton = document.getElementById("firstPersonButton") as HTMLButtonElement | null;
-  const thirdButton = document.getElementById("thirdPersonButton") as HTMLButtonElement | null;
-  const frontButton = document.getElementById("frontPersonButton") as HTMLButtonElement | null;
+  const cameraButton = document.getElementById("cameraModeButton") as HTMLButtonElement | null;
+  const frontButton = document.getElementById("frontCameraButton") as HTMLButtonElement | null;
   const reticle = document.getElementById("reticle");
-  if (!firstButton || !thirdButton || !frontButton) return;
+  if (!cameraButton) return;
 
   const setMode = (mode: ViewMode) => {
-    firstButton.classList.toggle("active", mode === "first");
-    thirdButton.classList.toggle("active", mode === "third");
-    frontButton.classList.toggle("active", mode === "front");
-    firstButton.setAttribute("aria-pressed", String(mode === "first"));
-    thirdButton.setAttribute("aria-pressed", String(mode === "third"));
-    frontButton.setAttribute("aria-pressed", String(mode === "front"));
-    reticle?.classList.toggle("hidden", mode === "front");
+    const isFirstPerson = mode === "first";
+    const isFrontView = mode === "front";
+    cameraButton.classList.toggle("active", isFirstPerson);
+    cameraButton.textContent = isFirstPerson ? "3P" : "1P";
+    cameraButton.setAttribute("aria-pressed", String(isFirstPerson));
+    cameraButton.setAttribute(
+      "aria-label",
+      isFirstPerson ? "Cambiar a tercera persona" : "Cambiar a primera persona"
+    );
+    frontButton?.classList.toggle("active", isFrontView);
+    frontButton?.setAttribute("aria-pressed", String(isFrontView));
+    frontButton?.setAttribute(
+      "aria-label",
+      isFrontView ? "Volver a tercera persona" : "Activar camara frontal"
+    );
+    reticle?.classList.toggle("hidden", isFrontView);
   };
 
-  firstButton.addEventListener("click", (event) => {
+  cameraButton.addEventListener("click", (event) => {
     event.stopPropagation();
-    player.setViewMode("first");
+    player.toggleViewMode();
   });
-  thirdButton.addEventListener("click", (event) => {
+
+  frontButton?.addEventListener("click", (event) => {
     event.stopPropagation();
-    player.setViewMode("third");
-  });
-  frontButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    player.setViewMode("front");
+    player.setViewMode(player.currentViewMode === "front" ? "third" : "front");
   });
 
   player.onViewModeChange(setMode);
@@ -291,6 +297,7 @@ const terrain = createTerrain(scene, {
   pathMat.specularColor = new Color3(0, 0, 0);
   // Oscurecer un toque el camino para que no “brille”
   pathMat.diffuseColor = new Color3(0.75, 0.75, 0.75);
+  pathMat.maxSimultaneousLights = 8;
   path.material = pathMat;
 
   // =========================
@@ -337,6 +344,9 @@ const terrain = createTerrain(scene, {
     gravity: -18.0,
   });
   setupViewModeControls(player);
+  createVintageFilmPostProcess(scene, player.camera, {
+    enabled: quality.name === "desktop",
+  });
 
   onProgress(0.36, "Cargando personaje...");
   await player.loadCharacter();
@@ -345,24 +355,24 @@ const terrain = createTerrain(scene, {
 // 🔦 FLASHLIGHT (SpotLight)
 // =========================
 const FLASHLIGHT_BASE_INTENSITY = 4.4;
-const FLASHLIGHT_FILL_BASE_INTENSITY = 0.85;
-const FLASHLIGHT_REACH_BASE_INTENSITY = 0.62;
+const FLASHLIGHT_FILL_BASE_INTENSITY = 0.68;
+const FLASHLIGHT_REACH_BASE_INTENSITY = 0.78;
 const initialLook = player.getFlashlightRay();
 const flashlight = new SpotLight(
   "flashlight",
   initialLook.origin.clone(),
   initialLook.direction.clone(),
-  Math.PI / 3.8,
+  Math.PI / 4.6,
   1,
   scene
 );
 
 // Falloff más “físico”
 flashlight.falloffType = Light.FALLOFF_GLTF;
-flashlight.innerAngle = Math.PI / 11;
+flashlight.innerAngle = Math.PI / 13;
 
 flashlight.intensity = FLASHLIGHT_BASE_INTENSITY;
-flashlight.range = 40;
+flashlight.range = 52;
 
 flashlight.diffuse = new Color3(1.0, 0.96, 0.88); // cálida
 flashlight.specular = new Color3(0, 0, 0);
@@ -371,15 +381,15 @@ const flashlightFill = new SpotLight(
   "flashlightFill",
   initialLook.origin.clone(),
   initialLook.direction.clone(),
-  Math.PI / 1.55,
+  Math.PI / 2.45,
   1,
   scene
 );
 
 flashlightFill.falloffType = Light.FALLOFF_GLTF;
-flashlightFill.innerAngle = Math.PI / 6.5;
+flashlightFill.innerAngle = Math.PI / 9.5;
 flashlightFill.intensity = FLASHLIGHT_FILL_BASE_INTENSITY;
-flashlightFill.range = 34;
+flashlightFill.range = 42;
 flashlightFill.diffuse = new Color3(0.82, 0.74, 0.58);
 flashlightFill.specular = new Color3(0, 0, 0);
 
@@ -387,14 +397,14 @@ const flashlightReach = new SpotLight(
   "flashlightReach",
   initialLook.origin.clone(),
   initialLook.direction.clone(),
-  Math.PI / 1.35,
+  Math.PI / 2.2,
   1,
   scene
 );
 
 flashlightReach.falloffType = Light.FALLOFF_STANDARD;
 flashlightReach.intensity = FLASHLIGHT_REACH_BASE_INTENSITY;
-flashlightReach.range = 95;
+flashlightReach.range = 125;
 flashlightReach.diffuse = new Color3(0.72, 0.70, 0.62);
 flashlightReach.specular = new Color3(0, 0, 0);
 

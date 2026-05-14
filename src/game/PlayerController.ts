@@ -41,6 +41,9 @@ const PATH_SURFACE_OFFSET = 0.1;
 const ANIMATION_BLEND_TIME = 0.16;
 const ACTION_BLEND_TIME = 0.08;
 const DOOR_OPEN_MOVEMENT_LOCK_SECONDS = 1.7;
+const THIRD_PERSON_FLASHLIGHT_PITCH_MIN = -0.58;
+const THIRD_PERSON_FLASHLIGHT_PITCH_MAX = 0.68;
+const FIRST_PERSON_CAMERA_HEIGHT_MULTIPLIER = 2;
 
 export class PlayerController {
   public readonly root: TransformNode;
@@ -143,7 +146,6 @@ export class PlayerController {
 
   toggleViewMode() {
     if (this.viewMode === "first") this.setViewMode("third");
-    else if (this.viewMode === "third") this.setViewMode("front");
     else this.setViewMode("first");
   }
 
@@ -201,8 +203,15 @@ export class PlayerController {
     const direction = this.camera.getDirection(Vector3.Forward());
     if (direction.lengthSquared() > 0) direction.normalize();
 
+    if (this.viewMode !== "first") {
+      return {
+        origin: this.root.getAbsolutePosition().add(direction.scale(0.45)),
+        direction,
+      };
+    }
+
     return {
-      origin: this.root.getAbsolutePosition().clone(),
+      origin: this.camera.globalPosition.clone(),
       direction,
     };
   }
@@ -229,8 +238,21 @@ export class PlayerController {
         .add(forward.scale(1.35))
         .add(right.scale(0.35))
         .add(new Vector3(0, -0.18, 0)),
-      direction: forward,
+      direction: this.getThirdPersonFlashlightDirection(forward),
     };
+  }
+
+  private getThirdPersonFlashlightDirection(forward: Vector3) {
+    const flashlightPitch = Math.max(
+      THIRD_PERSON_FLASHLIGHT_PITCH_MIN,
+      Math.min(THIRD_PERSON_FLASHLIGHT_PITCH_MAX, this.pitch)
+    );
+    const direction = forward
+      .scale(Math.cos(flashlightPitch))
+      .add(Vector3.Up().scale(-Math.sin(flashlightPitch)));
+
+    if (direction.lengthSquared() > 0) direction.normalize();
+    return direction;
   }
 
   setMobileEnabled(enabled: boolean) {
@@ -268,7 +290,7 @@ export class PlayerController {
   private applyCameraRig() {
     this.root.rotation.y = this.yaw;
     if (this.viewMode === "first") {
-      this.camera.position.set(0, 0, 0);
+      this.camera.position.set(0, this.settings.eyeHeight * (FIRST_PERSON_CAMERA_HEIGHT_MULTIPLIER - 1), 0);
       this.camera.rotation.x = this.pitch;
       this.camera.rotation.y = 0;
       this.camera.rotation.z = 0;

@@ -11,6 +11,8 @@ import { Ray } from "@babylonjs/core/Culling/ray";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import { Light } from "@babylonjs/core/Lights/light";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
@@ -86,6 +88,7 @@ type CandleFlameEntry = {
   fadeInSeconds: number;
   flame: Mesh;
   glow: Mesh;
+  floorGlow: Mesh;
   sparks: Mesh[];
   flameHeight: number;
 };
@@ -144,6 +147,7 @@ export class Segments {
   private candleTemplate: CandleTemplate | null = null;
   private candleFireMaterial: ReturnType<typeof createCandleFireMaterial> | null = null;
   private candleGlowMaterial: ReturnType<typeof createGlowMaterial> | null = null;
+  private candleFloorGlowMaterial: StandardMaterial | null = null;
   private candleLights: CandleFlameEntry[] = [];
   private candleFlickerRegistered = false;
   private startBlockerLoaded = false;
@@ -488,7 +492,41 @@ export class Segments {
 
     this.candleFireMaterial = createCandleFireMaterial(this.scene);
     this.candleGlowMaterial = createGlowMaterial(this.scene);
+    this.candleFloorGlowMaterial = this.createCandleFloorGlowMaterial();
     this.registerCandleFlicker();
+  }
+
+  private createCandleFloorGlowMaterial() {
+    const texture = new DynamicTexture(
+      "candleFloorGlowTexture",
+      { width: 256, height: 256 },
+      this.scene,
+      false
+    );
+    const ctx = texture.getContext() as CanvasRenderingContext2D;
+    ctx.clearRect(0, 0, 256, 256);
+    const gradient = ctx.createRadialGradient(128, 128, 4, 128, 128, 118);
+    gradient.addColorStop(0.0, "rgba(255, 196, 104, 0.72)");
+    gradient.addColorStop(0.18, "rgba(239, 119, 36, 0.38)");
+    gradient.addColorStop(0.4, "rgba(130, 45, 14, 0.14)");
+    gradient.addColorStop(0.68, "rgba(40, 8, 0, 0)");
+    gradient.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 256, 256);
+    texture.update();
+    texture.hasAlpha = true;
+
+    const material = new StandardMaterial("candleFloorGlowMaterial", this.scene);
+    material.diffuseTexture = texture;
+    material.opacityTexture = texture;
+    material.emissiveColor = new Color3(1.0, 0.43, 0.12);
+    material.diffuseColor = new Color3(0.92, 0.34, 0.1);
+    material.alpha = 0.58;
+    material.alphaMode = BabylonMaterial.MATERIAL_ALPHABLEND;
+    material.disableLighting = true;
+    material.backFaceCulling = false;
+    material.disableDepthWrite = true;
+    return material;
   }
 
   async loadStartBlocker() {
@@ -724,7 +762,7 @@ export class Segments {
   private createCandles(_centerZ: number, segmentId: number): SegCandlePack {
     const nodes: TransformNode[] = [];
     const lights: PointLight[] = [];
-    if (!this.candleTemplate || !this.candleFireMaterial || !this.candleGlowMaterial) {
+    if (!this.candleTemplate || !this.candleFireMaterial || !this.candleGlowMaterial || !this.candleFloorGlowMaterial) {
       return { nodes, lights };
     }
 
@@ -749,11 +787,11 @@ export class Segments {
         new Vector3(placement.x, flameY, placement.z),
         placement.rotationY,
         CANDLE_MODEL_SCALE,
-        2.8,
-        28
+        4.9,
+        42
       );
 
-      nodes.push(root, fire.root);
+      nodes.push(root, fire.root, fire.floorGlow);
       lights.push(fire.light);
       this.colliders.push({
         x: placement.x,
@@ -799,6 +837,24 @@ export class Segments {
     glow.billboardMode = Mesh.BILLBOARDMODE_ALL;
     glow.visibility = fadeInSeconds > 0 ? 0 : 0.64;
 
+    const floorGlowSize = Math.max(4.6, 5.6 * size);
+    const sideSign = position.x === 0 ? 0 : Math.sign(position.x);
+    const floorGlow = MeshBuilder.CreatePlane(
+      `${name}FloorGlow`,
+      { width: floorGlowSize, height: floorGlowSize },
+      this.scene
+    );
+    floorGlow.position.set(
+      position.x - sideSign * 1.15,
+      this.terrain.getHeightAt(position.x, position.z) + 0.045,
+      position.z
+    );
+    floorGlow.rotation.x = Math.PI / 2;
+    floorGlow.material = this.candleFloorGlowMaterial;
+    floorGlow.isPickable = false;
+    floorGlow.visibility = fadeInSeconds > 0 ? 0 : 0.52;
+    floorGlow.alwaysSelectAsActiveMesh = true;
+
     const sparks = Array.from({ length: 3 }, (_, sparkIndex) => {
       const spark = MeshBuilder.CreatePlane(
         `${name}Spark_${sparkIndex}`,
@@ -819,8 +875,9 @@ export class Segments {
       position.add(new Vector3(0, flameHeight * 0.55, 0)),
       this.scene
     );
-    light.diffuse = new Color3(1.0, 0.55, 0.2);
-    light.specular = new Color3(1.0, 0.42, 0.12);
+    light.falloffType = Light.FALLOFF_STANDARD;
+    light.diffuse = new Color3(1.0, 0.58, 0.24);
+    light.specular = new Color3(0.55, 0.22, 0.08);
     light.intensity = fadeInSeconds > 0 ? 0 : lightIntensity;
     light.range = lightRange;
 
@@ -833,11 +890,12 @@ export class Segments {
       fadeInSeconds,
       flame,
       glow,
+      floorGlow,
       sparks,
       flameHeight,
     });
 
-    return { root, light };
+    return { root, light, floorGlow };
   }
 
   private registerCandleFlicker() {
@@ -874,6 +932,9 @@ export class Segments {
         entry.glow.position.x = 0;
         entry.glow.position.y = entry.flameHeight * (0.54 + (stretch - 1) * 0.25);
         entry.glow.visibility = Math.max(0.38, Math.min(0.95, 0.64 + flicker * 1.55)) * fade;
+        const floorPulse = 1 + flicker * 0.14;
+        entry.floorGlow.scaling.set(floorPulse, floorPulse, 1);
+        entry.floorGlow.visibility = Math.max(0.28, Math.min(0.64, 0.5 + flicker * 0.3)) * fade;
 
         entry.sparks.forEach((spark, sparkIndex) => {
           const sparkPhase = entry.phase + sparkIndex * 2.17;
@@ -974,7 +1035,7 @@ export class Segments {
   }
 
   private createHouseCandle(bounds: { min: Vector3; max: Vector3 }) {
-    if (!this.candleTemplate || !this.candleFireMaterial || !this.candleGlowMaterial) return;
+    if (!this.candleTemplate || !this.candleFireMaterial || !this.candleGlowMaterial || !this.candleFloorGlowMaterial) return;
 
     const width = bounds.max.x - bounds.min.x;
     const depth = bounds.max.z - bounds.min.z;

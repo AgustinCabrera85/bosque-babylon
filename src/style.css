@@ -470,6 +470,11 @@ html, body {
   bottom: max(34px, calc(env(safe-area-inset-bottom) + 34px));
 }
 
+#mobileCameraButton {
+  right: max(158px, calc(env(safe-area-inset-right) + 158px));
+  bottom: max(34px, calc(env(safe-area-inset-bottom) + 34px));
+}
+
 #runButton {
   right: max(22px, env(safe-area-inset-right));
   bottom: max(22px, env(safe-area-inset-bottom));

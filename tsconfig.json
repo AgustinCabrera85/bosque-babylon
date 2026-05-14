@@ -14,8 +14,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "strict": true,
-    "types": [],
-    "baseUrl": "."
+    "types": []
   },
   "include": [
     "src"

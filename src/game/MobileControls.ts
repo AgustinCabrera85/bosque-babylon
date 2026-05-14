@@ -18,8 +18,9 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
   const runButton = document.getElementById("runButton");
   const jumpButton = document.getElementById("jumpButton");
   const interactButton = document.getElementById("interactButton");
+  const cameraButton = document.getElementById("mobileCameraButton") as HTMLButtonElement | null;
 
-  if (!root || !stick || !thumb || !lookPad || !runButton || !jumpButton || !interactButton) return;
+  if (!root || !stick || !thumb || !lookPad || !runButton || !jumpButton || !interactButton || !cameraButton) return;
 
   player.setMobileEnabled(true);
   root.classList.add("enabled");
@@ -118,5 +119,21 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
   interactButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     onInteract();
+  });
+
+  player.onViewModeChange((mode) => {
+    const isFirstPerson = mode === "first";
+    cameraButton.classList.toggle("active", isFirstPerson);
+    cameraButton.textContent = isFirstPerson ? "3P" : "1P";
+    cameraButton.setAttribute("aria-pressed", String(isFirstPerson));
+    cameraButton.setAttribute(
+      "aria-label",
+      isFirstPerson ? "Cambiar a tercera persona" : "Cambiar a primera persona"
+    );
+  });
+
+  cameraButton.addEventListener("pointerdown", (event) => {
+    stopEvent(event);
+    player.toggleViewMode();
   });
 }

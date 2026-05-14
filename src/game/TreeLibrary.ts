@@ -101,6 +101,9 @@ function patchFoliage(mesh: AbstractMesh, ultra: boolean) {
 
     cloned.useAlphaFromAlbedoTexture = true;
     cloned.specularIntensity = 0.0;
+    cloned.directIntensity = 1.18;
+    cloned.environmentIntensity = 0.14;
+    cloned.maxSimultaneousLights = 8;
 
     // por compatibilidad con assets raros
     (cloned as any).alphaMode = Mat.MATERIAL_ALPHATEST;
@@ -118,6 +121,30 @@ function patchFoliage(mesh: AbstractMesh, ultra: boolean) {
     cloned.backFaceCulling = ultra ? true : false;
 
     (cloned as any).alpha = 1.0;
+    cloned.maxSimultaneousLights = 8;
+  }
+}
+
+function patchTrunkMaterial(mesh: AbstractMesh) {
+  const mat = mesh.material as Material | null;
+  if (!mat) return;
+
+  const cloned = mat.clone(`${mat.name}_trunkClone`) as Material;
+  mesh.material = cloned;
+  (cloned as any).maxSimultaneousLights = 8;
+
+  if (cloned instanceof PBRMaterial) {
+    cloned.metallic = 0;
+    cloned.roughness = Math.max(cloned.roughness ?? 0.72, 0.72);
+    cloned.directIntensity = 1.22;
+    cloned.environmentIntensity = Math.max(cloned.environmentIntensity ?? 0.12, 0.12);
+    cloned.specularIntensity = Math.min(cloned.specularIntensity ?? 0.08, 0.08);
+    cloned.maxSimultaneousLights = 8;
+  }
+
+  if (cloned instanceof StandardMaterial) {
+    cloned.specularColor.set(0.025, 0.025, 0.025);
+    cloned.maxSimultaneousLights = 8;
   }
 }
 
@@ -176,6 +203,7 @@ for (const file of files.slice(0, maxTemplates)) {
       patchFoliage(m, this.ultraFoliage);
       foliageMeshes.push(m);
     } else {
+      patchTrunkMaterial(m);
       trunkMeshes.push(m);
     }
   }

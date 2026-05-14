@@ -147,6 +147,7 @@ export class GrassLibrary {
       mat.alphaMode = Material.MATERIAL_ALPHATEST;
       mat.backFaceCulling = false;
       mat.forceDepthWrite = true;
+      (mat as any).maxSimultaneousLights = 8;
       (mat as any).needDepthPrePass = true;
 
       const alphaTexture = mat.albedoTexture ?? mat.diffuseTexture;
@@ -155,15 +156,23 @@ export class GrassLibrary {
       if (mat instanceof PBRMaterial) {
         mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATEST;
         mat.useAlphaFromAlbedoTexture = true;
+        mat.twoSidedLighting = true;
+        mat.forceNormalForward = true;
         mat.alphaCutOff = 0.45;
         mat.metallic = 0;
-        mat.roughness = 0.8;
-        mat.specularIntensity = 0.1;
+        mat.roughness = 0.7;
+        mat.directIntensity = 0.94;
+        mat.environmentIntensity = 0.07;
+        mat.specularIntensity = 0.02;
+        mat.maxSimultaneousLights = 8;
       }
 
       if (mat instanceof StandardMaterial) {
+        mat.twoSidedLighting = true;
+        mat.maxSimultaneousLights = 8;
         mat.alphaCutOff = 0.45;
         mat.specularColor.set(0.02, 0.02, 0.02);
+        mat.diffuseColor.scaleInPlace(0.72);
       }
     }
   }

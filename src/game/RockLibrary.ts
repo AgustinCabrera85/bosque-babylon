@@ -5,6 +5,8 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Material } from "@babylonjs/core/Materials/material";
+import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 
 type RockTemplate = {
   name: string;
@@ -149,5 +151,18 @@ export class RockLibrary {
 
     const cloned = mat.clone(`${mat.name}_rockUnique`) as Material;
     mesh.material = cloned;
+    (cloned as any).maxSimultaneousLights = 8;
+
+    if (cloned instanceof PBRMaterial) {
+      cloned.maxSimultaneousLights = 8;
+      cloned.directIntensity = Math.max(cloned.directIntensity, 1.05);
+      cloned.environmentIntensity = Math.max(cloned.environmentIntensity ?? 0.08, 0.08);
+      cloned.specularIntensity = Math.min(cloned.specularIntensity ?? 0.06, 0.06);
+    }
+
+    if (cloned instanceof StandardMaterial) {
+      cloned.maxSimultaneousLights = 8;
+      cloned.specularColor.scaleInPlace(0.25);
+    }
   }
 }

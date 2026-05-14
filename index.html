@@ -19,17 +19,17 @@
     <div id="hud">
       <div id="help">
         Click para entrar<br/>
-        <span class="small">V camara · F linterna · botones 1P/3P/FR</span><br/>
-        <span class="small">WASD mover · Shift correr · Space saltar · E interactuar · Esc pausa</span>
+        <span class="small">V 1P/3P - F linterna - X filtro VHS - Esc pausa</span><br/>
+        <span class="small">WASD mover - Shift correr - Space saltar - E interactuar</span>
       </div>
       <div id="hint" class="hidden"></div>
       <div id="reticle" aria-hidden="true"></div>
 
       <div id="viewControls" aria-label="Modo de camara">
-        <button id="firstPersonButton" type="button" aria-label="Primera persona" aria-pressed="false">1P</button>
-        <button id="thirdPersonButton" type="button" aria-label="Tercera persona" aria-pressed="true">3P</button>
-        <button id="frontPersonButton" type="button" aria-label="Ver personaje de frente" aria-pressed="false">FR</button>
+        <button id="cameraModeButton" type="button" aria-label="Cambiar camara primera/tercera persona" aria-pressed="false">1P</button>
+        <button id="frontCameraButton" type="button" aria-label="Activar camara frontal" aria-pressed="false">FR</button>
         <button id="flashlightButton" type="button" aria-label="Encender o apagar linterna" aria-pressed="true">F</button>
+        <button id="vintageFilterButton" type="button" aria-label="Activar o desactivar filtro vintage" aria-pressed="false">FX</button>
         <button id="pauseButton" type="button" aria-label="Pausar juego" aria-pressed="false">II</button>
       </div>
 
@@ -39,8 +39,9 @@
         </div>
         <div id="lookPad"></div>
         <button id="runButton" class="mobile-button" type="button" aria-label="Correr">R</button>
-        <button id="jumpButton" class="mobile-button" type="button" aria-label="Saltar">↑</button>
+        <button id="jumpButton" class="mobile-button" type="button" aria-label="Saltar">^</button>
         <button id="interactButton" class="mobile-button" type="button" aria-label="Interactuar">E</button>
+        <button id="mobileCameraButton" class="mobile-button" type="button" aria-label="Cambiar camara primera/tercera persona" aria-pressed="false">1P</button>
       </div>
     </div>
 

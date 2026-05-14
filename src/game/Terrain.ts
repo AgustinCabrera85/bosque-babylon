@@ -176,6 +176,7 @@ export function createTerrain(
   // NOCHE: base oscura para que la linterna “levante”
   grassMat.diffuseColor = new Color3(0.22, 0.22, 0.22);
   grassMat.specularColor = new Color3(0, 0, 0);
+  grassMat.maxSimultaneousLights = 8;
 
   // Fog del engine (scene.fog...) debe afectar al terreno
   grassMat.fogEnabled = true;

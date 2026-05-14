@@ -99,25 +99,32 @@ export class PlantLibrary {
       mat.alphaMode = Material.MATERIAL_ALPHATEST;
       mat.backFaceCulling = false;
       mat.forceDepthWrite = true;
+      (mat as any).maxSimultaneousLights = 8;
       (mat as any).needDepthPrePass = true;
 
       if (mat instanceof PBRMaterial) {
         mat.disableLighting = false;
         mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATEST;
         mat.useAlphaFromAlbedoTexture = true;
+        mat.twoSidedLighting = true;
+        mat.forceNormalForward = true;
         mat.alphaCutOff = 0.52;
         mat.metallic = 0;
-        mat.roughness = 0.75;
-        mat.directIntensity = 1.25;
-        mat.environmentIntensity = 0.35;
-        mat.specularIntensity = 0.2;
+        mat.roughness = 0.68;
+        mat.directIntensity = 1.02;
+        mat.environmentIntensity = 0.08;
+        mat.specularIntensity = 0.025;
+        mat.maxSimultaneousLights = 8;
         mat.alpha = 1;
       }
 
       if (mat instanceof StandardMaterial) {
         mat.disableLighting = false;
+        mat.twoSidedLighting = true;
+        mat.maxSimultaneousLights = 8;
         mat.alphaCutOff = 0.52;
-        mat.specularColor.set(0.06, 0.06, 0.06);
+        mat.specularColor.set(0.025, 0.025, 0.025);
+        mat.diffuseColor.scaleInPlace(0.74);
         mat.alpha = 1;
       }
     }

@@ -10,12 +10,27 @@ export type PauseMenuHandle = {
 export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
   const menu = document.getElementById("pauseMenu");
   const pauseButton = document.getElementById("pauseButton") as HTMLButtonElement | null;
-  const resumeButton = document.getElementById("resumeButton") as HTMLButtonElement | null;
-  const backButton = document.getElementById("backButton") as HTMLButtonElement | null;
+  const saveButton = document.getElementById("saveButton") as HTMLButtonElement | null;
+  const exitButton = document.getElementById("exitButton") as HTMLButtonElement | null;
+  const pauseStatus = document.getElementById("pauseStatus");
 
   let paused = false;
   let wasPointerLocked = false;
   let ignoreEscapeUntil = 0;
+  let statusTimer: number | null = null;
+
+  const setStatus = (text: string) => {
+    if (!pauseStatus) return;
+    pauseStatus.textContent = text;
+    pauseStatus.classList.add("visible");
+
+    if (statusTimer !== null) window.clearTimeout(statusTimer);
+    statusTimer = window.setTimeout(() => {
+      pauseStatus.textContent = "";
+      pauseStatus.classList.remove("visible");
+      statusTimer = null;
+    }, 1800);
+  };
 
   const render = () => {
     menu?.classList.toggle("hidden", !paused);
@@ -59,12 +74,13 @@ export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
     setPaused(!paused);
   });
 
-  resumeButton?.addEventListener("click", (event) => {
+  saveButton?.addEventListener("click", (event) => {
     event.stopPropagation();
-    setPaused(false);
+    window.localStorage.setItem("bosque:lastManualSave", new Date().toISOString());
+    setStatus("Guardado");
   });
 
-  backButton?.addEventListener("click", (event) => {
+  exitButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     setPaused(false);
   });

@@ -19,7 +19,7 @@
     <div id="hud">
       <div id="help">
         Click para entrar<br/>
-        <span class="small">V 1P/3P - F linterna - X filtro VHS - Esc pausa</span><br/>
+        <span class="small">V 1P/3P - F linterna - Esc pausa</span><br/>
         <span class="small">WASD mover - Shift correr - Space saltar - E interactuar</span>
       </div>
       <div id="hint" class="hidden"></div>
@@ -29,7 +29,6 @@
         <button id="cameraModeButton" type="button" aria-label="Cambiar camara primera/tercera persona" aria-pressed="false">1P</button>
         <button id="frontCameraButton" type="button" aria-label="Activar camara frontal" aria-pressed="false">FR</button>
         <button id="flashlightButton" type="button" aria-label="Encender o apagar linterna" aria-pressed="true">F</button>
-        <button id="vintageFilterButton" type="button" aria-label="Activar o desactivar filtro vintage" aria-pressed="false">FX</button>
         <button id="pauseButton" type="button" aria-label="Pausar juego" aria-pressed="false">II</button>
       </div>
 
@@ -52,35 +51,53 @@
         <span class="corner bl"></span>
         <span class="corner br"></span>
 
-        <h1 id="pauseTitle" class="menu-title">Pausa</h1>
-        <p class="menu-subtitle">Opciones de sonido</p>
+        <header class="menu-header">
+          <p class="menu-kicker">Bosque Babylon</p>
+          <h1 id="pauseTitle" class="menu-title">Pausa</h1>
+        </header>
 
-        <div class="settings" aria-label="Audio">
-          <div class="setting-row">
-            <label class="setting-label" for="musicVolume">Musica</label>
-            <input id="musicVolume" type="range" min="0" max="100" step="1" value="70" />
-            <span class="value" id="musicValue">70%</span>
-          </div>
+        <div class="settings-grid">
+          <section class="settings-section" aria-labelledby="audioSettingsTitle">
+            <h2 id="audioSettingsTitle" class="section-title">Audio</h2>
+            <div class="settings">
+              <div class="setting-row">
+                <label class="setting-label" for="musicVolume">Musica</label>
+                <input id="musicVolume" type="range" min="0" max="100" step="1" value="70" />
+                <span class="value" id="musicValue">70%</span>
+              </div>
 
-          <div class="setting-row">
-            <label class="setting-label" for="ambientVolume">Ambiente</label>
-            <input id="ambientVolume" type="range" min="0" max="100" step="1" value="85" />
-            <span class="value" id="ambientValue">85%</span>
-          </div>
+              <div class="setting-row">
+                <label class="setting-label" for="ambientVolume">Ambiente</label>
+                <input id="ambientVolume" type="range" min="0" max="100" step="1" value="85" />
+                <span class="value" id="ambientValue">85%</span>
+              </div>
 
-          <div class="setting-row">
-            <label class="setting-label" for="sfxVolume">SFX</label>
-            <input id="sfxVolume" type="range" min="0" max="100" step="1" value="80" />
-            <span class="value" id="sfxValue">80%</span>
-          </div>
+              <div class="setting-row">
+                <label class="setting-label" for="sfxVolume">SFX</label>
+                <input id="sfxVolume" type="range" min="0" max="100" step="1" value="80" />
+                <span class="value" id="sfxValue">80%</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section" aria-labelledby="videoSettingsTitle">
+            <h2 id="videoSettingsTitle" class="section-title">Video</h2>
+            <label class="toggle-row" for="postProcessingToggle">
+              <span class="setting-label">Filtro VHS</span>
+              <input id="postProcessingToggle" type="checkbox" checked />
+              <span class="toggle-track" aria-hidden="true">
+                <span class="toggle-thumb"></span>
+              </span>
+            </label>
+          </section>
         </div>
 
         <div class="menu-actions">
-          <button class="menu-button" id="resumeButton" type="button">Continuar</button>
-          <button class="menu-button secondary" id="backButton" type="button">Volver</button>
+          <button class="menu-button" id="saveButton" type="button">Guardar</button>
+          <button class="menu-button secondary" id="exitButton" type="button">Salir</button>
         </div>
 
-        <div class="pause-hint">ESC para cerrar el menu</div>
+        <div id="pauseStatus" class="pause-status" aria-live="polite"></div>
       </section>
     </div>
 

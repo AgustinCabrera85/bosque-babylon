@@ -345,7 +345,7 @@ const terrain = createTerrain(scene, {
   });
   setupViewModeControls(player);
   createVintageFilmPostProcess(scene, player.camera, {
-    enabled: quality.name === "desktop",
+    enabled: true,
   });
 
   onProgress(0.36, "Cargando personaje...");

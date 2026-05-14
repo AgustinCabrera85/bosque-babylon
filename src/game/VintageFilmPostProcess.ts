@@ -170,17 +170,16 @@ function readStoredEnabled(defaultEnabled: boolean) {
   return defaultEnabled;
 }
 
-function bindButton(handle: VintageFilmHandle) {
-  const button = document.getElementById("vintageFilterButton") as HTMLButtonElement | null;
+function bindMenuToggle(handle: VintageFilmHandle) {
+  const toggle = document.getElementById("postProcessingToggle") as HTMLInputElement | null;
   const render = () => {
     const enabled = handle.isEnabled();
-    button?.classList.toggle("active", enabled);
-    button?.setAttribute("aria-pressed", String(enabled));
+    if (toggle) toggle.checked = enabled;
   };
 
-  button?.addEventListener("click", (event) => {
+  toggle?.addEventListener("change", (event) => {
     event.stopPropagation();
-    handle.toggle();
+    handle.setEnabled(toggle.checked);
     render();
   });
   render();
@@ -282,20 +281,14 @@ export function createVintageFilmPostProcess(
   };
 
   buttonRender = () => {
-    const button = document.getElementById("vintageFilterButton") as HTMLButtonElement | null;
-    button?.classList.toggle("active", enabled);
-    button?.setAttribute("aria-pressed", String(enabled));
+    const toggle = document.getElementById("postProcessingToggle") as HTMLInputElement | null;
+    if (toggle) toggle.checked = enabled;
   };
 
   const initialEnabled = readStoredEnabled(options.enabled ?? false);
   if (initialEnabled) handle.setEnabled(true);
 
-  bindButton(handle);
-
-  window.addEventListener("keydown", (event) => {
-    if (event.code !== "KeyX" || event.repeat) return;
-    handle.toggle();
-  });
+  bindMenuToggle(handle);
 
   scene.onDisposeObservable.addOnce(() => handle.dispose());
 

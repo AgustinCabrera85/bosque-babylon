@@ -40,16 +40,16 @@ const STORAGE_KEY = "bosque:vintageFilmEnabled";
 export const fridayThe13thVintagePreset: VintageFilmSettings = {
   grainIntensity: 0.13,
   chromaticAberration: 1.75,
-  vignetteIntensity: 0.58,
-  vignetteSoftness: 0.42,
+  vignetteIntensity: 0.38,
+  vignetteSoftness: 0.52,
   edgeBlur: 1.15,
   lineDistortion: 0.42,
   glitchIntensity: 0.11,
   scanlineIntensity: 0.18,
-  lutStrength: 0.86,
-  contrast: 1.18,
-  saturation: 0.72,
-  exposure: 0.93,
+  lutStrength: 0.70,
+  contrast: 1.08,
+  saturation: 0.76,
+  exposure: 1.08,
 };
 
 const fragmentShader = `

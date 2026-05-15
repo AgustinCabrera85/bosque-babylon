@@ -23,6 +23,8 @@ type InteractableMetadata = {
   onInteract?: () => InteractResult | void;
 };
 
+const INTERACTION_RAY_LENGTH = 4.25;
+
 export class InteractSystem {
   constructor(
     private scene: Scene,
@@ -42,7 +44,7 @@ export class InteractSystem {
 
   tryInteract() {
     const look = this.getLookRay();
-    const ray = new Ray(look.origin, look.direction, 3.0);
+    const ray = new Ray(look.origin, look.direction, INTERACTION_RAY_LENGTH);
 
     const hit = this.scene.pickWithRay(ray, (m) => !!m.metadata?.interactable);
     if (!hit?.hit || !hit.pickedMesh) return;

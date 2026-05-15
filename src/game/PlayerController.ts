@@ -93,6 +93,9 @@ export class PlayerController {
       if (target?.closest("#musicControls")) return;
       if (target?.closest("#viewControls")) return;
       if (target?.closest("#pauseMenu")) return;
+      if (target?.closest("#itemInspector")) return;
+      if (target?.closest("#inventoryOverlay")) return;
+      if (target?.closest("#inventoryButton")) return;
       if (this.mobileEnabled) return;
       canvas.requestPointerLock?.();
     });

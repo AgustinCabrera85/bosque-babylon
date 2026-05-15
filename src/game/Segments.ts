@@ -19,6 +19,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 
 import { mulberry32 } from "../utils/seed";
 import { createCandleFireMaterial, createGlowMaterial } from "./Torches";
+import { createPhotoCard } from "./PhotoCard";
 
 import type { TerrainHandle } from "./Terrain";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
@@ -118,6 +119,7 @@ const START_FOREST_CLOSURE_Z = -18;
 const END_HOUSE_MODEL_SCALE = 1.55;
 const END_HOUSE_RESERVE_WIDTH = 122;
 const END_HOUSE_RESERVE_DEPTH = 150;
+const INTERACTION_RAY_LENGTH = 4.25;
 // Asset especial: no se carga en TreeLibrary para que no aparezca en la generacion normal.
 const START_BLOCKER_TREE_PATH = "/assets/models/blockers/";
 const START_BLOCKER_TREE_FILE = "tree_08.glb";
@@ -955,7 +957,7 @@ export class Segments {
     const direction = "globalPosition" in cameraOrLook
       ? cameraOrLook.getDirection(Vector3.Forward())
       : cameraOrLook.direction;
-    const ray = new Ray(origin, direction, 3);
+    const ray = new Ray(origin, direction, INTERACTION_RAY_LENGTH);
     const hit = this.scene.pickWithRay(ray, (m) => !!m.metadata?.interactable);
     return hit?.hit ? hit.pickedMesh : null;
   }
@@ -1031,11 +1033,14 @@ export class Segments {
     this.createHouseColliders(finalBounds);
     this.createHouseMeshColliders(res.meshes);
     this.createHouseDoor(res.meshes, finalBounds);
-    this.createHouseCandle(finalBounds);
+    const candlePosition = this.createHouseCandle(finalBounds);
+    await createPhotoCard(this.scene, finalBounds, { candlePosition });
   }
 
   private createHouseCandle(bounds: { min: Vector3; max: Vector3 }) {
-    if (!this.candleTemplate || !this.candleFireMaterial || !this.candleGlowMaterial || !this.candleFloorGlowMaterial) return;
+    if (!this.candleTemplate || !this.candleFireMaterial || !this.candleGlowMaterial || !this.candleFloorGlowMaterial) {
+      return null;
+    }
 
     const width = bounds.max.x - bounds.min.x;
     const depth = bounds.max.z - bounds.min.z;
@@ -1067,6 +1072,8 @@ export class Segments {
       14,
       0
     );
+
+    return new Vector3(x, floorY, z);
   }
 
   private patchHouseMaterials(meshes: AbstractMesh[]) {

@@ -1,4 +1,5 @@
 import type { InspectableItem } from "./ItemInspector";
+import { asset } from "../utils/asset";
 
 type InventoryItem = InspectableItem & {
   count: number;
@@ -79,6 +80,7 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
   const addItem = (item: InspectableItem) => {
     const existing = items.get(item.id);
     if (existing) {
+      Object.assign(existing, item);
       existing.count += 1;
     } else {
       items.set(item.id, { ...item, count: 1 });
@@ -268,7 +270,16 @@ function renderItems(
 
     const preview = document.createElement("span");
     preview.className = "inventory-item-preview";
-    preview.textContent = item.name.slice(0, 1).toUpperCase();
+    if (item.inventoryIconPath) {
+      const icon = document.createElement("img");
+      icon.className = "inventory-item-icon";
+      icon.src = asset(item.inventoryIconPath);
+      icon.alt = "";
+      icon.draggable = false;
+      preview.appendChild(icon);
+    } else {
+      preview.textContent = item.name.slice(0, 1).toUpperCase();
+    }
 
     const name = document.createElement("span");
     name.className = "inventory-item-name";

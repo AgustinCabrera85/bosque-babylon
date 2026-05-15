@@ -20,6 +20,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { mulberry32 } from "../utils/seed";
 import { createCandleFireMaterial, createGlowMaterial } from "./Torches";
 import { createPhotoCard } from "./PhotoCard";
+import { createCollectibleNote } from "./CollectibleNotes";
 
 import type { TerrainHandle } from "./Terrain";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
@@ -120,6 +121,7 @@ const END_HOUSE_MODEL_SCALE = 1.55;
 const END_HOUSE_RESERVE_WIDTH = 122;
 const END_HOUSE_RESERVE_DEPTH = 150;
 const INTERACTION_RAY_LENGTH = 4.25;
+const FIRST_NOTE_SEGMENT_ID = 1;
 // Asset especial: no se carga en TreeLibrary para que no aparezca en la generacion normal.
 const START_BLOCKER_TREE_PATH = "/assets/models/blockers/";
 const START_BLOCKER_TREE_FILE = "tree_08.glb";
@@ -153,6 +155,7 @@ export class Segments {
   private candleLights: CandleFlameEntry[] = [];
   private candleFlickerRegistered = false;
   private startBlockerLoaded = false;
+  private firstNoteCreated = false;
 
   constructor(
     private scene: Scene,
@@ -248,6 +251,11 @@ export class Segments {
     // ---------- TREES + ROCKS ----------
     for (const id of objectNeeded) {
       const centerZ = (id + 0.5) * segLen;
+
+      if (id === FIRST_NOTE_SEGMENT_ID && !this.firstNoteCreated) {
+        this.createFirstPathNote();
+        this.firstNoteCreated = true;
+      }
 
       if (!this.candleSegments.has(id)) {
         const pack = this.createCandles(centerZ, id);
@@ -428,6 +436,23 @@ export class Segments {
   // =========================
   // INTERACTION
   // =========================
+  private createFirstPathNote() {
+    const segLen = this.cfg.segmentLength;
+    const z = FIRST_NOTE_SEGMENT_ID * segLen + segLen * 0.43;
+    const x = -0.95;
+    const y = this.terrain.getHeightAt(x, z) + 0.045;
+
+    createCollectibleNote(this.scene, {
+      id: "note-1",
+      name: "Nota",
+      description: "Una nota enrollada encontrada en el camino.",
+      worldTexturePath: "assets/models/props/png/generics/ItemRolledNoteGeneric.png",
+      contentImagePath: "assets/models/props/png/notes/Note_1.png",
+      position: new Vector3(x, y, z),
+      rotationY: Math.PI * -0.08,
+    });
+  }
+
   spawnDemoInteractables() {
     const note = MeshBuilder.CreateBox("note", { width: 0.25, height: 0.02, depth: 0.18 }, this.scene);
     note.position.set(0.8, this.terrain.getHeightAt(0.8, 8) + 1, 8);

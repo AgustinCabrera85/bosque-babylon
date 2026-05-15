@@ -14,6 +14,7 @@ import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 
 import { asset } from "../utils/asset";
+import { createItemLensFlare } from "./CollectibleEffects";
 
 export type PhotoCardBounds = {
   min: Vector3;
@@ -108,7 +109,11 @@ export async function createPhotoCard(
   root.scaling.setAll(config.scale);
   root.computeWorldMatrix(true);
   const pulse = createPhotoCardPulse(scene, `${config.name}Pulse`, position, config.pulseSize);
-  const glint = createPhotoCardGlint(scene, `${config.name}Glint`, position);
+  const flare = createItemLensFlare(scene, `${config.name}Flare`, position, {
+    size: 0.34,
+    height: 0.34,
+    intensity: 0.95,
+  });
 
   const interaction = MeshBuilder.CreateBox(
     `${config.name}Interaction`,
@@ -135,11 +140,10 @@ export async function createPhotoCard(
 
       pickedUp = true;
       scene.onBeforeRenderObservable.remove(pulse.observer);
-      scene.onBeforeRenderObservable.remove(glint.observer);
+      flare.dispose();
       root.dispose(false, true);
       interaction.dispose();
       pulse.mesh.dispose();
-      glint.root.dispose(false, true);
       const inventoryItem = {
         ...PHOTO_CARD_INSPECTABLE_ITEM,
         modelRootPath: config.modelRootPath,
@@ -252,57 +256,6 @@ function createPhotoCardPulse(scene: Scene, name: string, position: Vector3, siz
   });
 
   return { mesh, observer };
-}
-
-function createPhotoCardGlint(scene: Scene, name: string, position: Vector3) {
-  const root = new TransformNode(`${name}Root`, scene);
-  root.position.set(position.x, position.y + 0.34, position.z);
-
-  const texture = new DynamicTexture(
-    `${name}Texture`,
-    { width: 128, height: 128 },
-    scene,
-    false
-  );
-  const ctx = texture.getContext() as CanvasRenderingContext2D;
-  ctx.clearRect(0, 0, 128, 128);
-  const gradient = ctx.createRadialGradient(64, 64, 4, 64, 64, 48);
-  gradient.addColorStop(0.0, "rgba(255, 244, 190, 0.95)");
-  gradient.addColorStop(0.26, "rgba(255, 188, 83, 0.55)");
-  gradient.addColorStop(1.0, "rgba(255, 120, 32, 0)");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 128, 128);
-  texture.update();
-  texture.hasAlpha = true;
-
-  const material = new StandardMaterial(`${name}Material`, scene);
-  material.diffuseTexture = texture;
-  material.opacityTexture = texture;
-  material.emissiveColor = new Color3(1.0, 0.74, 0.32);
-  material.diffuseColor = new Color3(1.0, 0.76, 0.38);
-  material.alpha = 0.7;
-  material.alphaMode = BabylonMaterial.MATERIAL_ALPHABLEND;
-  material.transparencyMode = BabylonMaterial.MATERIAL_ALPHABLEND;
-  material.disableLighting = true;
-  material.backFaceCulling = false;
-
-  const front = MeshBuilder.CreatePlane(`${name}Front`, { size: 0.26 }, scene);
-  front.parent = root;
-  front.material = material;
-  front.isPickable = false;
-  front.billboardMode = Mesh.BILLBOARDMODE_ALL;
-
-  let t = 0;
-  const observer = scene.onBeforeRenderObservable.add(() => {
-    t += scene.getEngine().getDeltaTime() * 0.001;
-    const pulse = (Math.sin(t * 6.2) + 1) * 0.5;
-    material.alpha = 0.36 + pulse * 0.48;
-    const scale = 0.85 + pulse * 0.3;
-    root.scaling.set(scale, scale, scale);
-    root.position.y = position.y + 0.32 + Math.sin(t * 2.6) * 0.035;
-  });
-
-  return { root, observer };
 }
 
 function preparePhotoCardMeshes(meshes: AbstractMesh[]) {

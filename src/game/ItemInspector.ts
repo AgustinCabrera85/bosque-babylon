@@ -17,9 +17,12 @@ export type InspectableItem = {
   name: string;
   typeLabel: string;
   description: string;
-  modelRootPath: string;
-  modelFileName: string;
+  inspectMode?: "model" | "image";
+  modelRootPath?: string;
+  modelFileName?: string;
   texturePath?: string;
+  contentImagePath?: string;
+  inventoryIconPath?: string;
   modelScale?: number;
   cameraRadius?: number;
 };
@@ -28,11 +31,18 @@ type InspectItemEvent = CustomEvent<InspectableItem>;
 
 type InspectorDom = {
   overlay: HTMLDivElement;
+  view: HTMLDivElement;
   canvas: HTMLCanvasElement;
+  image: HTMLImageElement;
+  controls: HTMLElement;
   title: HTMLElement;
   type: HTMLElement;
   description: HTMLElement;
   closeButton: HTMLButtonElement;
+};
+
+const INSPECTABLE_IMAGE_FALLBACKS: Record<string, string> = {
+  "note-1": "assets/models/props/png/notes/Note_1.png",
 };
 
 export type ItemInspectorHandle = {
@@ -110,6 +120,25 @@ async function openItem(
   document.body.classList.add("inspector-open");
   window.dispatchEvent(new CustomEvent("bosque:pause", { detail: { paused: true } }));
 
+  if (item.inspectMode === "image") {
+    openImageItem(item, dom);
+    return;
+  }
+
+  if (!item.modelRootPath || !item.modelFileName) {
+    openImageItem(item, dom);
+    return;
+  }
+
+  dom.canvas.classList.remove("hidden");
+  dom.image.classList.add("hidden");
+  dom.controls.textContent = "";
+  const rotate = document.createElement("span");
+  rotate.textContent = "Arrastrar para rotar";
+  const zoom = document.createElement("span");
+  zoom.textContent = "Rueda para zoom";
+  dom.controls.append(rotate, zoom);
+
   const engine = new Engine(dom.canvas, true, {
     preserveDrawingBuffer: false,
     stencil: false,
@@ -158,6 +187,113 @@ async function openItem(
   engine.resize();
 }
 
+function openImageItem(item: InspectableItem, dom: InspectorDom) {
+  dom.canvas.classList.add("hidden");
+  dom.image.classList.remove("hidden");
+  dom.image.alt = item.name;
+  dom.image.draggable = false;
+  dom.controls.textContent = "";
+  const zoom = document.createElement("span");
+  zoom.textContent = "Rueda para acercar";
+  const pan = document.createElement("span");
+  pan.textContent = "Arrastrar para panear";
+  const close = document.createElement("span");
+  close.textContent = "Guardar para cerrar";
+  dom.controls.append(zoom, pan, close);
+
+  let scale = 1;
+  const offset = { x: 0, y: 0 };
+  const lastPointer = { x: 0, y: 0 };
+  let panning = false;
+
+  const clampOffset = () => {
+    const viewWidth = dom.view.clientWidth;
+    const viewHeight = dom.view.clientHeight;
+    const imageWidth = dom.image.offsetWidth;
+    const imageHeight = dom.image.offsetHeight;
+    const maxX = Math.max((imageWidth * scale - viewWidth) * 0.5, 0);
+    const maxY = Math.max((imageHeight * scale - viewHeight) * 0.5, 0);
+
+    offset.x = Math.min(maxX, Math.max(-maxX, offset.x));
+    offset.y = Math.min(maxY, Math.max(-maxY, offset.y));
+  };
+
+  const applyTransform = () => {
+    clampOffset();
+    dom.image.style.transform = `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) scale(${scale})`;
+    dom.image.classList.toggle("is-zoomed", scale > 1.01);
+  };
+
+  const resetView = () => {
+    scale = 1;
+    offset.x = 0;
+    offset.y = 0;
+    applyTransform();
+  };
+
+  const imagePath = getInspectableImagePath(item);
+  dom.image.onload = () => {
+    dom.image.classList.remove("unavailable");
+    window.requestAnimationFrame(resetView);
+  };
+  dom.image.onerror = () => {
+    dom.image.classList.add("unavailable");
+    dom.controls.textContent = "";
+    const error = document.createElement("span");
+    error.textContent = "Imagen no disponible";
+    dom.controls.append(error, close);
+  };
+  dom.image.src = imagePath ? asset(imagePath) : "";
+  dom.image.classList.toggle("unavailable", !imagePath);
+
+  resetView();
+  dom.image.onwheel = (event) => {
+    event.preventDefault();
+    scale = Math.max(0.75, Math.min(2.8, scale + (event.deltaY < 0 ? 0.12 : -0.12)));
+    if (scale <= 1.01) {
+      offset.x = 0;
+      offset.y = 0;
+    }
+    applyTransform();
+  };
+  dom.image.onpointerdown = (event) => {
+    event.preventDefault();
+    if (scale <= 1.01) return;
+
+    panning = true;
+    lastPointer.x = event.clientX;
+    lastPointer.y = event.clientY;
+    dom.image.classList.add("is-panning");
+    dom.image.setPointerCapture(event.pointerId);
+  };
+  dom.image.onpointermove = (event) => {
+    if (!panning) return;
+    event.preventDefault();
+
+    offset.x += event.clientX - lastPointer.x;
+    offset.y += event.clientY - lastPointer.y;
+    lastPointer.x = event.clientX;
+    lastPointer.y = event.clientY;
+    applyTransform();
+  };
+
+  const stopPanning = (event: PointerEvent) => {
+    if (!panning) return;
+    panning = false;
+    dom.image.classList.remove("is-panning");
+    if (dom.image.hasPointerCapture(event.pointerId)) {
+      dom.image.releasePointerCapture(event.pointerId);
+    }
+  };
+  dom.image.onpointerup = stopPanning;
+  dom.image.onpointercancel = stopPanning;
+  dom.image.ondragstart = (event) => event.preventDefault();
+}
+
+function getInspectableImagePath(item: InspectableItem) {
+  return item.contentImagePath ?? item.texturePath ?? INSPECTABLE_IMAGE_FALLBACKS[item.id] ?? "";
+}
+
 function createInspectorDom(): InspectorDom {
   const overlay = document.createElement("div");
   overlay.id = "itemInspector";
@@ -174,16 +310,14 @@ function createInspectorDom(): InspectorDom {
 
       <div class="item-inspector-view">
         <canvas id="itemInspectorCanvas"></canvas>
+        <img id="itemInspectorImage" class="item-inspector-image hidden" alt="" />
       </div>
 
       <aside class="item-inspector-detail">
         <p id="itemInspectorType" class="item-inspector-type"></p>
         <h2 id="itemInspectorTitle" class="item-inspector-title"></h2>
         <p id="itemInspectorDescription" class="item-inspector-description"></p>
-        <div class="item-inspector-controls">
-          <span>Arrastrar para rotar</span>
-          <span>Rueda para zoom</span>
-        </div>
+        <div id="itemInspectorControls" class="item-inspector-controls"></div>
         <button id="itemInspectorClose" class="menu-button secondary" type="button">Guardar</button>
       </aside>
     </section>
@@ -192,7 +326,10 @@ function createInspectorDom(): InspectorDom {
 
   return {
     overlay,
+    view: overlay.querySelector(".item-inspector-view") as HTMLDivElement,
     canvas: overlay.querySelector("#itemInspectorCanvas") as HTMLCanvasElement,
+    image: overlay.querySelector("#itemInspectorImage") as HTMLImageElement,
+    controls: overlay.querySelector("#itemInspectorControls") as HTMLElement,
     title: overlay.querySelector("#itemInspectorTitle") as HTMLElement,
     type: overlay.querySelector("#itemInspectorType") as HTMLElement,
     description: overlay.querySelector("#itemInspectorDescription") as HTMLElement,

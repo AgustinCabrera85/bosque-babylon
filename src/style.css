@@ -715,6 +715,16 @@ body.inventory-open #hud {
   text-shadow: 0 4px 8px #000;
 }
 
+.inventory-item-icon {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 5px 6px rgba(0, 0, 0, 0.62))
+    drop-shadow(0 0 8px rgba(216, 189, 122, 0.18));
+  user-select: none;
+}
+
 .inventory-item-name {
   display: block;
   color: var(--bone);
@@ -859,6 +869,7 @@ body.inventory-open #hud {
 .item-inspector-view {
   min-height: 500px;
   overflow: hidden;
+  user-select: none;
   background:
     radial-gradient(circle at 50% 45%, rgba(216, 189, 122, 0.12), transparent 44%),
     rgba(0, 0, 0, 0.24);
@@ -874,6 +885,38 @@ body.inventory-open #hud {
 
 #itemInspectorCanvas:active {
   cursor: grabbing;
+}
+
+.item-inspector-image {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: auto;
+  height: auto;
+  max-width: calc(100% - 36px);
+  max-height: calc(100% - 36px);
+  object-fit: contain;
+  display: block;
+  box-sizing: border-box;
+  transform-origin: center;
+  transition: transform 120ms ease;
+  user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
+  cursor: zoom-in;
+}
+
+.item-inspector-image.unavailable {
+  visibility: hidden;
+}
+
+.item-inspector-image.is-zoomed {
+  cursor: grab;
+}
+
+.item-inspector-image.is-panning {
+  cursor: grabbing;
+  transition: none;
 }
 
 .item-inspector-detail {

@@ -205,6 +205,8 @@ function openImageItem(item: InspectableItem, dom: InspectorDom) {
   const offset = { x: 0, y: 0 };
   const lastPointer = { x: 0, y: 0 };
   let panning = false;
+  let initialPinchDistance: number | null = null;
+  let initialPinchScale = 1;
 
   const clampOffset = () => {
     const viewWidth = dom.view.clientWidth;
@@ -288,6 +290,35 @@ function openImageItem(item: InspectableItem, dom: InspectorDom) {
   dom.image.onpointerup = stopPanning;
   dom.image.onpointercancel = stopPanning;
   dom.image.ondragstart = (event) => event.preventDefault();
+  dom.view.ontouchstart = (event) => {
+    if (event.touches.length === 2) {
+      initialPinchDistance = getTouchDistance(event.touches[0], event.touches[1]);
+      initialPinchScale = scale;
+      panning = false;
+      dom.image.classList.remove("is-panning");
+    }
+  };
+  dom.view.ontouchmove = (event) => {
+    if (event.touches.length !== 2 || !initialPinchDistance) return;
+    event.preventDefault();
+
+    const distance = getTouchDistance(event.touches[0], event.touches[1]);
+    scale = Math.max(1, Math.min(3.2, initialPinchScale * (distance / initialPinchDistance)));
+    if (scale <= 1.01) {
+      offset.x = 0;
+      offset.y = 0;
+    }
+    applyTransform();
+  };
+  dom.view.ontouchend = () => {
+    initialPinchDistance = null;
+  };
+}
+
+function getTouchDistance(a: Touch, b: Touch) {
+  const dx = a.clientX - b.clientX;
+  const dy = a.clientY - b.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 function getInspectableImagePath(item: InspectableItem) {

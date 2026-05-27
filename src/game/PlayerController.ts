@@ -47,33 +47,18 @@ const CHARACTER_VISUAL_SCALE: Record<CharacterId, number> = {
   lautaro: LAUTARO_VISUAL_SCALE,
   sofia: LAUTARO_VISUAL_SCALE * 0.75,
 };
-const CHARACTER_ANIMATIONS: Record<CharacterId, Record<AnimationKey, string>> = {
-  lautaro: {
-    idle: "Idle",
-    jump: "Jump_InPlace",
-    strafeLeftRun: "Left_Strafe_Run_InPlace",
-    strafeLeftWalk: "Left_Strafe_Walk_InPlace",
-    openDoor: "OpenDoor",
-    pickUpItem: "PickUpItem",
-    strafeRightRun: "Right_Strafe_Run_InPlace",
-    strafeRightWalk: "Right_Strafe_Walk_InPlace",
-    run: "Run_InPlace",
-    walkBackward: "Walk_Backwards_InPlace",
-    walk: "Walk_InPlace",
-  },
-  sofia: {
-    idle: "Idle",
-    jump: "jump",
-    strafeLeftRun: "Run Strafe Left",
-    strafeLeftWalk: "Walk Left Strafe",
-    openDoor: "Open Door",
-    pickUpItem: "PickUpItem",
-    strafeRightRun: "Run Strafe Right",
-    strafeRightWalk: "Walk Right Strafe",
-    run: "Run_InPlace ",
-    walkBackward: "Walk Backwards",
-    walk: "Walk",
-  },
+const CHARACTER_ANIMATIONS: Record<AnimationKey, string> = {
+  idle: "Idle",
+  jump: "Jump_InPlace",
+  strafeLeftRun: "Left_Strafe_Run_InPlace",
+  strafeLeftWalk: "Left_Strafe_Walk_InPlace",
+  openDoor: "OpenDoor",
+  pickUpItem: "PickUpItem",
+  strafeRightRun: "Right_Strafe_Run_InPlace",
+  strafeRightWalk: "Right_Strafe_Walk_InPlace",
+  run: "Run_InPlace",
+  walkBackward: "Walk_Backwards_InPlace",
+  walk: "Walk_InPlace",
 };
 const CHARACTER_YAW_OFFSET = 0;
 const CHARACTER_FOOT_CLEARANCE = 0.03;
@@ -528,6 +513,12 @@ export class PlayerController {
     this.avatarRoot.rotation.y = CHARACTER_YAW_OFFSET;
     this.avatarRoot.scaling.setAll(CHARACTER_VISUAL_SCALE[this.character]);
 
+    if (this.character === "sofia") {
+      // The corrected Sofia asset is already centered with its origin at foot level.
+      this.avatarRoot.position.set(0, -this.settings.eyeHeight + CHARACTER_FOOT_CLEARANCE, 0);
+      return;
+    }
+
     const scaledBounds = this.getAvatarBounds();
     if (!scaledBounds) return;
 
@@ -570,9 +561,15 @@ export class PlayerController {
       if (mat instanceof PBRMaterial) {
         mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
         mat.useAlphaFromAlbedoTexture = false;
-        mat.metallic = Math.min(mat.metallic ?? 0, 0.15);
-        mat.roughness = Math.max(mat.roughness ?? 0.65, 0.55);
-        mat.environmentIntensity = Math.min(mat.environmentIntensity ?? 0.35, 0.35);
+        if (this.character === "sofia") {
+          mat.metallic = 0;
+          mat.roughness = Math.max(mat.roughness ?? 0.8, 0.8);
+          mat.environmentIntensity = Math.min(mat.environmentIntensity ?? 0.2, 0.2);
+        } else {
+          mat.metallic = Math.min(mat.metallic ?? 0, 0.15);
+          mat.roughness = Math.max(mat.roughness ?? 0.65, 0.55);
+          mat.environmentIntensity = Math.min(mat.environmentIntensity ?? 0.35, 0.35);
+        }
       } else if (mat instanceof StandardMaterial) {
         mat.useAlphaFromDiffuseTexture = false;
       }
@@ -638,7 +635,7 @@ export class PlayerController {
   }
 
   private playAction(name: AnimationKey) {
-    if (!this.animations.has(CHARACTER_ANIMATIONS[this.character][name])) return;
+    if (!this.animations.has(CHARACTER_ANIMATIONS[name])) return;
 
     this.actionPlaying = true;
     const group = this.playAnimation(name, false, ACTION_BLEND_TIME);
@@ -656,8 +653,8 @@ export class PlayerController {
   }
 
   private playAnimation(name: AnimationKey, loop: boolean, blendTime = ANIMATION_BLEND_TIME) {
-    const animationName = CHARACTER_ANIMATIONS[this.character][name];
-    const idleName = CHARACTER_ANIMATIONS[this.character].idle;
+    const animationName = CHARACTER_ANIMATIONS[name];
+    const idleName = CHARACTER_ANIMATIONS.idle;
     const next = this.animations.get(animationName) ?? this.animations.get(idleName);
     if (!next) return null;
     if (this.currentAnimation === next.name && next.isPlaying) return next;

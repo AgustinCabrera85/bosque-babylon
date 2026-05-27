@@ -73,6 +73,7 @@ const PATH_END_Z = 70 * 8 - 8;
 const PATH_SURFACE_OFFSET = 0.1;
 const ANIMATION_BLEND_TIME = 0.16;
 const ACTION_BLEND_TIME = 0.08;
+const PICKUP_ACTION_SPEED_RATIO = 1.35;
 const DOOR_OPEN_MOVEMENT_LOCK_SECONDS = 1.7;
 const THIRD_PERSON_FLASHLIGHT_PITCH_MIN = -0.58;
 const THIRD_PERSON_FLASHLIGHT_PITCH_MAX = 0.68;
@@ -233,7 +234,7 @@ export class PlayerController {
       return;
     }
 
-    this.playAction("pickUpItem");
+    this.playAction("pickUpItem", PICKUP_ACTION_SPEED_RATIO);
   }
 
   private lockMovement(seconds: number) {
@@ -391,7 +392,8 @@ export class PlayerController {
     const running = this.mobileRun || this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
     const speed = running ? this.settings.runSpeed : this.settings.walkSpeed;
 
-    if (this.movementLockTimer > 0) {
+    const movementLocked = this.movementLockTimer > 0 || this.actionPlaying;
+    if (movementLocked) {
       moveX = 0;
       moveY = 0;
       move.set(0, 0, 0);
@@ -426,7 +428,7 @@ export class PlayerController {
       this.grounded = false;
     }
 
-    if ((this.keys.has("Space") || this.jumpQueued) && this.grounded) {
+    if (!movementLocked && (this.keys.has("Space") || this.jumpQueued) && this.grounded) {
       this.velY = this.settings.jumpSpeed;
       this.grounded = false;
       this.playSfx("jump");
@@ -634,11 +636,11 @@ export class PlayerController {
     this.playAnimation("idle", true);
   }
 
-  private playAction(name: AnimationKey) {
+  private playAction(name: AnimationKey, speedRatio = 1) {
     if (!this.animations.has(CHARACTER_ANIMATIONS[name])) return;
 
     this.actionPlaying = true;
-    const group = this.playAnimation(name, false, ACTION_BLEND_TIME);
+    const group = this.playAnimation(name, false, ACTION_BLEND_TIME, speedRatio);
     if (!group) {
       this.actionPlaying = false;
       return;
@@ -652,7 +654,12 @@ export class PlayerController {
     });
   }
 
-  private playAnimation(name: AnimationKey, loop: boolean, blendTime = ANIMATION_BLEND_TIME) {
+  private playAnimation(
+    name: AnimationKey,
+    loop: boolean,
+    blendTime = ANIMATION_BLEND_TIME,
+    speedRatio = 1
+  ) {
     const animationName = CHARACTER_ANIMATIONS[name];
     const idleName = CHARACTER_ANIMATIONS.idle;
     const next = this.animations.get(animationName) ?? this.animations.get(idleName);
@@ -666,6 +673,7 @@ export class PlayerController {
     }
 
     next.reset();
+    next.speedRatio = speedRatio;
     next.start(loop);
     this.setAnimationWeight(next, previous && previous !== next ? 0 : 1);
 

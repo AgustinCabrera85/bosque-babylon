@@ -23,10 +23,58 @@ type Settings = {
 
 export type ViewMode = "first" | "third" | "front";
 export type LookRay = { origin: Vector3; direction: Vector3 };
+export type CharacterId = "lautaro" | "sofia";
+type AnimationKey =
+  | "idle"
+  | "jump"
+  | "strafeLeftRun"
+  | "strafeLeftWalk"
+  | "openDoor"
+  | "pickUpItem"
+  | "strafeRightRun"
+  | "strafeRightWalk"
+  | "run"
+  | "walkBackward"
+  | "walk";
 
 const CHARACTER_ROOT_URL = "/assets/models/character/";
-const CHARACTER_FILE = "Lautaro_Animated.glb";
-const CHARACTER_VISUAL_SCALE = 2.7;
+const CHARACTER_FILES: Record<CharacterId, string> = {
+  lautaro: "Lautaro_Animated.glb",
+  sofia: "Sofia_Animated.glb",
+};
+const LAUTARO_VISUAL_SCALE = 2.7;
+const CHARACTER_VISUAL_SCALE: Record<CharacterId, number> = {
+  lautaro: LAUTARO_VISUAL_SCALE,
+  sofia: LAUTARO_VISUAL_SCALE * 0.75,
+};
+const CHARACTER_ANIMATIONS: Record<CharacterId, Record<AnimationKey, string>> = {
+  lautaro: {
+    idle: "Idle",
+    jump: "Jump_InPlace",
+    strafeLeftRun: "Left_Strafe_Run_InPlace",
+    strafeLeftWalk: "Left_Strafe_Walk_InPlace",
+    openDoor: "OpenDoor",
+    pickUpItem: "PickUpItem",
+    strafeRightRun: "Right_Strafe_Run_InPlace",
+    strafeRightWalk: "Right_Strafe_Walk_InPlace",
+    run: "Run_InPlace",
+    walkBackward: "Walk_Backwards_InPlace",
+    walk: "Walk_InPlace",
+  },
+  sofia: {
+    idle: "Idle",
+    jump: "jump",
+    strafeLeftRun: "Run Strafe Left",
+    strafeLeftWalk: "Walk Left Strafe",
+    openDoor: "Open Door",
+    pickUpItem: "PickUpItem",
+    strafeRightRun: "Run Strafe Right",
+    strafeRightWalk: "Walk Right Strafe",
+    run: "Run_InPlace ",
+    walkBackward: "Walk Backwards",
+    walk: "Walk",
+  },
+};
 const CHARACTER_YAW_OFFSET = 0;
 const CHARACTER_FOOT_CLEARANCE = 0.03;
 const THIRD_PERSON_CAMERA_DISTANCE = 5.2;
@@ -73,7 +121,12 @@ export class PlayerController {
   private movementLockTimer = 0;
   private sfxMovementState: "idle" | "walk" | "run" = "idle";
 
-  constructor(private scene: Scene, private canvas: HTMLCanvasElement, private settings: Settings) {
+  constructor(
+    private scene: Scene,
+    private canvas: HTMLCanvasElement,
+    private settings: Settings,
+    private character: CharacterId = "lautaro"
+  ) {
     this.root = new TransformNode("playerRoot", scene);
     this.root.position = new Vector3(0, settings.eyeHeight, 5);
 
@@ -152,7 +205,7 @@ export class PlayerController {
     else this.setViewMode("first");
   }
 
-  async loadCharacter(rootUrl = CHARACTER_ROOT_URL, fileName = CHARACTER_FILE) {
+  async loadCharacter(rootUrl = CHARACTER_ROOT_URL, fileName = CHARACTER_FILES[this.character]) {
     if (this.avatarRoot) return;
 
     const res = await SceneLoader.ImportMeshAsync(null, rootUrl, fileName, this.scene);
@@ -185,17 +238,17 @@ export class PlayerController {
 
     this.normalizeAvatar();
     this.setAvatarVisible(this.viewMode !== "first");
-    this.playAnimation("Idle", true);
+    this.playAnimation("idle", true);
   }
 
   playInteractionAction(type?: string, movementLockSeconds = DOOR_OPEN_MOVEMENT_LOCK_SECONDS) {
     if (type === "door") {
       this.lockMovement(movementLockSeconds);
-      this.playAction("OpenDoor");
+      this.playAction("openDoor");
       return;
     }
 
-    this.playAction("PickUpItem");
+    this.playAction("pickUpItem");
   }
 
   private lockMovement(seconds: number) {
@@ -317,7 +370,7 @@ export class PlayerController {
 
     const active = this.mobileEnabled || document.pointerLockElement === this.canvas;
     if (!active) {
-      if (!this.actionPlaying) this.playAnimation("Idle", true);
+      if (!this.actionPlaying) this.playAnimation("idle", true);
       this.updateMovementSfx("idle");
       this.updateAnimationFade(dt);
       this.updateThirdPersonCameraCollision(segments);
@@ -473,7 +526,7 @@ export class PlayerController {
   private normalizeAvatar() {
     if (!this.avatarRoot) return;
     this.avatarRoot.rotation.y = CHARACTER_YAW_OFFSET;
-    this.avatarRoot.scaling.setAll(CHARACTER_VISUAL_SCALE);
+    this.avatarRoot.scaling.setAll(CHARACTER_VISUAL_SCALE[this.character]);
 
     const scaledBounds = this.getAvatarBounds();
     if (!scaledBounds) return;
@@ -554,7 +607,7 @@ export class PlayerController {
     if (!this.animations.size || this.actionPlaying) return;
 
     if (!this.grounded) {
-      this.playAnimation("Jump_InPlace", false);
+      this.playAnimation("jump", false);
       return;
     }
 
@@ -564,28 +617,28 @@ export class PlayerController {
 
     if (moving) {
       if (moveY < -0.12 && absY >= absX) {
-        this.playAnimation("Walk_Backwards_InPlace", true);
+        this.playAnimation("walkBackward", true);
         return;
       }
 
       if (absX > 0.12) {
         if (moveX < 0) {
-          this.playAnimation(running ? "Left_Strafe_Run_InPlace" : "Left_Strafe_Walk_InPlace", true);
+          this.playAnimation(running ? "strafeLeftRun" : "strafeLeftWalk", true);
         } else {
-          this.playAnimation(running ? "Right_Strafe_Run_InPlace" : "Right_Strafe_Walk_InPlace", true);
+          this.playAnimation(running ? "strafeRightRun" : "strafeRightWalk", true);
         }
         return;
       }
 
-      this.playAnimation(running ? "Run_InPlace" : "Walk_InPlace", true);
+      this.playAnimation(running ? "run" : "walk", true);
       return;
     }
 
-    this.playAnimation("Idle", true);
+    this.playAnimation("idle", true);
   }
 
-  private playAction(name: string) {
-    if (!this.animations.has(name)) return;
+  private playAction(name: AnimationKey) {
+    if (!this.animations.has(CHARACTER_ANIMATIONS[this.character][name])) return;
 
     this.actionPlaying = true;
     const group = this.playAnimation(name, false, ACTION_BLEND_TIME);
@@ -595,15 +648,17 @@ export class PlayerController {
     }
 
     group.onAnimationGroupEndObservable.addOnce(() => {
-      if (this.currentAnimation !== name) return;
+      if (this.currentAnimation !== group.name) return;
       this.actionPlaying = false;
       this.currentAnimation = null;
       this.updateAvatarAnimation(0, 0, false);
     });
   }
 
-  private playAnimation(name: string, loop: boolean, blendTime = ANIMATION_BLEND_TIME) {
-    const next = this.animations.get(name) ?? this.animations.get("Idle");
+  private playAnimation(name: AnimationKey, loop: boolean, blendTime = ANIMATION_BLEND_TIME) {
+    const animationName = CHARACTER_ANIMATIONS[this.character][name];
+    const idleName = CHARACTER_ANIMATIONS[this.character].idle;
+    const next = this.animations.get(animationName) ?? this.animations.get(idleName);
     if (!next) return null;
     if (this.currentAnimation === next.name && next.isPlaying) return next;
 

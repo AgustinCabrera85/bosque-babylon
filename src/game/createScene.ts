@@ -6,7 +6,7 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { RockLibrary } from "./RockLibrary";
 import { createTerrain } from "./Terrain";
-import { PlayerController, type ViewMode } from "./PlayerController";
+import { PlayerController, type CharacterId, type ViewMode } from "./PlayerController";
 import { Segments } from "./Segments";
 import { TreeLibrary } from "./TreeLibrary";
 import { GrassLibrary } from "./GrassLibrary";
@@ -219,7 +219,8 @@ export async function createScene(
   engine: Engine,
   canvas: HTMLCanvasElement,
   onProgress: LoadingProgress = () => {},
-  quality: QualityProfile = desktopQuality
+  quality: QualityProfile = desktopQuality,
+  selectedCharacter: CharacterId = "lautaro"
 ) {
   onProgress(0.08, "Creando escena...");
   const scene = new Scene(engine);
@@ -342,7 +343,7 @@ const terrain = createTerrain(scene, {
     runSpeed: 6.8,
     jumpSpeed: 6.2,
     gravity: -18.0,
-  });
+  }, selectedCharacter);
   setupViewModeControls(player);
   createVintageFilmPostProcess(scene, player.camera, {
     enabled: true,

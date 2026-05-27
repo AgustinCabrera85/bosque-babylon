@@ -5,8 +5,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bosque Babylon</title>
   </head>
-  <body>
-    <div id="loadingScreen" role="status" aria-live="polite">
+  <body class="character-selecting">
+    <div id="characterSelection" class="character-selection" role="dialog" aria-modal="true" aria-labelledby="characterSelectionTitle">
+      <div class="character-selection-shell">
+        <header class="character-selection-header">
+          <p class="character-selection-kicker">Bosque Babylon</p>
+          <h1 id="characterSelectionTitle">Selecciona tu personaje</h1>
+          <p class="character-selection-subtitle">El bosque recuerda. Tu decides quien enfrenta lo desconocido.</p>
+        </header>
+
+        <section class="character-cards" aria-label="Personajes disponibles">
+          <button class="character-card selected" type="button" data-character="lautaro" aria-pressed="true">
+            <span class="character-card-bg" aria-hidden="true"></span>
+            <span class="character-portrait" aria-hidden="true">
+              <canvas id="lautaroPreview" class="character-preview"></canvas>
+              <span class="character-preview-status">Invocando...</span>
+            </span>
+            <span class="character-card-info">
+              <strong class="character-name">Lautaro</strong>
+              <span class="character-traits">Racional &middot; Observador &middot; Curioso</span>
+              <span class="character-description">Busca la verdad, sin importar el costo.</span>
+            </span>
+          </button>
+
+          <button class="character-card" type="button" data-character="sofia" aria-pressed="false">
+            <span class="character-card-bg" aria-hidden="true"></span>
+            <span class="character-portrait" aria-hidden="true">
+              <canvas id="sofiaPreview" class="character-preview"></canvas>
+              <span class="character-preview-status">Invocando...</span>
+            </span>
+            <span class="character-card-info">
+              <strong class="character-name">Sofia</strong>
+              <span class="character-traits">Intuitiva &middot; Valiente &middot; Empatica</span>
+              <span class="character-description">Siente lo que otros no pueden ver.</span>
+            </span>
+          </button>
+        </section>
+
+        <footer class="character-selection-actions">
+          <button id="startCharacterButton" class="character-start-button" type="button">Comenzar</button>
+        </footer>
+      </div>
+    </div>
+
+    <div id="loadingScreen" class="hidden" role="status" aria-live="polite">
       <div class="loading-panel">
         <div class="loading-title">Bosque Babylon</div>
         <div id="loadingText">Preparando escena...</div>

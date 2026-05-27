@@ -8,11 +8,340 @@ html, body {
   user-select: none;
 }
 
+.character-selection {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow-y: auto;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 3vh, 32px);
+  color: #dbcba9;
+  font-family: Georgia, "Times New Roman", serif;
+  background:
+    radial-gradient(circle at 50% 39%, rgba(116, 119, 93, 0.12), transparent 28%),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.26), rgba(0, 0, 0, 0.78)),
+    url("/assets/ui/select_character-bg.png") center / cover no-repeat;
+  isolation: isolate;
+}
+
+.character-selection::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, transparent 28%, rgba(0, 0, 0, 0.68) 100%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 5px);
+}
+
+.character-selection.hidden {
+  display: none;
+}
+
+body.character-selecting #hud,
+body.character-selecting #renderCanvas {
+  visibility: hidden;
+}
+
+.character-selection-shell {
+  width: min(1060px, 100%);
+  min-height: min(860px, calc(100vh - clamp(32px, 6vh, 64px)));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: clamp(16px, 2.4vh, 25px);
+}
+
+.character-selection-header {
+  justify-self: center;
+  width: min(720px, 100%);
+  padding: 15px clamp(18px, 4vw, 38px) 18px;
+  border: 2px solid rgba(20, 11, 6, 0.98);
+  border-radius: 9px;
+  text-align: center;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.2), transparent 25%, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0.25)),
+    repeating-linear-gradient(90deg, #181008 0, #342013 48px, #4a2d18 86px, #191008 134px);
+  box-shadow:
+    inset 0 0 23px rgba(0, 0, 0, 0.8),
+    inset 0 0 0 1px rgba(221, 185, 108, 0.15),
+    0 18px 45px rgba(0, 0, 0, 0.65);
+}
+
+.character-selection-kicker {
+  margin: 0 0 5px;
+  color: rgba(218, 196, 153, 0.66);
+  font-size: 11px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+.character-selection-header h1 {
+  margin: 0;
+  color: #e4d2ab;
+  font-size: clamp(27px, 4vw, 49px);
+  letter-spacing: clamp(2px, 0.6vw, 6px);
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 #090503, 0 0 20px rgba(226, 184, 105, 0.24);
+}
+
+.character-selection-subtitle {
+  margin: 9px 0 0;
+  color: rgba(222, 206, 173, 0.72);
+  font-size: clamp(12px, 1.25vw, 15px);
+  letter-spacing: 0.6px;
+}
+
+.character-cards {
+  width: min(870px, 100%);
+  justify-self: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(16px, 4vw, 42px);
+}
+
+.character-card {
+  position: relative;
+  min-width: 0;
+  min-height: clamp(400px, 55vh, 570px);
+  overflow: hidden;
+  padding: 0;
+  border: 2px solid #160d07;
+  border-radius: 10px;
+  background: #090907;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  box-shadow:
+    inset 0 0 28px rgba(0, 0, 0, 0.72),
+    0 16px 48px rgba(0, 0, 0, 0.65);
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.character-card::before {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  z-index: 5;
+  border: 1px solid rgba(214, 174, 99, 0.34);
+  border-radius: 7px;
+  pointer-events: none;
+}
+
+.character-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, transparent 37%, rgba(0, 0, 0, 0.3) 55%, rgba(0, 0, 0, 0.93) 100%),
+    radial-gradient(circle at 50% 36%, transparent 30%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+.character-card:hover,
+.character-card:focus-visible,
+.character-card.selected {
+  outline: none;
+  transform: translateY(-4px);
+  border-color: rgba(224, 184, 99, 0.94);
+  box-shadow:
+    inset 0 0 26px rgba(0, 0, 0, 0.65),
+    0 0 0 2px rgba(212, 169, 88, 0.24),
+    0 0 34px rgba(212, 169, 88, 0.25),
+    0 22px 54px rgba(0, 0, 0, 0.8);
+}
+
+.character-card-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  filter: brightness(0.66) saturate(0.86);
+  transform: scale(1.035);
+}
+
+.character-card[data-character="lautaro"] .character-card-bg {
+  background-image: url("/assets/ui/lautaro_character-bg.png");
+}
+
+.character-card[data-character="sofia"] .character-card-bg {
+  background-image: url("/assets/ui/sofia_character-bg.png");
+}
+
+.character-portrait {
+  position: absolute;
+  inset: 12px 10px 92px;
+  z-index: 2;
+  display: block;
+}
+
+.character-preview {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: transparent;
+  pointer-events: none;
+  filter: drop-shadow(0 16px 16px rgba(0, 0, 0, 0.78));
+}
+
+.character-preview-status {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  transform: translate(-50%, -50%);
+  color: rgba(221, 202, 164, 0.56);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.character-preview-status.hidden {
+  display: none;
+}
+
+.character-card-info {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 17px;
+  z-index: 4;
+  display: grid;
+  gap: 6px;
+  padding: 13px 12px 12px;
+  border: 1px solid rgba(207, 167, 94, 0.34);
+  border-radius: 6px;
+  background: linear-gradient(to bottom, rgba(33, 20, 11, 0.74), rgba(7, 5, 4, 0.94));
+  text-align: center;
+}
+
+.character-name {
+  color: #e3d1ad;
+  font-size: clamp(27px, 3.1vw, 38px);
+  font-weight: 700;
+  letter-spacing: 4px;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 0 2px 2px #000;
+}
+
+.character-traits {
+  color: #e7c982;
+  font-size: clamp(12px, 1.2vw, 14px);
+}
+
+.character-description {
+  color: rgba(231, 216, 187, 0.78);
+  font-size: clamp(12px, 1.15vw, 14px);
+}
+
+.character-selection-actions {
+  justify-self: center;
+  width: min(330px, 100%);
+}
+
+.character-start-button {
+  width: 100%;
+  padding: 15px 22px;
+  border: 2px solid #180d06;
+  border-radius: 7px;
+  background:
+    linear-gradient(to bottom, rgba(135, 94, 48, 0.92), rgba(45, 25, 13, 0.98)),
+    repeating-linear-gradient(90deg, #28170c 0, #4a2e18 44px, #231309 86px);
+  color: #ead8b3;
+  font: 700 clamp(19px, 2vw, 25px)/1 Georgia, "Times New Roman", serif;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.62), 0 12px 26px rgba(0, 0, 0, 0.6);
+  transition: transform 130ms ease, filter 130ms ease;
+}
+
+.character-start-button:hover,
+.character-start-button:focus-visible {
+  outline: 1px solid rgba(229, 191, 113, 0.64);
+  transform: translateY(-2px);
+  filter: brightness(1.12);
+}
+
+.character-start-button:active {
+  transform: translateY(1px);
+}
+
 #renderCanvas {
   width: 100%;
   height: 100%;
   touch-action: none;
   display: block;
+}
+
+@media (max-width: 700px) {
+  .character-selection {
+    align-items: start;
+    padding: 14px;
+  }
+
+  .character-selection-shell {
+    min-height: 0;
+    gap: 14px;
+  }
+
+  .character-selection-header {
+    padding: 12px 12px 13px;
+  }
+
+  .character-selection-subtitle {
+    display: none;
+  }
+
+  .character-cards {
+    gap: 10px;
+  }
+
+  .character-card {
+    min-height: clamp(300px, 51vh, 390px);
+  }
+
+  .character-portrait {
+    inset: 8px 5px 74px;
+  }
+
+  .character-card-info {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    gap: 4px;
+    padding: 9px 6px 8px;
+  }
+
+  .character-name {
+    font-size: clamp(19px, 7vw, 26px);
+    letter-spacing: 2px;
+  }
+
+  .character-traits {
+    font-size: 10px;
+  }
+
+  .character-description {
+    display: none;
+  }
+
+  .character-start-button {
+    padding: 13px 18px;
+  }
+}
+
+@media (max-width: 370px) {
+  .character-card {
+    min-height: 272px;
+  }
+
+  .character-traits {
+    display: none;
+  }
 }
 
 #hud {

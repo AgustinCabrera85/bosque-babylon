@@ -5,6 +5,7 @@ import { setupMusicPlayer } from "./game/MusicPlayer";
 import { setupPauseMenu } from "./game/PauseMenu";
 import { setupItemInspector } from "./game/ItemInspector";
 import { setupInventory } from "./game/Inventory";
+import { setupCharacterSelection } from "./game/CharacterSelection";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement | null;
 if (!canvas) throw new Error("No se encontro #renderCanvas");
@@ -23,6 +24,12 @@ function hideLoading() {
   if (!loadingScreen) return;
   loadingScreen.classList.add("hidden");
   loadingScreen.setAttribute("aria-hidden", "true");
+}
+
+function showLoading() {
+  if (!loadingScreen) return;
+  loadingScreen.classList.remove("hidden");
+  loadingScreen.setAttribute("aria-hidden", "false");
 }
 
 function shouldUseMobileQuality() {
@@ -44,13 +51,17 @@ const engine = new Engine(renderCanvas, quality.name === "desktop", {
 });
 engine.setHardwareScalingLevel(hardwareScaling);
 setupMusicPlayer();
-const pauseMenu = setupPauseMenu({ canvas: renderCanvas });
-const itemInspector = setupItemInspector();
-const inventory = setupInventory({ inspectItem: itemInspector.inspect });
 
 async function start() {
+  const selectedCharacter = await setupCharacterSelection();
+  document.body.classList.remove("character-selecting");
+  showLoading();
+  const pauseMenu = setupPauseMenu({ canvas: renderCanvas });
+  const itemInspector = setupItemInspector();
+  const inventory = setupInventory({ inspectItem: itemInspector.inspect });
+
   setLoading(0.02, `Iniciando motor (${quality.name})...`);
-  const scene = await createScene(engine, renderCanvas, setLoading, quality);
+  const scene = await createScene(engine, renderCanvas, setLoading, quality, selectedCharacter);
 
   scene.onAfterRenderObservable.addOnce(hideLoading);
   engine.runRenderLoop(() => {

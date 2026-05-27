@@ -45,7 +45,7 @@ const CHARACTER_FILES: Record<CharacterId, string> = {
 const LAUTARO_VISUAL_SCALE = 2.7;
 const CHARACTER_VISUAL_SCALE: Record<CharacterId, number> = {
   lautaro: LAUTARO_VISUAL_SCALE,
-  sofia: LAUTARO_VISUAL_SCALE * 0.75,
+  sofia: LAUTARO_VISUAL_SCALE * 0.95,
 };
 const CHARACTER_ANIMATIONS: Record<AnimationKey, string> = {
   idle: "Idle",

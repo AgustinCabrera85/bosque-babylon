@@ -15,6 +15,7 @@
   "dependencies": {
     "@babylonjs/core": "^7.22.0",
     "@babylonjs/loaders": "^7.22.0",
-    "@babylonjs/materials": "^7.54.3"
+    "@babylonjs/materials": "^7.54.3",
+    "graphify": "^1.0.0"
   }
 }

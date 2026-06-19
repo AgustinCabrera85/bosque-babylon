@@ -23,3 +23,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local Graphify knowledge graph, skill, hooks, and agent instructions
+/graphify-out/
+/.codex/
+/AGENTS.md

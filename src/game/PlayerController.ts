@@ -1,5 +1,6 @@
 import "@babylonjs/loaders/glTF";
 import { Scene } from "@babylonjs/core/scene";
+import { Camera } from "@babylonjs/core/Cameras/camera";
 import { UniversalCamera } from "@babylonjs/core/Cameras/universalCamera";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -21,8 +22,13 @@ type Settings = {
   gravity: number;
 };
 
-export type ViewMode = "first" | "third" | "front";
-export type LookRay = { origin: Vector3; direction: Vector3 };
+export type ViewMode = "first" | "third" | "front" | "iso";
+export type LookRay = {
+  origin: Vector3;
+  direction: Vector3;
+  proximityOrigin?: Vector3;
+  proximityRadius?: number;
+};
 export type CharacterId = "lautaro" | "sofia";
 type AnimationKey =
   | "idle"
@@ -78,6 +84,21 @@ const DOOR_OPEN_MOVEMENT_LOCK_SECONDS = 1.7;
 const THIRD_PERSON_FLASHLIGHT_PITCH_MIN = -0.58;
 const THIRD_PERSON_FLASHLIGHT_PITCH_MAX = 0.68;
 const FIRST_PERSON_CAMERA_HEIGHT_MULTIPLIER = 2;
+const PLAYER_CAMERA_FOV = 0.9;
+const PRIMARY_VIEW_MODE_SEQUENCE: ViewMode[] = ["third", "first", "iso"];
+const ISOMETRIC_CAMERA_SIDE_OFFSET = 6.8;
+const ISOMETRIC_CAMERA_DISTANCE = 8.8;
+const ISOMETRIC_CAMERA_HEIGHT = 8.9;
+const ISOMETRIC_CAMERA_TARGET_HEIGHT = -0.2;
+const ISOMETRIC_ORTHO_HEIGHT = 11.5;
+const ISOMETRIC_INTERACTION_HEIGHT = 0.65;
+const ISOMETRIC_INTERACTION_RADIUS = 2.15;
+
+export function getNextPrimaryViewMode(mode: ViewMode): ViewMode {
+  const index = PRIMARY_VIEW_MODE_SEQUENCE.indexOf(mode);
+  if (index === -1) return "third";
+  return PRIMARY_VIEW_MODE_SEQUENCE[(index + 1) % PRIMARY_VIEW_MODE_SEQUENCE.length];
+}
 
 export class PlayerController {
   public readonly root: TransformNode;
@@ -119,7 +140,7 @@ export class PlayerController {
     this.camera = new UniversalCamera("playerCam", new Vector3(0, 0, 0), scene);
     this.camera.parent = this.root;
     this.camera.minZ = 0.1;
-    this.camera.fov = 0.9;
+    this.camera.fov = PLAYER_CAMERA_FOV;
     this.camera.angularSensibility = 8000;
 
     this.yaw = this.root.rotation.y;
@@ -187,8 +208,7 @@ export class PlayerController {
   }
 
   toggleViewMode() {
-    if (this.viewMode === "first") this.setViewMode("third");
-    else this.setViewMode("first");
+    this.setViewMode(getNextPrimaryViewMode(this.viewMode));
   }
 
   async loadCharacter(rootUrl = CHARACTER_ROOT_URL, fileName = CHARACTER_FILES[this.character]) {
@@ -242,6 +262,19 @@ export class PlayerController {
   }
 
   getLookRay(): LookRay {
+    if (this.viewMode === "iso") {
+      const direction = this.getPlanarForward();
+      const proximityOrigin = this.root
+        .getAbsolutePosition()
+        .add(new Vector3(0, -this.settings.eyeHeight + ISOMETRIC_INTERACTION_HEIGHT, 0));
+      return {
+        origin: proximityOrigin.add(direction.scale(0.35)),
+        direction,
+        proximityOrigin,
+        proximityRadius: ISOMETRIC_INTERACTION_RADIUS,
+      };
+    }
+
     const direction = this.camera.getDirection(Vector3.Forward());
     if (direction.lengthSquared() > 0) direction.normalize();
 
@@ -330,12 +363,15 @@ export class PlayerController {
   }
 
   private applyCameraRig() {
+    this.configureCameraProjection();
     this.root.rotation.y = this.yaw;
     if (this.viewMode === "first") {
       this.camera.position.set(0, this.settings.eyeHeight * (FIRST_PERSON_CAMERA_HEIGHT_MULTIPLIER - 1), 0);
       this.camera.rotation.x = this.pitch;
       this.camera.rotation.y = 0;
       this.camera.rotation.z = 0;
+    } else if (this.viewMode === "iso") {
+      this.positionIsometricCamera();
     } else {
       this.positionThirdPersonCamera();
     }
@@ -343,6 +379,11 @@ export class PlayerController {
   }
 
   private clampPitchForView() {
+    if (this.viewMode === "iso") {
+      this.pitch = 0;
+      return;
+    }
+
     const minPitch = this.viewMode === "first" ? -1.45 : THIRD_PERSON_PITCH_MIN;
     const maxPitch = this.viewMode === "first" ? 1.45 : THIRD_PERSON_PITCH_MAX;
     if (this.pitch < minPitch) this.pitch = minPitch;
@@ -472,18 +513,43 @@ export class PlayerController {
   private updateThirdPersonCameraCollision(segments: Segments) {
     if (this.viewMode === "first") return;
 
-    this.positionThirdPersonCamera();
+    this.configureCameraProjection();
+    const target = this.getCameraTargetLocal();
+    this.positionCameraForView();
     this.root.computeWorldMatrix(true);
     this.camera.computeWorldMatrix();
-    const origin = Vector3.TransformCoordinates(
-      this.getThirdPersonTargetLocal(),
-      this.root.getWorldMatrix()
-    );
+    const origin = Vector3.TransformCoordinates(target, this.root.getWorldMatrix());
     const desired = this.camera.globalPosition.clone();
     const adjusted = segments.resolveCameraPosition(origin, desired);
     const inverse = this.root.getWorldMatrix().clone().invert();
     this.camera.position.copyFrom(Vector3.TransformCoordinates(adjusted, inverse));
-    this.lookAtLocal(this.getThirdPersonTargetLocal());
+    this.lookAtLocal(target);
+  }
+
+  private configureCameraProjection() {
+    if (this.viewMode !== "iso") {
+      this.camera.mode = Camera.PERSPECTIVE_CAMERA;
+      this.camera.fov = PLAYER_CAMERA_FOV;
+      return;
+    }
+
+    const aspect = this.canvas.clientWidth / Math.max(1, this.canvas.clientHeight);
+    const halfHeight = ISOMETRIC_ORTHO_HEIGHT * 0.5;
+    const halfWidth = halfHeight * Math.max(0.1, aspect);
+    this.camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
+    this.camera.orthoLeft = -halfWidth;
+    this.camera.orthoRight = halfWidth;
+    this.camera.orthoTop = halfHeight;
+    this.camera.orthoBottom = -halfHeight;
+  }
+
+  private positionCameraForView() {
+    if (this.viewMode === "iso") {
+      this.positionIsometricCamera();
+      return;
+    }
+
+    this.positionThirdPersonCamera();
   }
 
   private positionThirdPersonCamera() {
@@ -498,8 +564,35 @@ export class PlayerController {
     this.lookAtLocal(target);
   }
 
+  private positionIsometricCamera() {
+    const target = this.getCameraTargetLocal();
+    this.camera.position.set(
+      ISOMETRIC_CAMERA_SIDE_OFFSET,
+      target.y + ISOMETRIC_CAMERA_HEIGHT,
+      -ISOMETRIC_CAMERA_DISTANCE
+    );
+    this.lookAtLocal(target);
+  }
+
+  private getCameraTargetLocal() {
+    if (this.viewMode === "iso") return new Vector3(0, ISOMETRIC_CAMERA_TARGET_HEIGHT, 0);
+    return this.getThirdPersonTargetLocal();
+  }
+
   private getThirdPersonTargetLocal() {
     return new Vector3(0, THIRD_PERSON_CAMERA_TARGET_HEIGHT, 0);
+  }
+
+  private getPlanarForward() {
+    this.root.computeWorldMatrix(true);
+    const forward = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix());
+    forward.y = 0;
+    if (forward.lengthSquared() > 0) {
+      forward.normalize();
+      return forward;
+    }
+
+    return Vector3.Forward();
   }
 
   private lookAtLocal(target: Vector3) {

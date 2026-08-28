@@ -6,7 +6,7 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { RockLibrary } from "./RockLibrary";
 import { createTerrain } from "./Terrain";
-import { PlayerController, type CharacterId, type ViewMode } from "./PlayerController";
+import { getNextPrimaryViewMode, PlayerController, type CharacterId, type ViewMode } from "./PlayerController";
 import { Segments } from "./Segments";
 import { TreeLibrary } from "./TreeLibrary";
 import { GrassLibrary } from "./GrassLibrary";
@@ -16,7 +16,7 @@ import { setupMobileControls } from "./MobileControls";
 import { createRainSystem } from "./Rain";
 import { createFireflies } from "./Fireflies";
 import { createEndTorches } from "./Torches";
-import { createVintageFilmPostProcess } from "./VintageFilmPostProcess";
+import { createVintageFilmPostProcess, fridayThe13thVintagePreset } from "./VintageFilmPostProcess";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -33,6 +33,24 @@ import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 // ✅ Vite url imports (desde src/assets)
 const pathUrl = "/assets/models/textures/terrain/ground_camino/ground.jpg";
 const skyUrl = "/assets/hdr/hdr_high.png";
+const BASE_FOG_DENSITY = 0.021;
+const ISO_FOG_DENSITY = 0.011;
+const BASE_HEMI_INTENSITY = 0.015;
+const ISO_HEMI_INTENSITY = 0.12;
+const BASE_MOON_INTENSITY = 0.045;
+const ISO_MOON_INTENSITY = 0.12;
+const BASE_HEMI_GROUND_COLOR = new Color3(0.01, 0.01, 0.01);
+const ISO_HEMI_GROUND_COLOR = new Color3(0.035, 0.043, 0.037);
+const ISO_VINTAGE_PRESET = {
+  ...fridayThe13thVintagePreset,
+  grainIntensity: 0.08,
+  vignetteIntensity: 0.16,
+  edgeBlur: 0.62,
+  scanlineIntensity: 0.1,
+  contrast: 1.02,
+  saturation: 0.82,
+  exposure: 1.34,
+};
 type LoadingProgress = (value: number, text: string) => void;
 export type QualityProfile = {
   name: "desktop" | "mobile";
@@ -121,21 +139,38 @@ export const mobileQuality: QualityProfile = {
   fireflyCount: 5,
 };
 
+function getViewModeShortLabel(mode: ViewMode) {
+  if (mode === "first") return "1P";
+  if (mode === "iso") return "ISO";
+  if (mode === "front") return "FR";
+  return "3P";
+}
+
+function getViewModeName(mode: ViewMode) {
+  if (mode === "first") return "primera persona";
+  if (mode === "iso") return "isometrica";
+  if (mode === "front") return "frontal";
+  return "tercera persona";
+}
+
 function setupViewModeControls(player: PlayerController) {
   const cameraButton = document.getElementById("cameraModeButton") as HTMLButtonElement | null;
   const frontButton = document.getElementById("frontCameraButton") as HTMLButtonElement | null;
+  const isometricButton = document.getElementById("isometricCameraButton") as HTMLButtonElement | null;
   const reticle = document.getElementById("reticle");
   if (!cameraButton) return;
 
   const setMode = (mode: ViewMode) => {
     const isFirstPerson = mode === "first";
     const isFrontView = mode === "front";
+    const isIsometricView = mode === "iso";
+    const nextMode = getNextPrimaryViewMode(mode);
     cameraButton.classList.toggle("active", isFirstPerson);
-    cameraButton.textContent = isFirstPerson ? "3P" : "1P";
+    cameraButton.textContent = getViewModeShortLabel(nextMode);
     cameraButton.setAttribute("aria-pressed", String(isFirstPerson));
     cameraButton.setAttribute(
       "aria-label",
-      isFirstPerson ? "Cambiar a tercera persona" : "Cambiar a primera persona"
+      `Cambiar a vista ${getViewModeName(nextMode)}`
     );
     frontButton?.classList.toggle("active", isFrontView);
     frontButton?.setAttribute("aria-pressed", String(isFrontView));
@@ -143,7 +178,13 @@ function setupViewModeControls(player: PlayerController) {
       "aria-label",
       isFrontView ? "Volver a tercera persona" : "Activar camara frontal"
     );
-    reticle?.classList.toggle("hidden", isFrontView);
+    isometricButton?.classList.toggle("active", isIsometricView);
+    isometricButton?.setAttribute("aria-pressed", String(isIsometricView));
+    isometricButton?.setAttribute(
+      "aria-label",
+      isIsometricView ? "Volver a tercera persona" : "Activar vista isometrica"
+    );
+    reticle?.classList.toggle("hidden", isFrontView || isIsometricView);
   };
 
   cameraButton.addEventListener("click", (event) => {
@@ -154,6 +195,11 @@ function setupViewModeControls(player: PlayerController) {
   frontButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     player.setViewMode(player.currentViewMode === "front" ? "third" : "front");
+  });
+
+  isometricButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    player.setViewMode(player.currentViewMode === "iso" ? "third" : "iso");
   });
 
   player.onViewModeChange(setMode);
@@ -231,7 +277,7 @@ export async function createScene(
   // EXP2: densa y natural PERO con densidad baja (0.05 era demasiado)
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogColor = new Color3(0.014, 0.017, 0.022); // casi negro azulado
-  scene.fogDensity = 0.021; // 🔥 probá 0.010..0.018
+  scene.fogDensity = BASE_FOG_DENSITY; // probá 0.010..0.018
 
   // Para que el "horizonte" no se vea raro detrás de todo
   scene.clearColor = new Color4(
@@ -245,12 +291,12 @@ export async function createScene(
 // LUCES (NOCHE)
 // =========================
 const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
-hemi.intensity = 0.015; // MUY bajo
-hemi.groundColor = new Color3(0.01, 0.01, 0.01);
+hemi.intensity = BASE_HEMI_INTENSITY; // MUY bajo
+hemi.groundColor = BASE_HEMI_GROUND_COLOR.clone();
 
 const moon = new DirectionalLight("moon", new Vector3(-0.35, -1, 0.25), scene);
 moon.position = new Vector3(60, 120, 40);
-moon.intensity = 0.045; // suave
+moon.intensity = BASE_MOON_INTENSITY; // suave
 moon.diffuse = new Color3(0.6, 0.65, 0.9);
 moon.specular = new Color3(0, 0, 0);
 
@@ -345,8 +391,17 @@ const terrain = createTerrain(scene, {
     gravity: -18.0,
   }, selectedCharacter);
   setupViewModeControls(player);
-  createVintageFilmPostProcess(scene, player.camera, {
+  const vintageFilm = createVintageFilmPostProcess(scene, player.camera, {
     enabled: true,
+  });
+
+  player.onViewModeChange((mode) => {
+    const isIso = mode === "iso";
+    scene.fogDensity = isIso ? ISO_FOG_DENSITY : BASE_FOG_DENSITY;
+    hemi.intensity = isIso ? ISO_HEMI_INTENSITY : BASE_HEMI_INTENSITY;
+    moon.intensity = isIso ? ISO_MOON_INTENSITY : BASE_MOON_INTENSITY;
+    hemi.groundColor.copyFrom(isIso ? ISO_HEMI_GROUND_COLOR : BASE_HEMI_GROUND_COLOR);
+    vintageFilm.update(isIso ? ISO_VINTAGE_PRESET : fridayThe13thVintagePreset);
   });
 
   onProgress(0.36, "Cargando personaje...");
@@ -588,7 +643,7 @@ scene.onBeforeRenderObservable.add(() => {
       }
     }
 
-    const looking = segments.peekInteractable(player.getLookRay());
+    const looking = interactSystem.peekInteractable();
     hints.set(looking ? "E: interactuar" : null);
   });
 

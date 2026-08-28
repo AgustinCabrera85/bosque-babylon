@@ -2,9 +2,15 @@ import { Scene } from "@babylonjs/core/scene";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { Ray } from "@babylonjs/core/Culling/ray";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 
 type Hints = { set(text: string | null): void };
-type LookRay = { origin: Vector3; direction: Vector3 };
+type LookRay = {
+  origin: Vector3;
+  direction: Vector3;
+  proximityOrigin?: Vector3;
+  proximityRadius?: number;
+};
 type InteractResult =
   | string
   | {
@@ -24,6 +30,7 @@ type InteractableMetadata = {
 };
 
 const INTERACTION_RAY_LENGTH = 4.25;
+const INTERACTION_PROXIMITY_VERTICAL_TOLERANCE = 2.2;
 
 export class InteractSystem {
   constructor(
@@ -42,14 +49,15 @@ export class InteractSystem {
     });
   }
 
+  peekInteractable() {
+    return this.findInteractable(this.getLookRay());
+  }
+
   tryInteract() {
-    const look = this.getLookRay();
-    const ray = new Ray(look.origin, look.direction, INTERACTION_RAY_LENGTH);
+    const pickedMesh = this.peekInteractable();
+    if (!pickedMesh) return;
 
-    const hit = this.scene.pickWithRay(ray, (m) => !!m.metadata?.interactable);
-    if (!hit?.hit || !hit.pickedMesh) return;
-
-    const data = hit.pickedMesh.metadata as InteractableMetadata | undefined;
+    const data = pickedMesh.metadata as InteractableMetadata | undefined;
     const customResult = data?.onInteract?.();
     const customMessage =
       typeof customResult === "string" ? customResult : customResult?.message;
@@ -76,13 +84,54 @@ export class InteractSystem {
     if (data?.type === "door") {
       const locked = !!data.locked;
       if (locked) {
-        this.hints.set("La puerta está cerrada. Falta una llave…");
+        this.hints.set("La puerta esta cerrada. Falta una llave...");
       } else {
-        this.hints.set("Abrís la puerta (demo).");
+        this.hints.set("Abris la puerta (demo).");
       }
       return;
     }
 
-    this.hints.set(`Interacción: ${data?.type ?? "objeto"}`);
+    this.hints.set(`Interaccion: ${data?.type ?? "objeto"}`);
+  }
+
+  private findInteractable(look: LookRay) {
+    const ray = new Ray(look.origin, look.direction, INTERACTION_RAY_LENGTH);
+    const hit = this.scene.pickWithRay(ray, (m) => !!m.metadata?.interactable);
+    if (hit?.hit && hit.pickedMesh) return hit.pickedMesh;
+
+    if (!look.proximityOrigin || !look.proximityRadius) return null;
+    return this.findNearestInteractable(look.proximityOrigin, look.proximityRadius);
+  }
+
+  private findNearestInteractable(origin: Vector3, radius: number) {
+    let nearest: AbstractMesh | null = null;
+    let nearestDistanceSq = radius * radius;
+
+    for (const mesh of this.scene.meshes) {
+      if (!mesh.isEnabled() || !mesh.isPickable || !mesh.metadata?.interactable) continue;
+
+      mesh.computeWorldMatrix(true);
+      const box = mesh.getBoundingInfo().boundingBox;
+      const min = box.minimumWorld;
+      const max = box.maximumWorld;
+      const verticalDistance = this.distanceOutsideRange(origin.y, min.y, max.y);
+      if (verticalDistance > INTERACTION_PROXIMITY_VERTICAL_TOLERANCE) continue;
+
+      const dx = this.distanceOutsideRange(origin.x, min.x, max.x);
+      const dz = this.distanceOutsideRange(origin.z, min.z, max.z);
+      const distanceSq = dx * dx + dz * dz;
+      if (distanceSq > nearestDistanceSq) continue;
+
+      nearestDistanceSq = distanceSq;
+      nearest = mesh;
+    }
+
+    return nearest;
+  }
+
+  private distanceOutsideRange(value: number, min: number, max: number) {
+    if (value < min) return min - value;
+    if (value > max) return value - max;
+    return 0;
   }
 }

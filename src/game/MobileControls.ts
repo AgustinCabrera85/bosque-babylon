@@ -1,4 +1,4 @@
-import type { PlayerController } from "./PlayerController";
+import { getNextPrimaryViewMode, type PlayerController, type ViewMode } from "./PlayerController";
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -6,6 +6,20 @@ function clamp(value: number, min: number, max: number) {
 
 function isMobileBrowser() {
   return window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
+}
+
+function getViewModeShortLabel(mode: ViewMode) {
+  if (mode === "first") return "1P";
+  if (mode === "iso") return "ISO";
+  if (mode === "front") return "FR";
+  return "3P";
+}
+
+function getViewModeName(mode: ViewMode) {
+  if (mode === "first") return "primera persona";
+  if (mode === "iso") return "isometrica";
+  if (mode === "front") return "frontal";
+  return "tercera persona";
 }
 
 export function setupMobileControls(player: PlayerController, onInteract: () => void) {
@@ -122,13 +136,14 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
   });
 
   player.onViewModeChange((mode) => {
-    const isFirstPerson = mode === "first";
-    cameraButton.classList.toggle("active", isFirstPerson);
-    cameraButton.textContent = isFirstPerson ? "3P" : "1P";
-    cameraButton.setAttribute("aria-pressed", String(isFirstPerson));
+    const nextMode = getNextPrimaryViewMode(mode);
+    const isDefaultView = mode === "third";
+    cameraButton.classList.toggle("active", !isDefaultView);
+    cameraButton.textContent = getViewModeShortLabel(nextMode);
+    cameraButton.setAttribute("aria-pressed", String(!isDefaultView));
     cameraButton.setAttribute(
       "aria-label",
-      isFirstPerson ? "Cambiar a tercera persona" : "Cambiar a primera persona"
+      `Cambiar a vista ${getViewModeName(nextMode)}`
     );
   });
 

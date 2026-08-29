@@ -93,6 +93,8 @@ const ISOMETRIC_CAMERA_TARGET_HEIGHT = -0.2;
 const ISOMETRIC_ORTHO_HEIGHT = 11.5;
 const ISOMETRIC_INTERACTION_HEIGHT = 0.65;
 const ISOMETRIC_INTERACTION_RADIUS = 2.15;
+const ISOMETRIC_MOUSE_AIM_SPEED = 44;
+const ISOMETRIC_AIM_DEADZONE = 0.08;
 
 export function getNextPrimaryViewMode(mode: ViewMode): ViewMode {
   const index = PRIMARY_VIEW_MODE_SEQUENCE.indexOf(mode);
@@ -114,6 +116,8 @@ export class PlayerController {
   private jumpQueued = false;
   private pitch = 0;
   private yaw = 0;
+  private isometricAimX = 0;
+  private isometricAimY = -1;
   private viewMode: ViewMode = "third";
   private viewModeListeners = new Set<(mode: ViewMode) => void>();
   private avatarRoot: TransformNode | null = null;
@@ -201,7 +205,9 @@ export class PlayerController {
 
   setViewMode(mode: ViewMode) {
     if (this.viewMode === mode) return;
+    const previousMode = this.viewMode;
     this.viewMode = mode;
+    if (mode === "iso" && previousMode !== "iso") this.syncIsometricAimFromYaw();
     this.clampPitchForView();
     this.applyCameraRig();
     for (const listener of this.viewModeListeners) listener(mode);
@@ -354,11 +360,32 @@ export class PlayerController {
   }
 
   private applyLook(deltaYaw: number, deltaPitch: number) {
+    if (this.viewMode === "iso") {
+      this.applyIsometricLook(deltaYaw, deltaPitch);
+      return;
+    }
+
     this.yaw += deltaYaw;
     this.pitch += deltaPitch;
 
     this.clampPitchForView();
 
+    this.applyCameraRig();
+  }
+
+  private applyIsometricLook(deltaX: number, deltaY: number) {
+    this.isometricAimX += deltaX * ISOMETRIC_MOUSE_AIM_SPEED;
+    this.isometricAimY += deltaY * ISOMETRIC_MOUSE_AIM_SPEED;
+
+    const length = Math.hypot(this.isometricAimX, this.isometricAimY);
+    if (length > ISOMETRIC_AIM_DEADZONE) {
+      this.isometricAimX /= length;
+      this.isometricAimY /= length;
+      const direction = this.getIsometricWorldDirectionFromScreenAim(this.isometricAimX, this.isometricAimY);
+      this.yaw = Math.atan2(direction.x, direction.z);
+    }
+
+    this.pitch = 0;
     this.applyCameraRig();
   }
 
@@ -566,11 +593,14 @@ export class PlayerController {
 
   private positionIsometricCamera() {
     const target = this.getCameraTargetLocal();
-    this.camera.position.set(
-      ISOMETRIC_CAMERA_SIDE_OFFSET,
-      target.y + ISOMETRIC_CAMERA_HEIGHT,
-      -ISOMETRIC_CAMERA_DISTANCE
+    this.root.computeWorldMatrix(true);
+    const rootWorld = this.root.getWorldMatrix();
+    const targetWorld = Vector3.TransformCoordinates(target, rootWorld);
+    const desiredWorld = targetWorld.add(
+      new Vector3(ISOMETRIC_CAMERA_SIDE_OFFSET, ISOMETRIC_CAMERA_HEIGHT, -ISOMETRIC_CAMERA_DISTANCE)
     );
+    const inverseRootWorld = rootWorld.clone().invert();
+    this.camera.position.copyFrom(Vector3.TransformCoordinates(desiredWorld, inverseRootWorld));
     this.lookAtLocal(target);
   }
 
@@ -593,6 +623,42 @@ export class PlayerController {
     }
 
     return Vector3.Forward();
+  }
+
+  private syncIsometricAimFromYaw() {
+    const forward = new Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    const screenRight = this.getIsometricScreenRight();
+    const screenUp = this.getIsometricScreenUp();
+
+    this.isometricAimX = Vector3.Dot(forward, screenRight);
+    this.isometricAimY = -Vector3.Dot(forward, screenUp);
+
+    const length = Math.hypot(this.isometricAimX, this.isometricAimY);
+    if (length <= ISOMETRIC_AIM_DEADZONE) {
+      this.isometricAimX = 0;
+      this.isometricAimY = -1;
+      return;
+    }
+
+    this.isometricAimX /= length;
+    this.isometricAimY /= length;
+  }
+
+  private getIsometricWorldDirectionFromScreenAim(screenX: number, screenY: number) {
+    const direction = this.getIsometricScreenRight()
+      .scale(screenX)
+      .add(this.getIsometricScreenUp().scale(-screenY));
+
+    if (direction.lengthSquared() > 0) direction.normalize();
+    return direction;
+  }
+
+  private getIsometricScreenRight() {
+    return new Vector3(ISOMETRIC_CAMERA_DISTANCE, 0, ISOMETRIC_CAMERA_SIDE_OFFSET).normalize();
+  }
+
+  private getIsometricScreenUp() {
+    return new Vector3(-ISOMETRIC_CAMERA_SIDE_OFFSET, 0, ISOMETRIC_CAMERA_DISTANCE).normalize();
   }
 
   private lookAtLocal(target: Vector3) {

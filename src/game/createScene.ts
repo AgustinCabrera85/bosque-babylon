@@ -13,6 +13,7 @@ import { GrassLibrary } from "./GrassLibrary";
 import { PlantLibrary } from "./PlantLibrary";
 import { InteractSystem } from "./InteractSystem";
 import { setupMobileControls } from "./MobileControls";
+import { createDirectionIndicator } from "./DirectionIndicator";
 import { createRainSystem } from "./Rain";
 import { createFireflies } from "./Fireflies";
 import { createEndTorches } from "./Torches";
@@ -593,6 +594,13 @@ scene.onBeforeRenderObservable.add(() => {
   await segments.loadStartBlocker();
   await segments.loadEndHouse();
   await createEndTorches(scene, terrain);
+  createDirectionIndicator(scene, terrain, {
+    camera: player.camera,
+    canvas,
+    getPlayerPosition: () => player.position,
+    getCheckpoint: () => segments.getEndHouseCheckpoint(),
+    getViewMode: () => player.currentViewMode,
+  });
 
   // =========================
   // UI hints + Interacción (E)
@@ -633,6 +641,7 @@ scene.onBeforeRenderObservable.add(() => {
     const dt = engine.getDeltaTime() / 1000;
     player.update(dt, terrain, segments);
     segments.update(player.position.z);
+    segments.updateIsometricOccluders(player.position, player.currentViewMode === "iso");
     if (quality.grassWindInterval <= 0) {
       grassLibrary.updateWind(dt);
     } else {

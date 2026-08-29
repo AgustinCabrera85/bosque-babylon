@@ -122,9 +122,18 @@ const END_HOUSE_RESERVE_WIDTH = 122;
 const END_HOUSE_RESERVE_DEPTH = 150;
 const INTERACTION_RAY_LENGTH = 4.25;
 const FIRST_NOTE_SEGMENT_ID = 1;
+const ISOMETRIC_OCCLUDER_INNER_RADIUS = 0.35;
+const ISOMETRIC_OCCLUDER_OUTER_RADIUS = 2.25;
+const ISOMETRIC_OCCLUDER_MIN_VISIBILITY = 0.28;
+const ISOMETRIC_OCCLUDER_HEIGHT_CLEARANCE = 0.35;
+const ISOMETRIC_OCCLUDER_BLEND = 0.26;
 // Asset especial: no se carga en TreeLibrary para que no aparezca en la generacion normal.
 const START_BLOCKER_TREE_PATH = "/assets/models/blockers/";
 const START_BLOCKER_TREE_FILE = "tree_08.glb";
+
+function clamp(x: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, x));
+}
 
 export class Segments {
   private readonly WORLD_SEED = 1337;
@@ -153,9 +162,12 @@ export class Segments {
   private candleGlowMaterial: ReturnType<typeof createGlowMaterial> | null = null;
   private candleFloorGlowMaterial: StandardMaterial | null = null;
   private candleLights: CandleFlameEntry[] = [];
+  private isometricOccluderRoots = new Set<TransformNode>();
+  private isometricOccluderBaseVisibility = new Map<AbstractMesh, number>();
   private candleFlickerRegistered = false;
   private startBlockerLoaded = false;
   private firstNoteCreated = false;
+  private endHouseCheckpoint: Vector3 | null = null;
 
   constructor(
     private scene: Scene,
@@ -166,6 +178,13 @@ export class Segments {
     private rockLibrary: RockLibrary,
     private cfg: SegmentCfg
   ) {}
+
+  getEndHouseCheckpoint() {
+    if (this.endHouseCheckpoint) return this.endHouseCheckpoint.clone();
+
+    const fallbackZ = this.cfg.segmentLength * 8;
+    return new Vector3(0, this.terrain.getHeightAt(0, fallbackZ) + 1.4, fallbackZ);
+  }
 
   // =========================
   // RNG por segmento (FIJO)
@@ -269,7 +288,10 @@ export class Segments {
         const nodes = this.createTrees(centerZ, id, desiredLOD);
         this.treeSegments.set(id, { nodes, lod: desiredLOD });
       } else if (desiredLOD !== prev.lod) {
-        prev.nodes.forEach((n) => n.dispose?.());
+        prev.nodes.forEach((n) => {
+          this.unregisterIsometricOccluder(n);
+          n.dispose?.();
+        });
         this.removeColliders(id, "tree");
         const nodes = this.createTrees(centerZ, id, desiredLOD);
         this.treeSegments.set(id, { nodes, lod: desiredLOD });
@@ -286,6 +308,89 @@ export class Segments {
     this.lastSegment = currentSeg;
 
     this.cleanup(grassNeeded, plantNeeded, objectNeeded);
+  }
+
+  updateIsometricOccluders(playerPosition: Vector3, enabled: boolean) {
+    const occludingTargets = new Map<AbstractMesh, number>();
+
+    if (enabled) {
+      for (const root of this.isometricOccluderRoots) {
+        if (!root.isEnabled()) continue;
+
+        for (const mesh of root.getChildMeshes(false)) {
+          const visibilityFactor = this.getIsometricOccluderVisibilityFactor(mesh, playerPosition);
+          if (visibilityFactor === null) continue;
+          occludingTargets.set(mesh, visibilityFactor);
+        }
+      }
+    }
+
+    for (const mesh of occludingTargets.keys()) {
+      if (!this.isometricOccluderBaseVisibility.has(mesh)) {
+        this.isometricOccluderBaseVisibility.set(mesh, mesh.visibility);
+      }
+    }
+
+    for (const [mesh, baseVisibility] of [...this.isometricOccluderBaseVisibility]) {
+      if (this.isDisposedMesh(mesh)) {
+        this.isometricOccluderBaseVisibility.delete(mesh);
+        continue;
+      }
+
+      const targetFactor = occludingTargets.get(mesh) ?? 1;
+      const targetVisibility = baseVisibility * targetFactor;
+      mesh.visibility += (targetVisibility - mesh.visibility) * ISOMETRIC_OCCLUDER_BLEND;
+
+      if (targetFactor === 1 && Math.abs(mesh.visibility - baseVisibility) < 0.01) {
+        mesh.visibility = baseVisibility;
+        this.isometricOccluderBaseVisibility.delete(mesh);
+      }
+    }
+  }
+
+  private getIsometricOccluderVisibilityFactor(mesh: AbstractMesh, playerPosition: Vector3) {
+    if (!mesh.isEnabled() || !mesh.isVisible) return null;
+
+    mesh.computeWorldMatrix(false);
+    const box = mesh.getBoundingInfo().boundingBox;
+    if (box.maximumWorld.y < playerPosition.y + ISOMETRIC_OCCLUDER_HEIGHT_CLEARANCE) return null;
+
+    const dx = this.axisDistance(playerPosition.x, box.minimumWorld.x, box.maximumWorld.x);
+    const dz = this.axisDistance(playerPosition.z, box.minimumWorld.z, box.maximumWorld.z);
+    const distance = Math.sqrt(dx * dx + dz * dz);
+    if (distance >= ISOMETRIC_OCCLUDER_OUTER_RADIUS) return null;
+
+    const t = clamp(
+      (distance - ISOMETRIC_OCCLUDER_INNER_RADIUS) /
+        (ISOMETRIC_OCCLUDER_OUTER_RADIUS - ISOMETRIC_OCCLUDER_INNER_RADIUS),
+      0,
+      1
+    );
+    const smooth = t * t * (3 - 2 * t);
+    return ISOMETRIC_OCCLUDER_MIN_VISIBILITY + (1 - ISOMETRIC_OCCLUDER_MIN_VISIBILITY) * smooth;
+  }
+
+  private axisDistance(value: number, min: number, max: number) {
+    if (value < min) return min - value;
+    if (value > max) return value - max;
+    return 0;
+  }
+
+  private registerIsometricOccluder(root: TransformNode) {
+    this.isometricOccluderRoots.add(root);
+  }
+
+  private unregisterIsometricOccluder(root: TransformNode) {
+    this.isometricOccluderRoots.delete(root);
+    for (const mesh of root.getChildMeshes(false)) {
+      const baseVisibility = this.isometricOccluderBaseVisibility.get(mesh);
+      if (baseVisibility !== undefined) mesh.visibility = baseVisibility;
+      this.isometricOccluderBaseVisibility.delete(mesh);
+    }
+  }
+
+  private isDisposedMesh(mesh: AbstractMesh) {
+    return !!(mesh as unknown as { isDisposed?: () => boolean }).isDisposed?.();
   }
 
   // =========================
@@ -392,7 +497,10 @@ export class Segments {
   ) {
     for (const [id, pack] of this.treeSegments) {
       if (!objectNeeded.has(id)) {
-        pack.nodes.forEach((n) => n.dispose?.());
+        pack.nodes.forEach((n) => {
+          this.unregisterIsometricOccluder(n);
+          n.dispose?.();
+        });
         this.treeSegments.delete(id);
       }
     }
@@ -658,6 +766,7 @@ export class Segments {
       tree.scaling.setAll(placement.scale);
       tree.rotation.y = placement.rot;
       tree.freezeWorldMatrix();
+      this.registerIsometricOccluder(tree);
     });
   }
 
@@ -1417,6 +1526,7 @@ export class Segments {
     const doorCenterY = doorBounds
       ? (doorBounds.minimumWorld.y + doorBounds.maximumWorld.y) * 0.5
       : this.terrain.getHeightAt(doorCenterX, doorCenterZ) + 1.1;
+    this.endHouseCheckpoint = new Vector3(doorCenterX, doorCenterY, doorCenterZ);
     const doorWidth = doorBounds
       ? Math.max(2.6, Math.min(5.6, doorBounds.maximumWorld.x - doorBounds.minimumWorld.x + 1.05))
       : 3.4;
@@ -1841,6 +1951,7 @@ export class Segments {
       this.colliders.push({ x, z, radius, segmentId, kind: "tree" });
 
       tree.freezeWorldMatrix();
+      this.registerIsometricOccluder(tree);
       instances.push(tree);
     }
 

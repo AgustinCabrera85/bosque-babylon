@@ -435,6 +435,20 @@ body.character-selecting #renderCanvas {
   opacity: 0.65;
 }
 
+.checkpoint-indicator-hud {
+  position: absolute;
+  z-index: 4;
+  width: 58px;
+  height: 58px;
+  pointer-events: none;
+  transform-origin: center;
+  filter:
+    drop-shadow(0 0 5px rgba(255, 217, 156, 0.95))
+    drop-shadow(0 0 16px rgba(227, 116, 38, 0.62))
+    drop-shadow(0 5px 14px rgba(0, 0, 0, 0.72));
+  will-change: left, top, transform, opacity;
+}
+
 #hint {
   position: absolute;
   left: 50%;
@@ -1408,6 +1422,11 @@ body.inventory-open #hud {
   #reticle {
     width: 10px;
     height: 10px;
+  }
+
+  .checkpoint-indicator-hud {
+    width: 48px;
+    height: 48px;
   }
 
   .menu-panel {

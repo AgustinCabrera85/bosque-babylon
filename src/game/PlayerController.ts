@@ -359,6 +359,23 @@ export class PlayerController {
     this.applyLook(deltaX * 0.0032, deltaY * 0.0027);
   }
 
+  private getIsometricMobileMovementDirection(moveX: number, moveY: number) {
+    return this.getIsometricWorldDirectionFromScreenAim(moveX, -moveY);
+  }
+
+  private faceMobileMovement(direction: Vector3) {
+    if (direction.lengthSquared() <= 0) return;
+
+    this.yaw = Math.atan2(direction.x, direction.z);
+    if (this.viewMode === "iso") {
+      this.syncIsometricAimFromYaw();
+      this.applyCameraRig();
+      return;
+    }
+
+    this.root.rotation.y = this.yaw;
+  }
+
   private applyLook(deltaYaw: number, deltaPitch: number) {
     if (this.viewMode === "iso") {
       this.applyIsometricLook(deltaYaw, deltaPitch);
@@ -447,7 +464,7 @@ export class PlayerController {
     if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) moveX += 1;
     if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) moveX -= 1;
 
-    if (this.mobileEnabled) {
+    if (this.mobileEnabled && this.viewMode !== "iso") {
       moveY += this.mobileMoveY;
       moveX += this.mobileMoveX;
     }
@@ -456,6 +473,15 @@ export class PlayerController {
     moveY = Math.max(-1, Math.min(1, moveY));
     move.addInPlace(forward.scale(moveY));
     move.addInPlace(right.scale(moveX));
+
+    const mobileInputStrength = Math.min(1, Math.hypot(this.mobileMoveX, this.mobileMoveY));
+    if (this.mobileEnabled && this.viewMode === "iso" && mobileInputStrength > 0.12) {
+      const mobileDirection = this.getIsometricMobileMovementDirection(this.mobileMoveX, this.mobileMoveY);
+      this.faceMobileMovement(mobileDirection);
+      move.addInPlace(mobileDirection.scale(mobileInputStrength));
+      moveX = 0;
+      moveY = mobileInputStrength;
+    }
 
     const running = this.mobileRun || this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
     const speed = running ? this.settings.runSpeed : this.settings.walkSpeed;

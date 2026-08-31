@@ -22,6 +22,22 @@ function getViewModeName(mode: ViewMode) {
   return "tercera persona";
 }
 
+function capturePointer(element: HTMLElement, pointerId: number) {
+  try {
+    element.setPointerCapture(pointerId);
+  } catch {
+    // Some mobile browsers can refuse capture during viewport/overlay changes.
+  }
+}
+
+function releasePointer(element: HTMLElement, pointerId: number) {
+  try {
+    if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
+  } catch {
+    // The pointer may already have been released by the browser.
+  }
+}
+
 export function setupMobileControls(player: PlayerController, onInteract: () => void) {
   if (!isMobileBrowser()) return;
 
@@ -42,6 +58,7 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
 
   let movePointer: number | null = null;
   let lookPointer: number | null = null;
+  let runPointer: number | null = null;
   let lastLookX = 0;
   let lastLookY = 0;
 
@@ -51,16 +68,34 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
   };
 
   const resetStick = () => {
+    const pointerId = movePointer;
     movePointer = null;
+    if (pointerId !== null) releasePointer(stick, pointerId);
     player.setMobileMove(0, 0);
     thumb.style.transform = "translate(-50%, -50%)";
+  };
+
+  const resetStickFromEvent = (event: PointerEvent) => {
+    if (movePointer !== null && event.pointerId !== movePointer) return;
+    stopEvent(event);
+    resetStick();
+  };
+
+  const resetStickFromWindow = (event: PointerEvent) => {
+    if (movePointer === null || event.pointerId !== movePointer) return;
+    resetStick();
   };
 
   const updateStick = (event: PointerEvent) => {
     const rect = stick.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const radius = rect.width * 0.38;
+    const radius = Math.min(rect.width, rect.height) * 0.38;
+    if (!Number.isFinite(radius) || radius <= 0) {
+      resetStick();
+      return;
+    }
+
     const rawX = event.clientX - centerX;
     const rawY = event.clientY - centerY;
     const len = Math.hypot(rawX, rawY);
@@ -72,10 +107,47 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
     player.setMobileMove(clamp(x / radius, -1, 1), clamp(-y / radius, -1, 1));
   };
 
+  const resetLook = () => {
+    const pointerId = lookPointer;
+    lookPointer = null;
+    if (pointerId !== null) releasePointer(lookPad, pointerId);
+  };
+
+  const resetLookFromEvent = (event: PointerEvent) => {
+    if (lookPointer !== null && event.pointerId !== lookPointer) return;
+    stopEvent(event);
+    resetLook();
+  };
+
+  const resetLookFromWindow = (event: PointerEvent) => {
+    if (lookPointer === null || event.pointerId !== lookPointer) return;
+    resetLook();
+  };
+
+  const stopRun = () => {
+    const pointerId = runPointer;
+    runPointer = null;
+    if (pointerId !== null) releasePointer(runButton, pointerId);
+    runButton.classList.remove("active");
+    player.setMobileRun(false);
+  };
+
+  const stopRunFromEvent = (event: PointerEvent) => {
+    if (runPointer !== null && event.pointerId !== runPointer) return;
+    stopEvent(event);
+    stopRun();
+  };
+
+  const stopRunFromWindow = (event: PointerEvent) => {
+    if (runPointer === null || event.pointerId !== runPointer) return;
+    stopRun();
+  };
+
   stick.addEventListener("pointerdown", (event) => {
     stopEvent(event);
+    if (movePointer !== null) resetStick();
     movePointer = event.pointerId;
-    stick.setPointerCapture(event.pointerId);
+    capturePointer(stick, event.pointerId);
     updateStick(event);
   });
 
@@ -85,15 +157,17 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
     updateStick(event);
   });
 
-  stick.addEventListener("pointerup", resetStick);
-  stick.addEventListener("pointercancel", resetStick);
+  stick.addEventListener("pointerup", resetStickFromEvent);
+  stick.addEventListener("pointercancel", resetStickFromEvent);
+  stick.addEventListener("lostpointercapture", resetStickFromWindow);
 
   lookPad.addEventListener("pointerdown", (event) => {
     stopEvent(event);
+    if (lookPointer !== null) resetLook();
     lookPointer = event.pointerId;
     lastLookX = event.clientX;
     lastLookY = event.clientY;
-    lookPad.setPointerCapture(event.pointerId);
+    capturePointer(lookPad, event.pointerId);
   });
 
   lookPad.addEventListener("pointermove", (event) => {
@@ -104,25 +178,22 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
     lastLookY = event.clientY;
   });
 
-  const resetLook = () => {
-    lookPointer = null;
-  };
-
-  lookPad.addEventListener("pointerup", resetLook);
-  lookPad.addEventListener("pointercancel", resetLook);
+  lookPad.addEventListener("pointerup", resetLookFromEvent);
+  lookPad.addEventListener("pointercancel", resetLookFromEvent);
+  lookPad.addEventListener("lostpointercapture", resetLookFromWindow);
 
   runButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
+    if (runPointer !== null) stopRun();
+    runPointer = event.pointerId;
+    capturePointer(runButton, event.pointerId);
     runButton.classList.add("active");
     player.setMobileRun(true);
   });
 
-  const stopRun = () => {
-    runButton.classList.remove("active");
-    player.setMobileRun(false);
-  };
-  runButton.addEventListener("pointerup", stopRun);
-  runButton.addEventListener("pointercancel", stopRun);
+  runButton.addEventListener("pointerup", stopRunFromEvent);
+  runButton.addEventListener("pointercancel", stopRunFromEvent);
+  runButton.addEventListener("lostpointercapture", stopRunFromWindow);
   runButton.addEventListener("pointerleave", stopRun);
 
   jumpButton.addEventListener("pointerdown", (event) => {
@@ -150,5 +221,29 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
   cameraButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     player.toggleViewMode();
+  });
+
+  const resetMobileInput = () => {
+    resetStick();
+    resetLook();
+    stopRun();
+  };
+
+  window.addEventListener("pointerup", resetStickFromWindow, true);
+  window.addEventListener("pointercancel", resetStickFromWindow, true);
+  window.addEventListener("pointerup", resetLookFromWindow, true);
+  window.addEventListener("pointercancel", resetLookFromWindow, true);
+  window.addEventListener("pointerup", stopRunFromWindow, true);
+  window.addEventListener("pointercancel", stopRunFromWindow, true);
+  window.addEventListener("blur", resetMobileInput);
+  window.addEventListener("resize", resetMobileInput);
+  window.visualViewport?.addEventListener("resize", resetMobileInput);
+  window.visualViewport?.addEventListener("scroll", resetMobileInput);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") resetMobileInput();
+  });
+  window.addEventListener("bosque:pause", (event) => {
+    const paused = (event as CustomEvent<{ paused?: boolean }>).detail?.paused;
+    if (paused) resetMobileInput();
   });
 }

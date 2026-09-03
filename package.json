@@ -6,16 +6,21 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "vfx:generate-atlas": "node scripts/generate-shadow-flame-atlas.mjs",
+    "vfx:generate-npe": "node scripts/generate-shadow-npe.mjs",
+    "vfx:profile": "node scripts/profile-shadow-vfx.mjs",
+    "vfx:verify": "node scripts/verify-shadow-vfx.mjs"
   },
   "devDependencies": {
+    "sharp": "^0.34.3",
     "typescript": "^5.5.4",
     "vite": "^5.4.0"
   },
   "dependencies": {
-    "@babylonjs/core": "^7.22.0",
-    "@babylonjs/loaders": "^7.22.0",
-    "@babylonjs/materials": "^7.54.3",
+    "@babylonjs/core": "^9.23.0",
+    "@babylonjs/loaders": "^9.23.0",
+    "@babylonjs/materials": "^9.23.0",
     "graphify": "^1.0.0"
   }
 }

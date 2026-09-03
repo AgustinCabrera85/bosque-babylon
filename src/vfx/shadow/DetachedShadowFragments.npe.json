@@ -1,0 +1,2171 @@
+{
+  "tags": null,
+  "name": "DetachedShadowFragments",
+  "comment": "Local production NPE graph for Bosque Babylon's living shadow VFX.",
+  "editorData": null,
+  "customType": "BABYLON.NodeParticleSystemSet",
+  "blocks": [
+    {
+      "customType": "BABYLON.SystemBlock",
+      "id": 162,
+      "name": "DetachedShadowFragments",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "particle",
+          "inputName": "particle",
+          "targetBlockId": 161,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "emitRate",
+          "valueType": "number",
+          "value": 0
+        },
+        {
+          "name": "texture",
+          "inputName": "texture",
+          "targetBlockId": 163,
+          "targetConnectionName": "texture",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "translationPivot",
+          "valueType": "BABYLON.Vector2",
+          "value": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "textureMask",
+          "valueType": "BABYLON.Color4",
+          "value": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "name": "targetStopDuration",
+          "valueType": "number",
+          "value": 0
+        },
+        {
+          "name": "onStart"
+        },
+        {
+          "name": "onEnd"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "system"
+        }
+      ],
+      "capacity": 6,
+      "manualEmitCount": -1,
+      "blendMode": 1,
+      "updateSpeed": 0.016666666666666666,
+      "preWarmCycles": 0,
+      "preWarmStepOffset": 1,
+      "isBillboardBased": true,
+      "billBoardMode": 7,
+      "isLocal": false,
+      "disposeOnStop": false,
+      "doNoStart": false,
+      "renderingGroupId": 0,
+      "startDelay": 0,
+      "customShader": null
+    },
+    {
+      "customType": "BABYLON.BasicSpriteUpdateBlock",
+      "id": 161,
+      "name": "Sprite Cell Update",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "particle",
+          "inputName": "particle",
+          "targetBlockId": 160,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ]
+    },
+    {
+      "customType": "BABYLON.UpdateSizeBlock",
+      "id": 160,
+      "name": "Size Update",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "particle",
+          "inputName": "particle",
+          "targetBlockId": 147,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "size",
+          "inputName": "size",
+          "targetBlockId": 150,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ]
+    },
+    {
+      "customType": "BABYLON.UpdatePositionBlock",
+      "id": 147,
+      "name": "Position Update",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "particle",
+          "inputName": "particle",
+          "targetBlockId": 137,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "position",
+          "inputName": "position",
+          "targetBlockId": 148,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ]
+    },
+    {
+      "customType": "BABYLON.UpdateAngleBlock",
+      "id": 137,
+      "name": "Angle Update with Angular Speed",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "particle",
+          "inputName": "particle",
+          "targetBlockId": 125,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "angle",
+          "inputName": "angle",
+          "targetBlockId": 135,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ]
+    },
+    {
+      "customType": "BABYLON.UpdateColorBlock",
+      "id": 125,
+      "name": "Color update",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "particle",
+          "inputName": "particle",
+          "targetBlockId": 113,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "color",
+          "inputName": "color",
+          "targetBlockId": 129,
+          "targetConnectionName": "color",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ]
+    },
+    {
+      "customType": "BABYLON.SetupSpriteSheetBlock",
+      "id": 113,
+      "name": "Sprite Sheet Setup",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "particle",
+          "inputName": "particle",
+          "targetBlockId": 108,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "width": 128,
+      "height": 256,
+      "start": 0,
+      "end": 2,
+      "spriteCellChangeSpeed": 0,
+      "loop": false,
+      "randomStartCell": true
+    },
+    {
+      "customType": "BABYLON.BoxShapeBlock",
+      "id": 108,
+      "name": "Box Shape",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "particle",
+          "inputName": "particle",
+          "targetBlockId": 90,
+          "targetConnectionName": "particle",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "direction1",
+          "valueType": "BABYLON.Vector3",
+          "value": [
+            0,
+            1,
+            0
+          ],
+          "inputName": "direction1",
+          "targetBlockId": 109,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "direction2",
+          "valueType": "BABYLON.Vector3",
+          "value": [
+            0,
+            1,
+            0
+          ],
+          "inputName": "direction2",
+          "targetBlockId": 110,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "minEmitBox",
+          "valueType": "BABYLON.Vector3",
+          "value": [
+            -0.5,
+            -0.5,
+            -0.5
+          ],
+          "inputName": "minEmitBox",
+          "targetBlockId": 111,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "maxEmitBox",
+          "valueType": "BABYLON.Vector3",
+          "value": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "inputName": "maxEmitBox",
+          "targetBlockId": 112,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ]
+    },
+    {
+      "customType": "BABYLON.CreateParticleBlock",
+      "id": 90,
+      "name": "Create Particle",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "emitPower",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "emitPower",
+          "targetBlockId": 94,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "lifeTime",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "lifeTime",
+          "targetBlockId": 91,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "color",
+          "valueType": "BABYLON.Color4",
+          "value": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "inputName": "color",
+          "targetBlockId": 106,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "colorDead",
+          "valueType": "BABYLON.Color4",
+          "value": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "inputName": "colorDead",
+          "targetBlockId": 107,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "scale",
+          "valueType": "BABYLON.Vector2",
+          "value": [
+            1,
+            1
+          ],
+          "inputName": "scale",
+          "targetBlockId": 100,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "angle",
+          "valueType": "number",
+          "value": 0,
+          "inputName": "angle",
+          "targetBlockId": 103,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "size",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "size",
+          "targetBlockId": 97,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "particle"
+        }
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleRandomBlock",
+      "id": 94,
+      "name": "Random Emit Power",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "min",
+          "valueType": "number",
+          "value": 0,
+          "inputName": "min",
+          "targetBlockId": 95,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "max",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "max",
+          "targetBlockId": 96,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "lockMode": 1
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 95,
+      "name": "Min Emit Power",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.35
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 96,
+      "name": "Max Emit Power",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.75
+    },
+    {
+      "customType": "BABYLON.ParticleRandomBlock",
+      "id": 91,
+      "name": "Random Lifetime",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "min",
+          "valueType": "number",
+          "value": 0,
+          "inputName": "min",
+          "targetBlockId": 92,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "max",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "max",
+          "targetBlockId": 93,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "lockMode": 1
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 92,
+      "name": "Min Lifetime",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.65
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 93,
+      "name": "Max Lifetime",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 1.15
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 106,
+      "name": "Value",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 128,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "BABYLON.Color4",
+      "value": [
+        0.004,
+        0.004,
+        0.008,
+        0
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 107,
+      "name": "Dead Color",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 128,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "BABYLON.Color4",
+      "value": [
+        0.004,
+        0.004,
+        0.008,
+        0
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleRandomBlock",
+      "id": 100,
+      "name": "Random Scale",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "min",
+          "valueType": "number",
+          "value": 0,
+          "inputName": "min",
+          "targetBlockId": 101,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "max",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "max",
+          "targetBlockId": 102,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "lockMode": 1
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 101,
+      "name": "Min Scale",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 4,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "BABYLON.Vector2",
+      "value": [
+        0.55,
+        0.9
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 102,
+      "name": "Max Scale",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 4,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "BABYLON.Vector2",
+      "value": [
+        0.82,
+        1.25
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleRandomBlock",
+      "id": 103,
+      "name": "Random Rotation",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "min",
+          "valueType": "number",
+          "value": 0,
+          "inputName": "min",
+          "targetBlockId": 104,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "max",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "max",
+          "targetBlockId": 105,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "lockMode": 1
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 104,
+      "name": "Min Rotation",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": -0.2617993877991494
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 105,
+      "name": "Max Rotation",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.2617993877991494
+    },
+    {
+      "customType": "BABYLON.ParticleRandomBlock",
+      "id": 97,
+      "name": "Random Value 0",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "min",
+          "valueType": "number",
+          "value": 0,
+          "inputName": "min",
+          "targetBlockId": 98,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "max",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "max",
+          "targetBlockId": 99,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "lockMode": 3
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 98,
+      "name": "Value 1",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.05
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 99,
+      "name": "Value 2",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.08
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 109,
+      "name": "Direction 1",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 8,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "BABYLON.Vector3",
+      "value": [
+        -0.35,
+        0.15,
+        -0.12
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 110,
+      "name": "Direction 2",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 8,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "BABYLON.Vector3",
+      "value": [
+        0.35,
+        0.5,
+        0.12
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 111,
+      "name": "Min Emit Box",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 8,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "BABYLON.Vector3",
+      "value": [
+        -0.02,
+        -0.02,
+        -0.02
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 112,
+      "name": "Max Emit Box",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 8,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "BABYLON.Vector3",
+      "value": [
+        0.02,
+        0.02,
+        0.02
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleConverterBlock",
+      "id": 129,
+      "name": "Compose Color",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "color "
+        },
+        {
+          "name": "xyz ",
+          "inputName": "xyz ",
+          "targetBlockId": 126,
+          "targetConnectionName": "xyz",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "xy "
+        },
+        {
+          "name": "zw "
+        },
+        {
+          "name": "x "
+        },
+        {
+          "name": "y "
+        },
+        {
+          "name": "z "
+        },
+        {
+          "name": "w ",
+          "inputName": "w ",
+          "targetBlockId": 127,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "color"
+        },
+        {
+          "name": "xyz"
+        },
+        {
+          "name": "xy"
+        },
+        {
+          "name": "zw"
+        },
+        {
+          "name": "x"
+        },
+        {
+          "name": "y"
+        },
+        {
+          "name": "z"
+        },
+        {
+          "name": "w"
+        }
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleConverterBlock",
+      "id": 126,
+      "name": "Decompose Color",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "color ",
+          "inputName": "color ",
+          "targetBlockId": 117,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "xyz "
+        },
+        {
+          "name": "xy "
+        },
+        {
+          "name": "zw "
+        },
+        {
+          "name": "x "
+        },
+        {
+          "name": "y "
+        },
+        {
+          "name": "z "
+        },
+        {
+          "name": "w "
+        }
+      ],
+      "outputs": [
+        {
+          "name": "color"
+        },
+        {
+          "name": "xyz"
+        },
+        {
+          "name": "xy"
+        },
+        {
+          "name": "zw"
+        },
+        {
+          "name": "x"
+        },
+        {
+          "name": "y"
+        },
+        {
+          "name": "z"
+        },
+        {
+          "name": "w"
+        }
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleGradientBlock",
+      "id": 117,
+      "name": "Color Gradient Block",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "gradient",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "gradient",
+          "targetBlockId": 114,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value0",
+          "inputName": "value0",
+          "targetBlockId": 118,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value1",
+          "inputName": "value1",
+          "targetBlockId": 119,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value2",
+          "inputName": "value2",
+          "targetBlockId": 121,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value3",
+          "inputName": "value3",
+          "targetBlockId": 123,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value4"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "_entryCount": 5
+    },
+    {
+      "customType": "BABYLON.ParticleMathBlock",
+      "id": 114,
+      "name": "Age/LifeTime Ratio",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "left",
+          "inputName": "left",
+          "targetBlockId": 115,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "right",
+          "inputName": "right",
+          "targetBlockId": 116,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "operation": 3
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 115,
+      "name": "Age",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 3,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 116,
+      "name": "LifeTime",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 4,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true
+    },
+    {
+      "customType": "BABYLON.ParticleGradientValueBlock",
+      "id": 118,
+      "name": "Color Gradient Value 0",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "value",
+          "inputName": "value",
+          "targetBlockId": 106,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "reference": 0
+    },
+    {
+      "customType": "BABYLON.ParticleGradientValueBlock",
+      "id": 119,
+      "name": "Color Gradient Value 1",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "value",
+          "inputName": "value",
+          "targetBlockId": 120,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "reference": 0.15
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 120,
+      "name": "Value",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 128,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "BABYLON.Color4",
+      "value": [
+        0.012,
+        0.008,
+        0.016,
+        0.42
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleGradientValueBlock",
+      "id": 121,
+      "name": "Color Gradient Value 2",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "value",
+          "inputName": "value",
+          "targetBlockId": 122,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "reference": 0.55
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 122,
+      "name": "Value",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 128,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "BABYLON.Color4",
+      "value": [
+        0.024,
+        0.016,
+        0.031,
+        0.5
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleGradientValueBlock",
+      "id": 123,
+      "name": "Color Gradient Value 3",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "value",
+          "inputName": "value",
+          "targetBlockId": 124,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "reference": 1
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 124,
+      "name": "Value",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 128,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "BABYLON.Color4",
+      "value": [
+        0.004,
+        0.004,
+        0.008,
+        0
+      ]
+    },
+    {
+      "customType": "BABYLON.ParticleMathBlock",
+      "id": 127,
+      "name": "Alpha >= 0",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "left",
+          "inputName": "left",
+          "targetBlockId": 126,
+          "targetConnectionName": "w",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "right",
+          "inputName": "right",
+          "targetBlockId": 128,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "operation": 4
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 128,
+      "name": "Zero",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0
+    },
+    {
+      "customType": "BABYLON.ParticleMathBlock",
+      "id": 135,
+      "name": "Add Angular Speed to Angle",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "left",
+          "inputName": "left",
+          "targetBlockId": 136,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "right",
+          "inputName": "right",
+          "targetBlockId": 133,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "operation": 0
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 136,
+      "name": "Angle",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 9,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true
+    },
+    {
+      "customType": "BABYLON.ParticleMathBlock",
+      "id": 133,
+      "name": "Multiply by Delta",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "left",
+          "inputName": "left",
+          "targetBlockId": 130,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "right",
+          "inputName": "right",
+          "targetBlockId": 134,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "operation": 2
+    },
+    {
+      "customType": "BABYLON.ParticleRandomBlock",
+      "id": 130,
+      "name": "Random Angular Speed",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "min",
+          "valueType": "number",
+          "value": 0,
+          "inputName": "min",
+          "targetBlockId": 131,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "max",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "max",
+          "targetBlockId": 132,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "lockMode": 3
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 131,
+      "name": "Min Angular Speed",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": -0.28
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 132,
+      "name": "Max Angular Speed",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.28
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 134,
+      "name": "Delta",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 2,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true
+    },
+    {
+      "customType": "BABYLON.ParticleMathBlock",
+      "id": 148,
+      "name": "Add Position",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "left",
+          "inputName": "left",
+          "targetBlockId": 149,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "right",
+          "inputName": "right",
+          "targetBlockId": 145,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "operation": 0
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 149,
+      "name": "Position",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 8,
+      "contextualValue": 1,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true
+    },
+    {
+      "customType": "BABYLON.ParticleMathBlock",
+      "id": 145,
+      "name": "Scaled Direction",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "left",
+          "inputName": "left",
+          "targetBlockId": 143,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "right",
+          "inputName": "right",
+          "targetBlockId": 146,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "operation": 2
+    },
+    {
+      "customType": "BABYLON.ParticleMathBlock",
+      "id": 143,
+      "name": "Multiply Direction Scale by Velocity",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "left",
+          "inputName": "left",
+          "targetBlockId": 138,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "right",
+          "inputName": "right",
+          "targetBlockId": 144,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "operation": 2
+    },
+    {
+      "customType": "BABYLON.ParticleGradientBlock",
+      "id": 138,
+      "name": "Velocity Gradient Block",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "gradient",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "gradient",
+          "targetBlockId": 114,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value0",
+          "inputName": "value0",
+          "targetBlockId": 139,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value1",
+          "inputName": "value1",
+          "targetBlockId": 141,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value2"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "_entryCount": 3
+    },
+    {
+      "customType": "BABYLON.ParticleGradientValueBlock",
+      "id": 139,
+      "name": "Velocity Gradient Value 0",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "value",
+          "inputName": "value",
+          "targetBlockId": 140,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "reference": 0
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 140,
+      "name": "Value",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 1
+    },
+    {
+      "customType": "BABYLON.ParticleGradientValueBlock",
+      "id": 141,
+      "name": "Velocity Gradient Value 1",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "value",
+          "inputName": "value",
+          "targetBlockId": 142,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "reference": 1
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 142,
+      "name": "Value",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.35
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 144,
+      "name": "Direction Scale",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 32,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 146,
+      "name": "Direction",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 8,
+      "contextualValue": 2,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true
+    },
+    {
+      "customType": "BABYLON.ParticleGradientBlock",
+      "id": 150,
+      "name": "Size Gradient Block",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "gradient",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "gradient",
+          "targetBlockId": 114,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value0",
+          "inputName": "value0",
+          "targetBlockId": 151,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value1",
+          "inputName": "value1",
+          "targetBlockId": 152,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value2",
+          "inputName": "value2",
+          "targetBlockId": 156,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "value3"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "_entryCount": 4
+    },
+    {
+      "customType": "BABYLON.ParticleGradientValueBlock",
+      "id": 151,
+      "name": "Size Gradient Value 0",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "value",
+          "inputName": "value",
+          "targetBlockId": 97,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "reference": 0
+    },
+    {
+      "customType": "BABYLON.ParticleGradientValueBlock",
+      "id": 152,
+      "name": "Size Gradient Value 1",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "value",
+          "inputName": "value",
+          "targetBlockId": 153,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "reference": 0.35
+    },
+    {
+      "customType": "BABYLON.ParticleRandomBlock",
+      "id": 153,
+      "name": "Random Value 1",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "min",
+          "valueType": "number",
+          "value": 0,
+          "inputName": "min",
+          "targetBlockId": 154,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "max",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "max",
+          "targetBlockId": 155,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "lockMode": 3
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 154,
+      "name": "Value 1",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.14
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 155,
+      "name": "Value 2",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.28
+    },
+    {
+      "customType": "BABYLON.ParticleGradientValueBlock",
+      "id": 156,
+      "name": "Size Gradient Value 2",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "value",
+          "inputName": "value",
+          "targetBlockId": 157,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "reference": 1
+    },
+    {
+      "customType": "BABYLON.ParticleRandomBlock",
+      "id": 157,
+      "name": "Random Value 2",
+      "visibleOnFrame": false,
+      "inputs": [
+        {
+          "name": "min",
+          "valueType": "number",
+          "value": 0,
+          "inputName": "min",
+          "targetBlockId": 158,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        },
+        {
+          "name": "max",
+          "valueType": "number",
+          "value": 1,
+          "inputName": "max",
+          "targetBlockId": 159,
+          "targetConnectionName": "output",
+          "isExposedOnFrame": true,
+          "exposedPortPosition": -1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "lockMode": 3
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 158,
+      "name": "Value 1",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.025
+    },
+    {
+      "customType": "BABYLON.ParticleInputBlock",
+      "id": 159,
+      "name": "Value 2",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output"
+        }
+      ],
+      "type": 2,
+      "contextualValue": 0,
+      "systemSource": 0,
+      "min": 0,
+      "max": 0,
+      "groupInInspector": "",
+      "displayInInspector": true,
+      "valueType": "number",
+      "value": 0.05
+    },
+    {
+      "customType": "BABYLON.ParticleTextureSourceBlock",
+      "id": 163,
+      "name": "Shadow Flame Atlas",
+      "visibleOnFrame": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "texture"
+        }
+      ],
+      "url": "/assets/vfx/shadow-flames/shadow-flame-atlas.png",
+      "serializedCachedData": false,
+      "invertY": true
+    }
+  ]
+}

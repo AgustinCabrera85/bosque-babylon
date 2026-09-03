@@ -160,6 +160,7 @@ export class PlayerController {
       if (target?.closest("#itemInspector")) return;
       if (target?.closest("#inventoryOverlay")) return;
       if (target?.closest("#inventoryButton")) return;
+      if (target?.closest("#shadowAuraDebug")) return;
       if (this.mobileEnabled) return;
       canvas.requestPointerLock?.();
     });
@@ -195,6 +196,10 @@ export class PlayerController {
 
   get currentViewMode() {
     return this.viewMode;
+  }
+
+  getAvatarMeshes(): readonly AbstractMesh[] {
+    return this.avatarMeshes;
   }
 
   onViewModeChange(listener: (mode: ViewMode) => void) {
@@ -719,12 +724,14 @@ export class PlayerController {
     this.avatarRoot.position.z -= centerZ - rootWorld.z;
   }
 
-  private getWalkableSurfaceHeight(terrain: TerrainHandle) {
-    const baseHeight = terrain.getHeightAt(this.root.position.x, this.root.position.z);
+  getWalkableSurfaceHeight(
+    terrain: TerrainHandle,
+    x = this.root.position.x,
+    z = this.root.position.z
+  ) {
+    const baseHeight = terrain.getHeightAt(x, z);
     const onPath =
-      Math.abs(this.root.position.x) <= PATH_HALF_WIDTH &&
-      this.root.position.z >= PATH_START_Z &&
-      this.root.position.z <= PATH_END_Z;
+      Math.abs(x) <= PATH_HALF_WIDTH && z >= PATH_START_Z && z <= PATH_END_Z;
 
     return baseHeight + (onPath ? PATH_SURFACE_OFFSET : 0);
   }

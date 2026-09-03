@@ -538,6 +538,89 @@ body.character-selecting #renderCanvas {
   border-color: rgba(224, 174, 91, 0.5);
 }
 
+#shadowAuraDebug {
+  position: absolute;
+  z-index: 5;
+  left: 16px;
+  bottom: 16px;
+  width: min(245px, calc(100vw - 32px));
+  padding: 10px;
+  border: 1px solid rgba(150, 112, 219, 0.38);
+  border-radius: 8px;
+  background: rgba(10, 5, 20, 0.84);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42);
+  color: #e8def8;
+  font: 600 12px/1.25 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  pointer-events: auto;
+}
+
+#shadowAuraDebug.hidden {
+  display: none;
+}
+
+.shadow-aura-debug-title {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #cdb8f1;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+.shadow-aura-debug-title kbd {
+  padding: 1px 4px;
+  border: 1px solid rgba(232, 222, 248, 0.22);
+  border-radius: 3px;
+  color: rgba(232, 222, 248, 0.76);
+  font: inherit;
+}
+
+#shadowAuraDebug label {
+  display: grid;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+#shadowAuraDebug label > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+#shadowAuraDebug input[type="range"] {
+  width: 100%;
+  accent-color: #8c61cd;
+}
+
+#shadowAuraDebug .shadow-aura-debug-toggle {
+  display: flex;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.shadow-aura-debug-metrics {
+  display: grid;
+  gap: 3px;
+  margin: 9px 0 0;
+  padding-top: 7px;
+  border-top: 1px solid rgba(232, 222, 248, 0.14);
+  color: rgba(232, 222, 248, 0.68);
+  font-size: 10px;
+}
+
+.shadow-aura-debug-metrics div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shadow-aura-debug-metrics dt,
+.shadow-aura-debug-metrics dd {
+  margin: 0;
+}
+
 #pauseMenu {
   position: fixed;
   inset: 0;

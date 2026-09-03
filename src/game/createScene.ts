@@ -28,6 +28,8 @@ import { SpotLight } from "@babylonjs/core/Lights/spotLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"; 
 import { Light } from "@babylonjs/core/Lights/light";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
+import { ShadowAuraController } from "./ShadowAura";
+import { createShadowAuraDebugControls } from "./ShadowAuraDebug";
 
 
 
@@ -407,6 +409,32 @@ const terrain = createTerrain(scene, {
 
   onProgress(0.36, "Cargando personaje...");
   await player.loadCharacter();
+  const shadowAura = new ShadowAuraController(
+    scene,
+    {
+      root: player.root,
+      avatarMeshes: player.getAvatarMeshes(),
+      getGroundSurfaceHeightAt: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
+    },
+    {
+      performance: {
+        allowFlames: true,
+        qualityLevel: quality.name === "desktop" ? "high" : "low",
+      },
+    }
+  );
+  const shadowAuraDebug = createShadowAuraDebugControls(shadowAura);
+  player.onViewModeChange((mode) => shadowAura.setVisible(mode !== "first"));
+  const requestedShadowView = new URLSearchParams(window.location.search).get("shadowView");
+  if (
+    requestedShadowView === "first" ||
+    requestedShadowView === "third" ||
+    requestedShadowView === "front" ||
+    requestedShadowView === "iso"
+  ) {
+    player.setViewMode(requestedShadowView);
+  }
+  scene.onDisposeObservable.add(() => shadowAuraDebug.dispose());
 
 // =========================
 // 🔦 FLASHLIGHT (SpotLight)

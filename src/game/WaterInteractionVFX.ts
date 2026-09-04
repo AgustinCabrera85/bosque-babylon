@@ -67,16 +67,29 @@ function createRippleTexture(scene: Scene) {
     false
   );
   const context = texture.getContext();
-  const gradient = context.createRadialGradient(64, 64, 18, 64, 64, 62);
-  gradient.addColorStop(0, "rgba(120, 176, 181, 0)");
-  gradient.addColorStop(0.63, "rgba(120, 176, 181, 0)");
-  gradient.addColorStop(0.76, "rgba(140, 194, 197, 0.12)");
-  gradient.addColorStop(0.84, "rgba(166, 207, 208, 0.82)");
-  gradient.addColorStop(0.91, "rgba(125, 180, 184, 0.16)");
-  gradient.addColorStop(1, "rgba(90, 145, 151, 0)");
   context.clearRect(0, 0, 128, 128);
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, 128, 128);
+  // Two incomplete rings form a wake without the artificial target-like look
+  // produced by several perfectly closed concentric circles.
+  const drawBrokenRing = (radius: number, phase: number) => {
+    const arcs = [
+      [phase + 0.08, phase + 2.62],
+      [phase + 3.08, phase + 5.72],
+    ] as const;
+    for (const [start, end] of arcs) {
+      context.beginPath();
+      context.arc(64, 64, radius, start, end);
+      context.strokeStyle = "rgba(146, 207, 211, 0.2)";
+      context.lineWidth = 7;
+      context.stroke();
+      context.beginPath();
+      context.arc(64, 64, radius, start + 0.025, end - 0.025);
+      context.strokeStyle = "rgba(218, 243, 244, 0.9)";
+      context.lineWidth = 2.4;
+      context.stroke();
+    }
+  };
+  drawBrokenRing(39, 0.18);
+  drawBrokenRing(56, -0.12);
   texture.hasAlpha = true;
   texture.update(false);
   return texture;
@@ -118,10 +131,10 @@ export class WaterRippleEffectPool {
     this.texture = createRippleTexture(scene);
     this.material = new StandardMaterial("waterContactRippleMaterial", scene);
     this.material.diffuseTexture = this.texture;
-    this.material.opacityTexture = this.texture;
     this.material.useAlphaFromDiffuseTexture = true;
-    this.material.diffuseColor = new Color3(0.34, 0.5, 0.51);
-    this.material.emissiveColor = new Color3(0.055, 0.105, 0.11);
+    this.material.emissiveTexture = this.texture;
+    this.material.diffuseColor = new Color3(0.7, 0.86, 0.87);
+    this.material.emissiveColor = new Color3(0.3, 0.48, 0.5);
     this.material.specularColor = Color3.Black();
     this.material.disableLighting = true;
     this.material.alphaMode = Material.MATERIAL_ALPHABLEND;
@@ -140,6 +153,9 @@ export class WaterRippleEffectPool {
       mesh.material = this.material;
       mesh.rotation.x = Math.PI * 0.5;
       mesh.isPickable = false;
+      // WaterMaterial is transparent; a later rendering group prevents its
+      // surface pass from hiding contact rings and droplets.
+      mesh.renderingGroupId = 1;
       mesh.alphaIndex = 40 + index;
       mesh.setEnabled(false);
       return {
@@ -266,19 +282,24 @@ export class WaterSplashEffectPool {
       system.emitter = emitter;
       system.minEmitBox.set(-0.08, 0, -0.08);
       system.maxEmitBox.set(0.08, 0.03, 0.08);
-      system.color1 = new Color4(0.69, 0.82, 0.83, 0.76);
-      system.color2 = new Color4(0.49, 0.67, 0.7, 0.58);
+      system.color1 = new Color4(0.82, 0.94, 0.95, 0.94);
+      system.color2 = new Color4(0.58, 0.8, 0.83, 0.78);
       system.colorDead = new Color4(0.2, 0.34, 0.36, 0);
       system.minLifeTime = config.droplets.minLifetime;
       system.maxLifeTime = config.droplets.maxLifetime;
       system.minSize = config.droplets.minSize;
       system.maxSize = config.droplets.maxSize;
+      system.minScaleX = 0.62;
+      system.maxScaleX = 0.92;
+      system.minScaleY = 1;
+      system.maxScaleY = 2.1;
       system.emitRate = 0;
       system.minEmitPower = 0.92;
       system.maxEmitPower = 1.08;
       system.updateSpeed = 0.012;
       system.gravity.set(0, config.droplets.gravity, 0);
       system.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+      system.renderingGroupId = 1;
       system.disposeOnStop = false;
       return { system, emitter, active: false, age: 0 };
     });

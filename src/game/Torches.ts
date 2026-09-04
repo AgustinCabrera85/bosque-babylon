@@ -15,6 +15,7 @@ import { FireMaterial } from "@babylonjs/materials/fire/fireMaterial";
 import { Engine } from "@babylonjs/core/Engines/engine";
 
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { TerrainHandle } from "./Terrain";
 
 type TorchPlacement = {
@@ -33,6 +34,11 @@ const END_TORCH_LIGHT_ACTIVATION_RADIUS = 80;
 
 export type EndTorchesHandle = {
   update: (playerPosition: Vector3) => void;
+};
+
+export type EndTorchesOptions = {
+  /** Meshes that can actually receive the short-range entrance lights. */
+  includedOnlyMeshes?: readonly AbstractMesh[];
 };
 
 function createFireTextureSet(scene: Scene) {
@@ -394,7 +400,8 @@ function addStaticFlame(
 
 export async function createEndTorches(
   scene: Scene,
-  terrain: TerrainHandle
+  terrain: TerrainHandle,
+  options: EndTorchesOptions = {}
 ): Promise<EndTorchesHandle> {
   const pathEndZ = 70 * 8 - 8;
   const placements: TorchPlacement[] = [
@@ -404,6 +411,7 @@ export async function createEndTorches(
   const fireMaterial = createFireMaterial(scene);
   const glowMaterial = createGlowMaterial(scene);
   const lights: { light: PointLight; baseIntensity: number; phase: number }[] = [];
+  const torchMeshes: AbstractMesh[] = [];
 
   for (let i = 0; i < placements.length; i++) {
     const placement = placements[i];
@@ -419,7 +427,7 @@ export async function createEndTorches(
       groundY + offsets.topOffsetY - TORCH_GROUND_SINK - FLAME_BASE_OVERLAP,
       placement.z
     );
-    addStaticFlame(
+    const flameRoot = addStaticFlame(
       scene,
       fireMaterial,
       glowMaterial,
@@ -427,6 +435,7 @@ export async function createEndTorches(
       flameBase,
       placement.rotationY
     );
+    torchMeshes.push(...root.getChildMeshes(false), ...flameRoot.getChildMeshes(false));
 
     const light = new PointLight(
       `endTorchLight_${i}`,
@@ -443,6 +452,15 @@ export async function createEndTorches(
 
     lights.push({ light, baseIntensity: light.intensity, phase: i * 2.19 });
   }
+
+  // These lights used to affect every mesh in the scene. Enabling them near
+  // the house consequently invalidated all forest and lagoon shaders at once.
+  const litMeshes = [...new Set([
+    terrain.mesh as AbstractMesh,
+    ...(options.includedOnlyMeshes ?? []),
+    ...torchMeshes,
+  ])].filter((mesh) => !mesh.isDisposed());
+  for (const { light } of lights) light.includedOnlyMeshes.push(...litMeshes);
 
   let t = 0;
   scene.onBeforeRenderObservable.add(() => {

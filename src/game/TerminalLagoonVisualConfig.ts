@@ -19,6 +19,12 @@ export type TerminalLagoonVisualConfig = {
   impact: {
     foamAlpha: number;
     splashCapacity: number;
+    splashEmitRate: number;
+    burstCapacity: number;
+    burstMinCount: number;
+    burstMaxCount: number;
+    burstMinInterval: number;
+    burstMaxInterval: number;
     mistCapacity: number;
   };
   underwater: {
@@ -55,9 +61,15 @@ export const TERMINAL_LAGOON_VISUAL_CONFIG: TerminalLagoonVisualConfig = {
     secondaryLayerAlpha: 0.72,
   },
   impact: {
-    foamAlpha: 0.58,
-    splashCapacity: 48,
-    mistCapacity: 88,
+    foamAlpha: 0.74,
+    splashCapacity: 72,
+    splashEmitRate: 31,
+    burstCapacity: 72,
+    burstMinCount: 12,
+    burstMaxCount: 28,
+    burstMinInterval: 0.24,
+    burstMaxInterval: 0.62,
+    mistCapacity: 96,
   },
   underwater: {
     waterLevel: -0.65,

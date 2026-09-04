@@ -44,6 +44,7 @@ import {
   createTerminalTerrainModifier,
 } from "./TerminalLandmark";
 import {
+  enforceSceneMaterialLightBudget,
   installSceneMaterialLightBudgetGuard,
   synchronizeSceneLightPriorities,
 } from "../materials";
@@ -768,7 +769,14 @@ scene.onBeforeRenderObservable.add(() => {
   });
   segments.reserveNoSpawnZone(terminalLandmark.generationExclusion);
   terminalLandmark.blockers.forEach((blocker) => segments.addStaticWorldBlocker(blocker));
-  const endTorches = await createEndTorches(scene, terrain);
+  const endTorches = await createEndTorches(scene, terrain, {
+    includedOnlyMeshes: [
+      path,
+      ...segments.getEndHouseMeshes(),
+      ...terminalLandmark.root.getChildMeshes(false),
+      ...player.getAvatarMeshes(),
+    ],
+  });
   createDirectionIndicator(scene, terrain, {
     camera: player.camera,
     canvas,
@@ -806,7 +814,43 @@ scene.onBeforeRenderObservable.add(() => {
   // =========================
   createRainSystem(scene, terrain, quality.rainDrops);
   createFireflies(scene, terrain, () => player.position, quality.fireflyCount);
-  onProgress(0.92, "Preparando controles...");
+
+  onProgress(0.91, "Precargando segmentos...");
+  await segments.prewarmAll(player.position, (completed, total) => {
+    const ratio = total > 0 ? completed / total : 1;
+    onProgress(0.91 + ratio * 0.05, `Precargando bosque (${completed}/${total})...`);
+  });
+
+  // Render the exact light/material states encountered at the forest, house
+  // entrance and lagoon while the loading overlay still hides incomplete RTTs.
+  // Real frames both compile shaders and populate the water render targets;
+  // scene.whenReadyAsync(true) cannot be used here because those targets may
+  // wait indefinitely before the normal render loop has started.
+  const initialPlayerPosition = player.position.clone();
+  const houseWarmupPosition = segments.getEndHouseCheckpoint();
+  const lagoonWarmupPosition = terminalLandmark.waterfallImpactPoint.clone();
+  const prepareTransitionState = async (position: Vector3) => {
+    terminalLandmark.update(0, position);
+    endTorches.update(position);
+    // The regular guard runs in onBeforeRender, but these readiness passes run
+    // before the first frame. Clamp imported glTF materials here as well or
+    // Babylon may generate 12-15-light shaders that exceed WebGL2 UBO limits.
+    enforceSceneMaterialLightBudget(scene);
+    synchronizeSceneLightPriorities(scene);
+    for (let frame = 0; frame < 2; frame++) {
+      scene.render();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+  };
+
+  onProgress(0.965, "Compilando materiales del bosque...");
+  await prepareTransitionState(initialPlayerPosition);
+  onProgress(0.975, "Compilando materiales de la casa...");
+  await prepareTransitionState(houseWarmupPosition);
+  onProgress(0.985, "Compilando materiales del lago...");
+  await prepareTransitionState(lagoonWarmupPosition);
+  await prepareTransitionState(initialPlayerPosition);
+  onProgress(0.995, "Preparando controles...");
 
   // =========================
   // Loop

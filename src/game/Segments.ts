@@ -180,6 +180,8 @@ export class Segments {
   private candleSegments = new Map<number, SegCandlePack>();
   private grassSegments = new Map<number, Float32Array[]>();
   private plantSegments = new Map<number, Float32Array[]>();
+  private combinedGrassSegments = new Map<number, Float32Array[]>();
+  private combinedPlantSegments = new Map<number, Float32Array[]>();
 
   private colliders: Collider[] = [];
   private staticBoxColliders: BoxCollider[] = [];
@@ -201,6 +203,8 @@ export class Segments {
   private startBlockerLoaded = false;
   private firstNoteCreated = false;
   private endHouseCheckpoint: Vector3 | null = null;
+  private endHouseMeshes: AbstractMesh[] = [];
+  private worldPrewarmed = false;
 
   constructor(
     private scene: Scene,
@@ -224,6 +228,125 @@ export class Segments {
 
     const fallbackZ = this.cfg.segmentLength * 8;
     return new Vector3(0, this.terrain.getHeightAt(0, fallbackZ) + 1.4, fallbackZ);
+  }
+
+  getEndHouseMeshes(): readonly AbstractMesh[] {
+    return this.endHouseMeshes;
+  }
+
+  /**
+   * Builds the finite procedural route while the loading screen is still up.
+   * Runtime streaming then only toggles cached nodes and uploads preassembled
+   * thin-instance buffers instead of allocating an entire segment in one frame.
+   */
+  async prewarmAll(
+    playerPositionOrZ: Vector3 | number,
+    onProgress: (completed: number, total: number) => void = () => {}
+  ): Promise<void> {
+    const maxSegment = this.cfg.maxGeneratedSegment;
+    if (maxSegment === undefined) {
+      this.update(playerPositionOrZ);
+      onProgress(1, 1);
+      return;
+    }
+
+    if (this.worldPrewarmed) {
+      this.update(playerPositionOrZ);
+      onProgress(1, 1);
+      return;
+    }
+
+    if (!this.grassInitialized) {
+      this.initGrass();
+      this.grassInitialized = true;
+    }
+    if (!this.plantsInitialized) {
+      this.initPlants();
+      this.plantsInitialized = true;
+    }
+
+    const furthestBehind = Math.max(
+      1,
+      this.cfg.behind,
+      this.cfg.objectBehind ?? this.cfg.behind,
+      this.cfg.plantBehind ?? this.cfg.behind
+    );
+    const firstSegment = -furthestBehind;
+    const total = maxSegment - firstSegment + 1;
+
+    for (let segmentId = firstSegment; segmentId <= maxSegment; segmentId++) {
+      this.prewarmSegment(segmentId);
+      onProgress(segmentId - firstSegment + 1, total);
+
+      // Give the browser a paint opportunity so the loading UI remains alive.
+      if (segmentId < maxSegment) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+    }
+
+    // Assemble every finite streaming window once. Crossing a boundary will no
+    // longer concatenate large typed arrays on the render thread.
+    for (let currentSegment = 0; currentSegment <= maxSegment; currentSegment++) {
+      if (this.grassBases) {
+        const needed = this.segmentRange(currentSegment, this.cfg.behind, this.cfg.ahead);
+        this.combinedGrassSegments.set(
+          currentSegment,
+          this.combineInstanceBuffers(
+            this.grassSegments,
+            needed,
+            this.grassBases.length,
+            this.stableGrassCount()
+          )
+        );
+      }
+
+      if (this.plantBases) {
+        const needed = this.segmentRange(
+          currentSegment,
+          this.cfg.plantBehind ?? this.cfg.behind,
+          this.cfg.plantAhead ?? this.cfg.ahead
+        );
+        this.combinedPlantSegments.set(
+          currentSegment,
+          this.combineInstanceBuffers(
+            this.plantSegments,
+            needed,
+            this.plantBases.length,
+            this.stablePlantCount()
+          )
+        );
+      }
+    }
+
+    this.worldPrewarmed = true;
+    this.update(playerPositionOrZ);
+  }
+
+  private prewarmSegment(segmentId: number) {
+    const centerZ = (segmentId + 0.5) * this.cfg.segmentLength;
+
+    if (this.grassBases && !this.grassSegments.has(segmentId)) {
+      this.buildGrassForSegment(segmentId);
+    }
+    if (this.plantBases && !this.plantSegments.has(segmentId)) {
+      this.buildPlantsForSegment(segmentId);
+    }
+    if (!this.candleSegments.has(segmentId)) {
+      const pack = this.createCandles(centerZ, segmentId);
+      pack.nodes.forEach((node) => node.setEnabled(false));
+      this.candleSegments.set(segmentId, pack);
+    }
+    if (!this.treeSegments.has(segmentId)) {
+      const lod = this.lodFor(segmentId, segmentId);
+      const nodes = this.createTrees(centerZ, segmentId, lod);
+      nodes.forEach((node) => node.setEnabled(false));
+      this.treeSegments.set(segmentId, { nodes, lod });
+    }
+    if (!this.rockSegments.has(segmentId)) {
+      const nodes = this.createRocks(centerZ, segmentId);
+      nodes.forEach((node) => node.setEnabled(false));
+      this.rockSegments.set(segmentId, { nodes });
+    }
   }
 
   // =========================
@@ -1320,6 +1443,7 @@ export class Segments {
       mesh.alwaysSelectAsActiveMesh = true;
       mesh.computeWorldMatrix(true);
     }
+    this.endHouseMeshes = res.meshes.filter((mesh) => mesh.getTotalVertices() > 0);
     this.patchHouseMaterials(res.meshes);
 
     const firstBounds = this.getHierarchyBounds(res.meshes);
@@ -1966,36 +2090,19 @@ export class Segments {
 
   private applyCombinedGrassBuffers(needed: Set<number>, currentSeg: number) {
     if (!this.grassBases) return;
-    void currentSeg;
+    let buffers = this.combinedGrassSegments.get(currentSeg);
+    if (!buffers) {
+      buffers = this.combineInstanceBuffers(
+        this.grassSegments,
+        needed,
+        this.grassBases.length,
+        this.stableGrassCount()
+      );
+      this.combinedGrassSegments.set(currentSeg, buffers);
+    }
 
     for (let b = 0; b < this.grassBases.length; b++) {
-      const parts: Float32Array[] = [];
-
-      for (const segId of needed) {
-        const want = this.stableGrassCount();
-        if (want <= 0) continue;
-
-        const segBuffers = this.grassSegments.get(segId);
-        if (!segBuffers) continue;
-
-        const buf = segBuffers[b];
-        const max = buf.length / 16;
-        const use = Math.min(want, max);
-
-        parts.push(buf.subarray(0, use * 16));
-      }
-
-      let total = 0;
-      parts.forEach((p) => (total += p.length));
-
-      const combined = new Float32Array(total);
-      let off = 0;
-      for (const p of parts) {
-        combined.set(p, off);
-        off += p.length;
-      }
-
-      this.grassBases[b].thinInstanceSetBuffer("matrix", combined, 16, true);
+      this.grassBases[b].thinInstanceSetBuffer("matrix", buffers[b], 16, true);
       this.grassBases[b].thinInstanceRefreshBoundingInfo(true);
     }
   }
@@ -2065,38 +2172,57 @@ export class Segments {
 
   private applyCombinedPlantBuffers(needed: Set<number>, currentSeg: number) {
     if (!this.plantBases) return;
-    void currentSeg;
+    let buffers = this.combinedPlantSegments.get(currentSeg);
+    if (!buffers) {
+      buffers = this.combineInstanceBuffers(
+        this.plantSegments,
+        needed,
+        this.plantBases.length,
+        this.stablePlantCount()
+      );
+      this.combinedPlantSegments.set(currentSeg, buffers);
+    }
 
     for (let b = 0; b < this.plantBases.length; b++) {
-      const parts: Float32Array[] = [];
-
-      for (const segId of needed) {
-        const want = this.stablePlantCount();
-        if (want <= 0) continue;
-
-        const segBuffers = this.plantSegments.get(segId);
-        if (!segBuffers) continue;
-
-        const buf = segBuffers[b];
-        const max = buf.length / 16;
-        const use = Math.min(want, max);
-
-        parts.push(buf.subarray(0, use * 16));
-      }
-
-      let total = 0;
-      parts.forEach((p) => (total += p.length));
-
-      const combined = new Float32Array(total);
-      let off = 0;
-      for (const p of parts) {
-        combined.set(p, off);
-        off += p.length;
-      }
-
-      this.plantBases[b].thinInstanceSetBuffer("matrix", combined, 16, true);
+      this.plantBases[b].thinInstanceSetBuffer("matrix", buffers[b], 16, true);
       this.plantBases[b].thinInstanceRefreshBoundingInfo(true);
     }
+  }
+
+  private combineInstanceBuffers(
+    segmentBuffers: Map<number, Float32Array[]>,
+    needed: Set<number>,
+    baseCount: number,
+    instanceLimit: number
+  ) {
+    const combinedBuffers: Float32Array[] = [];
+
+    for (let baseIndex = 0; baseIndex < baseCount; baseIndex++) {
+      const parts: Float32Array[] = [];
+      let totalLength = 0;
+
+      if (instanceLimit > 0) {
+        for (const segmentId of needed) {
+          const buffer = segmentBuffers.get(segmentId)?.[baseIndex];
+          if (!buffer) continue;
+
+          const instanceCount = Math.min(instanceLimit, buffer.length / 16);
+          const part = buffer.subarray(0, instanceCount * 16);
+          parts.push(part);
+          totalLength += part.length;
+        }
+      }
+
+      const combined = new Float32Array(totalLength);
+      let offset = 0;
+      for (const part of parts) {
+        combined.set(part, offset);
+        offset += part.length;
+      }
+      combinedBuffers.push(combined);
+    }
+
+    return combinedBuffers;
   }
 
   // =========================

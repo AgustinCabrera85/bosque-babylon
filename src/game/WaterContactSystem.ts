@@ -172,11 +172,23 @@ export class WaterContactSystem {
     const motionMode = this.options.getMotionMode?.() ?? "grounded";
     if (motionMode === "swimming") {
       this.stateValue = "swimming";
+      if (this.horizontalSpeedValue >= this.config.movement.minSpeedForEffects) {
+        this.updateMovementEffects(
+          horizontalDistance,
+          this.config.movement.swimmingStrengthScale
+        );
+      }
       this.previousPosition.copyFrom(position);
       return;
     }
     if (motionMode === "treadingWater") {
       this.stateValue = "treadingWater";
+      if (this.horizontalSpeedValue >= this.config.movement.minSpeedForEffects) {
+        this.updateMovementEffects(
+          horizontalDistance,
+          this.config.movement.treadingStrengthScale
+        );
+      }
       this.previousPosition.copyFrom(position);
       return;
     }
@@ -274,7 +286,7 @@ export class WaterContactSystem {
     this.activeSurface = null;
   }
 
-  private updateMovementEffects(horizontalDistance: number) {
+  private updateMovementEffects(horizontalDistance: number, strengthScale = 1) {
     this.distanceSinceSplash += horizontalDistance;
     this.distanceSinceRipple += horizontalDistance;
     const speedFactor = this.getSpeedFactor();
@@ -285,7 +297,7 @@ export class WaterContactSystem {
       this.config.movement.minimumStrength,
       this.config.movement.maximumStrength,
       speedFactor
-    ) * lerp(0.82, 1, depthFactor);
+    ) * lerp(0.82, 1, depthFactor) * strengthScale;
 
     if (this.distanceSinceRipple >= this.config.movement.rippleStepDistance) {
       this.distanceSinceRipple -= this.config.movement.rippleStepDistance;

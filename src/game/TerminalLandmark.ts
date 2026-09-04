@@ -218,6 +218,13 @@ type CaveCandleDecoration = {
   lights: PointLight[];
 };
 
+type WaterfallDropletBurst = {
+  system: ParticleSystem;
+  impactPoint: Vector3;
+  nextBurstAt: number;
+  sequence: number;
+};
+
 class LagoonRippleMaterialPlugin extends MaterialPluginBase {
   private readonly shaderCode: string;
 
@@ -262,6 +269,7 @@ export class TerminalLandmarkGenerator {
     baseIntensity: number;
     phase: number;
   }[] = [];
+  private waterfallDropletBurst: WaterfallDropletBurst | null = null;
   private animationTime = 0;
 
   constructor(
@@ -297,6 +305,7 @@ export class TerminalLandmarkGenerator {
     const waterfallLayers = this.createWaterfall(root, config, waterfallMetrics);
     const waterfallFoam = this.createWaterfallFoam(root, config, waterfallMetrics.impactPoint);
     this.createWaterfallSplash(config, waterfallMetrics.impactPoint);
+    this.createWaterfallDropletBursts(config, waterfallMetrics.impactPoint);
     this.createWaterfallMist(config, waterfallMetrics.impactPoint);
     const nearbyRockMeshes = this.populateRockClosure(root, config, random);
     const caveRockMeshes = this.populateWaterfallCaveRocks(
@@ -914,6 +923,7 @@ export class TerminalLandmarkGenerator {
     foam.rotation.x = Math.PI * 0.5;
     foam.position.copyFrom(impactPoint);
     foam.isPickable = false;
+    foam.renderingGroupId = 1;
     foam.setParent(root);
 
     const material = new ShaderMaterial(
@@ -951,8 +961,23 @@ export class TerminalLandmarkGenerator {
             float rings = sin(distanceFromImpact * 26.0 - time * 2.25 + sin(angle * 5.0) * 0.7) * 0.5 + 0.5;
             float brokenFoam = smoothstep(0.38, 0.9, rings) * softPatch;
             float centerChurn = 1.0 - smoothstep(0.04, 0.56, distanceFromImpact);
-            float opacity = foamAlpha * softPatch * (0.2 + brokenFoam * 0.52 + centerChurn * 0.28);
-            vec3 foamColor = mix(vec3(0.18, 0.30, 0.31), vec3(0.52, 0.62, 0.62), brokenFoam * 0.55 + centerChurn * 0.24);
+
+            // Small expanding cells continually appear and vanish across the
+            // impact patch, suggesting aerated water without extra geometry.
+            vec2 bubbleUV = p * vec2(5.4, 3.8) + vec2(sin(time * 0.41) * 0.22, -time * 0.72);
+            vec2 bubbleCell = floor(bubbleUV);
+            vec2 bubbleLocal = fract(bubbleUV) - 0.5;
+            float bubbleSeed = hash(bubbleCell);
+            float bubblePhase = fract(time * (0.54 + bubbleSeed * 0.46) + bubbleSeed);
+            float bubbleRadius = mix(0.08, 0.34, bubblePhase);
+            float bubbleDistance = length(bubbleLocal);
+            float bubbleRing = smoothstep(bubbleRadius - 0.055, bubbleRadius, bubbleDistance);
+            bubbleRing *= 1.0 - smoothstep(bubbleRadius, bubbleRadius + 0.065, bubbleDistance);
+            float bubbleLife = smoothstep(0.02, 0.16, bubblePhase) * (1.0 - smoothstep(0.64, 1.0, bubblePhase));
+            float bubbles = bubbleRing * bubbleLife * softPatch;
+
+            float opacity = foamAlpha * softPatch * (0.25 + brokenFoam * 0.48 + centerChurn * 0.34 + bubbles * 0.62);
+            vec3 foamColor = mix(vec3(0.18, 0.30, 0.31), vec3(0.62, 0.72, 0.73), brokenFoam * 0.5 + centerChurn * 0.3 + bubbles * 0.55);
             gl_FragColor = vec4(foamColor * 0.78, opacity);
           }
         `,
@@ -1003,20 +1028,85 @@ export class TerminalLandmarkGenerator {
     splash.maxEmitBox = new Vector3(config.waterfallWidth * 0.34, 0.15, 0.45);
     splash.direction1 = new Vector3(-0.9, 1.8, -0.65);
     splash.direction2 = new Vector3(0.9, 3.1, 0.35);
-    splash.color1 = new Color4(0.55, 0.7, 0.71, 0.5);
-    splash.color2 = new Color4(0.3, 0.5, 0.52, 0.3);
+    splash.color1 = new Color4(0.72, 0.87, 0.88, 0.72);
+    splash.color2 = new Color4(0.42, 0.66, 0.68, 0.48);
     splash.colorDead = new Color4(0.12, 0.2, 0.21, 0);
-    splash.minSize = 0.06;
-    splash.maxSize = 0.18;
+    splash.minSize = 0.065;
+    splash.maxSize = 0.21;
     splash.minLifeTime = 0.35;
     splash.maxLifeTime = 0.78;
-    splash.emitRate = 17;
+    splash.emitRate = this.visualConfig.impact.splashEmitRate;
     splash.minEmitPower = 0.55;
     splash.maxEmitPower = 1.2;
     splash.updateSpeed = 0.012;
     splash.gravity = new Vector3(0, -5.5, 0);
     splash.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    splash.renderingGroupId = 1;
     splash.start();
+  }
+
+  private createWaterfallDropletBursts(
+    config: TerminalLandmarkConfig,
+    impactPoint: Vector3
+  ) {
+    const texture = new DynamicTexture(
+      "terminalWaterfallBurstTexture",
+      { width: 32, height: 32 },
+      this.scene,
+      false
+    );
+    const context = texture.getContext();
+    const gradient = context.createRadialGradient(16, 13, 1, 16, 16, 15);
+    gradient.addColorStop(0, "rgba(238, 250, 250, 0.98)");
+    gradient.addColorStop(0.38, "rgba(183, 225, 227, 0.86)");
+    gradient.addColorStop(0.76, "rgba(112, 175, 181, 0.32)");
+    gradient.addColorStop(1, "rgba(70, 120, 126, 0)");
+    context.clearRect(0, 0, 32, 32);
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 32, 32);
+    texture.hasAlpha = true;
+    texture.update(false);
+
+    const tuning = this.visualConfig.impact;
+    const system = new ParticleSystem(
+      "terminalWaterfallDropletBursts",
+      tuning.burstCapacity,
+      this.scene
+    );
+    system.particleTexture = texture;
+    system.emitter = impactPoint.add(new Vector3(0, 0.1, 0));
+    system.minEmitBox = new Vector3(-config.waterfallWidth * 0.38, 0, -0.65);
+    system.maxEmitBox = new Vector3(config.waterfallWidth * 0.38, 0.16, 0.65);
+    system.direction1 = new Vector3(-1.35, 2.1, -0.9);
+    system.direction2 = new Vector3(1.35, 4.25, 0.8);
+    system.color1 = new Color4(0.86, 0.96, 0.97, 0.96);
+    system.color2 = new Color4(0.58, 0.8, 0.82, 0.76);
+    system.colorDead = new Color4(0.2, 0.36, 0.38, 0);
+    system.minSize = 0.075;
+    system.maxSize = 0.24;
+    system.minScaleX = 0.5;
+    system.maxScaleX = 0.82;
+    system.minScaleY = 1.1;
+    system.maxScaleY = 1.85;
+    system.minLifeTime = 0.3;
+    system.maxLifeTime = 0.86;
+    system.minEmitPower = 0.85;
+    system.maxEmitPower = 1.25;
+    system.updateSpeed = 0.012;
+    system.gravity = new Vector3(0, -7.4, 0);
+    system.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    system.renderingGroupId = 1;
+    system.emitRate = 0;
+    system.manualEmitCount = 0;
+    system.disposeOnStop = false;
+    system.start();
+
+    this.waterfallDropletBurst = {
+      system,
+      impactPoint: impactPoint.clone(),
+      nextBurstAt: 0.18,
+      sequence: 0,
+    };
   }
 
   private createWaterfallMist(config: TerminalLandmarkConfig, impactPoint: Vector3) {
@@ -1061,6 +1151,7 @@ export class TerminalLandmarkGenerator {
     mist.updateSpeed = 0.012;
     mist.gravity = new Vector3(0, -0.18, 0);
     mist.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    mist.renderingGroupId = 1;
     mist.start();
   }
 
@@ -1373,6 +1464,36 @@ export class TerminalLandmarkGenerator {
         Math.sin(this.animationTime * 23.0 + phase * 0.7) * 0.045;
       light.intensity = baseIntensity + flicker;
     }
+    this.updateWaterfallDropletBursts(playerPosition);
+  }
+
+  private updateWaterfallDropletBursts(playerPosition?: Vector3) {
+    const burst = this.waterfallDropletBurst;
+    if (!burst) return;
+
+    const activationRadius = CAVE_LIGHT_ACTIVATION_RADIUS * 1.7;
+    const isNear =
+      !playerPosition ||
+      Vector3.DistanceSquared(playerPosition, burst.impactPoint) <=
+        activationRadius * activationRadius;
+    if (!isNear) {
+      // Avoid accumulating missed bursts that would all fire when the player
+      // re-enters the lagoon area.
+      burst.nextBurstAt = Math.max(burst.nextBurstAt, this.animationTime + 0.2);
+      return;
+    }
+    if (this.animationTime < burst.nextBurstAt) return;
+
+    const tuning = this.visualConfig.impact;
+    const countNoise = pseudoRandom01(burst.sequence * 2 + 1);
+    const intervalNoise = pseudoRandom01(burst.sequence * 2 + 2);
+    burst.system.manualEmitCount = Math.round(
+      lerp(tuning.burstMinCount, tuning.burstMaxCount, countNoise)
+    );
+    burst.sequence += 1;
+    burst.nextBurstAt =
+      this.animationTime +
+      lerp(tuning.burstMinInterval, tuning.burstMaxInterval, intervalNoise);
   }
 }
 
@@ -1420,4 +1541,9 @@ function smoothstep(edge0: number, edge1: number, value: number) {
 
 function lerp(a: number, b: number, amount: number) {
   return a + (b - a) * amount;
+}
+
+function pseudoRandom01(seed: number) {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
 }

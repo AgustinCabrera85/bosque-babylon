@@ -2,12 +2,9 @@
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Scene } from "@babylonjs/core/scene";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
-import { Texture } from "@babylonjs/core/Materials/Textures/texture";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { setGameMaterial } from "../materials";
 
 // ✅ Vite assets (IMPORTADOS)
-const grassUrl = "/assets/models/textures/terrain/ground_grass/wispy-grass-meadow_albedo.png";
 
 export type TerrainHandle = {
   mesh: any;
@@ -20,6 +17,8 @@ export type TerrainHandle = {
   playableHalfWidth: number; // hasta antes de montaña
   mountainStart: number;
 };
+
+export type TerrainHeightModifier = (x: number, z: number, currentHeight: number) => number;
 
 type FlatArea = {
   x: number;
@@ -58,6 +57,7 @@ export function createTerrain(
     mountainHeight?: number;
     playableHalfWidth?: number; // límite de movimiento (antes de montaña)
     flatAreas?: FlatArea[];
+    heightModifiers?: readonly TerrainHeightModifier[];
   }
 ): TerrainHandle {
   const size = opts.size;
@@ -72,6 +72,7 @@ export function createTerrain(
   // 🧱 Límite jugable (antes de montaña)
   const playableHalfWidth = opts.playableHalfWidth ?? mountainStart - 2;
   const flatAreas = opts.flatAreas ?? [];
+  const heightModifiers = opts.heightModifiers ?? [];
 
   const step = size / segments;
   const half = size / 2;
@@ -112,6 +113,7 @@ export function createTerrain(
       // Aplanar el sendero central (ojo: el camino real es el mesh "path" en tu Scene)
       if (absX < pathHalfWidth + 1.2) h = 0;
       h = applyFlatAreas(x, z, h);
+      for (const modifyHeight of heightModifiers) h = modifyHeight(x, z, h);
 
       heights[idx] = h;
       positions.push(x, h, z);
@@ -161,27 +163,8 @@ export function createTerrain(
   // ✅ IMPORTANTE: el terreno debe recibir sombras (casters: árboles/rocas)
   mesh.receiveShadows = true;
 
-  // ===== Material (Standard) para que responda a luces (igual que el camino) =====
-  const grassMat = new StandardMaterial("grassMat", scene);
-  const grassTex = new Texture(grassUrl, scene);
-
-  grassTex.wrapU = Texture.WRAP_ADDRESSMODE;
-  grassTex.wrapV = Texture.WRAP_ADDRESSMODE;
-  grassTex.uScale = 1;
-  grassTex.vScale = 1;
-  grassTex.anisotropicFilteringLevel = 4;
-
-  grassMat.diffuseTexture = grassTex;
-
-  // NOCHE: base oscura para que la linterna “levante”
-  grassMat.diffuseColor = new Color3(0.22, 0.22, 0.22);
-  grassMat.specularColor = new Color3(0, 0, 0);
-  grassMat.maxSimultaneousLights = 8;
-
-  // Fog del engine (scene.fog...) debe afectar al terreno
-  grassMat.fogEnabled = true;
-
-  mesh.material = grassMat;
+  // Shared PBR material retains the dark night tint and Babylon fog support.
+  setGameMaterial(mesh, "grass", scene);
 
   // ======= HeightAt (bilinear) =======
   function applyFlatAreas(x: number, z: number, h: number) {

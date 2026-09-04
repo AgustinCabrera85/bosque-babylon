@@ -8,6 +8,7 @@ import type { Material } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Material as Mat } from "@babylonjs/core/Materials/material";
+import { setGameMaterial } from "../materials";
 
 type TreeTemplate = {
   name: string;
@@ -263,6 +264,8 @@ for (const file of files.slice(0, maxTemplates)) {
       else inst.rotation.copyFrom(src.rotation);
       inst.scaling.copyFrom(src.scaling);
 
+      // Preserve the imported GLB texture while exposing shared wood properties to gameplay.
+      setGameMaterial(inst, "wood", scene, { applyVisual: false });
       inst.setParent(instRoot);
     }
 
@@ -280,6 +283,7 @@ for (const file of files.slice(0, maxTemplates)) {
         inst.scaling.copyFrom(src.scaling);
 
         // ✅ Ultra: foliage mirando a cámara para poder cullar backfaces
+        setGameMaterial(inst, "grass", scene, { applyVisual: false });
         if (this.ultraFoliage) {
           // FULL billboard suele verse raro; Y-only mantiene vertical (mejor para hojas/cards)
           inst.billboardMode = Mesh.BILLBOARDMODE_Y;

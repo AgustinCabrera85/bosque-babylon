@@ -18,6 +18,9 @@ import { createRainSystem } from "./Rain";
 import { createFireflies } from "./Fireflies";
 import { createEndTorches } from "./Torches";
 import { createVintageFilmPostProcess, fridayThe13thVintagePreset } from "./VintageFilmPostProcess";
+import { createLagoonUnderwaterEffect } from "./LagoonUnderwaterEffect";
+import { TERMINAL_LAGOON_VISUAL_CONFIG } from "./TerminalLagoonVisualConfig";
+import type { MusicPlayerHandle } from "./MusicPlayer";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -30,12 +33,21 @@ import { Light } from "@babylonjs/core/Lights/light";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { ShadowAuraController } from "./ShadowAura";
 import { createShadowAuraDebugControls } from "./ShadowAuraDebug";
+import {
+  DEFAULT_END_HOUSE_SEGMENT,
+  DEFAULT_WORLD_SEGMENT_LENGTH,
+  TerminalLandmarkGenerator,
+  createTerminalLandmarkConfig,
+  createTerminalTerrainModifier,
+} from "./TerminalLandmark";
+import { installSceneMaterialLightBudgetGuard } from "../materials";
 
 
 
 // ✅ Vite url imports (desde src/assets)
 const pathUrl = "/assets/models/textures/terrain/ground_camino/ground.jpg";
-const skyUrl = "/assets/hdr/hdr_high.png";
+const SKY_DESKTOP_URL = "/assets/hdr/forest_night_8k.jpg";
+const SKY_MOBILE_URL = "/assets/hdr/hdr_high.png";
 const BASE_FOG_DENSITY = 0.021;
 const ISO_FOG_DENSITY = 0.011;
 const BASE_HEMI_INTENSITY = 0.015;
@@ -88,7 +100,7 @@ export const desktopQuality: QualityProfile = {
   name: "desktop",
   terrainSegments: 180,
   pathRows: 160,
-  photoDomeResolution: 64,
+  photoDomeResolution: 96,
   shadowMapSize: 512,
   shadowBlurKernel: 8,
   rainDrops: 500,
@@ -117,7 +129,7 @@ export const mobileQuality: QualityProfile = {
   name: "mobile",
   terrainSegments: 110,
   pathRows: 72,
-  photoDomeResolution: 32,
+  photoDomeResolution: 48,
   shadowMapSize: 0,
   shadowBlurKernel: 0,
   rainDrops: 120,
@@ -269,10 +281,12 @@ export async function createScene(
   canvas: HTMLCanvasElement,
   onProgress: LoadingProgress = () => {},
   quality: QualityProfile = desktopQuality,
-  selectedCharacter: CharacterId = "lautaro"
+  selectedCharacter: CharacterId = "lautaro",
+  musicPlayer: MusicPlayerHandle | null = null
 ) {
   onProgress(0.08, "Creando escena...");
   const scene = new Scene(engine);
+  installSceneMaterialLightBudgetGuard(scene);
 
   // =========================
   // Fog lúgubre (NOCHE)
@@ -308,6 +322,11 @@ moon.specular = new Color3(0, 0, 0);
   // Terreno
   // =========================
 onProgress(0.18, "Generando terreno...");
+const mapLayout = {
+  segmentLength: DEFAULT_WORLD_SEGMENT_LENGTH,
+  endHouseSegment: DEFAULT_END_HOUSE_SEGMENT,
+};
+const terminalConfig = createTerminalLandmarkConfig(mapLayout);
 const terrain = createTerrain(scene, {
   size: 1600,
   segments: quality.terrainSegments,
@@ -315,7 +334,7 @@ const terrain = createTerrain(scene, {
   flatAreas: [
     {
       x: 0,
-      z: 70 * 8 + 18,
+      z: mapLayout.segmentLength * mapLayout.endHouseSegment + 18,
       width: 118,
       depth: 146,
       height: 0,
@@ -326,14 +345,21 @@ const terrain = createTerrain(scene, {
   mountainStart: 55,    // antes 26
   mountainEnd: 95,      // antes 48
   mountainHeight: 34,   // un poco más alto
-  playableHalfWidth: 52 // antes de montaña
+  playableHalfWidth: 52, // antes de montaña
+  heightModifiers: [createTerminalTerrainModifier(terminalConfig)],
 });
 
 
   // =========================
   // Sendero plano (opcional)
   // =========================
-  const path = createPathMesh(scene, terrain, quality.pathRows, undefined, 70 * 8 - 8);
+  const path = createPathMesh(
+    scene,
+    terrain,
+    quality.pathRows,
+    undefined,
+    mapLayout.segmentLength * mapLayout.endHouseSegment - 8
+  );
 
   const pathMat = new StandardMaterial("pathMat", scene);
   const pathTex = new Texture(pathUrl, scene);
@@ -354,19 +380,27 @@ const terrain = createTerrain(scene, {
   // SKY (PhotoDome PNG 360)
   // =========================
   onProgress(0.3, "Cargando cielo...");
+  const skyUrl = quality.name === "desktop" ? SKY_DESKTOP_URL : SKY_MOBILE_URL;
   const photoDome = new PhotoDome(
     "skyDome",
     skyUrl,
     {
       resolution: quality.photoDomeResolution,
       size: 3000,
+      faceForward: false,
     },
     scene
   );
 
+  // Use a slightly wider projection and a deliberate yaw so the panorama does
+  // not look magnified or put its brightest feature directly over the path.
+  photoDome.fovMultiplier = 1.28;
+  photoDome.rotation.y = Math.PI * 0.32;
   photoDome.mesh.infiniteDistance = true;
   photoDome.mesh.isPickable = false;
   photoDome.mesh.renderingGroupId = 0;
+  photoDome.photoTexture.updateSamplingMode(Texture.TRILINEAR_SAMPLINGMODE);
+  photoDome.photoTexture.anisotropicFilteringLevel = quality.name === "desktop" ? 4 : 2;
 
   // ✅ el cielo NO debe recibir fog
   // (PhotoDome.material no siempre tipa fogEnabled, por eso el cast)
@@ -374,10 +408,7 @@ const terrain = createTerrain(scene, {
 
   // ✅ “bajar” la potencia visual del cielo (si está muy brillante)
   // (depende del material que use internamente)
-  const m: any = photoDome.material as any;
-  if (m.emissiveColor?.set) m.emissiveColor.set(0.42, 0.42, 0.42);
-  if (m.diffuseColor?.set) m.diffuseColor.set(0, 0, 0);
-  if (m.specularColor?.set) m.specularColor.set(0, 0, 0);
+  photoDome.material.primaryColor.set(0.72, 0.82, 1);
 
   photoDome.onLoadObservable.add(() => {
     console.log("✔ PhotoDome loaded:", skyUrl);
@@ -601,7 +632,9 @@ scene.onBeforeRenderObservable.add(() => {
   // Segmentos
   // =========================
   const segments = new Segments(scene, terrain, treeLibrary, grassLibrary, plantLibrary, rockLibrary, {
-    segmentLength: 70,
+    segmentLength: mapLayout.segmentLength,
+    endHouseSegment: mapLayout.endHouseSegment,
+    maxGeneratedSegment: mapLayout.endHouseSegment,
     behind: quality.segmentBehind,
     ahead: quality.segmentAhead,
     objectBehind: quality.objectSegmentBehind,
@@ -621,7 +654,39 @@ scene.onBeforeRenderObservable.add(() => {
   await segments.loadCandles();
   await segments.loadStartBlocker();
   await segments.loadEndHouse();
-  await createEndTorches(scene, terrain);
+  const terminalLandmark = new TerminalLandmarkGenerator(
+    scene,
+    terrain,
+    treeLibrary,
+    rockLibrary,
+    plantLibrary,
+    {
+      waterRenderTargetSize: quality.name === "mobile" ? 128 : 256,
+      environmentReflectionMeshes: [photoDome.mesh],
+      visualConfig: TERMINAL_LAGOON_VISUAL_CONFIG,
+    }
+  ).generateWaterfallLagoonEnd(terminalConfig);
+  musicPlayer?.configureWaterfallArea({
+    position: terminalLandmark.waterfallImpactPoint,
+    // On the center line this reaches silence where the authored forest path
+    // ends, then rises smoothly through the terminal trail toward the lagoon.
+    audibleRadius: terminalLandmark.waterfallImpactPoint.z - (terminalConfig.houseFrontZ - 8),
+    fullVolumeRadius: 26,
+    volumeScale: 0.72,
+  });
+  const lagoonUnderwaterEffect = createLagoonUnderwaterEffect(scene, player.camera, {
+    waterLevel: terminalConfig.waterLevel,
+    centerX: terminalConfig.lagoonCenterX,
+    centerZ: terminalConfig.lagoonCenterZ,
+    radiusX: terminalConfig.lagoonRadiusX,
+    radiusZ: terminalConfig.lagoonRadiusZ,
+    tuning: TERMINAL_LAGOON_VISUAL_CONFIG.underwater,
+    getBaseFogDensity: () =>
+      player.currentViewMode === "iso" ? ISO_FOG_DENSITY : BASE_FOG_DENSITY,
+  });
+  segments.reserveNoSpawnZone(terminalLandmark.generationExclusion);
+  terminalLandmark.blockers.forEach((blocker) => segments.addStaticWorldBlocker(blocker));
+  const endTorches = await createEndTorches(scene, terrain);
   createDirectionIndicator(scene, terrain, {
     camera: player.camera,
     canvas,
@@ -668,6 +733,10 @@ scene.onBeforeRenderObservable.add(() => {
   scene.onBeforeRenderObservable.add(() => {
     const dt = engine.getDeltaTime() / 1000;
     player.update(dt, terrain, segments);
+    musicPlayer?.updateListenerPosition(player.position);
+    terminalLandmark.update(dt, player.position);
+    lagoonUnderwaterEffect.update(dt);
+    endTorches.update(player.position);
     segments.update(player.position.z);
     segments.updateIsometricOccluders(player.position, player.currentViewMode === "iso");
     if (quality.grassWindInterval <= 0) {

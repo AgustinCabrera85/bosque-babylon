@@ -50,7 +50,7 @@ const engine = new Engine(renderCanvas, quality.name === "desktop", {
   antialias: quality.name === "desktop",
 });
 engine.setHardwareScalingLevel(hardwareScaling);
-setupMusicPlayer();
+const musicPlayer = setupMusicPlayer();
 
 async function start() {
   const selectedCharacter = await setupCharacterSelection();
@@ -61,7 +61,14 @@ async function start() {
   const inventory = setupInventory({ inspectItem: itemInspector.inspect });
 
   setLoading(0.02, `Iniciando motor (${quality.name})...`);
-  const scene = await createScene(engine, renderCanvas, setLoading, quality, selectedCharacter);
+  const scene = await createScene(
+    engine,
+    renderCanvas,
+    setLoading,
+    quality,
+    selectedCharacter,
+    musicPlayer
+  );
 
   scene.onAfterRenderObservable.addOnce(hideLoading);
   engine.runRenderLoop(() => {

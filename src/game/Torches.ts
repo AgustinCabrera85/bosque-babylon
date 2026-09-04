@@ -10,6 +10,7 @@ import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTextur
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { Light } from "@babylonjs/core/Lights/light";
 import { FireMaterial } from "@babylonjs/materials/fire/fireMaterial";
 import { Engine } from "@babylonjs/core/Engines/engine";
 
@@ -28,6 +29,11 @@ const FLAME_HEIGHT = 2.55;
 const FLAME_WIDTH = 0.82;
 const FLAME_BASE_OVERLAP = 0.32;
 const CANDLE_FLAME_TEXTURE_URL = "/assets/models/textures/fire/candle_flame.png";
+const END_TORCH_LIGHT_ACTIVATION_RADIUS = 80;
+
+export type EndTorchesHandle = {
+  update: (playerPosition: Vector3) => void;
+};
 
 function createFireTextureSet(scene: Scene) {
   const diffuse = new DynamicTexture(
@@ -386,7 +392,10 @@ function addStaticFlame(
   return root;
 }
 
-export async function createEndTorches(scene: Scene, terrain: TerrainHandle) {
+export async function createEndTorches(
+  scene: Scene,
+  terrain: TerrainHandle
+): Promise<EndTorchesHandle> {
   const pathEndZ = 70 * 8 - 8;
   const placements: TorchPlacement[] = [
     { x: -6.4, z: pathEndZ + 0.4, rotationY: Math.PI * 0.5 },
@@ -428,6 +437,9 @@ export async function createEndTorches(scene: Scene, terrain: TerrainHandle) {
     light.specular = new Color3(1.0, 0.54, 0.22);
     light.intensity = 3.75;
     light.range = 45;
+    light.falloffType = Light.FALLOFF_STANDARD;
+    light.renderPriority = 7;
+    light.setEnabled(false);
 
     lights.push({ light, baseIntensity: light.intensity, phase: i * 2.19 });
   }
@@ -443,4 +455,15 @@ export async function createEndTorches(scene: Scene, terrain: TerrainHandle) {
       light.intensity = baseIntensity + flicker;
     }
   });
+
+  const activationRadiusSquared = END_TORCH_LIGHT_ACTIVATION_RADIUS ** 2;
+  return {
+    update(playerPosition) {
+      for (const { light } of lights) {
+        const distanceSquared = Vector3.DistanceSquared(playerPosition, light.position);
+        const shouldBeEnabled = distanceSquared <= activationRadiusSquared;
+        if (light.isEnabled() !== shouldBeEnabled) light.setEnabled(shouldBeEnabled);
+      }
+    },
+  };
 }

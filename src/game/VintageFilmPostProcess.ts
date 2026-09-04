@@ -49,7 +49,7 @@ export const fridayThe13thVintagePreset: VintageFilmSettings = {
   lutStrength: 0.70,
   contrast: 1.08,
   saturation: 0.76,
-  exposure: 1.08,
+  exposure: 1.18,
 };
 
 const fragmentShader = `

@@ -7,6 +7,7 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Material } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { setGameMaterial } from "../materials";
 
 type RockTemplate = {
   name: string;
@@ -138,6 +139,8 @@ export class RockLibrary {
       }
 
       inst.scaling.copyFrom(src.scaling);
+      // Keep each imported rock appearance, but make its stone definition queryable.
+      setGameMaterial(inst, "stone", scene, { applyVisual: false });
       inst.setParent(instRoot);
     }
 

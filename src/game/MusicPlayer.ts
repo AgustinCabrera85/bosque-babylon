@@ -19,8 +19,31 @@ type GameSfxEvent = CustomEvent<{
   active?: boolean;
 }>;
 
+type WorldPosition = {
+  x: number;
+  z: number;
+};
+
+export type WaterfallAudioArea = {
+  position: WorldPosition;
+  audibleRadius: number;
+  fullVolumeRadius: number;
+  volumeScale?: number;
+};
+
+export type MusicPlayerHandle = {
+  configureWaterfallArea: (area: WaterfallAudioArea) => void;
+  updateListenerPosition: (position: WorldPosition) => void;
+};
+
 function clamp01(value: number) {
+  if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
+}
+
+function smoothstep(edge0: number, edge1: number, value: number) {
+  const t = clamp01((value - edge0) / Math.max(0.0001, edge1 - edge0));
+  return t * t * (3 - 2 * t);
 }
 
 function readSavedVolume(key: string, fallback: number) {
@@ -42,13 +65,13 @@ function renderBinding(binding: SliderBinding | null, volume: number) {
   binding.valueText.textContent = `${percent}%`;
 }
 
-export function setupMusicPlayer() {
+export function setupMusicPlayer(): MusicPlayerHandle | null {
   const pauseMenu = document.getElementById("pauseMenu");
   const musicSlider = getSlider("musicVolume", "musicValue");
   const ambientSlider = getSlider("ambientVolume", "ambientValue");
   const sfxSlider = getSlider("sfxVolume", "sfxValue");
 
-  if (!musicSlider || !ambientSlider || !sfxSlider) return;
+  if (!musicSlider || !ambientSlider || !sfxSlider) return null;
 
   const music = new Audio(asset("assets/audio/music/Echoes_in_the_Dark_ingame.mp3"));
   music.loop = true;
@@ -57,6 +80,12 @@ export function setupMusicPlayer() {
   const ambient = new Audio(asset("assets/audio/ambience/Gentle_cricket_chirp.mp3"));
   ambient.loop = true;
   ambient.preload = "auto";
+
+  const waterfall = new Audio(asset("assets/audio/ambience/waterfall_sound.mp3"));
+  waterfall.loop = true;
+  waterfall.preload = "auto";
+  waterfall.volume = 0;
+  waterfall.muted = true;
 
   const walkSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_walking.mp3"));
   const runSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_running.mp3"));
@@ -69,9 +98,12 @@ export function setupMusicPlayer() {
 
   let started = false;
   let ambientStarted = false;
+  let waterfallStarted = false;
   let footstepMode: "idle" | "walk" | "run" = "idle";
   let audioContext: AudioContext | null = null;
   let sfxGain: GainNode | null = null;
+  let waterfallArea: WaterfallAudioArea | null = null;
+  let waterfallProximity = 0;
 
   const volumes: Record<VolumeChannel, number> = {
     music: readSavedVolume(MUSIC_VOLUME_KEY, DEFAULT_MUSIC_VOLUME),
@@ -124,6 +156,14 @@ export function setupMusicPlayer() {
     walkSfx.muted = volume <= 0;
     runSfx.muted = volume <= 0;
     jumpSfx.muted = volume <= 0;
+  }
+
+  function updateWaterfallVolume() {
+    const requestedVolumeScale = waterfallArea?.volumeScale ?? 0.72;
+    const volumeScale = Number.isFinite(requestedVolumeScale) ? requestedVolumeScale : 0.72;
+    const volume = clamp01(volumes.ambient * volumeScale * waterfallProximity);
+    waterfall.volume = volume;
+    waterfall.muted = volume <= 0.001;
   }
 
   async function playLoop(audio: HTMLAudioElement) {
@@ -184,6 +224,16 @@ export function setupMusicPlayer() {
         console.warn("[MusicPlayer] Ambient playback was blocked until the next user gesture.", error);
       }
     }
+
+    if (!waterfallStarted) {
+      waterfallStarted = true;
+      try {
+        await waterfall.play();
+      } catch (error) {
+        waterfallStarted = false;
+        console.warn("[MusicPlayer] Waterfall playback was blocked until the next user gesture.", error);
+      }
+    }
   }
 
   function setVolume(channel: VolumeChannel, volume: number, save = true) {
@@ -200,6 +250,7 @@ export function setupMusicPlayer() {
     if (channel === "ambient") {
       ambient.volume = next * 0.65;
       ambient.muted = next <= 0;
+      updateWaterfallVolume();
       if (save) localStorage.setItem(AMBIENT_VOLUME_KEY, String(next));
       renderBinding(ambientSlider, next);
     }
@@ -253,4 +304,42 @@ export function setupMusicPlayer() {
   setVolume("ambient", volumes.ambient, false);
   setVolume("sfx", volumes.sfx, false);
   renderAll();
+
+  return {
+    configureWaterfallArea(area) {
+      const fullVolumeRadius = Number.isFinite(area.fullVolumeRadius)
+        ? Math.max(0, area.fullVolumeRadius)
+        : 0;
+      const audibleRadius = Number.isFinite(area.audibleRadius)
+        ? Math.max(fullVolumeRadius + 0.01, area.audibleRadius)
+        : fullVolumeRadius + 0.01;
+      waterfallArea = {
+        ...area,
+        // Babylon Vector3 exposes x/z through accessors, so object spread does
+        // not reliably preserve those public coordinates.
+        position: { x: area.position.x, z: area.position.z },
+        fullVolumeRadius,
+        audibleRadius,
+      };
+      updateWaterfallVolume();
+    },
+    updateListenerPosition(position) {
+      if (!waterfallArea) return;
+      const distance = Math.hypot(
+        position.x - waterfallArea.position.x,
+        position.z - waterfallArea.position.z
+      );
+      if (!Number.isFinite(distance)) {
+        waterfallProximity = 0;
+        updateWaterfallVolume();
+        return;
+      }
+      waterfallProximity = 1 - smoothstep(
+        waterfallArea.fullVolumeRadius,
+        waterfallArea.audibleRadius,
+        distance
+      );
+      updateWaterfallVolume();
+    },
+  };
 }

@@ -47,7 +47,7 @@ type BoxCollider = {
   kind: "house" | "door" | "blocker";
 };
 
-type NoSpawnZone = {
+export type NoSpawnZone = {
   x: number;
   z: number;
   width: number;
@@ -70,6 +70,16 @@ type SegmentCfg = {
   plantBuildCount?: number;
   plantRingCounts?: [number, number, number];
   plantFarCount?: number;
+  endHouseSegment?: number;
+  maxGeneratedSegment?: number;
+};
+
+export type StaticWorldBlocker = {
+  x: number;
+  z: number;
+  width: number;
+  depth: number;
+  rotation?: number;
 };
 
 type SegTreePack = { nodes: TransformNode[]; lod: 0 | 1 | 2 };
@@ -106,6 +116,8 @@ const CANDLE_COLLISION_RADIUS = 0.55;
 const CANDLE_FLAME_WIDTH = 0.34;
 const CANDLE_FLAME_HEIGHT = 0.68;
 const SEGMENT_CANDLE_FADE_SECONDS = 0.85;
+const MAX_ACTIVE_CANDLE_LIGHTS = 2;
+const CANDLE_LIGHT_RENDER_PRIORITY = 8;
 const STREAM_TREE_LOD: 0 | 1 | 2 = 1;
 const PLAYER_WORLD_COLLISION_RADIUS = 1.0;
 const PLAYER_HOUSE_COLLISION_RADIUS = 0.42;
@@ -150,9 +162,7 @@ export class Segments {
 
   private colliders: Collider[] = [];
   private staticBoxColliders: BoxCollider[] = [];
-  private noSpawnZones: NoSpawnZone[] = [
-    { x: 0, z: 70 * 8 + 18, width: END_HOUSE_RESERVE_WIDTH, depth: END_HOUSE_RESERVE_DEPTH },
-  ];
+  private noSpawnZones: NoSpawnZone[] = [];
   private interactables: Interactable[] = [];
 
   private grassBases: Mesh[] | null = null;
@@ -177,7 +187,14 @@ export class Segments {
     private plantLibrary: PlantLibrary,
     private rockLibrary: RockLibrary,
     private cfg: SegmentCfg
-  ) {}
+  ) {
+    this.noSpawnZones.push({
+      x: 0,
+      z: this.cfg.segmentLength * (this.cfg.endHouseSegment ?? 8) + 18,
+      width: END_HOUSE_RESERVE_WIDTH,
+      depth: END_HOUSE_RESERVE_DEPTH,
+    });
+  }
 
   getEndHouseCheckpoint() {
     if (this.endHouseCheckpoint) return this.endHouseCheckpoint.clone();
@@ -205,7 +222,13 @@ export class Segments {
   private segmentRange(currentSeg: number, behind: number, ahead: number) {
     const needed = new Set<number>();
     for (let o = -behind; o <= ahead; o++) {
-      needed.add(currentSeg + o);
+      const segmentId = currentSeg + o;
+      if (
+        this.cfg.maxGeneratedSegment === undefined ||
+        segmentId <= this.cfg.maxGeneratedSegment
+      ) {
+        needed.add(segmentId);
+      }
     }
     return needed;
   }
@@ -304,10 +327,12 @@ export class Segments {
     }
 
     // cleanup SOLO al cambiar segmento
-    if (!segmentChanged) return;
-    this.lastSegment = currentSeg;
+    if (segmentChanged) {
+      this.lastSegment = currentSeg;
+      this.cleanup(grassNeeded, plantNeeded, objectNeeded);
+    }
 
-    this.cleanup(grassNeeded, plantNeeded, objectNeeded);
+    this.updateCandleLightSelection(camZ);
   }
 
   updateIsometricOccluders(playerPosition: Vector3, enabled: boolean) {
@@ -407,6 +432,19 @@ export class Segments {
       if (this.isPointInsideBoxCollider(x, z, this.boxColliderPlayerRadius(c), c)) return true;
     }
     return false;
+  }
+
+  addStaticWorldBlocker(blocker: StaticWorldBlocker) {
+    this.staticBoxColliders.push({
+      ...blocker,
+      rotation: blocker.rotation ?? 0,
+      active: true,
+      kind: "blocker",
+    });
+  }
+
+  reserveNoSpawnZone(zone: NoSpawnZone) {
+    this.noSpawnZones.push({ ...zone });
   }
 
   private boxColliderPlayerRadius(collider: BoxCollider) {
@@ -1016,6 +1054,8 @@ export class Segments {
     light.specular = new Color3(0.55, 0.22, 0.08);
     light.intensity = fadeInSeconds > 0 ? 0 : lightIntensity;
     light.range = lightRange;
+    light.renderPriority = CANDLE_LIGHT_RENDER_PRIORITY;
+    light.setEnabled(false);
 
     this.candleLights.push({
       root,
@@ -1086,6 +1126,23 @@ export class Segments {
     });
   }
 
+  private updateCandleLightSelection(playerZ: number) {
+    const nearest = [...this.candleLights]
+      .sort(
+        (a, b) =>
+          Math.abs(a.root.position.z - playerZ) - Math.abs(b.root.position.z - playerZ)
+      )
+      .slice(0, MAX_ACTIVE_CANDLE_LIGHTS);
+    const activeLights = new Set(nearest.map((entry) => entry.light));
+
+    for (const entry of this.candleLights) {
+      const shouldBeEnabled = activeLights.has(entry.light);
+      if (entry.light.isEnabled() !== shouldBeEnabled) {
+        entry.light.setEnabled(shouldBeEnabled);
+      }
+    }
+  }
+
   peekInteractable(cameraOrLook: Camera | { origin: Vector3; direction: Vector3 }) {
     const origin = "globalPosition" in cameraOrLook ? cameraOrLook.globalPosition : cameraOrLook.origin;
     const direction = "globalPosition" in cameraOrLook
@@ -1098,7 +1155,7 @@ export class Segments {
 
   async loadEndHouse() {
     const segmentLength = this.cfg.segmentLength;
-    const targetFrontZ = segmentLength * 8;
+    const targetFrontZ = segmentLength * (this.cfg.endHouseSegment ?? 8);
     const scale = END_HOUSE_MODEL_SCALE;
 
     const res = await SceneLoader.ImportMeshAsync(

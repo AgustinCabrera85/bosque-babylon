@@ -6,6 +6,7 @@ import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { Material } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { setGameMaterial } from "../materials";
 
 type WindMesh = {
   mesh: Mesh;
@@ -63,6 +64,8 @@ export class GrassLibrary {
         merged.setEnabled(false);
         merged.isPickable = false;
         this.patchGrassMaterial(merged.material);
+        // Thin instances share this source mesh, so its logical material applies to the whole batch.
+        setGameMaterial(merged, "grass", scene, { applyVisual: false });
         this.prepareWindMesh(merged, this.prototypes.length);
 
         this.prototypes.push(merged);

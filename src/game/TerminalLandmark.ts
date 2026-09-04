@@ -30,6 +30,7 @@ import {
   TERMINAL_LAGOON_VISUAL_CONFIG,
   type TerminalLagoonVisualConfig,
 } from "./TerminalLagoonVisualConfig";
+import type { WaterSurfaceInfo } from "./WaterSurface";
 
 export const DEFAULT_END_HOUSE_SEGMENT = 8;
 export const DEFAULT_WORLD_SEGMENT_LENGTH = 70;
@@ -71,6 +72,7 @@ export type TerminalPassageAnchor = {
 export type TerminalLandmarkHandle = {
   root: TransformNode;
   lagoon: Mesh;
+  waterSurface: WaterSurfaceInfo;
   lagoonWaterMaterial: WaterMaterial;
   underwaterLight: PointLight;
   waterfallImpactLight: PointLight;
@@ -118,13 +120,54 @@ export function createTerminalLandmarkConfig(
     lagoonCenterZ: houseFrontZ + 98,
     lagoonRadiusX: 34,
     lagoonRadiusZ: 42,
-    lagoonDepth: 3.8,
+    lagoonDepth: 8.5,
     waterLevel: TERMINAL_LAGOON_VISUAL_CONFIG.underwater.waterLevel,
     waterfallZ: houseFrontZ + 143,
     waterfallWidth: 15,
     backCliffZ: houseFrontZ + 151,
     cliffHeight: 20,
   };
+}
+
+function getTerminalLagoonEdgeScale(config: TerminalLandmarkConfig, angle: number) {
+  const phase = (config.seed % 997) * 0.017;
+  return {
+    x:
+      1 +
+      Math.sin(angle * 3 + phase) * 0.075 +
+      Math.sin(angle * 7 - phase) * 0.035,
+    z: 1 + Math.cos(angle * 4 - phase) * 0.055,
+  };
+}
+
+function getTerminalLagoonNormalizedDistance(
+  config: TerminalLandmarkConfig,
+  positionX: number,
+  positionZ: number,
+  horizontalMargin = 0
+) {
+  const localX = positionX - config.lagoonCenterX;
+  const localZ = positionZ - config.lagoonCenterZ;
+  const edgeScale = getTerminalLagoonEdgeScale(config, Math.atan2(localZ, localX));
+  const radiusX = Math.max(0.001, config.lagoonRadiusX * edgeScale.x + horizontalMargin);
+  const radiusZ = Math.max(0.001, config.lagoonRadiusZ * edgeScale.z + horizontalMargin);
+  return Math.hypot(localX / radiusX, localZ / radiusZ);
+}
+
+/** Uses the same authored irregular boundary as the lagoon mesh and terrain basin. */
+export function isPointInsideTerminalLagoon(
+  config: TerminalLandmarkConfig,
+  position: Vector3,
+  horizontalMargin = 0
+) {
+  return (
+    getTerminalLagoonNormalizedDistance(
+      config,
+      position.x,
+      position.z,
+      horizontalMargin
+    ) <= 1
+  );
 }
 
 /**
@@ -134,21 +177,14 @@ export function createTerminalLandmarkConfig(
 export function createTerminalTerrainModifier(
   config: TerminalLandmarkConfig
 ): TerrainHeightModifier {
-  const phase = (config.seed % 997) * 0.017;
-
   return (x, z, currentHeight) => {
     const localX = x - config.lagoonCenterX;
-    const localZ = z - config.lagoonCenterZ;
-    const angle = Math.atan2(localZ, localX);
-    const irregularX = 1 + Math.sin(angle * 3 + phase) * 0.075 + Math.sin(angle * 7 - phase) * 0.035;
-    const irregularZ = 1 + Math.cos(angle * 4 - phase) * 0.055;
-    const lagoonDistance = Math.hypot(
-      localX / (config.lagoonRadiusX * irregularX),
-      localZ / (config.lagoonRadiusZ * irregularZ)
-    );
+    const lagoonDistance = getTerminalLagoonNormalizedDistance(config, x, z);
 
     const basinWeight = 1 - smoothstep(0.72, 1.08, lagoonDistance);
-    const centerDepth = 1 - smoothstep(0, 0.9, lagoonDistance);
+    // Preserve a broad deep-water area instead of concentrating the full depth
+    // in a single terrain vertex at the exact centre of the lagoon.
+    const centerDepth = 1 - smoothstep(0.16, 0.92, lagoonDistance);
     const basinHeight = config.waterLevel - 0.35 - config.lagoonDepth * centerDepth;
     let height = lerp(currentHeight, basinHeight, basinWeight);
 
@@ -247,6 +283,15 @@ export class TerminalLandmarkGenerator {
 
     this.createFadingTrail(root, config, random);
     const lagoon = this.createLagoon(root, config);
+    lagoon.computeWorldMatrix(true);
+    const waterSurface: WaterSurfaceInfo = {
+      id: "terminalLagoon",
+      mesh: lagoon,
+      waterLevel: config.waterLevel,
+      bounds: lagoon.getBoundingInfo(),
+      containsPoint: (position, horizontalMargin) =>
+        isPointInsideTerminalLagoon(config, position, horizontalMargin),
+    };
     const waterfallMetrics = this.getWaterfallMetrics(config);
     const passageAnchor = this.createPassageAnchor(config);
     const waterfallLayers = this.createWaterfall(root, config, waterfallMetrics);
@@ -302,6 +347,7 @@ export class TerminalLandmarkGenerator {
     return {
       root,
       lagoon,
+      waterSurface,
       lagoonWaterMaterial,
       underwaterLight,
       waterfallImpactLight,
@@ -360,16 +406,13 @@ export class TerminalLandmarkGenerator {
     const normals: number[] = [];
     const uvs: number[] = [0.5, 0.5];
     const indices: number[] = [];
-    const phase = (config.seed % 997) * 0.017;
-
     for (let ring = 1; ring <= radialRings; ring++) {
       const radius = ring / radialRings;
       for (let segment = 0; segment < radialSegments; segment++) {
         const angle = (segment / radialSegments) * Math.PI * 2;
-        const irregularX = 1 + Math.sin(angle * 3 + phase) * 0.075 + Math.sin(angle * 7 - phase) * 0.035;
-        const irregularZ = 1 + Math.cos(angle * 4 - phase) * 0.055;
-        const x = Math.cos(angle) * config.lagoonRadiusX * irregularX * radius;
-        const z = Math.sin(angle) * config.lagoonRadiusZ * irregularZ * radius;
+        const edgeScale = getTerminalLagoonEdgeScale(config, angle);
+        const x = Math.cos(angle) * config.lagoonRadiusX * edgeScale.x * radius;
+        const z = Math.sin(angle) * config.lagoonRadiusZ * edgeScale.z * radius;
         positions.push(x, 0, z);
         uvs.push(x / (config.lagoonRadiusX * 2) + 0.5, z / (config.lagoonRadiusZ * 2) + 0.5);
       }

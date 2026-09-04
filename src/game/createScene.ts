@@ -20,6 +20,9 @@ import { createEndTorches } from "./Torches";
 import { createVintageFilmPostProcess, fridayThe13thVintagePreset } from "./VintageFilmPostProcess";
 import { createLagoonUnderwaterEffect } from "./LagoonUnderwaterEffect";
 import { TERMINAL_LAGOON_VISUAL_CONFIG } from "./TerminalLagoonVisualConfig";
+import { WaterContactSystem } from "./WaterContactSystem";
+import { WaterInteractionVFX } from "./WaterInteractionVFX";
+import { WaterSurfaceRegistry } from "./WaterSurface";
 import type { MusicPlayerHandle } from "./MusicPlayer";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
@@ -671,6 +674,84 @@ scene.onBeforeRenderObservable.add(() => {
         segments.instantiateCandleAsset(name, scale),
     }
   ).generateWaterfallLagoonEnd(terminalConfig);
+  // The lagoon lights use explicit mesh lists to protect the global light
+  // budget. Include the loaded avatar so a submerged third-person view keeps
+  // the swimmer readable without adding another dynamic light.
+  terminalLandmark.underwaterLight.includedOnlyMeshes.push(...player.getAvatarMeshes());
+  terminalLandmark.waterfallImpactLight.includedOnlyMeshes.push(...player.getAvatarMeshes());
+  const waterSurfaces = new WaterSurfaceRegistry();
+  waterSurfaces.register(terminalLandmark.waterSurface);
+  player.setWaterSurfaceRegistry(waterSurfaces);
+  const waterInteractionVfx = new WaterInteractionVFX(scene);
+  const waterContactSystem = new WaterContactSystem(waterSurfaces, waterInteractionVfx, {
+    getContactPosition: (result) => player.getGroundContactPositionToRef(result),
+    getMotionMode: () => player.waterLocomotionState,
+  });
+  if (import.meta.env.DEV) {
+    const waterContactDebug = {
+      getSnapshot: () => waterContactSystem.getDebugSnapshot(),
+      getResourceCounts: () => ({
+        rippleMeshes: scene.meshes.filter((mesh) =>
+          mesh.name.startsWith("waterContactRipple_")
+        ).length,
+        splashSystems: scene.particleSystems.filter((system) =>
+          system.name.startsWith("waterSplashPool_")
+        ).length,
+        rippleMaterials: scene.materials.filter(
+          (material) => material.name === "waterContactRippleMaterial"
+        ).length,
+      }),
+      getPlayerState: () => ({
+        waterLocomotion: player.waterLocomotionState,
+        animation: player.currentAnimationName,
+        registeredAnimations: player.getRegisteredAnimationNames(),
+      }),
+      getSpatialState: () => {
+        player.camera.getViewMatrix(true);
+        const cameraPosition = player.camera.globalPosition;
+        return {
+          player: {
+            x: player.position.x,
+            y: player.position.y,
+            z: player.position.z,
+            groundY: terrain.getHeightAt(player.position.x, player.position.z),
+          },
+          camera: {
+            x: cameraPosition.x,
+            y: cameraPosition.y,
+            z: cameraPosition.z,
+            groundY: terrain.getHeightAt(cameraPosition.x, cameraPosition.z),
+          },
+          waterLevel: terminalLandmark.waterSurface.waterLevel,
+        };
+      },
+      pressDiveControl: () => {
+        player.setMobileRun(true);
+        player.setMobileRun(false);
+      },
+      setMovement: (x: number, y: number) => player.setMobileMove(x, y),
+      setViewMode: (mode: ViewMode) => player.setViewMode(mode),
+      playThrowObject: () => player.playThrowObject(0),
+      setSimulationActive: (active: boolean) => player.setMobileEnabled(active),
+      playerRoot: player.root,
+    };
+    scene.metadata ??= {};
+    scene.metadata.waterContact = waterContactDebug;
+    const debugGlobal = globalThis as typeof globalThis & {
+      __bosqueWaterContactDebug?: typeof waterContactDebug;
+    };
+    debugGlobal.__bosqueWaterContactDebug = waterContactDebug;
+    scene.onDisposeObservable.addOnce(() => {
+      if (debugGlobal.__bosqueWaterContactDebug === waterContactDebug) {
+        delete debugGlobal.__bosqueWaterContactDebug;
+      }
+    });
+  }
+  scene.onDisposeObservable.addOnce(() => {
+    waterContactSystem.dispose();
+    waterInteractionVfx.dispose();
+    waterSurfaces.clear();
+  });
   musicPlayer?.configureWaterfallArea({
     position: terminalLandmark.waterfallImpactPoint,
     // On the center line this reaches silence where the authored forest path
@@ -680,11 +761,7 @@ scene.onBeforeRenderObservable.add(() => {
     volumeScale: 0.72,
   });
   const lagoonUnderwaterEffect = createLagoonUnderwaterEffect(scene, player.camera, {
-    waterLevel: terminalConfig.waterLevel,
-    centerX: terminalConfig.lagoonCenterX,
-    centerZ: terminalConfig.lagoonCenterZ,
-    radiusX: terminalConfig.lagoonRadiusX,
-    radiusZ: terminalConfig.lagoonRadiusZ,
+    surface: terminalLandmark.waterSurface,
     tuning: TERMINAL_LAGOON_VISUAL_CONFIG.underwater,
     getBaseFogDensity: () =>
       player.currentViewMode === "iso" ? ISO_FOG_DENSITY : BASE_FOG_DENSITY,
@@ -740,6 +817,8 @@ scene.onBeforeRenderObservable.add(() => {
     // Activate cached world content before collision and movement use it.
     segments.update(player.position);
     player.update(dt, terrain, segments);
+    waterContactSystem.update(dt);
+    waterInteractionVfx.update(dt);
     musicPlayer?.updateListenerPosition(player.position);
     terminalLandmark.update(dt, player.position);
     lagoonUnderwaterEffect.update(dt);

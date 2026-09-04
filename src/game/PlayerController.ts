@@ -13,6 +13,11 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { TerrainHandle } from "./Terrain";
 import type { Segments } from "./Segments";
+import {
+  getWaterLevelAt,
+  type WaterSurfaceInfo,
+  type WaterSurfaceRegistry,
+} from "./WaterSurface";
 
 type Settings = {
   eyeHeight: number;
@@ -30,6 +35,7 @@ export type LookRay = {
   proximityRadius?: number;
 };
 export type CharacterId = "lautaro" | "sofia";
+export type PlayerWaterLocomotionState = "grounded" | "treadingWater" | "swimming";
 type AnimationKey =
   | "idle"
   | "jump"
@@ -40,8 +46,12 @@ type AnimationKey =
   | "strafeRightRun"
   | "strafeRightWalk"
   | "run"
+  | "standingUp"
   | "walkBackward"
-  | "walk";
+  | "walk"
+  | "throwObject"
+  | "treadingWater"
+  | "swimming";
 
 const CHARACTER_ROOT_URL = "/assets/models/character/";
 const CHARACTER_FILES: Record<CharacterId, string> = {
@@ -63,9 +73,14 @@ const CHARACTER_ANIMATIONS: Record<AnimationKey, string> = {
   strafeRightRun: "Right_Strafe_Run_InPlace",
   strafeRightWalk: "Right_Strafe_Walk_InPlace",
   run: "Run_InPlace",
+  standingUp: "Standing Up",
   walkBackward: "Walk_Backwards_InPlace",
   walk: "Walk_InPlace",
+  throwObject: "Throw Object",
+  treadingWater: "Treading Water",
+  swimming: "Swimming",
 };
+const REGISTERED_CHARACTER_ANIMATIONS = new Set(Object.values(CHARACTER_ANIMATIONS));
 const CHARACTER_YAW_OFFSET = 0;
 const CHARACTER_FOOT_CLEARANCE = 0.03;
 const THIRD_PERSON_CAMERA_DISTANCE = 5.2;
@@ -80,6 +95,8 @@ const PATH_SURFACE_OFFSET = 0.1;
 const MAX_SIMULATION_DELTA_SECONDS = 0.05;
 const ANIMATION_BLEND_TIME = 0.16;
 const ACTION_BLEND_TIME = 0.08;
+const STANDING_UP_BLEND_TIME = 0.18;
+const THROW_ACTION_MOVEMENT_LOCK_SECONDS = 1.15;
 const PICKUP_ACTION_SPEED_RATIO = 1.35;
 const DOOR_OPEN_MOVEMENT_LOCK_SECONDS = 1.7;
 const THIRD_PERSON_FLASHLIGHT_PITCH_MIN = -0.58;
@@ -96,6 +113,37 @@ const ISOMETRIC_INTERACTION_HEIGHT = 0.65;
 const ISOMETRIC_INTERACTION_RADIUS = 2.15;
 const ISOMETRIC_MOUSE_AIM_SPEED = 44;
 const ISOMETRIC_AIM_DEADZONE = 0.08;
+const TREADING_WATER_ENTER_DEPTH = 1.34;
+const TREADING_WATER_EXIT_DEPTH = 1.18;
+// The treading clip keeps its animated torso higher than the locomotion root.
+// Submerge the root enough for the authored shoulder line to meet the surface.
+const TREADING_WATER_BODY_DEPTH = 2.08;
+const TREADING_WATER_SPEED = 1.45;
+const SWIMMING_SPEED = 3.15;
+const SWIMMING_SURFACE_CEILING = 0.1;
+const SWIMMING_SURFACE_TOGGLE_RANGE = 0.3;
+const SWIMMING_SURFACE_ENTRY_SECONDS = 0.5;
+const SWIMMING_IDLE_BUOYANCY_SPEED = 0.08;
+// The animated swimming bounds extend roughly one metre below and more than a
+// metre along the root. These margins protect the actual pose, not only its pivot.
+const SWIMMING_BOTTOM_BODY_CLEARANCE = 1.4;
+const SWIMMING_BODY_HALF_LENGTH = 1.3;
+const SWIMMING_BODY_HALF_WIDTH = 0.65;
+const WATER_VERTICAL_SETTLE_SPEED = 3.2;
+const SHALLOW_WATER_TREADING_TRANSITION_SECONDS = 0.28;
+// A camera above WaterMaterial sees mostly its reflection. While diving, keep
+// the camera on the underwater side of the surface and blend the move so the
+// transition does not pop.
+const SWIMMING_CAMERA_DEPTH = 0.58;
+const SWIMMING_CAMERA_BLEND_SPEED = 4.5;
+const CAMERA_TERRAIN_CLEARANCE = 0.24;
+const CAMERA_TERRAIN_SAMPLE_SPACING = 0.45;
+const CAMERA_TERRAIN_MAX_SAMPLES = 24;
+const SOFIA_MATERIAL_ROUGHNESS = 0.92;
+const SOFIA_SPECULAR_INTENSITY = 0.24;
+const SOFIA_ENVIRONMENT_INTENSITY = 0.14;
+const SOFIA_DIELECTRIC_F0_FACTOR = 0.65;
+const charactersWithPlayedOpeningAnimation = new Set<CharacterId>();
 
 export function getNextPrimaryViewMode(mode: ViewMode): ViewMode {
   const index = PRIMARY_VIEW_MODE_SEQUENCE.indexOf(mode);
@@ -115,6 +163,7 @@ export class PlayerController {
   private mobileMoveY = 0;
   private mobileRun = false;
   private jumpQueued = false;
+  private waterActionQueued = false;
   private pitch = 0;
   private yaw = 0;
   private isometricAimX = 0;
@@ -132,6 +181,15 @@ export class PlayerController {
   private actionPlaying = false;
   private movementLockTimer = 0;
   private sfxMovementState: "idle" | "walk" | "run" = "idle";
+  private waterSurfaces: WaterSurfaceRegistry | null = null;
+  private activeWaterSurface: WaterSurfaceInfo | null = null;
+  private waterLevel = Number.NEGATIVE_INFINITY;
+  private waterDepthAtGround = 0;
+  private diving = false;
+  private swimmingSurfaceEntryTimer = 0;
+  private swimmingCameraBlend = 0;
+  private shallowWaterTransitionTimer = 0;
+  private waterLocomotionStateValue: PlayerWaterLocomotionState = "grounded";
 
   constructor(
     private scene: Scene,
@@ -181,6 +239,10 @@ export class PlayerController {
       if (kb.type === KeyboardEventTypes.KEYDOWN) {
         const event = kb.event as KeyboardEvent;
         if (event.code === "KeyV" && !event.repeat) this.toggleViewMode();
+        if (event.code === "Space" && !event.repeat) {
+          this.jumpQueued = true;
+          this.waterActionQueued = true;
+        }
         this.keys.add(kb.event.code);
       }
       if (kb.type === KeyboardEventTypes.KEYUP) this.keys.delete(kb.event.code);
@@ -195,12 +257,35 @@ export class PlayerController {
     return this.root.position;
   }
 
+  /** Writes the character's ground/feet contact point without allocating. */
+  getGroundContactPositionToRef(result: Vector3) {
+    result.copyFrom(this.root.position);
+    result.y -= this.settings.eyeHeight;
+    return result;
+  }
+
   get currentViewMode() {
     return this.viewMode;
   }
 
+  get waterLocomotionState() {
+    return this.waterLocomotionStateValue;
+  }
+
+  get currentAnimationName() {
+    return this.currentAnimation;
+  }
+
+  setWaterSurfaceRegistry(registry: WaterSurfaceRegistry) {
+    this.waterSurfaces = registry;
+  }
+
   getAvatarMeshes(): readonly AbstractMesh[] {
     return this.avatarMeshes;
+  }
+
+  getRegisteredAnimationNames() {
+    return [...this.animations.keys()];
   }
 
   onViewModeChange(listener: (mode: ViewMode) => void) {
@@ -251,22 +336,41 @@ export class PlayerController {
     this.animations.clear();
     for (const group of res.animationGroups) {
       group.stop();
+      if (!REGISTERED_CHARACTER_ANIMATIONS.has(group.name)) continue;
       this.animations.set(group.name, group);
     }
 
     this.normalizeAvatar();
     this.setAvatarVisible(this.viewMode !== "first");
-    this.playAnimation("idle", true);
+    if (
+      !charactersWithPlayedOpeningAnimation.has(this.character) &&
+      this.animations.has(CHARACTER_ANIMATIONS.standingUp)
+    ) {
+      charactersWithPlayedOpeningAnimation.add(this.character);
+      this.playAction("standingUp", 1, STANDING_UP_BLEND_TIME);
+    } else {
+      this.playAnimation("idle", true);
+    }
   }
 
-  playInteractionAction(type?: string, movementLockSeconds = DOOR_OPEN_MOVEMENT_LOCK_SECONDS) {
+  playInteractionAction(type?: string, movementLockSeconds?: number) {
     if (type === "door") {
-      this.lockMovement(movementLockSeconds);
+      this.lockMovement(movementLockSeconds ?? DOOR_OPEN_MOVEMENT_LOCK_SECONDS);
       this.playAction("openDoor");
       return;
     }
 
+    if (type === "throw" || type === "throwObject") {
+      this.playThrowObject(movementLockSeconds ?? THROW_ACTION_MOVEMENT_LOCK_SECONDS);
+      return;
+    }
+
     this.playAction("pickUpItem", PICKUP_ACTION_SPEED_RATIO);
+  }
+
+  playThrowObject(movementLockSeconds = THROW_ACTION_MOVEMENT_LOCK_SECONDS) {
+    this.lockMovement(movementLockSeconds);
+    this.playAction("throwObject");
   }
 
   private lockMovement(seconds: number) {
@@ -354,6 +458,7 @@ export class PlayerController {
   }
 
   setMobileRun(running: boolean) {
+    if (running && !this.mobileRun) this.waterActionQueued = true;
     this.mobileRun = running;
   }
 
@@ -448,13 +553,26 @@ export class PlayerController {
     if (this.movementLockTimer > 0) {
       this.movementLockTimer = Math.max(0, this.movementLockTimer - dt);
     }
+    if (this.shallowWaterTransitionTimer > 0) {
+      this.shallowWaterTransitionTimer = Math.max(
+        0,
+        this.shallowWaterTransitionTimer - dt
+      );
+    }
+
+    this.refreshWaterEnvironment(terrain);
+    this.refreshWaterLocomotionState();
+    const movementLocked = this.movementLockTimer > 0 || this.actionPlaying;
+    this.consumeWaterAction(movementLocked);
+    this.updateSwimmingCameraBlend(dt);
 
     const active = this.mobileEnabled || document.pointerLockElement === this.canvas;
     if (!active) {
-      if (!this.actionPlaying) this.playAnimation("idle", true);
+      if (!this.actionPlaying) this.resumeIdleOrWaterAnimation();
+      this.jumpQueued = false;
       this.updateMovementSfx("idle");
       this.updateAnimationFade(dt);
-      this.updateThirdPersonCameraCollision(segments);
+      this.updateThirdPersonCameraCollision(segments, terrain);
       return;
     }
 
@@ -465,6 +583,12 @@ export class PlayerController {
 
     const right = Vector3.Cross(Vector3.Up(), forward);
     if (right.lengthSquared() > 0) right.normalize();
+    const movementForward =
+      this.waterLocomotionStateValue === "swimming" && this.viewMode !== "iso"
+        ? forward
+            .scale(Math.cos(this.pitch))
+            .add(Vector3.Up().scale(-Math.sin(this.pitch)))
+        : forward;
 
     const move = new Vector3(0, 0, 0);
     let moveX = 0;
@@ -481,7 +605,7 @@ export class PlayerController {
 
     moveX = Math.max(-1, Math.min(1, moveX));
     moveY = Math.max(-1, Math.min(1, moveY));
-    move.addInPlace(forward.scale(moveY));
+    move.addInPlace(movementForward.scale(moveY));
     move.addInPlace(right.scale(moveX));
 
     const mobileInputStrength = Math.min(1, Math.hypot(this.mobileMoveX, this.mobileMoveY));
@@ -494,9 +618,15 @@ export class PlayerController {
     }
 
     const running = this.mobileRun || this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
-    const speed = running ? this.settings.runSpeed : this.settings.walkSpeed;
+    const speed =
+      this.waterLocomotionStateValue === "swimming"
+        ? SWIMMING_SPEED
+        : this.waterLocomotionStateValue === "treadingWater"
+          ? TREADING_WATER_SPEED
+          : running
+            ? this.settings.runSpeed
+            : this.settings.walkSpeed;
 
-    const movementLocked = this.movementLockTimer > 0 || this.actionPlaying;
     if (movementLocked) {
       moveX = 0;
       moveY = 0;
@@ -521,38 +651,222 @@ export class PlayerController {
     if (this.root.position.x > maxX - margin) this.root.position.x = maxX - margin;
     if (this.root.position.x < -maxX + margin) this.root.position.x = -maxX + margin;
 
+    this.refreshWaterEnvironment(terrain);
+    this.refreshWaterLocomotionState();
     const groundY = this.getWalkableSurfaceHeight(terrain);
     const targetY = groundY + this.settings.eyeHeight;
 
-    if (this.root.position.y <= targetY + 0.02) {
-      this.root.position.y = targetY;
-      this.velY = 0;
-      this.grounded = true;
+    if (this.waterLocomotionStateValue === "swimming" && this.activeWaterSurface) {
+      this.updateSwimmingVerticalMotion(
+        dt,
+        move.y,
+        this.getSwimmingFloorHeight(terrain)
+      );
+      this.jumpQueued = false;
+    } else if (
+      this.waterLocomotionStateValue === "treadingWater" &&
+      this.activeWaterSurface
+    ) {
+      this.updateTreadingWaterVerticalMotion(dt, groundY);
+      this.jumpQueued = false;
     } else {
-      this.grounded = false;
-    }
+      if (this.root.position.y <= targetY + 0.02) {
+        this.root.position.y = targetY;
+        this.velY = 0;
+        this.grounded = true;
+      } else {
+        this.grounded = false;
+      }
 
-    if (!movementLocked && (this.keys.has("Space") || this.jumpQueued) && this.grounded) {
-      this.velY = this.settings.jumpSpeed;
-      this.grounded = false;
-      this.playSfx("jump");
+      if (!movementLocked && this.jumpQueued && this.grounded) {
+        this.velY = this.settings.jumpSpeed;
+        this.grounded = false;
+        this.playSfx("jump");
+      }
+
+      this.velY += this.settings.gravity * dt;
+      this.root.position.y += this.velY * dt;
+
+      if (this.root.position.y < targetY) {
+        this.root.position.y = targetY;
+        this.velY = 0;
+        this.grounded = true;
+      }
     }
     this.jumpQueued = false;
 
-    this.velY += this.settings.gravity * dt;
-    this.root.position.y += this.velY * dt;
-
-    if (this.root.position.y < targetY) {
-      this.root.position.y = targetY;
-      this.velY = 0;
-      this.grounded = true;
-    }
-
-    this.updateThirdPersonCameraCollision(segments);
+    this.updateThirdPersonCameraCollision(segments, terrain);
     this.updateAvatarAnimation(moveX, moveY, running);
     const moving = Math.abs(moveX) > 0.12 || Math.abs(moveY) > 0.12;
-    this.updateMovementSfx(moving && this.grounded ? (running ? "run" : "walk") : "idle");
+    this.updateMovementSfx(
+      moving && this.grounded && this.waterLocomotionStateValue === "grounded"
+        ? running
+          ? "run"
+          : "walk"
+        : "idle"
+    );
     this.updateAnimationFade(dt);
+  }
+
+  private refreshWaterEnvironment(terrain: TerrainHandle) {
+    this.activeWaterSurface = this.waterSurfaces?.getWaterSurfaceAt(this.root.position) ?? null;
+    if (!this.activeWaterSurface) {
+      this.waterLevel = Number.NEGATIVE_INFINITY;
+      this.waterDepthAtGround = 0;
+      return;
+    }
+
+    this.waterLevel = getWaterLevelAt(this.activeWaterSurface, this.root.position);
+    const groundY = this.getWalkableSurfaceHeight(terrain);
+    this.waterDepthAtGround = Math.max(0, this.waterLevel - groundY);
+  }
+
+  private refreshWaterLocomotionState() {
+    if (!this.activeWaterSurface) {
+      this.diving = false;
+      this.swimmingSurfaceEntryTimer = 0;
+      this.shallowWaterTransitionTimer = 0;
+      this.waterLocomotionStateValue = "grounded";
+      return;
+    }
+
+    if (this.diving) {
+      if (this.waterDepthAtGround <= TREADING_WATER_EXIT_DEPTH) {
+        this.diving = false;
+        this.swimmingSurfaceEntryTimer = 0;
+        this.shallowWaterTransitionTimer = Math.max(
+          this.shallowWaterTransitionTimer,
+          SHALLOW_WATER_TREADING_TRANSITION_SECONDS
+        );
+      } else {
+        this.waterLocomotionStateValue = "swimming";
+        return;
+      }
+    }
+
+    if (this.shallowWaterTransitionTimer > 0) {
+      this.waterLocomotionStateValue = "treadingWater";
+      return;
+    }
+
+    const feetAtOrBelowSurface =
+      this.root.position.y - this.settings.eyeHeight <= this.waterLevel + 0.08;
+    const depthThreshold =
+      this.waterLocomotionStateValue === "treadingWater"
+        ? TREADING_WATER_EXIT_DEPTH
+        : TREADING_WATER_ENTER_DEPTH;
+    this.waterLocomotionStateValue =
+      feetAtOrBelowSurface && this.waterDepthAtGround >= depthThreshold
+        ? "treadingWater"
+        : "grounded";
+  }
+
+  private consumeWaterAction(movementLocked: boolean) {
+    if (!this.waterActionQueued) return;
+    this.waterActionQueued = false;
+    if (movementLocked || !this.activeWaterSurface) return;
+
+    if (
+      this.waterLocomotionStateValue === "treadingWater" &&
+      this.waterDepthAtGround >= TREADING_WATER_ENTER_DEPTH
+    ) {
+      this.diving = true;
+      this.swimmingSurfaceEntryTimer = SWIMMING_SURFACE_ENTRY_SECONDS;
+      this.shallowWaterTransitionTimer = 0;
+      this.waterLocomotionStateValue = "swimming";
+      this.velY = 0;
+      this.jumpQueued = false;
+      return;
+    }
+
+    if (this.waterLocomotionStateValue === "swimming") {
+      if (this.root.position.y >= this.waterLevel - SWIMMING_SURFACE_TOGGLE_RANGE) {
+        this.diving = false;
+        this.swimmingSurfaceEntryTimer = 0;
+        this.shallowWaterTransitionTimer = SHALLOW_WATER_TREADING_TRANSITION_SECONDS;
+        this.waterLocomotionStateValue = "treadingWater";
+      }
+      this.jumpQueued = false;
+    }
+  }
+
+  private updateSwimmingVerticalMotion(
+    dt: number,
+    inputVerticalMovement: number,
+    groundY: number
+  ) {
+    const maximumRootY = this.waterLevel - SWIMMING_SURFACE_CEILING;
+    if (this.swimmingSurfaceEntryTimer > 0) {
+      this.swimmingSurfaceEntryTimer = Math.max(0, this.swimmingSurfaceEntryTimer - dt);
+      const distance = maximumRootY - this.root.position.y;
+      const step = WATER_VERTICAL_SETTLE_SPEED * dt;
+      this.root.position.y += Math.max(-step, Math.min(step, distance));
+    } else {
+      let verticalMovement = inputVerticalMovement;
+      if (Math.abs(verticalMovement) < 0.0001) {
+        verticalMovement += SWIMMING_IDLE_BUOYANCY_SPEED * dt;
+      }
+      this.root.position.y += verticalMovement;
+    }
+
+    this.root.position.y = Math.min(this.root.position.y, maximumRootY);
+    this.root.position.y = Math.max(
+      this.root.position.y,
+      groundY + SWIMMING_BOTTOM_BODY_CLEARANCE
+    );
+    this.velY = 0;
+    this.grounded = false;
+  }
+
+  private updateTreadingWaterVerticalMotion(dt: number, groundY: number) {
+    const standingRootY = groundY + this.settings.eyeHeight;
+    const floatingRootY =
+      this.waterLevel + this.settings.eyeHeight - TREADING_WATER_BODY_DEPTH;
+    const targetRootY = Math.max(standingRootY, floatingRootY);
+    const distance = targetRootY - this.root.position.y;
+    const step = WATER_VERTICAL_SETTLE_SPEED * dt;
+    this.root.position.y += Math.max(-step, Math.min(step, distance));
+    this.velY = 0;
+    this.grounded = false;
+  }
+
+  private getSwimmingFloorHeight(terrain: TerrainHandle) {
+    const forwardX = Math.sin(this.yaw);
+    const forwardZ = Math.cos(this.yaw);
+    const rightX = forwardZ;
+    const rightZ = -forwardX;
+    const x = this.root.position.x;
+    const z = this.root.position.z;
+
+    return Math.max(
+      terrain.getHeightAt(x, z),
+      terrain.getHeightAt(
+        x + forwardX * SWIMMING_BODY_HALF_LENGTH,
+        z + forwardZ * SWIMMING_BODY_HALF_LENGTH
+      ),
+      terrain.getHeightAt(
+        x - forwardX * SWIMMING_BODY_HALF_LENGTH,
+        z - forwardZ * SWIMMING_BODY_HALF_LENGTH
+      ),
+      terrain.getHeightAt(
+        x + rightX * SWIMMING_BODY_HALF_WIDTH,
+        z + rightZ * SWIMMING_BODY_HALF_WIDTH
+      ),
+      terrain.getHeightAt(
+        x - rightX * SWIMMING_BODY_HALF_WIDTH,
+        z - rightZ * SWIMMING_BODY_HALF_WIDTH
+      )
+    );
+  }
+
+  private updateSwimmingCameraBlend(dt: number) {
+    const target = this.waterLocomotionStateValue === "swimming" ? 1 : 0;
+    const step = SWIMMING_CAMERA_BLEND_SPEED * dt;
+    if (this.swimmingCameraBlend < target) {
+      this.swimmingCameraBlend = Math.min(target, this.swimmingCameraBlend + step);
+    } else if (this.swimmingCameraBlend > target) {
+      this.swimmingCameraBlend = Math.max(target, this.swimmingCameraBlend - step);
+    }
   }
 
   private playSfx(name: "jump" | "walk" | "run") {
@@ -573,20 +887,113 @@ export class PlayerController {
     if (state !== "idle") this.playSfx(state);
   }
 
-  private updateThirdPersonCameraCollision(segments: Segments) {
-    if (this.viewMode === "first") return;
-
+  private updateThirdPersonCameraCollision(segments: Segments, terrain: TerrainHandle) {
     this.configureCameraProjection();
+    if (this.viewMode === "first") {
+      this.positionFirstPersonCamera();
+      this.applySwimmingCameraDepth();
+      this.keepFirstPersonCameraAboveTerrain(terrain);
+      return;
+    }
+
     const target = this.getCameraTargetLocal();
     this.positionCameraForView();
+    this.applySwimmingCameraDepth();
     this.root.computeWorldMatrix(true);
     this.camera.computeWorldMatrix();
     const origin = Vector3.TransformCoordinates(target, this.root.getWorldMatrix());
     const desired = this.camera.globalPosition.clone();
-    const adjusted = segments.resolveCameraPosition(origin, desired);
+    const blockerAdjusted = segments.resolveCameraPosition(origin, desired);
+    const adjusted = this.resolveCameraTerrainPosition(origin, blockerAdjusted, terrain);
     const inverse = this.root.getWorldMatrix().clone().invert();
     this.camera.position.copyFrom(Vector3.TransformCoordinates(adjusted, inverse));
     this.lookAtLocal(target);
+  }
+
+  private positionFirstPersonCamera() {
+    this.camera.position.set(0, this.settings.eyeHeight * (FIRST_PERSON_CAMERA_HEIGHT_MULTIPLIER - 1), 0);
+    this.camera.rotation.x = this.pitch;
+    this.camera.rotation.y = 0;
+    this.camera.rotation.z = 0;
+  }
+
+  private applySwimmingCameraDepth() {
+    if (!this.activeWaterSurface || this.swimmingCameraBlend <= 0) return;
+
+    // The controller only rotates around Y, therefore local and world vertical
+    // deltas are identical. Constrain all camera modes below the WaterMaterial
+    // while preserving their authored horizontal framing.
+    const currentWorldY = this.root.position.y + this.camera.position.y;
+    const underwaterWorldY = Math.min(currentWorldY, this.waterLevel - SWIMMING_CAMERA_DEPTH);
+    this.camera.position.y +=
+      (underwaterWorldY - currentWorldY) * this.swimmingCameraBlend;
+  }
+
+  private keepFirstPersonCameraAboveTerrain(terrain: TerrainHandle) {
+    this.root.computeWorldMatrix(true);
+    this.camera.computeWorldMatrix();
+    const cameraWorld = this.camera.globalPosition;
+    const minimumWorldY =
+      terrain.getHeightAt(cameraWorld.x, cameraWorld.z) + CAMERA_TERRAIN_CLEARANCE;
+    if (cameraWorld.y < minimumWorldY) {
+      this.camera.position.y += minimumWorldY - cameraWorld.y;
+    }
+  }
+
+  private resolveCameraTerrainPosition(
+    origin: Vector3,
+    desired: Vector3,
+    terrain: TerrainHandle
+  ) {
+    const dx = desired.x - origin.x;
+    const dy = desired.y - origin.y;
+    const dz = desired.z - origin.z;
+    const distance = Math.hypot(dx, dy, dz);
+    if (distance <= 0.001) return desired.clone();
+
+    const sampleCount = Math.max(
+      4,
+      Math.min(
+        CAMERA_TERRAIN_MAX_SAMPLES,
+        Math.ceil(distance / CAMERA_TERRAIN_SAMPLE_SPACING)
+      )
+    );
+    let previousSafeT = 0;
+
+    for (let index = 1; index <= sampleCount; index++) {
+      const t = index / sampleCount;
+      const x = origin.x + dx * t;
+      const y = origin.y + dy * t;
+      const z = origin.z + dz * t;
+      const minimumY = terrain.getHeightAt(x, z) + CAMERA_TERRAIN_CLEARANCE;
+      if (y >= minimumY) {
+        previousSafeT = t;
+        continue;
+      }
+
+      // Refine the last safe interval so the camera stops close to the bank
+      // instead of visibly stepping between coarse terrain samples.
+      let low = previousSafeT;
+      let high = t;
+      for (let iteration = 0; iteration < 5; iteration++) {
+        const middle = (low + high) * 0.5;
+        const middleX = origin.x + dx * middle;
+        const middleY = origin.y + dy * middle;
+        const middleZ = origin.z + dz * middle;
+        const middleMinimumY =
+          terrain.getHeightAt(middleX, middleZ) + CAMERA_TERRAIN_CLEARANCE;
+        if (middleY >= middleMinimumY) low = middle;
+        else high = middle;
+      }
+
+      return new Vector3(
+        origin.x + dx * low,
+        origin.y + dy * low,
+        origin.z + dz * low
+      );
+    }
+
+    return desired.clone();
   }
 
   private configureCameraProjection() {
@@ -761,9 +1168,20 @@ export class PlayerController {
         mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
         mat.useAlphaFromAlbedoTexture = false;
         if (this.character === "sofia") {
+          // Sofia's GLB exports a metallic-only image in the combined
+          // metallic/roughness slot and its roughness image as KHR specular.
+          // Used as-is, the almost-black green channel makes the whole avatar
+          // glossy. Prefer a stable dielectric response while retaining the
+          // authored albedo and normal detail.
+          mat.metallicTexture = null;
+          mat.metallicReflectanceTexture = null;
+          mat.reflectanceTexture = null;
+          mat.microSurfaceTexture = null;
           mat.metallic = 0;
-          mat.roughness = Math.max(mat.roughness ?? 0.8, 0.8);
-          mat.environmentIntensity = Math.min(mat.environmentIntensity ?? 0.2, 0.2);
+          mat.roughness = SOFIA_MATERIAL_ROUGHNESS;
+          mat.specularIntensity = SOFIA_SPECULAR_INTENSITY;
+          mat.environmentIntensity = SOFIA_ENVIRONMENT_INTENSITY;
+          mat.metallicF0Factor = SOFIA_DIELECTRIC_F0_FACTOR;
         } else {
           mat.metallic = Math.min(mat.metallic ?? 0, 0.15);
           mat.roughness = Math.max(mat.roughness ?? 0.65, 0.55);
@@ -802,6 +1220,16 @@ export class PlayerController {
   private updateAvatarAnimation(moveX: number, moveY: number, running: boolean) {
     if (!this.animations.size || this.actionPlaying) return;
 
+    if (this.waterLocomotionStateValue === "swimming") {
+      this.playAnimation("swimming", true);
+      return;
+    }
+
+    if (this.waterLocomotionStateValue === "treadingWater") {
+      this.playAnimation("treadingWater", true);
+      return;
+    }
+
     if (!this.grounded) {
       this.playAnimation("jump", false);
       return;
@@ -833,11 +1261,15 @@ export class PlayerController {
     this.playAnimation("idle", true);
   }
 
-  private playAction(name: AnimationKey, speedRatio = 1) {
+  private playAction(
+    name: AnimationKey,
+    speedRatio = 1,
+    blendTime = ACTION_BLEND_TIME
+  ) {
     if (!this.animations.has(CHARACTER_ANIMATIONS[name])) return;
 
     this.actionPlaying = true;
-    const group = this.playAnimation(name, false, ACTION_BLEND_TIME, speedRatio);
+    const group = this.playAnimation(name, false, blendTime, speedRatio);
     if (!group) {
       this.actionPlaying = false;
       return;
@@ -847,8 +1279,16 @@ export class PlayerController {
       if (this.currentAnimation !== group.name) return;
       this.actionPlaying = false;
       this.currentAnimation = null;
-      this.updateAvatarAnimation(0, 0, false);
+      this.resumeIdleOrWaterAnimation();
     });
+  }
+
+  private resumeIdleOrWaterAnimation() {
+    if (this.waterLocomotionStateValue === "grounded") {
+      this.playAnimation("idle", true);
+      return;
+    }
+    this.updateAvatarAnimation(0, 0, false);
   }
 
   private playAnimation(

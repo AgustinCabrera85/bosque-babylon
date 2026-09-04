@@ -4,15 +4,16 @@ import { Effect } from "@babylonjs/core/Materials/effect";
 import { PostProcess } from "@babylonjs/core/PostProcesses/postProcess";
 import { Scene } from "@babylonjs/core/scene";
 import type { TerminalLagoonVisualConfig } from "./TerminalLagoonVisualConfig";
+import {
+  getWaterLevelAt,
+  isPointInsideWaterSurface,
+  type WaterSurfaceInfo,
+} from "./WaterSurface";
 
 export type LagoonImmersionState = "above" | "crossing" | "underwater";
 
 export type LagoonUnderwaterEffectOptions = {
-  waterLevel: number;
-  centerX: number;
-  centerZ: number;
-  radiusX: number;
-  radiusZ: number;
+  surface: WaterSurfaceInfo;
   tuning: TerminalLagoonVisualConfig["underwater"];
   getBaseFogDensity: () => number;
 };
@@ -149,11 +150,9 @@ export function createLagoonUnderwaterEffect(
       // matrix once so globalPosition reflects that parent in this same frame.
       camera.getViewMatrix(true);
       const cameraPosition = camera.globalPosition;
-      const normalizedX = (cameraPosition.x - options.centerX) / options.radiusX;
-      const normalizedZ = (cameraPosition.z - options.centerZ) / options.radiusZ;
-      const insideLagoon = normalizedX * normalizedX + normalizedZ * normalizedZ <= 1.08;
+      const insideLagoon = isPointInsideWaterSurface(options.surface, cameraPosition, 0.08);
       const band = Math.max(0.05, tuning.transitionBandThickness);
-      const depth = options.waterLevel - cameraPosition.y;
+      const depth = getWaterLevelAt(options.surface, cameraPosition) - cameraPosition.y;
 
       if (!insideLagoon || depth < -band) {
         state = "above";

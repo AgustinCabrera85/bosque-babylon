@@ -77,6 +77,7 @@ const PATH_HALF_WIDTH = 4.5;
 const PATH_START_Z = -800;
 const PATH_END_Z = 70 * 8 - 8;
 const PATH_SURFACE_OFFSET = 0.1;
+const MAX_SIMULATION_DELTA_SECONDS = 0.05;
 const ANIMATION_BLEND_TIME = 0.16;
 const ACTION_BLEND_TIME = 0.08;
 const PICKUP_ACTION_SPEED_RATIO = 1.35;
@@ -440,6 +441,10 @@ export class PlayerController {
   }
 
   update(dt: number, terrain: TerrainHandle, segments: Segments) {
+    // Streaming and shader compilation can occasionally stall a frame. Never
+    // convert that wall-clock pause into several metres of player movement.
+    dt = Math.max(0, Math.min(dt, MAX_SIMULATION_DELTA_SECONDS));
+
     if (this.movementLockTimer > 0) {
       this.movementLockTimer = Math.max(0, this.movementLockTimer - dt);
     }

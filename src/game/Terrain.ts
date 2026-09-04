@@ -213,9 +213,12 @@ export function createTerrain(
     const y01 = heights[i01];
     const y11 = heights[i11];
 
-    const y0 = y00 * (1 - tx) + y10 * tx;
-    const y1 = y01 * (1 - tx) + y11 * tx;
-    return y0 * (1 - tz) + y1 * tz;
+    // Match the two triangles emitted for each terrain cell. Bilinear sampling
+    // can differ visibly from the rendered plane on the steep lagoon banks.
+    if (tx + tz <= 1) {
+      return y00 + (y10 - y00) * tx + (y01 - y00) * tz;
+    }
+    return y11 + (y01 - y11) * (1 - tx) + (y10 - y11) * (1 - tz);
   }
 
   return {

@@ -93,6 +93,14 @@ export type TerminalLandmarkRenderOptions = {
   waterRenderTargetSize?: number;
   environmentReflectionMeshes?: readonly AbstractMesh[];
   visualConfig?: TerminalLagoonVisualConfig;
+  instantiateCandleAsset?: (
+    name: string,
+    scale: Vector3
+  ) => {
+    root: TransformNode;
+    baseOffsetY: number;
+    topOffsetY: number;
+  } | null;
 };
 
 export function createTerminalLandmarkConfig(
@@ -275,7 +283,10 @@ export class TerminalLandmarkGenerator {
     lagoon.material = lagoonWaterMaterial;
 
     const underwaterLight = this.createUnderwaterLight(root, config);
-    const waterfallImpactLight = this.createWaterfallImpactLight(root, config);
+    const waterfallImpactLight = this.createWaterfallImpactLight(
+      root,
+      waterfallMetrics.impactPoint
+    );
     this.limitLagoonLights(
       underwaterLight,
       waterfallImpactLight,
@@ -549,14 +560,10 @@ export class TerminalLandmarkGenerator {
     return light;
   }
 
-  private createWaterfallImpactLight(root: TransformNode, config: TerminalLandmarkConfig) {
+  private createWaterfallImpactLight(root: TransformNode, impactPoint: Vector3) {
     const light = new PointLight(
       "lagoonWaterfallImpactLight",
-      new Vector3(
-        config.lagoonCenterX,
-        config.waterLevel + 0.65,
-        config.waterfallZ - 2.1
-      ),
+      impactPoint.add(new Vector3(0, 0.57, 0)),
       this.scene
     );
     light.diffuse = new Color3(0.13, 0.34, 0.35);
@@ -598,6 +605,18 @@ export class TerminalLandmarkGenerator {
     );
     const bottom = config.waterLevel + 0.25;
     const height = cliffTop - bottom;
+    // The lagoon outline and terrain basin share this exact procedural edge.
+    // Keep the whole waterfall footprint safely inside it, including the wide
+    // outer columns, instead of assuming waterfallZ is still over water.
+    const phase = (config.seed % 997) * 0.017;
+    const rearIrregularity = 1 + Math.cos(Math.PI * 2 - phase) * 0.055;
+    const rearWaterEdgeZ =
+      config.lagoonCenterZ + config.lagoonRadiusZ * rearIrregularity;
+    const impactInset = Math.max(6, config.waterfallWidth * 0.4);
+    const impactZ = Math.min(
+      config.waterfallZ - 1.25,
+      rearWaterEdgeZ - impactInset
+    );
     return {
       cliffTop,
       bottom,
@@ -605,7 +624,7 @@ export class TerminalLandmarkGenerator {
       impactPoint: new Vector3(
         config.lagoonCenterX,
         config.waterLevel + 0.08,
-        config.waterfallZ - 1.25
+        impactZ
       ),
     };
   }
@@ -703,11 +722,19 @@ export class TerminalLandmarkGenerator {
           lateralDrift +
           horizontal * halfWidth * (1 + broadVariation + detailVariation) * endTaper;
         const y = metrics.bottom + vertical * metrics.height;
+        // A falling sheet accelerates away from the cliff. Its lower edge must
+        // converge on the authored impact point, which is guaranteed to be in
+        // the lagoon, while the upper lip remains attached to the rock wall.
+        const fallingProgress = 1 - vertical;
+        const trajectory = fallingProgress * fallingProgress;
+        const baseZ = lerp(config.waterfallZ, metrics.impactPoint.z, trajectory);
         const z =
-          config.waterfallZ +
-          zOffset -
+          baseZ +
+          zOffset * vertical -
           Math.sin(vertical * Math.PI) * (0.55 + widthScale * 0.18) +
-          Math.sin(vertical * Math.PI * 3.4 + phase) * 0.07;
+          Math.sin(vertical * Math.PI * 3.4 + phase) *
+            Math.sin(vertical * Math.PI) *
+            0.07;
         path.push(new Vector3(x, y, z));
       }
       paths.push(path);
@@ -1052,16 +1079,13 @@ export class TerminalLandmarkGenerator {
   ): CaveCandleDecoration {
     const meshes: AbstractMesh[] = [];
     const lights: PointLight[] = [];
-    const waxMaterial = new StandardMaterial("terminalCaveCandleWaxMaterial", this.scene);
-    waxMaterial.diffuseColor = new Color3(0.62, 0.48, 0.29);
-    waxMaterial.emissiveColor = new Color3(0.018, 0.01, 0.004);
-    waxMaterial.specularColor = new Color3(0.08, 0.055, 0.03);
-    waxMaterial.maxSimultaneousLights = 8;
-
-    const wickMaterial = new StandardMaterial("terminalCaveCandleWickMaterial", this.scene);
-    wickMaterial.diffuseColor = new Color3(0.025, 0.018, 0.012);
-    wickMaterial.specularColor = Color3.Black();
-    wickMaterial.maxSimultaneousLights = 8;
+    const instantiateCandleAsset = this.renderOptions.instantiateCandleAsset;
+    if (!instantiateCandleAsset) {
+      console.warn(
+        "[TerminalLandmark] No candle asset factory was provided; cave candles were omitted."
+      );
+      return { meshes, lights };
+    }
 
     const flameMaterial = createCandleFireMaterial(this.scene);
     flameMaterial.name = "terminalCaveCandleFlameMaterial";
@@ -1069,16 +1093,10 @@ export class TerminalLandmarkGenerator {
     const glowMaterial = createGlowMaterial(this.scene);
     glowMaterial.name = "terminalCaveCandleGlowMaterial";
     glowMaterial.fogEnabled = false;
-    const flameCoreMaterial = new StandardMaterial(
-      "terminalCaveCandleFlameCoreMaterial",
-      this.scene
-    );
-    flameCoreMaterial.diffuseColor = new Color3(1.4, 0.48, 0.035);
-    flameCoreMaterial.emissiveColor = new Color3(4.2, 1.75, 0.18);
-    flameCoreMaterial.specularColor = Color3.Black();
-    flameCoreMaterial.disableLighting = true;
-    flameCoreMaterial.fogEnabled = false;
     const z = config.waterfallZ - 3.6;
+    const candleScale = new Vector3(0.18, 0.085, 0.18);
+    const flameWidth = 0.48;
+    const flameHeight = 0.56;
 
     [-1, 1].forEach((side, index) => {
       const x = config.lagoonCenterX + side * config.waterfallWidth * 0.52;
@@ -1096,65 +1114,36 @@ export class TerminalLandmarkGenerator {
       support.setParent(root);
       this.collectChildMeshes(support, meshes, 48);
 
-      const candleHeight = 1.5 + index * 0.18;
-      const body = MeshBuilder.CreateCylinder(
-        `terminalCaveCandleBody_${index}`,
-        {
-          height: candleHeight,
-          diameterTop: 0.28,
-          diameterBottom: 0.36,
-          tessellation: 18,
-        },
-        this.scene
+      const candle = instantiateCandleAsset(
+        `terminalCaveCandleAsset_${index}`,
+        candleScale
       );
-      body.position.set(x, ledgeY + candleHeight * 0.5, z);
-      body.material = waxMaterial;
-      body.isPickable = false;
-      body.setParent(root);
+      if (!candle) return;
+      candle.root.position.set(x, ledgeY - candle.baseOffsetY - 0.015, z);
+      candle.root.rotation.y = side * 0.22 + (random() - 0.5) * 0.18;
+      candle.root.setParent(root);
+      this.collectChildMeshes(candle.root, meshes, 48);
 
-      const wick = MeshBuilder.CreateCylinder(
-        `terminalCaveCandleWick_${index}`,
-        { height: 0.14, diameter: 0.035, tessellation: 8 },
-        this.scene
-      );
-      const flameY = ledgeY + candleHeight + 0.27;
-      wick.position.set(x, ledgeY + candleHeight + 0.06, z);
-      wick.material = wickMaterial;
-      wick.isPickable = false;
-      wick.setParent(root);
+      const flameY = candle.root.position.y + candle.topOffsetY - 0.115;
 
       const flame = MeshBuilder.CreatePlane(
         `terminalCaveCandleFlame_${index}`,
-        { width: 0.64, height: 1.28 },
+        { width: flameWidth, height: flameHeight },
         this.scene
       );
-      flame.position.set(x, flameY, z - 0.03);
+      flame.position.set(x, flameY + flameHeight * 0.42, z - 0.03);
       flame.material = flameMaterial;
       flame.billboardMode = Mesh.BILLBOARDMODE_ALL;
       flame.isPickable = false;
       flame.alwaysSelectAsActiveMesh = true;
       flame.setParent(root);
 
-      // A small emissive core remains readable at the long approach distance;
-      // the animated transparent plane supplies the softer flame silhouette.
-      const flameCore = MeshBuilder.CreateSphere(
-        `terminalCaveCandleFlameCore_${index}`,
-        { diameter: 0.92, segments: 12 },
-        this.scene
-      );
-      flameCore.position.set(x, flameY - 0.03, z - 0.08);
-      flameCore.scaling.set(0.56, 1.12, 0.42);
-      flameCore.material = flameCoreMaterial;
-      flameCore.isPickable = false;
-      flameCore.alwaysSelectAsActiveMesh = true;
-      flameCore.setParent(root);
-
       const glow = MeshBuilder.CreatePlane(
         `terminalCaveCandleGlow_${index}`,
-        { width: 4.2, height: 4.6 },
+        { width: 2.3, height: 2.6 },
         this.scene
       );
-      glow.position.set(x, flameY, z + 0.02);
+      glow.position.set(x, flameY + flameHeight * 0.4, z + 0.02);
       glow.material = glowMaterial;
       glow.billboardMode = Mesh.BILLBOARDMODE_ALL;
       glow.isPickable = false;
@@ -1163,7 +1152,7 @@ export class TerminalLandmarkGenerator {
 
       const light = new PointLight(
         `terminalCaveCandleLight_${index}`,
-        new Vector3(x, flameY + 0.02, z - 0.18),
+        new Vector3(x, flameY + flameHeight * 0.36, z - 0.18),
         this.scene
       );
       light.diffuse = new Color3(1, 0.48, 0.16);
@@ -1180,7 +1169,7 @@ export class TerminalLandmarkGenerator {
         baseIntensity: light.intensity,
         phase: index * 2.37 + 0.4,
       });
-      meshes.push(body, wick, flame, flameCore, glow);
+      meshes.push(flame, glow);
     });
 
     return { meshes, lights };

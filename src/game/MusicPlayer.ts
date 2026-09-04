@@ -6,6 +6,9 @@ const SFX_VOLUME_KEY = "bosque.sfxVolume";
 const DEFAULT_MUSIC_VOLUME = 0.7;
 const DEFAULT_AMBIENT_VOLUME = 0.85;
 const DEFAULT_SFX_VOLUME = 0.8;
+// The supplied recording peaks around -23.5 dBFS. A dedicated Web Audio gain
+// restores useful headroom without changing the other ambience tracks.
+const WATERFALL_GAIN_COMPENSATION = 4.5;
 
 type VolumeChannel = "music" | "ambient" | "sfx";
 
@@ -85,7 +88,6 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   waterfall.loop = true;
   waterfall.preload = "auto";
   waterfall.volume = 0;
-  waterfall.muted = true;
 
   const walkSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_walking.mp3"));
   const runSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_running.mp3"));
@@ -102,6 +104,8 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   let footstepMode: "idle" | "walk" | "run" = "idle";
   let audioContext: AudioContext | null = null;
   let sfxGain: GainNode | null = null;
+  let waterfallSource: MediaElementAudioSourceNode | null = null;
+  let waterfallGain: GainNode | null = null;
   let waterfallArea: WaterfallAudioArea | null = null;
   let waterfallProximity = 0;
 
@@ -127,6 +131,17 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       sfxGain = audioContext.createGain();
       sfxGain.connect(audioContext.destination);
       sfxGain.gain.value = volumes.sfx;
+
+      waterfallSource = audioContext.createMediaElementSource(waterfall);
+      waterfallGain = audioContext.createGain();
+      waterfallGain.gain.value = 0;
+      waterfallSource.connect(waterfallGain);
+      waterfallGain.connect(audioContext.destination);
+      // Once routed through Web Audio, proximity and the ambient slider are
+      // controlled by waterfallGain rather than HTMLMediaElement.volume.
+      waterfall.volume = 1;
+      waterfall.muted = false;
+      updateWaterfallVolume();
     }
 
     return audioContext;
@@ -162,6 +177,16 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     const requestedVolumeScale = waterfallArea?.volumeScale ?? 0.72;
     const volumeScale = Number.isFinite(requestedVolumeScale) ? requestedVolumeScale : 0.72;
     const volume = clamp01(volumes.ambient * volumeScale * waterfallProximity);
+    if (audioContext && waterfallGain) {
+      waterfallGain.gain.setTargetAtTime(
+        volume * WATERFALL_GAIN_COMPENSATION,
+        audioContext.currentTime,
+        0.08
+      );
+      return;
+    }
+
+    // Safe fallback before the first user gesture creates the AudioContext.
     waterfall.volume = volume;
     waterfall.muted = volume <= 0.001;
   }
@@ -202,38 +227,37 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   }
 
   async function start() {
-    ensureAudioContext();
-    if (audioContext?.state === "suspended") await audioContext.resume();
+    const context = ensureAudioContext();
+    const playbackRequests: Promise<void>[] = [];
+    if (context.state === "suspended") {
+      playbackRequests.push(context.resume());
+    }
 
     if (!started) {
       started = true;
-      try {
-        await music.play();
-      } catch (error) {
+      playbackRequests.push(music.play().catch((error) => {
         started = false;
         console.warn("[MusicPlayer] Music playback was blocked until the next user gesture.", error);
-      }
+      }));
     }
 
     if (!ambientStarted) {
       ambientStarted = true;
-      try {
-        await ambient.play();
-      } catch (error) {
+      playbackRequests.push(ambient.play().catch((error) => {
         ambientStarted = false;
         console.warn("[MusicPlayer] Ambient playback was blocked until the next user gesture.", error);
-      }
+      }));
     }
 
     if (!waterfallStarted) {
       waterfallStarted = true;
-      try {
-        await waterfall.play();
-      } catch (error) {
+      playbackRequests.push(waterfall.play().catch((error) => {
         waterfallStarted = false;
         console.warn("[MusicPlayer] Waterfall playback was blocked until the next user gesture.", error);
-      }
+      }));
     }
+
+    await Promise.all(playbackRequests);
   }
 
   function setVolume(channel: VolumeChannel, volume: number, save = true) {

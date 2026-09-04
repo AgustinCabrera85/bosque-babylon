@@ -40,7 +40,10 @@ import {
   createTerminalLandmarkConfig,
   createTerminalTerrainModifier,
 } from "./TerminalLandmark";
-import { installSceneMaterialLightBudgetGuard } from "../materials";
+import {
+  installSceneMaterialLightBudgetGuard,
+  synchronizeSceneLightPriorities,
+} from "../materials";
 
 
 
@@ -392,8 +395,8 @@ const terrain = createTerrain(scene, {
     scene
   );
 
-  // Use a slightly wider projection and a deliberate yaw so the panorama does
-  // not look magnified or put its brightest feature directly over the path.
+  // Keep the detailed horizon away from the zenith and expose more of the
+  // panorama so stars and mountains retain their natural scale.
   photoDome.fovMultiplier = 1.28;
   photoDome.rotation.y = Math.PI * 0.32;
   photoDome.mesh.infiniteDistance = true;
@@ -664,6 +667,8 @@ scene.onBeforeRenderObservable.add(() => {
       waterRenderTargetSize: quality.name === "mobile" ? 128 : 256,
       environmentReflectionMeshes: [photoDome.mesh],
       visualConfig: TERMINAL_LAGOON_VISUAL_CONFIG,
+      instantiateCandleAsset: (name, scale) =>
+        segments.instantiateCandleAsset(name, scale),
     }
   ).generateWaterfallLagoonEnd(terminalConfig);
   musicPlayer?.configureWaterfallArea({
@@ -731,13 +736,15 @@ scene.onBeforeRenderObservable.add(() => {
   // =========================
   let grassWindTimer = 0;
   scene.onBeforeRenderObservable.add(() => {
-    const dt = engine.getDeltaTime() / 1000;
+    const dt = Math.max(0, Math.min(engine.getDeltaTime() / 1000, 0.05));
+    // Activate cached world content before collision and movement use it.
+    segments.update(player.position);
     player.update(dt, terrain, segments);
     musicPlayer?.updateListenerPosition(player.position);
     terminalLandmark.update(dt, player.position);
     lagoonUnderwaterEffect.update(dt);
     endTorches.update(player.position);
-    segments.update(player.position.z);
+    synchronizeSceneLightPriorities(scene);
     segments.updateIsometricOccluders(player.position, player.currentViewMode === "iso");
     if (quality.grassWindInterval <= 0) {
       grassLibrary.updateWind(dt);

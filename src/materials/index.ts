@@ -4,6 +4,7 @@ export {
   SAFE_MAX_SIMULTANEOUS_LIGHTS,
   enforceSceneMaterialLightBudget,
   installSceneMaterialLightBudgetGuard,
+  synchronizeSceneLightPriorities,
 } from "./LightBudget";
 export {
   GAME_MATERIAL_METADATA_KEY,

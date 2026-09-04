@@ -84,7 +84,7 @@ export type StaticWorldBlocker = {
 
 type SegTreePack = { nodes: TransformNode[]; lod: 0 | 1 | 2 };
 type SegRockPack = { nodes: TransformNode[] };
-type SegCandlePack = { nodes: TransformNode[]; lights: PointLight[] };
+type SegCandlePack = { nodes: TransformNode[] };
 type CandleTemplate = {
   meshes: Mesh[];
   baseOffsetY: number;
@@ -93,8 +93,8 @@ type CandleTemplate = {
 
 type CandleFlameEntry = {
   root: TransformNode;
-  light: PointLight;
   baseIntensity: number;
+  lightRange: number;
   phase: number;
   age: number;
   fadeInSeconds: number;
@@ -103,6 +103,17 @@ type CandleFlameEntry = {
   floorGlow: Mesh;
   sparks: Mesh[];
   flameHeight: number;
+};
+
+type CandleLightPoolEntry = {
+  side: -1 | 1;
+  light: PointLight;
+  targetPosition: Vector3;
+  targetIntensity: number;
+  targetRange: number;
+  currentIntensity: number;
+  currentRange: number;
+  initialized: boolean;
 };
 
 const CANDLES_PER_SIDE = 3;
@@ -116,8 +127,13 @@ const CANDLE_COLLISION_RADIUS = 0.55;
 const CANDLE_FLAME_WIDTH = 0.34;
 const CANDLE_FLAME_HEIGHT = 0.68;
 const SEGMENT_CANDLE_FADE_SECONDS = 0.85;
-const MAX_ACTIVE_CANDLE_LIGHTS = 2;
 const CANDLE_LIGHT_RENDER_PRIORITY = 8;
+const CANDLE_LIGHT_BASE_INTENSITY = 1.35;
+const CANDLE_LIGHT_RANGE = 18;
+const CANDLE_LIGHT_FULL_INFLUENCE_RADIUS = 7;
+const CANDLE_LIGHT_FADE_RADIUS = 28;
+const CANDLE_LIGHT_INTENSITY_RESPONSE = 2.8;
+const CANDLE_LIGHT_POSITION_RESPONSE = 3.6;
 const STREAM_TREE_LOD: 0 | 1 | 2 = 1;
 const PLAYER_WORLD_COLLISION_RADIUS = 1.0;
 const PLAYER_HOUSE_COLLISION_RADIUS = 0.42;
@@ -147,6 +163,11 @@ function clamp(x: number, min: number, max: number) {
   return Math.max(min, Math.min(max, x));
 }
 
+function smoothstep(edge0: number, edge1: number, value: number) {
+  const t = clamp((value - edge0) / Math.max(0.0001, edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
 export class Segments {
   private readonly WORLD_SEED = 1337;
 
@@ -172,6 +193,8 @@ export class Segments {
   private candleGlowMaterial: ReturnType<typeof createGlowMaterial> | null = null;
   private candleFloorGlowMaterial: StandardMaterial | null = null;
   private candleLights: CandleFlameEntry[] = [];
+  private candleLightPool: CandleLightPoolEntry[] = [];
+  private activeObjectSegments = new Set<number>();
   private isometricOccluderRoots = new Set<TransformNode>();
   private isometricOccluderBaseVisibility = new Map<AbstractMesh, number>();
   private candleFlickerRegistered = false;
@@ -236,7 +259,13 @@ export class Segments {
   // =========================
   // UPDATE
   // =========================
-  update(camZ: number): void {
+  update(playerPositionOrZ: Vector3 | number): void {
+    const playerPosition =
+      typeof playerPositionOrZ === "number"
+        ? new Vector3(0, 0, playerPositionOrZ)
+        : playerPositionOrZ;
+    const camZ = playerPosition.z;
+
     if (!this.grassInitialized) {
       this.initGrass();
       this.grassInitialized = true;
@@ -247,14 +276,31 @@ export class Segments {
     }
 
     const segLen = this.cfg.segmentLength;
-    const currentSeg = Math.floor(camZ / segLen);
+    const playerSegment = Math.floor(camZ / segLen);
+    // The terminal landmark extends beyond the last procedural forest segment.
+    // Treat that whole authored area as the final segment so crossing the lagoon
+    // boundary never empties and restores the last forest buffers.
+    const currentSeg =
+      this.cfg.maxGeneratedSegment === undefined
+        ? playerSegment
+        : Math.min(playerSegment, this.cfg.maxGeneratedSegment);
     const segmentChanged = this.lastSegment !== currentSeg;
 
     const grassNeeded = this.segmentRange(currentSeg, this.cfg.behind, this.cfg.ahead);
+    const objectBehind = this.cfg.objectBehind ?? this.cfg.behind;
+    const objectAhead = this.cfg.objectAhead ?? this.cfg.ahead;
     const objectNeeded = this.segmentRange(
       currentSeg,
-      this.cfg.objectBehind ?? this.cfg.behind,
-      this.cfg.objectAhead ?? this.cfg.ahead
+      objectBehind,
+      objectAhead
+    );
+    // Keep one completed segment of candle visuals behind the player. This is
+    // enough to move the previous row outside its light influence before it is
+    // pooled, without expanding the tree/rock streaming budget on mobile.
+    const candleNeeded = this.segmentRange(
+      currentSeg,
+      Math.max(1, objectBehind),
+      Math.max(1, objectAhead)
     );
     const plantNeeded = this.segmentRange(
       currentSeg,
@@ -290,6 +336,16 @@ export class Segments {
       }
     }
 
+    // ---------- CANDLES ----------
+    for (const id of candleNeeded) {
+      const centerZ = (id + 0.5) * segLen;
+      if (!this.candleSegments.has(id)) {
+        this.candleSegments.set(id, this.createCandles(centerZ, id));
+      } else {
+        this.candleSegments.get(id)?.nodes.forEach((node) => node.setEnabled(true));
+      }
+    }
+
     // ---------- TREES + ROCKS ----------
     for (const id of objectNeeded) {
       const centerZ = (id + 0.5) * segLen;
@@ -297,11 +353,6 @@ export class Segments {
       if (id === FIRST_NOTE_SEGMENT_ID && !this.firstNoteCreated) {
         this.createFirstPathNote();
         this.firstNoteCreated = true;
-      }
-
-      if (!this.candleSegments.has(id)) {
-        const pack = this.createCandles(centerZ, id);
-        this.candleSegments.set(id, pack);
       }
 
       const desiredLOD = this.lodFor(id, currentSeg);
@@ -318,21 +369,25 @@ export class Segments {
         this.removeColliders(id, "tree");
         const nodes = this.createTrees(centerZ, id, desiredLOD);
         this.treeSegments.set(id, { nodes, lod: desiredLOD });
+      } else {
+        prev.nodes.forEach((node) => node.setEnabled(true));
       }
 
       if (!this.rockSegments.has(id)) {
         const nodes = this.createRocks(centerZ, id);
         this.rockSegments.set(id, { nodes });
+      } else {
+        this.rockSegments.get(id)?.nodes.forEach((node) => node.setEnabled(true));
       }
     }
 
     // cleanup SOLO al cambiar segmento
     if (segmentChanged) {
       this.lastSegment = currentSeg;
-      this.cleanup(grassNeeded, plantNeeded, objectNeeded);
+      this.cleanup(grassNeeded, plantNeeded, objectNeeded, candleNeeded);
     }
 
-    this.updateCandleLightSelection(camZ);
+    this.updateCandleLightTargets(playerPosition);
   }
 
   updateIsometricOccluders(playerPosition: Vector3, enabled: boolean) {
@@ -423,6 +478,7 @@ export class Segments {
   // =========================
   isColliding(x: number, z: number) {
     for (const c of this.colliders) {
+      if (!this.activeObjectSegments.has(c.segmentId)) continue;
       const dx = x - c.x;
       const dz = z - c.z;
       if (dx * dx + dz * dz < (PLAYER_WORLD_COLLISION_RADIUS + c.radius) ** 2) return true;
@@ -531,46 +587,34 @@ export class Segments {
   private cleanup(
     grassNeeded: Set<number>,
     plantNeeded: Set<number>,
-    objectNeeded: Set<number>
+    objectNeeded: Set<number>,
+    candleNeeded: Set<number>
   ) {
+    this.activeObjectSegments = new Set(objectNeeded);
+
     for (const [id, pack] of this.treeSegments) {
       if (!objectNeeded.has(id)) {
-        pack.nodes.forEach((n) => {
-          this.unregisterIsometricOccluder(n);
-          n.dispose?.();
-        });
-        this.treeSegments.delete(id);
+        pack.nodes.forEach((node) => node.setEnabled(false));
       }
     }
 
     for (const [id, pack] of this.rockSegments) {
       if (!objectNeeded.has(id)) {
-        pack.nodes.forEach((n) => n.dispose?.());
-        this.rockSegments.delete(id);
+        pack.nodes.forEach((node) => node.setEnabled(false));
       }
     }
 
     for (const [id, pack] of this.candleSegments) {
-      if (!objectNeeded.has(id)) {
-        pack.nodes.forEach((n) => n.dispose?.());
-        pack.lights.forEach((light) => {
-          this.candleLights = this.candleLights.filter((entry) => entry.light !== light);
-          light.dispose();
-        });
-        this.candleSegments.delete(id);
+      if (!candleNeeded.has(id)) {
+        pack.nodes.forEach((node) => node.setEnabled(false));
       }
     }
 
-    this.colliders = this.colliders.filter((c) => objectNeeded.has(c.segmentId));
-    this.interactables = this.interactables.filter((i) => objectNeeded.has(i.segmentId));
-
-    for (const id of this.grassSegments.keys()) {
-      if (!grassNeeded.has(id)) this.grassSegments.delete(id);
-    }
-
-    for (const id of this.plantSegments.keys()) {
-      if (!plantNeeded.has(id)) this.plantSegments.delete(id);
-    }
+    // CPU-side instance buffers and scene instances are deliberately retained.
+    // Returning through an explored segment now only uploads the cached combined
+    // buffers and re-enables pooled nodes instead of rebuilding every placement.
+    void grassNeeded;
+    void plantNeeded;
   }
 
   private removeColliders(segmentId: number, kind: Collider["kind"]) {
@@ -666,7 +710,37 @@ export class Segments {
     this.candleFireMaterial = createCandleFireMaterial(this.scene);
     this.candleGlowMaterial = createGlowMaterial(this.scene);
     this.candleFloorGlowMaterial = this.createCandleFloorGlowMaterial();
+    this.createCandleLightPool();
     this.registerCandleFlicker();
+  }
+
+  private createCandleLightPool() {
+    if (this.candleLightPool.length > 0) return;
+
+    for (const side of [-1, 1] as const) {
+      const light = new PointLight(
+        `pathCandleLight_${side < 0 ? "left" : "right"}`,
+        new Vector3(0, -10000, 0),
+        this.scene
+      );
+      light.falloffType = Light.FALLOFF_STANDARD;
+      light.diffuse = new Color3(1.0, 0.48, 0.19);
+      light.specular = new Color3(0.28, 0.1, 0.025);
+      light.intensity = 0;
+      light.range = CANDLE_LIGHT_RANGE;
+      light.renderPriority = CANDLE_LIGHT_RENDER_PRIORITY;
+
+      this.candleLightPool.push({
+        side,
+        light,
+        targetPosition: light.position.clone(),
+        targetIntensity: 0,
+        targetRange: CANDLE_LIGHT_RANGE,
+        currentIntensity: 0,
+        currentRange: CANDLE_LIGHT_RANGE,
+        initialized: false,
+      });
+    }
   }
 
   private createCandleFloorGlowMaterial() {
@@ -933,11 +1007,22 @@ export class Segments {
     return root;
   }
 
+  instantiateCandleAsset(name: string, scale: Vector3) {
+    const template = this.candleTemplate;
+    if (!template) return null;
+
+    const root = this.instantiateCandle(name, scale);
+    return {
+      root,
+      baseOffsetY: template.baseOffsetY * scale.y,
+      topOffsetY: (template.baseOffsetY + template.topOffsetY) * scale.y,
+    };
+  }
+
   private createCandles(_centerZ: number, segmentId: number): SegCandlePack {
     const nodes: TransformNode[] = [];
-    const lights: PointLight[] = [];
     if (!this.candleTemplate || !this.candleFireMaterial || !this.candleGlowMaterial || !this.candleFloorGlowMaterial) {
-      return { nodes, lights };
+      return { nodes };
     }
 
     const placements = this.candlePlacementsForSegment(segmentId);
@@ -961,12 +1046,11 @@ export class Segments {
         new Vector3(placement.x, flameY, placement.z),
         placement.rotationY,
         CANDLE_MODEL_SCALE,
-        4.9,
-        42
+        CANDLE_LIGHT_BASE_INTENSITY,
+        CANDLE_LIGHT_RANGE
       );
 
       nodes.push(root, fire.root, fire.floorGlow);
-      lights.push(fire.light);
       this.colliders.push({
         x: placement.x,
         z: placement.z,
@@ -976,7 +1060,7 @@ export class Segments {
       });
     }
 
-    return { nodes, lights };
+    return { nodes };
   }
 
   private createCandleFire(
@@ -1044,23 +1128,10 @@ export class Segments {
       return spark;
     });
 
-    const light = new PointLight(
-      `${name}Light`,
-      position.add(new Vector3(0, flameHeight * 0.55, 0)),
-      this.scene
-    );
-    light.falloffType = Light.FALLOFF_STANDARD;
-    light.diffuse = new Color3(1.0, 0.58, 0.24);
-    light.specular = new Color3(0.55, 0.22, 0.08);
-    light.intensity = fadeInSeconds > 0 ? 0 : lightIntensity;
-    light.range = lightRange;
-    light.renderPriority = CANDLE_LIGHT_RENDER_PRIORITY;
-    light.setEnabled(false);
-
     this.candleLights.push({
       root,
-      light,
       baseIntensity: lightIntensity,
+      lightRange,
       phase: (this.candleLights.length % 17) * 1.37,
       age: fadeInSeconds > 0 ? 0 : fadeInSeconds,
       fadeInSeconds,
@@ -1071,7 +1142,7 @@ export class Segments {
       flameHeight,
     });
 
-    return { root, light, floorGlow };
+    return { root, floorGlow };
   }
 
   private registerCandleFlicker() {
@@ -1080,10 +1151,11 @@ export class Segments {
 
     let t = 0;
     this.scene.onBeforeRenderObservable.add(() => {
-      const dt = this.scene.getEngine().getDeltaTime() * 0.001;
+      const dt = Math.max(0, Math.min(this.scene.getEngine().getDeltaTime() * 0.001, 0.05));
       t += dt;
       for (const entry of this.candleLights) {
         entry.age += dt;
+        if (!entry.root.isEnabled(true)) continue;
         const fade =
           entry.fadeInSeconds > 0
             ? Math.min(1, entry.age / entry.fadeInSeconds)
@@ -1092,7 +1164,6 @@ export class Segments {
           Math.sin(t * 16.0 + entry.phase) * 0.13 +
           Math.sin(t * 29.0 + entry.phase * 0.61) * 0.075 +
           Math.sin(t * 47.0 + entry.phase * 1.23) * 0.04;
-        entry.light.intensity = Math.max(0, (entry.baseIntensity + flicker) * fade);
 
         const bend = Math.sin(t * 8.6 + entry.phase) * 0.06 + Math.sin(t * 17.5 + entry.phase * 0.4) * 0.024;
         const stretch = 1 + Math.sin(t * 11.8 + entry.phase * 0.7) * 0.085 + Math.sin(t * 24.0 + entry.phase) * 0.045;
@@ -1107,10 +1178,10 @@ export class Segments {
         entry.glow.scaling.set(glowPulse, glowPulse, 1);
         entry.glow.position.x = 0;
         entry.glow.position.y = entry.flameHeight * (0.54 + (stretch - 1) * 0.25);
-        entry.glow.visibility = Math.max(0.38, Math.min(0.95, 0.64 + flicker * 1.55)) * fade;
+        entry.glow.visibility = Math.max(0.25, Math.min(0.68, 0.45 + flicker * 0.9)) * fade;
         const floorPulse = 1 + flicker * 0.14;
         entry.floorGlow.scaling.set(floorPulse, floorPulse, 1);
-        entry.floorGlow.visibility = Math.max(0.28, Math.min(0.64, 0.5 + flicker * 0.3)) * fade;
+        entry.floorGlow.visibility = Math.max(0.12, Math.min(0.32, 0.22 + flicker * 0.18)) * fade;
 
         entry.sparks.forEach((spark, sparkIndex) => {
           const sparkPhase = entry.phase + sparkIndex * 2.17;
@@ -1123,23 +1194,86 @@ export class Segments {
           spark.position.y = entry.flameHeight * (0.72 + cycle * 0.32);
         });
       }
+
+      const intensityBlend = 1 - Math.exp(-CANDLE_LIGHT_INTENSITY_RESPONSE * dt);
+      const positionBlend = 1 - Math.exp(-CANDLE_LIGHT_POSITION_RESPONSE * dt);
+      for (const pool of this.candleLightPool) {
+        if (!pool.initialized && pool.targetIntensity > 0.001) {
+          pool.light.position.copyFrom(pool.targetPosition);
+          pool.initialized = true;
+        } else if (pool.initialized) {
+          Vector3.LerpToRef(
+            pool.light.position,
+            pool.targetPosition,
+            positionBlend,
+            pool.light.position
+          );
+        }
+
+        pool.currentIntensity +=
+          (pool.targetIntensity - pool.currentIntensity) * intensityBlend;
+        pool.currentRange += (pool.targetRange - pool.currentRange) * intensityBlend;
+        const poolFlicker =
+          Math.sin(t * 10.2 + pool.side * 1.73) * 0.025 +
+          Math.sin(t * 18.7 + pool.side * 0.83) * 0.012;
+        pool.light.intensity = Math.max(0, pool.currentIntensity * (1 + poolFlicker));
+        pool.light.range = pool.currentRange;
+      }
     });
   }
 
-  private updateCandleLightSelection(playerZ: number) {
-    const nearest = [...this.candleLights]
-      .sort(
-        (a, b) =>
-          Math.abs(a.root.position.z - playerZ) - Math.abs(b.root.position.z - playerZ)
-      )
-      .slice(0, MAX_ACTIVE_CANDLE_LIGHTS);
-    const activeLights = new Set(nearest.map((entry) => entry.light));
+  private updateCandleLightTargets(playerPosition: Vector3) {
+    for (const pool of this.candleLightPool) {
+      let totalWeight = 0;
+      let combinedInfluence = 0;
+      let weightedIntensity = 0;
+      let weightedRange = 0;
+      let weightedX = 0;
+      let weightedY = 0;
+      let weightedZ = 0;
 
-    for (const entry of this.candleLights) {
-      const shouldBeEnabled = activeLights.has(entry.light);
-      if (entry.light.isEnabled() !== shouldBeEnabled) {
-        entry.light.setEnabled(shouldBeEnabled);
+      for (const entry of this.candleLights) {
+        if (!entry.root.isEnabled(true)) continue;
+        const position = entry.root.getAbsolutePosition();
+        const entrySide = position.x < 0 ? -1 : 1;
+        if (entrySide !== pool.side) continue;
+
+        const dx = position.x - playerPosition.x;
+        const dz = position.z - playerPosition.z;
+        const distance = Math.hypot(dx, dz);
+        const influence =
+          1 -
+          smoothstep(
+            CANDLE_LIGHT_FULL_INFLUENCE_RADIUS,
+            CANDLE_LIGHT_FADE_RADIUS,
+            distance
+          );
+        if (influence <= 0) continue;
+
+        const weight = influence * influence;
+        totalWeight += weight;
+        combinedInfluence = 1 - (1 - combinedInfluence) * (1 - influence);
+        weightedX += position.x * weight;
+        weightedY += position.y * weight;
+        weightedZ += position.z * weight;
+        weightedIntensity += entry.baseIntensity * weight;
+        weightedRange += entry.lightRange * weight;
       }
+
+      if (totalWeight <= 0.0001) {
+        pool.targetIntensity = 0;
+        continue;
+      }
+
+      const inverseWeight = 1 / totalWeight;
+      pool.targetPosition.set(
+        weightedX * inverseWeight,
+        weightedY * inverseWeight,
+        weightedZ * inverseWeight
+      );
+      pool.targetIntensity =
+        (weightedIntensity / totalWeight) * clamp(combinedInfluence, 0, 1);
+      pool.targetRange = weightedRange / totalWeight;
     }
   }
 

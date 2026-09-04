@@ -438,7 +438,7 @@ export async function createEndTorches(
     light.intensity = 3.75;
     light.range = 45;
     light.falloffType = Light.FALLOFF_STANDARD;
-    light.renderPriority = 7;
+    light.renderPriority = 10;
     light.setEnabled(false);
 
     lights.push({ light, baseIntensity: light.intensity, phase: i * 2.19 });

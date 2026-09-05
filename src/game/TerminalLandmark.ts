@@ -27,6 +27,11 @@ import type { TerrainHandle, TerrainHeightModifier } from "./Terrain";
 import type { TreeLibrary } from "./TreeLibrary";
 import { createCandleFireMaterial, createGlowMaterial } from "./Torches";
 import {
+  createFluidWaterfallConfig,
+  FluidWaterfallController,
+  type FluidWaterfallFeatureOptions,
+} from "./FluidWaterfallController";
+import {
   TERMINAL_LAGOON_VISUAL_CONFIG,
   type TerminalLagoonVisualConfig,
 } from "./TerminalLagoonVisualConfig";
@@ -39,6 +44,10 @@ const CAVE_LIGHT_DEACTIVATION_RADIUS = 124;
 const LAGOON_LIGHT_ACTIVATION_RADIUS = 72;
 const LAGOON_LIGHT_DEACTIVATION_RADIUS = 84;
 const WATERFALL_PARTICLE_ACTIVATION_RADIUS = 118;
+// The visible water extends beneath the opaque shore so its mesh boundary can
+// never appear as a cut-off plate. Gameplay uses the smaller wet extent.
+const LAGOON_LOGICAL_EXTENT = 1.08;
+const LAGOON_RENDER_OVERDRAW = 1.18;
 
 export type TerminalLandmarkConfig = {
   seed: number;
@@ -83,6 +92,7 @@ export type TerminalLandmarkHandle = {
   waterfall: Mesh;
   waterfallLayers: readonly Mesh[];
   waterfallImpactPoint: Vector3;
+  fluidWaterfall: FluidWaterfallController | null;
   passageAnchor: TerminalPassageAnchor;
   update: (deltaTime: number, playerPosition?: Vector3) => void;
   blockers: readonly TerminalCollisionBlocker[];
@@ -98,7 +108,9 @@ type TerminalLayoutOptions = {
 export type TerminalLandmarkRenderOptions = {
   waterRenderTargetSize?: number;
   environmentReflectionMeshes?: readonly AbstractMesh[];
+  refractionOnlyMeshes?: readonly AbstractMesh[];
   visualConfig?: TerminalLagoonVisualConfig;
+  fluidWaterfall?: FluidWaterfallFeatureOptions;
   instantiateCandleAsset?: (
     name: string,
     scale: Vector3
@@ -124,7 +136,7 @@ export function createTerminalLandmarkConfig(
     lagoonCenterZ: houseFrontZ + 98,
     lagoonRadiusX: 34,
     lagoonRadiusZ: 42,
-    lagoonDepth: 8.5,
+    lagoonDepth: 16,
     waterLevel: TERMINAL_LAGOON_VISUAL_CONFIG.underwater.waterLevel,
     waterfallZ: houseFrontZ + 143,
     waterfallWidth: 15,
@@ -135,12 +147,24 @@ export function createTerminalLandmarkConfig(
 
 function getTerminalLagoonEdgeScale(config: TerminalLandmarkConfig, angle: number) {
   const phase = (config.seed % 997) * 0.017;
+  const irregularZ = 1 + Math.cos(angle * 4 - phase) * 0.055;
+  const rearAngle = Math.PI * 0.5;
+  const rearAngleDelta = Math.atan2(
+    Math.sin(angle - rearAngle),
+    Math.cos(angle - rearAngle)
+  );
+  // Pull the rear waterline into a narrow cove directly below the waterfall.
+  // This is part of the shared boundary, so terrain carving, gameplay water
+  // detection and the rendered lagoon all agree on the same silhouette.
+  const rearCoveWeight = Math.exp(-Math.pow(Math.abs(rearAngleDelta) / 0.34, 4));
+  const rearCoveScale =
+    (config.waterfallZ + 2.5 - config.lagoonCenterZ) / config.lagoonRadiusZ;
   return {
     x:
       1 +
       Math.sin(angle * 3 + phase) * 0.075 +
       Math.sin(angle * 7 - phase) * 0.035,
-    z: 1 + Math.cos(angle * 4 - phase) * 0.055,
+    z: lerp(irregularZ, Math.max(irregularZ, rearCoveScale), rearCoveWeight),
   };
 }
 
@@ -158,7 +182,7 @@ function getTerminalLagoonNormalizedDistance(
   return Math.hypot(localX / radiusX, localZ / radiusZ);
 }
 
-/** Uses the same authored irregular boundary as the lagoon mesh and terrain basin. */
+/** Uses the authored irregular shoreline, excluding the hidden render overdraw. */
 export function isPointInsideTerminalLagoon(
   config: TerminalLandmarkConfig,
   position: Vector3,
@@ -171,6 +195,21 @@ export function isPointInsideTerminalLagoon(
       position.z,
       horizontalMargin
     ) <= 1
+  );
+}
+
+function isPointInsideTerminalLagoonWetExtent(
+  config: TerminalLandmarkConfig,
+  position: Vector3,
+  horizontalMargin = 0
+) {
+  return (
+    getTerminalLagoonNormalizedDistance(
+      config,
+      position.x,
+      position.z,
+      horizontalMargin
+    ) <= LAGOON_LOGICAL_EXTENT
   );
 }
 
@@ -189,8 +228,24 @@ export function createTerminalTerrainModifier(
     // Preserve a broad deep-water area instead of concentrating the full depth
     // in a single terrain vertex at the exact centre of the lagoon.
     const centerDepth = 1 - smoothstep(0.16, 0.92, lagoonDistance);
-    const basinHeight = config.waterLevel - 0.35 - config.lagoonDepth * centerDepth;
+    const basinHeight = config.waterLevel - 0.55 - config.lagoonDepth * centerDepth;
     let height = lerp(currentHeight, basinHeight, basinWeight);
+
+    // A broad plunge pool keeps the coarse terrain triangles below the water
+    // throughout the rear cove. Its deepest section sits under the waterfall,
+    // then blends into the already-deep central lagoon basin.
+    const plungeCenterZ = config.waterfallZ - 3.5;
+    const plungeDistance = Math.hypot(
+      localX / (config.waterfallWidth * 1.15),
+      (z - plungeCenterZ) / (config.lagoonRadiusZ * 0.38)
+    );
+    const plungeEnvelope =
+      (1 - smoothstep(0.48, 1.12, plungeDistance)) *
+      (1 - smoothstep(config.waterfallZ + 0.5, config.waterfallZ + 5, z));
+    const plungeCore = 1 - smoothstep(0.12, 0.82, plungeDistance);
+    const plungeFloor =
+      config.waterLevel - 1.4 - config.lagoonDepth * 1.05 * plungeCore;
+    height = lerp(height, Math.min(height, plungeFloor), plungeEnvelope);
 
     const rearRamp = smoothstep(config.waterfallZ + 1, config.backCliffZ + 8, z);
     const rearWidth = 1 - smoothstep(58, 88, Math.abs(localX));
@@ -214,6 +269,7 @@ type WaterfallMetrics = {
   cliffTop: number;
   bottom: number;
   height: number;
+  sourceZ: number;
   impactPoint: Vector3;
 };
 
@@ -281,6 +337,7 @@ export class TerminalLandmarkGenerator {
   private lagoonLightActivationPoint: Vector3 | null = null;
   private lagoonLightsActive = false;
   private animationTime = 0;
+  private fluidWaterfall: FluidWaterfallController | null = null;
 
   constructor(
     private readonly scene: Scene,
@@ -308,18 +365,68 @@ export class TerminalLandmarkGenerator {
       waterLevel: config.waterLevel,
       bounds: lagoon.getBoundingInfo(),
       containsPoint: (position, horizontalMargin) =>
-        isPointInsideTerminalLagoon(config, position, horizontalMargin),
+        isPointInsideTerminalLagoonWetExtent(
+          config,
+          position,
+          horizontalMargin
+        ),
     };
     const waterfallMetrics = this.getWaterfallMetrics(config);
-    this.waterfallParticleImpactPoint = waterfallMetrics.impactPoint.clone();
     const passageAnchor = this.createPassageAnchor(config);
-    const waterfallLayers = this.createWaterfall(root, config, waterfallMetrics);
-    const waterfallFoam = this.createWaterfallFoam(root, config, waterfallMetrics.impactPoint);
+    const fluidOptions = this.renderOptions.fluidWaterfall;
+    const hybridWaterfallWidth = config.waterfallWidth * 0.75;
+    if (fluidOptions?.enabled) {
+      const safeImpactPoint = this.getHybridWaterfallImpactPoint(
+        config,
+        hybridWaterfallWidth,
+        waterfallMetrics.impactPoint
+      );
+      this.fluidWaterfall = new FluidWaterfallController(
+        this.scene,
+        createFluidWaterfallConfig({
+          ...fluidOptions,
+          // Keep the particle detail inside the 3/4-width backing sheet.
+          emitterWidth: hybridWaterfallWidth * 0.82,
+          // Emit from inside the visible upper stream and over the terrain lip.
+          emitterPosition: new Vector3(
+            config.lagoonCenterX,
+            waterfallMetrics.cliffTop - 0.06,
+            waterfallMetrics.sourceZ - 0.08
+          ),
+          impactPosition: safeImpactPoint,
+          lakeY: config.waterLevel + 0.08,
+        }),
+        config.seed
+      );
+    }
+    const fluidWaterfall = this.fluidWaterfall;
+    const hybridWaterfallEnabled = fluidWaterfall?.isAvailable === true;
+    const activeImpactPoint = hybridWaterfallEnabled && fluidWaterfall
+      ? fluidWaterfall.getImpactPosition()
+      : waterfallMetrics.impactPoint.clone();
+    const activeWaterfallMetrics = hybridWaterfallEnabled
+      ? { ...waterfallMetrics, impactPoint: activeImpactPoint }
+      : waterfallMetrics;
+    const waterfallLayers = this.createWaterfall(
+      root,
+      config,
+      activeWaterfallMetrics,
+      hybridWaterfallEnabled
+    );
+    const waterfallHeadwater = this.createWaterfallHeadwater(
+      root,
+      config,
+      activeWaterfallMetrics,
+      hybridWaterfallEnabled ? 0.75 : 1
+    );
+    this.waterfallParticleImpactPoint = activeImpactPoint.clone();
+
+    const waterfallFoam = this.createWaterfallFoam(root, config, activeImpactPoint);
     waterfallFoam.setEnabled(false);
     this.waterfallOverlayMeshes.push(waterfallFoam);
-    this.createWaterfallSplash(config, waterfallMetrics.impactPoint);
-    this.createWaterfallDropletBursts(config, waterfallMetrics.impactPoint);
-    this.createWaterfallMist(config, waterfallMetrics.impactPoint);
+    this.createWaterfallSplash(config, activeImpactPoint);
+    this.createWaterfallDropletBursts(config, activeImpactPoint);
+    this.createWaterfallMist(config, activeImpactPoint);
     const nearbyRockMeshes = this.populateRockClosure(root, config, random);
     const caveRockMeshes = this.populateWaterfallCaveRocks(
       root,
@@ -337,10 +444,11 @@ export class TerminalLandmarkGenerator {
     const nearbyVegetationMeshes = this.populateWetVegetation(root, config, random);
     const lagoonWaterMaterial = this.createLagoonWaterMaterial(
       config,
-      waterfallMetrics.impactPoint
+      activeImpactPoint
     );
     const waterRenderMeshes = [
       ...waterfallLayers,
+      waterfallHeadwater,
       waterfallFoam,
       ...nearbyRockMeshes,
       ...nearbyVegetationMeshes,
@@ -352,7 +460,7 @@ export class TerminalLandmarkGenerator {
     const underwaterLight = this.createUnderwaterLight(root, config);
     const waterfallImpactLight = this.createWaterfallImpactLight(
       root,
-      waterfallMetrics.impactPoint
+      activeImpactPoint
     );
     this.lagoonLightActivationPoint = new Vector3(
       config.lagoonCenterX,
@@ -383,7 +491,8 @@ export class TerminalLandmarkGenerator {
       waterfallImpactLight,
       waterfall: waterfallLayers[0],
       waterfallLayers,
-      waterfallImpactPoint: waterfallMetrics.impactPoint.clone(),
+      waterfallImpactPoint: activeImpactPoint.clone(),
+      fluidWaterfall: this.fluidWaterfall,
       passageAnchor,
       update: (deltaTime, playerPosition) => this.updateAnimation(deltaTime, playerPosition),
       blockers: createTerminalBlockers(config),
@@ -437,14 +546,17 @@ export class TerminalLandmarkGenerator {
     const uvs: number[] = [0.5, 0.5];
     const indices: number[] = [];
     for (let ring = 1; ring <= radialRings; ring++) {
-      const radius = ring / radialRings;
+      const radius = (ring / radialRings) * LAGOON_RENDER_OVERDRAW;
       for (let segment = 0; segment < radialSegments; segment++) {
         const angle = (segment / radialSegments) * Math.PI * 2;
         const edgeScale = getTerminalLagoonEdgeScale(config, angle);
         const x = Math.cos(angle) * config.lagoonRadiusX * edgeScale.x * radius;
         const z = Math.sin(angle) * config.lagoonRadiusZ * edgeScale.z * radius;
         positions.push(x, 0, z);
-        uvs.push(x / (config.lagoonRadiusX * 2) + 0.5, z / (config.lagoonRadiusZ * 2) + 0.5);
+        uvs.push(
+          x / (config.lagoonRadiusX * 2 * LAGOON_RENDER_OVERDRAW) + 0.5,
+          z / (config.lagoonRadiusZ * 2 * LAGOON_RENDER_OVERDRAW) + 0.5
+        );
       }
     }
 
@@ -524,7 +636,8 @@ export class TerminalLandmarkGenerator {
     material.maxSimultaneousLights = 8;
     material.disableLighting = false;
     material.alpha = 0.94;
-    material.backFaceCulling = true;
+    // The underside must remain visible while swimming below the surface.
+    material.backFaceCulling = false;
     material.useWorldCoordinatesForWaveDeformation = false;
 
     // The plugin reuses WaterMaterial's existing time uniform and adds no
@@ -600,21 +713,33 @@ export class TerminalLandmarkGenerator {
     const terrainMesh = this.terrain.mesh as AbstractMesh;
     pushUniqueRenderMesh(material.refractionTexture, terrainMesh);
 
-    // The dark sky is reflection-only. Distant forest, grass and the player are
-    // deliberately excluded from both RTTs.
+    // WaterMaterial clips the refraction pass at the water plane. Rendering the
+    // avatar only there gives the submerged half the water tint/distortion while
+    // leaving the portion above the surface on the regular scene pass.
+    for (const mesh of this.renderOptions.refractionOnlyMeshes ?? []) {
+      if (mesh !== lagoon && !mesh.isDisposed()) {
+        pushUniqueRenderMesh(material.refractionTexture, mesh);
+      }
+    }
+
+    // The dark sky is reflection-only. Distant forest and grass remain excluded
+    // from both RTTs.
     for (const mesh of this.renderOptions.environmentReflectionMeshes ?? []) {
       if (mesh !== lagoon && !mesh.isDisposed()) {
         pushUniqueRenderMesh(material.reflectionTexture, mesh);
       }
     }
 
-    const refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONEVERYTWOFRAMES;
     if (material.refractionTexture) {
-      material.refractionTexture.refreshRate = refreshRate;
+      // The refraction contains the animated swimmer, so it must not alternate
+      // with stale poses between frames.
+      material.refractionTexture.refreshRate =
+        RenderTargetTexture.REFRESHRATE_RENDER_ONEVERYFRAME;
       material.refractionTexture.setRenderingAutoClearDepthStencil(1, false);
     }
     if (material.reflectionTexture) {
-      material.reflectionTexture.refreshRate = refreshRate;
+      material.reflectionTexture.refreshRate =
+        RenderTargetTexture.REFRESHRATE_RENDER_ONEVERYTWOFRAMES;
       material.reflectionTexture.setRenderingAutoClearDepthStencil(1, false);
     }
   }
@@ -684,11 +809,13 @@ export class TerminalLandmarkGenerator {
     );
     const bottom = config.waterLevel + 0.25;
     const height = cliffTop - bottom;
+    // Move the visible source onto the upper terrain lip. The feeder surface
+    // ends at this same edge, so the fall has a physical origin.
+    const sourceZ = config.backCliffZ + 5.5;
     // The lagoon outline and terrain basin share this exact procedural edge.
     // Keep the whole waterfall footprint safely inside it, including the wide
     // outer columns, instead of assuming waterfallZ is still over water.
-    const phase = (config.seed % 997) * 0.017;
-    const rearIrregularity = 1 + Math.cos(Math.PI * 2 - phase) * 0.055;
+    const rearIrregularity = getTerminalLagoonEdgeScale(config, Math.PI * 0.5).z;
     const rearWaterEdgeZ =
       config.lagoonCenterZ + config.lagoonRadiusZ * rearIrregularity;
     const impactInset = Math.max(6, config.waterfallWidth * 0.4);
@@ -700,12 +827,52 @@ export class TerminalLandmarkGenerator {
       cliffTop,
       bottom,
       height,
+      sourceZ,
       impactPoint: new Vector3(
         config.lagoonCenterX,
         config.waterLevel + 0.08,
         impactZ
       ),
     };
+  }
+
+  private getHybridWaterfallImpactPoint(
+    config: TerminalLandmarkConfig,
+    waterfallWidth: number,
+    fallback: Vector3
+  ) {
+    const lakeY = config.waterLevel + 0.08;
+    const halfWidth = waterfallWidth * 0.5;
+    const sampleCount = 9;
+    const safetyMargin = 1.25;
+
+    // Walk inward from the cliff and accept the first row whose complete
+    // waterfall footprint is inside a contracted copy of the authored lagoon.
+    // The same containment function drives the lake mesh, terrain and gameplay.
+    for (
+      let z = config.waterfallZ - 0.5;
+      z >= config.lagoonCenterZ;
+      z -= 0.25
+    ) {
+      let allSamplesInside = true;
+      for (let sample = 0; sample < sampleCount; sample++) {
+        const horizontal = sample / (sampleCount - 1) - 0.5;
+        const position = new Vector3(
+          config.lagoonCenterX + horizontal * waterfallWidth,
+          lakeY,
+          z
+        );
+        if (!isPointInsideTerminalLagoon(config, position, -safetyMargin)) {
+          allSamplesInside = false;
+          break;
+        }
+      }
+      if (allSamplesInside) {
+        return new Vector3(config.lagoonCenterX, lakeY, z);
+      }
+    }
+
+    return fallback.clone();
   }
 
   private createPassageAnchor(config: TerminalLandmarkConfig): TerminalPassageAnchor {
@@ -723,26 +890,38 @@ export class TerminalLandmarkGenerator {
   private createWaterfall(
     root: TransformNode,
     config: TerminalLandmarkConfig,
-    metrics: WaterfallMetrics
+    metrics: WaterfallMetrics,
+    hybrid = false
   ) {
-    const layers = [
-      {
-        name: "terminalWaterfallMain",
-        widthScale: 1,
-        xOffset: -config.waterfallWidth * 0.025,
-        zOffset: 0,
-        opacityScale: 1,
-        phase: 0.35,
-      },
-      {
-        name: "terminalWaterfallVeil",
-        widthScale: 0.78,
-        xOffset: config.waterfallWidth * 0.1,
-        zOffset: -0.2,
-        opacityScale: this.visualConfig.waterfall.secondaryLayerAlpha,
-        phase: 2.1,
-      },
-    ];
+    const layers = hybrid
+      ? [
+          {
+            name: "terminalWaterfallHybridSheet",
+            widthScale: 0.75,
+            xOffset: 0,
+            zOffset: 0,
+            opacityScale: 0.82,
+            phase: 0.35,
+          },
+        ]
+      : [
+          {
+            name: "terminalWaterfallMain",
+            widthScale: 1,
+            xOffset: -config.waterfallWidth * 0.025,
+            zOffset: 0,
+            opacityScale: 1,
+            phase: 0.35,
+          },
+          {
+            name: "terminalWaterfallVeil",
+            widthScale: 0.78,
+            xOffset: config.waterfallWidth * 0.1,
+            zOffset: -0.2,
+            opacityScale: this.visualConfig.waterfall.secondaryLayerAlpha,
+            phase: 2.1,
+          },
+        ];
 
     return layers.map((layer) => {
       const waterfall = this.createWaterfallRibbon(
@@ -752,12 +931,14 @@ export class TerminalLandmarkGenerator {
         layer.widthScale,
         layer.xOffset,
         layer.zOffset,
-        layer.phase
+        layer.phase,
+        hybrid
       );
       waterfall.material = this.createWaterfallMaterial(
         `${layer.name}Material`,
         layer.opacityScale,
-        layer.phase
+        layer.phase,
+        { fadeStart: true, fadeEnd: !hybrid }
       );
       // Keep the translucent ribbons in the main rendering group. Later groups
       // clear their depth buffer by default, which made the waterfall draw over
@@ -771,6 +952,68 @@ export class TerminalLandmarkGenerator {
     });
   }
 
+  private createWaterfallHeadwater(
+    root: TransformNode,
+    config: TerminalLandmarkConfig,
+    metrics: WaterfallMetrics,
+    widthScale: number
+  ) {
+    const paths: Vector3[][] = [];
+    const columnCount = 7;
+    const rowCount = 9;
+    const lipZ = metrics.sourceZ + 0.04;
+    const upstreamZ = config.backCliffZ + 9;
+    const lipHalfWidth = config.waterfallWidth * widthScale * 0.5;
+    const upstreamHalfWidth = Math.max(
+      lipHalfWidth * 1.18,
+      config.waterfallWidth * 0.58
+    );
+
+    for (let column = 0; column < columnCount; column++) {
+      const horizontal = (column / (columnCount - 1)) * 2 - 1;
+      const path: Vector3[] = [];
+      for (let row = 0; row < rowCount; row++) {
+        const upstreamProgress = row / (rowCount - 1);
+        const halfWidth = lerp(lipHalfWidth, upstreamHalfWidth, upstreamProgress);
+        const bankVariation = 1 + Math.sin(upstreamProgress * Math.PI) * 0.045;
+        const x =
+          config.lagoonCenterX +
+          horizontal * halfWidth * bankVariation +
+          Math.sin(upstreamProgress * Math.PI * 2 + horizontal * 1.7) * 0.08;
+        const y =
+          metrics.cliffTop +
+          lerp(0.04, 0.24, upstreamProgress) +
+          Math.sin(upstreamProgress * Math.PI * 2 + horizontal) * 0.025;
+        const z = lerp(lipZ, upstreamZ, upstreamProgress);
+        path.push(new Vector3(x, y, z));
+      }
+      paths.push(path);
+    }
+
+    const headwater = MeshBuilder.CreateRibbon(
+      "terminalWaterfallHeadwater",
+      {
+        pathArray: paths,
+        closeArray: false,
+        closePath: false,
+        sideOrientation: Mesh.DOUBLESIDE,
+      },
+      this.scene
+    );
+    headwater.material = this.createWaterfallMaterial(
+      "terminalWaterfallHeadwaterMaterial",
+      0.92,
+      1.37,
+      { fadeStart: false, fadeEnd: true }
+    );
+    headwater.renderingGroupId = 0;
+    headwater.isPickable = false;
+    headwater.alwaysSelectAsActiveMesh = true;
+    headwater.setParent(root);
+    setGameMaterial(headwater, "water", this.scene, { applyVisual: false });
+    return headwater;
+  }
+
   private createWaterfallRibbon(
     name: string,
     config: TerminalLandmarkConfig,
@@ -778,7 +1021,8 @@ export class TerminalLandmarkGenerator {
     widthScale: number,
     xOffset: number,
     zOffset: number,
-    phase: number
+    phase: number,
+    hybrid: boolean
   ) {
     const paths: Vector3[][] = [];
     const columnCount = 7;
@@ -805,8 +1049,14 @@ export class TerminalLandmarkGenerator {
         // converge on the authored impact point, which is guaranteed to be in
         // the lagoon, while the upper lip remains attached to the rock wall.
         const fallingProgress = 1 - vertical;
-        const trajectory = fallingProgress * fallingProgress;
-        const baseZ = lerp(config.waterfallZ, metrics.impactPoint.z, trajectory);
+        // A ballistic particle advances horizontally at a steady rate while
+        // gravity accelerates it vertically, so z progress is approximately
+        // sqrt(y progress). Matching that curve keeps the detail particles on
+        // top of the hybrid sheet and leaves most of the lower fall vertical.
+        const trajectory = hybrid
+          ? Math.sqrt(fallingProgress)
+          : fallingProgress * fallingProgress;
+        const baseZ = lerp(metrics.sourceZ, metrics.impactPoint.z, trajectory);
         const z =
           baseZ +
           zOffset * vertical -
@@ -831,7 +1081,12 @@ export class TerminalLandmarkGenerator {
     );
   }
 
-  private createWaterfallMaterial(name: string, layerOpacity: number, phase: number) {
+  private createWaterfallMaterial(
+    name: string,
+    layerOpacity: number,
+    phase: number,
+    endpointFades = { fadeStart: true, fadeEnd: true }
+  ) {
     const tuning = this.visualConfig.waterfall;
     const material = new ShaderMaterial(
       name,
@@ -865,6 +1120,8 @@ export class TerminalLandmarkGenerator {
           uniform float scrollSpeed;
           uniform float layerOpacity;
           uniform float layerPhase;
+          uniform float fadeStart;
+          uniform float fadeEnd;
 
           float hash(vec2 p) {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -895,7 +1152,9 @@ export class TerminalLandmarkGenerator {
             float softStreaks = smoothstep(0.32, 0.88, broad * 0.52 + fineFlow * 0.48);
             float brokenFlow = smoothstep(0.2, 0.84, broad * 0.56 + detail * 0.29 + fineFlow * 0.15);
             float transparency = 0.18 + softStreaks * 0.28 + brokenFlow * 0.3;
-            float verticalBlend = smoothstep(0.0, 0.055, waterfallUV.y) * smoothstep(0.0, 0.075, 1.0 - waterfallUV.y);
+            float startBlend = mix(1.0, smoothstep(0.0, 0.055, waterfallUV.y), fadeStart);
+            float endBlend = mix(1.0, smoothstep(0.0, 0.075, 1.0 - waterfallUV.y), fadeEnd);
+            float verticalBlend = startBlend * endBlend;
 
             vec3 blueGray = vec3(0.24, 0.38, 0.42);
             vec3 aeratedWater = vec3(0.72, 0.82, 0.84);
@@ -917,6 +1176,8 @@ export class TerminalLandmarkGenerator {
           "scrollSpeed",
           "layerOpacity",
           "layerPhase",
+          "fadeStart",
+          "fadeEnd",
         ],
         needAlphaBlending: true,
       }
@@ -929,6 +1190,8 @@ export class TerminalLandmarkGenerator {
     material.setFloat("scrollSpeed", tuning.scrollSpeed);
     material.setFloat("layerOpacity", layerOpacity);
     material.setFloat("layerPhase", phase);
+    material.setFloat("fadeStart", endpointFades.fadeStart ? 1 : 0);
+    material.setFloat("fadeEnd", endpointFades.fadeEnd ? 1 : 0);
     material.alphaMode = Material.MATERIAL_ALPHABLEND;
     material.backFaceCulling = false;
     material.disableDepthWrite = true;
@@ -1479,6 +1742,7 @@ export class TerminalLandmarkGenerator {
       material.setFloat("time", this.animationTime);
     }
     this.updateLagoonLightActivation(playerPosition);
+    this.fluidWaterfall?.update(deltaTime, playerPosition);
     for (const { light, baseIntensity, phase } of this.flickeringLights) {
       const activationRadius = light.isEnabled()
         ? CAVE_LIGHT_DEACTIVATION_RADIUS

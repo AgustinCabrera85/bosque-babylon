@@ -125,6 +125,8 @@ const scratchSegment = Vector3.Zero();
 const scratchFromStart = Vector3.Zero();
 const scratchScaled = Vector3.Zero();
 const scratchClosest = Vector3.Zero();
+const RUNNING_AWARENESS_START_SPEED = 3.2;
+const RUNNING_AWARENESS_FULL_SPEED = 6.8;
 
 /** Autonomous state machine for one instance. It commands, but never inspects, asset nodes. */
 export class ShadowGrabberBehavior {
@@ -346,7 +348,19 @@ export class ShadowGrabberBehavior {
 
   private updateActivation(dt: number, target: ShadowGrabberTargetSnapshot) {
     const config = this.controller.config;
-    if (!this.active && this.lastPlayerDistance <= config.activationRange) {
+    const playerSpeed = Math.hypot(
+      target.horizontalVelocity.x,
+      target.horizontalVelocity.z
+    );
+    const runningAwareness = clamp(
+      (playerSpeed - RUNNING_AWARENESS_START_SPEED) /
+        (RUNNING_AWARENESS_FULL_SPEED - RUNNING_AWARENESS_START_SPEED),
+      0,
+      1
+    );
+    const activationRange =
+      config.activationRange + config.runningDetectionBonus * runningAwareness;
+    if (!this.active && this.lastPlayerDistance <= activationRange) {
       this.active = true;
       this.options.coordinator.setMemberActive(
         this.options.groupId,
@@ -433,10 +447,18 @@ export class ShadowGrabberBehavior {
       this.computeTacticalTarget(target);
     }
     const role = this.options.coordinator.getRole(this.options.groupId, this.controller.id);
-    const speed =
+    const playerSpeed = Math.hypot(
+      target.horizontalVelocity.x,
+      target.horizontalVelocity.z
+    );
+    const pursuitSpeed =
       role === ShadowGrabberRole.Pressure || role === ShadowGrabberRole.Interceptor
         ? config.huntSpeed
         : config.encircleSpeed;
+    const speed =
+      role === ShadowGrabberRole.Pressure || role === ShadowGrabberRole.Interceptor
+        ? Math.max(pursuitSpeed, Math.min(config.maxMoveSpeed, playerSpeed + 0.7))
+        : pursuitSpeed;
     this.moveToward(
       this.tacticalTarget,
       speed * (1 + this.getDarknessPressure() * 0.03),

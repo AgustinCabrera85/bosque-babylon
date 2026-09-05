@@ -10,7 +10,6 @@ import {
   getNextPrimaryViewMode,
   PlayerController,
   type CharacterId,
-  type IsometricCameraAnchor,
   type ViewMode,
 } from "./PlayerController";
 import { Segments } from "./Segments";
@@ -25,6 +24,7 @@ import { createFireflies } from "./Fireflies";
 import { createEndTorches } from "./Torches";
 import { createVintageFilmPostProcess, fridayThe13thVintagePreset } from "./VintageFilmPostProcess";
 import { createLagoonUnderwaterEffect } from "./LagoonUnderwaterEffect";
+import { isFluidWaterfallPreset } from "./FluidWaterfallController";
 import { TERMINAL_LAGOON_VISUAL_CONFIG } from "./TerminalLagoonVisualConfig";
 import { WaterContactSystem } from "./WaterContactSystem";
 import { WaterInteractionVFX } from "./WaterInteractionVFX";
@@ -199,7 +199,10 @@ function setupViewModeControls(player: PlayerController) {
     const isFirstPerson = mode === "first";
     const isFrontView = mode === "front";
     const isIsometricView = mode === "iso";
-    const nextMode = getNextPrimaryViewMode(mode);
+    const nextMode = getNextPrimaryViewMode(
+      mode,
+      player.isIsometricViewAllowed
+    );
     cameraButton.classList.toggle("active", isFirstPerson);
     cameraButton.textContent = getViewModeShortLabel(nextMode);
     cameraButton.setAttribute("aria-pressed", String(isFirstPerson));
@@ -214,10 +217,15 @@ function setupViewModeControls(player: PlayerController) {
       isFrontView ? "Volver a tercera persona" : "Activar camara frontal"
     );
     isometricButton?.classList.toggle("active", isIsometricView);
+    if (isometricButton) isometricButton.disabled = !player.isIsometricViewAllowed;
     isometricButton?.setAttribute("aria-pressed", String(isIsometricView));
     isometricButton?.setAttribute(
       "aria-label",
-      isIsometricView ? "Volver a tercera persona" : "Activar vista isometrica"
+      !player.isIsometricViewAllowed
+        ? "Vista isometrica no disponible desde la casa"
+        : isIsometricView
+          ? "Volver a tercera persona"
+          : "Activar vista isometrica"
     );
     reticle?.classList.toggle("hidden", isFrontView || isIsometricView);
   };
@@ -695,6 +703,16 @@ scene.onBeforeRenderObservable.add(() => {
     enemyManager.preload(SHADOW_GRABBER_TYPE),
   ]);
   onProgress(0.89, "Preparando tramo final...");
+  const waterfallQuery = new URLSearchParams(window.location.search);
+  const fluidWaterfallEnabled = waterfallQuery.get("fluidWaterfall") === "1";
+  const fluidWaterfallDebug =
+    import.meta.env.DEV &&
+    fluidWaterfallEnabled &&
+    waterfallQuery.get("fluidWaterfallDebug") === "1";
+  const requestedFluidPreset = waterfallQuery.get("fluidWaterfallPreset");
+  const fluidWaterfallPreset = isFluidWaterfallPreset(requestedFluidPreset)
+    ? requestedFluidPreset
+    : "medium";
   const terminalLandmark = new TerminalLandmarkGenerator(
     scene,
     terrain,
@@ -704,31 +722,33 @@ scene.onBeforeRenderObservable.add(() => {
     {
       waterRenderTargetSize: quality.name === "mobile" ? 128 : 256,
       environmentReflectionMeshes: [photoDome.mesh],
+      refractionOnlyMeshes: player.getAvatarMeshes(),
       visualConfig: TERMINAL_LAGOON_VISUAL_CONFIG,
+      fluidWaterfall: {
+        enabled: fluidWaterfallEnabled,
+        debug: fluidWaterfallDebug,
+        preset: fluidWaterfallPreset,
+      },
       instantiateCandleAsset: (name, scale) =>
         segments.instantiateCandleAsset(name, scale),
     }
   ).generateWaterfallLagoonEnd(terminalConfig);
-  const lagoonIsometricCameraAnchor: IsometricCameraAnchor = {
-    // A high, stable world-space viewpoint keeps the orthographic camera away
-    // from the lagoon banks, waterfall ribbons and terrain underside.
-    cameraPosition: new Vector3(
-      terminalConfig.lagoonCenterX + 28,
-      terminalConfig.waterLevel + 32,
-      terminalConfig.lagoonCenterZ - 34
-    ),
-    targetPosition: new Vector3(
-      terminalConfig.lagoonCenterX,
-      terminalConfig.waterLevel + 0.8,
-      terminalConfig.lagoonCenterZ + 4
-    ),
-    orthographicHeight: 38,
-    cameraFollowFactorX: 0.42,
-    maxCameraOffsetX: 9.5,
-    targetFollowFactor: 0.36,
-    maxTargetOffsetX: 8,
-    maxTargetOffsetZ: 16,
-  };
+  if (import.meta.env.DEV && terminalLandmark.fluidWaterfall) {
+    const fluidWaterfallDiagnostics = {
+      getSnapshot: () => terminalLandmark.fluidWaterfall!.getDebugSnapshot(),
+    };
+    scene.metadata ??= {};
+    scene.metadata.fluidWaterfall = fluidWaterfallDiagnostics;
+    const debugGlobal = globalThis as typeof globalThis & {
+      __bosqueFluidWaterfallDebug?: typeof fluidWaterfallDiagnostics;
+    };
+    debugGlobal.__bosqueFluidWaterfallDebug = fluidWaterfallDiagnostics;
+    scene.onDisposeObservable.addOnce(() => {
+      if (debugGlobal.__bosqueFluidWaterfallDebug === fluidWaterfallDiagnostics) {
+        delete debugGlobal.__bosqueFluidWaterfallDebug;
+      }
+    });
+  }
   // The lagoon lights use explicit mesh lists to protect the global light
   // budget. Include the loaded avatar so a submerged third-person view keeps
   // the swimmer readable without adding another dynamic light.
@@ -1035,30 +1055,15 @@ scene.onBeforeRenderObservable.add(() => {
   // Loop
   // =========================
   let grassWindTimer = 0;
-  let previousCameraZonePlayerZ = player.position.z;
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.max(0, Math.min(engine.getDeltaTime() / 1000, 0.05));
     // Activate cached world content before collision and movement use it.
     segments.update(player.position);
-    const cameraZoneTravelDeltaZ = player.position.z - previousCameraZonePlayerZ;
-    previousCameraZonePlayerZ = player.position.z;
-    if (
-      player.currentViewMode === "iso" &&
-      segments.isInsideEndHouseCameraZone(player.position, cameraZoneTravelDeltaZ)
-    ) {
-      // Start outside the front wall, before the isometric collision ray can
-      // collapse the camera into the roof or floor meshes.
-      player.setViewMode("third", 0.78);
-    }
-    const lagoonIsometricCameraActive =
-      player.currentViewMode === "iso" &&
-      Math.abs(player.position.x - terminalConfig.lagoonCenterX) <=
-        terminalConfig.lagoonRadiusX + 24 &&
-      player.position.z >=
-        terminalConfig.lagoonCenterZ - terminalConfig.lagoonRadiusZ + 6 &&
-      player.position.z <= terminalConfig.backCliffZ + 16;
-    player.setIsometricCameraAnchor(
-      lagoonIsometricCameraActive ? lagoonIsometricCameraAnchor : null
+    // From the house onward, close cameras are part of the level design: they
+    // avoid the expensive distant lake view and preserve underwater searching.
+    player.setIsometricViewAllowed(
+      player.position.z < terminalConfig.houseFrontZ - 7,
+      0.78
     );
     player.update(dt, terrain, segments);
     shadowGrabberBehaviorSystem.update(dt);
@@ -1072,7 +1077,7 @@ scene.onBeforeRenderObservable.add(() => {
     synchronizeSceneLightPriorities(scene);
     segments.updateIsometricOccluders(
       player.position,
-      player.currentViewMode === "iso" && !lagoonIsometricCameraActive
+      player.currentViewMode === "iso"
     );
     if (quality.grassWindInterval <= 0) {
       grassLibrary.updateWind(dt);

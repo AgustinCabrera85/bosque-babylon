@@ -54,7 +54,11 @@ export class ShadowGrabberDebugView {
     this.anchor = this.makeMarker("anchor", 0.18, green);
     this.tacticalTarget = this.makeMarker("target", 0.22, yellow);
     this.grabTarget = this.makeMarker("grabTarget", 0.16, red);
-    this.detectionRange = this.makeRing("detectionRange", controller.config.activationRange, cyan);
+    this.detectionRange = this.makeRing(
+      "detectionRange",
+      controller.config.activationRange + controller.config.runningDetectionBonus,
+      cyan
+    );
     this.attackRange = this.makeRing("attackRange", controller.config.attackRange, magenta);
     this.lightAvoidanceRange = this.makeRing(
       "lightAvoidanceRange",

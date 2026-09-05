@@ -147,7 +147,7 @@ const SHALLOW_WATER_TREADING_TRANSITION_SECONDS = 0.28;
 // transition does not pop.
 const SWIMMING_CAMERA_DEPTH = 0.58;
 const SWIMMING_CAMERA_BLEND_SPEED = 4.5;
-const CAMERA_TERRAIN_CLEARANCE = 0.24;
+const CAMERA_TERRAIN_CLEARANCE = 0.4;
 const CAMERA_TERRAIN_SAMPLE_SPACING = 0.45;
 const CAMERA_TERRAIN_MAX_SAMPLES = 24;
 const SOFIA_MATERIAL_ROUGHNESS = 0.92;
@@ -159,10 +159,16 @@ const OPENING_CAMERA_MIN_DESCENT_SECONDS = 2.8;
 const OPENING_CAMERA_MAX_DESCENT_SECONDS = 12;
 const charactersWithPlayedOpeningAnimation = new Set<CharacterId>();
 
-export function getNextPrimaryViewMode(mode: ViewMode): ViewMode {
-  const index = PRIMARY_VIEW_MODE_SEQUENCE.indexOf(mode);
+export function getNextPrimaryViewMode(
+  mode: ViewMode,
+  isometricAllowed = true
+): ViewMode {
+  const sequence = isometricAllowed
+    ? PRIMARY_VIEW_MODE_SEQUENCE
+    : PRIMARY_VIEW_MODE_SEQUENCE.filter((candidate) => candidate !== "iso");
+  const index = sequence.indexOf(mode);
   if (index === -1) return "third";
-  return PRIMARY_VIEW_MODE_SEQUENCE[(index + 1) % PRIMARY_VIEW_MODE_SEQUENCE.length];
+  return sequence[(index + 1) % sequence.length];
 }
 
 export class PlayerController {
@@ -183,6 +189,7 @@ export class PlayerController {
   private isometricAimX = 0;
   private isometricAimY = -1;
   private viewMode: ViewMode = "third";
+  private isometricViewAllowed = true;
   private viewModeListeners = new Set<(mode: ViewMode) => void>();
   private isometricCameraAnchor: IsometricCameraAnchor | null = null;
   private isometricCameraAnchorEnabled = false;
@@ -312,6 +319,10 @@ export class PlayerController {
     return this.viewMode;
   }
 
+  get isIsometricViewAllowed() {
+    return this.isometricViewAllowed;
+  }
+
   get waterLocomotionState() {
     return this.waterLocomotionStateValue;
   }
@@ -344,6 +355,7 @@ export class PlayerController {
 
   setViewMode(mode: ViewMode, transitionSeconds = 0) {
     if (this.openingSequenceActive) return;
+    if (mode === "iso" && !this.isometricViewAllowed) return;
     if (this.viewMode === mode) return;
     let transitionOrigin: Vector3 | null = null;
     if (transitionSeconds > 0) {
@@ -367,6 +379,18 @@ export class PlayerController {
     for (const listener of this.viewModeListeners) listener(mode);
   }
 
+  setIsometricViewAllowed(allowed: boolean, transitionSeconds = 0) {
+    if (this.isometricViewAllowed === allowed) return;
+    this.isometricViewAllowed = allowed;
+    if (!allowed && this.viewMode === "iso") {
+      this.setViewMode("third", transitionSeconds);
+      return;
+    }
+    // Availability changes the camera-cycle label even when the active mode
+    // remains the same, so refresh the existing view listeners.
+    for (const listener of this.viewModeListeners) listener(this.viewMode);
+  }
+
   setIsometricCameraAnchor(anchor: IsometricCameraAnchor | null) {
     if (anchor) {
       this.isometricCameraAnchor = anchor;
@@ -385,7 +409,9 @@ export class PlayerController {
   }
 
   toggleViewMode() {
-    this.setViewMode(getNextPrimaryViewMode(this.viewMode));
+    this.setViewMode(
+      getNextPrimaryViewMode(this.viewMode, this.isometricViewAllowed)
+    );
   }
 
   async loadCharacter(rootUrl = CHARACTER_ROOT_URL, fileName = CHARACTER_FILES[this.character]) {
@@ -1107,8 +1133,11 @@ export class PlayerController {
           segments.resolveCameraPosition(origin, desired),
           terrain
         );
+    const terrainSafePosition = this.clampCameraAboveTerrain(adjusted, terrain);
     const inverse = this.root.getWorldMatrix().clone().invert();
-    this.camera.position.copyFrom(Vector3.TransformCoordinates(adjusted, inverse));
+    this.camera.position.copyFrom(
+      Vector3.TransformCoordinates(terrainSafePosition, inverse)
+    );
     this.lookAtLocal(target);
   }
 
@@ -1146,6 +1175,13 @@ export class PlayerController {
     if (cameraWorld.y < minimumWorldY) {
       this.camera.position.y += minimumWorldY - cameraWorld.y;
     }
+  }
+
+  private clampCameraAboveTerrain(position: Vector3, terrain: TerrainHandle) {
+    const minimumY =
+      terrain.getHeightAt(position.x, position.z) + CAMERA_TERRAIN_CLEARANCE;
+    if (position.y >= minimumY) return position;
+    return new Vector3(position.x, minimumY, position.z);
   }
 
   private resolveCameraTerrainPosition(

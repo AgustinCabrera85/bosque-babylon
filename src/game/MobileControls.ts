@@ -207,7 +207,10 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
   });
 
   player.onViewModeChange((mode) => {
-    const nextMode = getNextPrimaryViewMode(mode);
+    const nextMode = getNextPrimaryViewMode(
+      mode,
+      player.isIsometricViewAllowed
+    );
     const isDefaultView = mode === "third";
     cameraButton.classList.toggle("active", !isDefaultView);
     cameraButton.textContent = getViewModeShortLabel(nextMode);

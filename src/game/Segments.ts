@@ -276,37 +276,6 @@ export class Segments {
     }
   }
 
-  isInsideEndHouseCameraZone(position: Vector3, travelDeltaZ = 0) {
-    const bounds = this.endHouseBounds;
-    if (!bounds) return false;
-
-    // Enter the safer indoor camera before the player crosses the front wall,
-    // so the transition starts while the isometric camera is still unobstructed.
-    const sideMargin = 6;
-    const frontMargin = 7;
-    const rearMargin = 5;
-    const insideHouseApproach =
-      position.x >= bounds.min.x - sideMargin &&
-      position.x <= bounds.max.x + sideMargin &&
-      position.z >= bounds.min.z - frontMargin &&
-      position.z <= bounds.max.z + rearMargin;
-    if (insideHouseApproach) return true;
-
-    // On the return trip the high lagoon camera can reveal the house roof from
-    // well behind it, particularly along the camera-facing bank. Catch only
-    // backward travel here so this wider zone does not cancel ISO while the
-    // player is entering the lagoon.
-    const returnSideMargin = 30;
-    const returnRearMargin = 42;
-    return (
-      travelDeltaZ < -0.001 &&
-      position.x >= bounds.min.x - returnSideMargin &&
-      position.x <= bounds.max.x + returnSideMargin &&
-      position.z >= bounds.min.z - frontMargin &&
-      position.z <= bounds.max.z + returnRearMargin
-    );
-  }
-
   /**
    * Builds the finite procedural route while the loading screen is still up.
    * Runtime streaming then only toggles cached nodes and uploads preassembled

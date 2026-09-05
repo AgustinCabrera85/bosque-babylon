@@ -47,7 +47,7 @@ export interface ShadowGrabberConfig {
   };
   armMaterial: ShadowGrabberMaterialConfig;
   portalMaterial: ShadowGrabberMaterialConfig;
-  detectionRange: number;
+  runningDetectionBonus: number;
   activationRange: number;
   deactivationRange: number;
   attackRange: number;
@@ -150,7 +150,7 @@ export const SHADOW_GRABBER_STATE_ANIMATION: Readonly<
 export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   modelUrl: SHADOW_GRABBER_MODEL_URL,
   // Calibrated in-game Shadow Grabber scale. Do not normalize the GLB again.
-  baseScale: 3.5,
+  baseScale: 3.9,
   fxQuality: "low",
   portalRotationSpeed: 0.18,
   animationSpeed: {
@@ -200,39 +200,41 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
     roughness: 0.72,
     environmentIntensity: 0.22,
   },
-  detectionRange: 18,
-  activationRange: 34,
-  deactivationRange: 42,
-  attackRange: 5,
+  // Running is audible from farther away; walking retains the base range.
+  runningDetectionBonus: 14,
+  activationRange: 40,
+  deactivationRange: 96,
+  attackRange: 5.6,
   grabRange: 3.5,
-  // Player walk/run are 2.8/6.8: idle deceives, hunt catches walking but not running.
+  // Player walk/run are 2.8/6.8. Hunters can close on a sprint in darkness,
+  // while candles and the flashlight still reduce their effective speed.
   idleSpeed: 0.52,
   idlePatrolRadius: 1.15,
   idlePatrolAngularSpeed: 0.16,
-  huntSpeed: 3.05,
-  encircleSpeed: 2.85,
-  lightRetreatSpeed: 3.2,
-  maxMoveSpeed: 3.2,
-  acceleration: 8.2,
-  deceleration: 7.2,
-  turnSpeed: 5.2,
+  huntSpeed: 7.55,
+  encircleSpeed: 6.9,
+  lightRetreatSpeed: 5.2,
+  maxMoveSpeed: 7.8,
+  acceleration: 12.5,
+  deceleration: 10,
+  turnSpeed: 6.4,
   pressureStandoffDistance: 2.9,
-  predictionTimeMin: 1.2,
-  predictionTimeMax: 2.8,
-  predictionMaxDistance: 9.5,
+  predictionTimeMin: 0.9,
+  predictionTimeMax: 1.85,
+  predictionMaxDistance: 13.5,
   flankerLateralDistance: 4.6,
   flankerForwardDistance: 2.8,
   hoverHeightMin: 0.55,
   hoverHeightMax: 0.85,
   hoverBobAmplitude: 0.055,
   hoverBobFrequency: 0.72,
-  tacticalUpdateHz: 6,
+  tacticalUpdateHz: 8,
   roleReassignmentIntervalIdle: 6,
   roleReassignmentIntervalActive: 2.2,
   roleActivityHysteresisSeconds: 0.8,
   separationRadius: 5.5,
   separationStrength: 1.15,
-  returnToAnchorDelay: 2.5,
+  returnToAnchorDelay: 5,
   anchorArrivalRadius: 0.45,
   hardLightAvoidanceRadius: 7,
   softLightAvoidanceRadius: 13,
@@ -249,9 +251,9 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   legTargetLeadTime: 0.16,
   // In Babylon's imported pose the palm projects from the portal toward local -X.
   attackForwardAxis: [-1, 0],
-  telegraphDuration: 0.56,
-  aimLockLeadTime: 0.13,
-  extendDuration: 0.39,
+  telegraphDuration: 0.48,
+  aimLockLeadTime: 0.1,
+  extendDuration: 0.36,
   grabDuration: 0.34,
   maxHoldDuration: 2.25,
   retractDuration: 0.7,
@@ -259,16 +261,18 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   attackCooldownMax: 2,
   groupAttackCooldown: 0.42,
   maxConcurrentAttacks: 1,
-  grabHitRadius: 1,
+  grabHitRadius: 1.15,
   grabActiveWindowStart: 0.12,
   grabActiveWindowEnd: 0.96,
   grabSanityDrainPerSecond: 0.08,
   grabBreakDistance: 5.6,
   grabMovementMultiplier: 0.68,
   grabPullSpeed: 0.38,
-  obstacleProbeDistance: 0.8,
+  obstacleProbeDistance: 1.2,
   obstacleAvoidanceAngle: Math.PI / 5,
-  maxDistanceFromAnchor: 56,
+  // Roughly two and a half 70-unit segments: an alerted grabber can keep
+  // pursuing well beyond its authored encounter without roaming forever.
+  maxDistanceFromAnchor: 175,
 };
 
 export function createShadowGrabberConfig(

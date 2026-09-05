@@ -161,14 +161,14 @@ export class TreeLibrary {
 
   async load(scene: Scene, maxTemplates = Number.POSITIVE_INFINITY) {
     const files = [
-      "tree_00.glb",
-      "tree_01.glb",
-      "tree_02.glb",
-      "tree_03.glb",
-      "tree_04.glb",
-      "tree_05.glb",
+      "tree_00_runtime.glb",
+      "tree_01_runtime.glb",
+      "tree_02_runtime.glb",
+      "tree_03_runtime.glb",
+      "tree_04_runtime.glb",
+      "tree_05_runtime.glb",
       // tree_06.glb es el mismo tronco caido que tree_08.glb; se reserva solo para el bloqueo inicial.
-      "tree_07.glb",
+      "tree_07_runtime.glb",
     ];
 
 for (const file of files.slice(0, maxTemplates)) {

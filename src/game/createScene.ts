@@ -66,7 +66,7 @@ import { loadInitialForestEnemies } from "./levels/ForestEnemySpawns";
 
 // ✅ Vite url imports (desde src/assets)
 const pathUrl = "/assets/models/textures/terrain/ground_camino/ground.jpg";
-const SKY_DESKTOP_URL = "/assets/hdr/forest_night_8k.jpg";
+const SKY_DESKTOP_URL = "/assets/hdr/forest_night_4k.jpg";
 const SKY_MOBILE_URL = "/assets/hdr/hdr_high.png";
 const BASE_FOG_DENSITY = 0.021;
 const ISO_FOG_DENSITY = 0.011;
@@ -127,9 +127,9 @@ export const desktopQuality: QualityProfile = {
   segmentBehind: 1,
   segmentAhead: 2,
   objectSegmentBehind: 1,
-  objectSegmentAhead: 5,
+  objectSegmentAhead: 4,
   plantSegmentBehind: 1,
-  plantSegmentAhead: 8,
+  plantSegmentAhead: 5,
   treeCount: 60,
   rockCount: 14,
   grassBuildCount: 4200,
@@ -654,14 +654,16 @@ scene.onBeforeRenderObservable.add(() => {
   const plantLibrary = new PlantLibrary();
   const rockLibrary = new RockLibrary();
 
-  onProgress(0.45, "Cargando rocas...");
-  await rockLibrary.load(scene, quality.rockTemplateLimit);
-  onProgress(0.62, "Cargando arboles...");
-  await treeLibrary.load(scene, quality.treeTemplateLimit);
-  onProgress(0.74, "Cargando pasto...");
-  await grassLibrary.load(scene, quality.grassTemplateLimit);
-  onProgress(0.82, "Cargando plantas...");
-  await plantLibrary.load(scene, quality.plantTemplateLimit);
+  onProgress(0.45, "Cargando arboles y rocas...");
+  await Promise.all([
+    treeLibrary.load(scene, quality.treeTemplateLimit),
+    rockLibrary.load(scene, quality.rockTemplateLimit),
+  ]);
+  onProgress(0.72, "Cargando vegetacion...");
+  await Promise.all([
+    grassLibrary.load(scene, quality.grassTemplateLimit),
+    plantLibrary.load(scene, quality.plantTemplateLimit),
+  ]);
 
   // =========================
   // Segmentos
@@ -685,12 +687,14 @@ scene.onBeforeRenderObservable.add(() => {
     plantFarCount: quality.plantFarCount,
   });
 
-  onProgress(0.88, "Cargando casa...");
+  onProgress(0.86, "Cargando casa...");
   await segments.loadCandles();
-  await segments.loadStartBlocker();
-  await segments.loadEndHouse();
-  onProgress(0.89, "Cargando enemigos...");
-  await enemyManager.preload(SHADOW_GRABBER_TYPE);
+  await Promise.all([
+    segments.loadStartBlocker(),
+    segments.loadEndHouse(),
+    enemyManager.preload(SHADOW_GRABBER_TYPE),
+  ]);
+  onProgress(0.89, "Preparando tramo final...");
   const terminalLandmark = new TerminalLandmarkGenerator(
     scene,
     terrain,
@@ -1083,6 +1087,9 @@ scene.onBeforeRenderObservable.add(() => {
     hints.set(looking ? "E: interactuar" : null);
   });
 
+  // Register only after all hidden warm-up renders. The opening action then
+  // begins after the first visible frame instead of completing under loading.
+  scene.onAfterRenderObservable.addOnce(() => player.playOpeningAnimation());
   onProgress(1, "Listo");
   return scene;
 }

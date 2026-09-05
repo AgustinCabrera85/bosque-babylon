@@ -163,8 +163,8 @@ const ISOMETRIC_OCCLUDER_MIN_VISIBILITY = 0.28;
 const ISOMETRIC_OCCLUDER_HEIGHT_CLEARANCE = 0.35;
 const ISOMETRIC_OCCLUDER_BLEND = 0.26;
 // Asset especial: no se carga en TreeLibrary para que no aparezca en la generacion normal.
-const START_BLOCKER_TREE_PATH = "/assets/models/blockers/";
-const START_BLOCKER_TREE_FILE = "tree_08.glb";
+const START_BLOCKER_TREE_PATH = "/assets/models/vegetation/";
+const START_BLOCKER_TREE_FILE = "tree_08_runtime.glb";
 
 function clamp(x: number, min: number, max: number) {
   return Math.max(min, Math.min(max, x));

@@ -42,7 +42,8 @@ function shouldUseMobileQuality() {
 const quality = shouldUseMobileQuality() ? mobileQuality : desktopQuality;
 const hardwareScaling = quality.name === "mobile"
   ? ((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8) <= 4 ? 2.25 : 1.8
-  : 1;
+  // 80% per axis retains the vintage image while cutting full-screen work by 36%.
+  : 1.25;
 
 const engine = new Engine(renderCanvas, quality.name === "desktop", {
   preserveDrawingBuffer: false,

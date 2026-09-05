@@ -44,12 +44,12 @@ export class RockLibrary {
 
   async load(scene: Scene, maxTemplates = Number.POSITIVE_INFINITY) {
     const files = [
-      "rock_01.glb",
-      "rock_02.glb",
-      "rock_03.glb",
-      "rock_04.glb",
-      "rock_05.glb",
-      "rock_06.glb",
+      "rock_01_runtime.glb",
+      "rock_02_runtime.glb",
+      "rock_03_runtime.glb",
+      "rock_04_runtime.glb",
+      "rock_05_runtime.glb",
+      "rock_06_runtime.glb",
     ];
 
     for (const file of files.slice(0, maxTemplates)) {

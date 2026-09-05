@@ -262,6 +262,25 @@ try {
     screenshots: [idleScreenshot, maximumIsoScreenshot, surfaceOnlyIsoScreenshot, maximumThirdScreenshot, maximumFrontScreenshot, maximumFirstScreenshot],
     browserErrors: client.errors,
   }, null, 2));
+} catch (error) {
+  let pageState = null;
+  try {
+    pageState = await client?.evaluate(`({
+      readyState: document.readyState,
+      loadingText: document.getElementById('loadingText')?.textContent,
+      loadingProgress: document.getElementById('loadingBar')?.style.width,
+      loadingHidden: document.getElementById('loadingScreen')?.classList.contains('hidden'),
+      characterSelectionHidden: document.getElementById('characterSelection')?.classList.contains('hidden')
+    })`);
+  } catch {
+    // Preserve the original profiler failure if the page is no longer available.
+  }
+  console.error(JSON.stringify({
+    profilerError: error instanceof Error ? error.message : String(error),
+    pageState,
+    browserErrors: client?.errors ?? [],
+  }, null, 2));
+  throw error;
 } finally {
   client?.close();
   chrome.kill();

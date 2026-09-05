@@ -198,6 +198,7 @@ export class PlayerController {
   private fadeElapsed = 0;
   private fadeDuration = ANIMATION_BLEND_TIME;
   private actionPlaying = false;
+  private openingAnimationPending = false;
   private movementLockTimer = 0;
   private enemyGrabPressureTimer = 0;
   private enemyGrabMovementMultiplier = 1;
@@ -404,11 +405,19 @@ export class PlayerController {
       !charactersWithPlayedOpeningAnimation.has(this.character) &&
       this.animations.has(CHARACTER_ANIMATIONS.standingUp)
     ) {
-      charactersWithPlayedOpeningAnimation.add(this.character);
-      this.playAction("standingUp", 1, STANDING_UP_BLEND_TIME);
+      this.openingAnimationPending = true;
+      this.playAnimation("idle", true);
     } else {
       this.playAnimation("idle", true);
     }
+  }
+
+  playOpeningAnimation() {
+    if (!this.openingAnimationPending) return false;
+    this.openingAnimationPending = false;
+    charactersWithPlayedOpeningAnimation.add(this.character);
+    this.playAction("standingUp", 1, STANDING_UP_BLEND_TIME);
+    return true;
   }
 
   playInteractionAction(type?: string, movementLockSeconds?: number) {

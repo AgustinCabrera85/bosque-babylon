@@ -35,6 +35,10 @@ import type { WaterSurfaceInfo } from "./WaterSurface";
 export const DEFAULT_END_HOUSE_SEGMENT = 8;
 export const DEFAULT_WORLD_SEGMENT_LENGTH = 70;
 const CAVE_LIGHT_ACTIVATION_RADIUS = 112;
+const CAVE_LIGHT_DEACTIVATION_RADIUS = 124;
+const LAGOON_LIGHT_ACTIVATION_RADIUS = 72;
+const LAGOON_LIGHT_DEACTIVATION_RADIUS = 84;
+const WATERFALL_PARTICLE_ACTIVATION_RADIUS = 118;
 
 export type TerminalLandmarkConfig = {
   seed: number;
@@ -220,7 +224,6 @@ type CaveCandleDecoration = {
 
 type WaterfallDropletBurst = {
   system: ParticleSystem;
-  impactPoint: Vector3;
   nextBurstAt: number;
   sequence: number;
 };
@@ -269,7 +272,14 @@ export class TerminalLandmarkGenerator {
     baseIntensity: number;
     phase: number;
   }[] = [];
+  private readonly waterfallOverlayMeshes: AbstractMesh[] = [];
+  private readonly waterfallParticleSystems: ParticleSystem[] = [];
+  private readonly lagoonLights: PointLight[] = [];
   private waterfallDropletBurst: WaterfallDropletBurst | null = null;
+  private waterfallParticleImpactPoint: Vector3 | null = null;
+  private waterfallParticlesActive = false;
+  private lagoonLightActivationPoint: Vector3 | null = null;
+  private lagoonLightsActive = false;
   private animationTime = 0;
 
   constructor(
@@ -301,9 +311,12 @@ export class TerminalLandmarkGenerator {
         isPointInsideTerminalLagoon(config, position, horizontalMargin),
     };
     const waterfallMetrics = this.getWaterfallMetrics(config);
+    this.waterfallParticleImpactPoint = waterfallMetrics.impactPoint.clone();
     const passageAnchor = this.createPassageAnchor(config);
     const waterfallLayers = this.createWaterfall(root, config, waterfallMetrics);
     const waterfallFoam = this.createWaterfallFoam(root, config, waterfallMetrics.impactPoint);
+    waterfallFoam.setEnabled(false);
+    this.waterfallOverlayMeshes.push(waterfallFoam);
     this.createWaterfallSplash(config, waterfallMetrics.impactPoint);
     this.createWaterfallDropletBursts(config, waterfallMetrics.impactPoint);
     this.createWaterfallMist(config, waterfallMetrics.impactPoint);
@@ -341,6 +354,14 @@ export class TerminalLandmarkGenerator {
       root,
       waterfallMetrics.impactPoint
     );
+    this.lagoonLightActivationPoint = new Vector3(
+      config.lagoonCenterX,
+      config.waterLevel,
+      config.lagoonCenterZ
+    );
+    this.lagoonLights.push(underwaterLight, waterfallImpactLight);
+    underwaterLight.setEnabled(false);
+    waterfallImpactLight.setEnabled(false);
     this.limitLagoonLights(
       underwaterLight,
       waterfallImpactLight,
@@ -588,8 +609,14 @@ export class TerminalLandmarkGenerator {
     }
 
     const refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONEVERYTWOFRAMES;
-    if (material.refractionTexture) material.refractionTexture.refreshRate = refreshRate;
-    if (material.reflectionTexture) material.reflectionTexture.refreshRate = refreshRate;
+    if (material.refractionTexture) {
+      material.refractionTexture.refreshRate = refreshRate;
+      material.refractionTexture.setRenderingAutoClearDepthStencil(1, false);
+    }
+    if (material.reflectionTexture) {
+      material.reflectionTexture.refreshRate = refreshRate;
+      material.reflectionTexture.setRenderingAutoClearDepthStencil(1, false);
+    }
   }
 
   private createUnderwaterLight(root: TransformNode, config: TerminalLandmarkConfig) {
@@ -1042,7 +1069,7 @@ export class TerminalLandmarkGenerator {
     splash.gravity = new Vector3(0, -5.5, 0);
     splash.blendMode = ParticleSystem.BLENDMODE_STANDARD;
     splash.renderingGroupId = 1;
-    splash.start();
+    this.waterfallParticleSystems.push(splash);
   }
 
   private createWaterfallDropletBursts(
@@ -1099,11 +1126,10 @@ export class TerminalLandmarkGenerator {
     system.emitRate = 0;
     system.manualEmitCount = 0;
     system.disposeOnStop = false;
-    system.start();
+    this.waterfallParticleSystems.push(system);
 
     this.waterfallDropletBurst = {
       system,
-      impactPoint: impactPoint.clone(),
       nextBurstAt: 0.18,
       sequence: 0,
     };
@@ -1152,7 +1178,7 @@ export class TerminalLandmarkGenerator {
     mist.gravity = new Vector3(0, -0.18, 0);
     mist.blendMode = ParticleSystem.BLENDMODE_STANDARD;
     mist.renderingGroupId = 1;
-    mist.start();
+    this.waterfallParticleSystems.push(mist);
   }
 
   private populateWaterfallCaveRocks(
@@ -1452,36 +1478,76 @@ export class TerminalLandmarkGenerator {
     for (const material of this.animatedMaterials) {
       material.setFloat("time", this.animationTime);
     }
+    this.updateLagoonLightActivation(playerPosition);
     for (const { light, baseIntensity, phase } of this.flickeringLights) {
+      const activationRadius = light.isEnabled()
+        ? CAVE_LIGHT_DEACTIVATION_RADIUS
+        : CAVE_LIGHT_ACTIVATION_RADIUS;
       const shouldEnable =
         !playerPosition ||
         Vector3.DistanceSquared(playerPosition, light.getAbsolutePosition()) <=
-          CAVE_LIGHT_ACTIVATION_RADIUS * CAVE_LIGHT_ACTIVATION_RADIUS;
-      light.setEnabled(shouldEnable);
+          activationRadius * activationRadius;
+      if (light.isEnabled() !== shouldEnable) light.setEnabled(shouldEnable);
       if (!shouldEnable) continue;
       const flicker =
         Math.sin(this.animationTime * 11.5 + phase) * 0.09 +
         Math.sin(this.animationTime * 23.0 + phase * 0.7) * 0.045;
       light.intensity = baseIntensity + flicker;
     }
-    this.updateWaterfallDropletBursts(playerPosition);
+    if (this.updateWaterfallParticleActivation(playerPosition)) {
+      this.updateWaterfallDropletBursts();
+    }
   }
 
-  private updateWaterfallDropletBursts(playerPosition?: Vector3) {
+  private updateLagoonLightActivation(playerPosition?: Vector3) {
+    const activationPoint = this.lagoonLightActivationPoint;
+    const activationRadius = this.lagoonLightsActive
+      ? LAGOON_LIGHT_DEACTIVATION_RADIUS
+      : LAGOON_LIGHT_ACTIVATION_RADIUS;
+    const shouldBeActive =
+      !playerPosition ||
+      !activationPoint ||
+      Vector3.DistanceSquared(playerPosition, activationPoint) <=
+        activationRadius * activationRadius;
+    if (shouldBeActive === this.lagoonLightsActive) return;
+
+    this.lagoonLightsActive = shouldBeActive;
+    for (const light of this.lagoonLights) light.setEnabled(shouldBeActive);
+  }
+
+  private updateWaterfallParticleActivation(playerPosition?: Vector3) {
+    const impactPoint = this.waterfallParticleImpactPoint;
+    const shouldBeActive =
+      !playerPosition ||
+      !impactPoint ||
+      Vector3.DistanceSquared(playerPosition, impactPoint) <=
+        WATERFALL_PARTICLE_ACTIVATION_RADIUS * WATERFALL_PARTICLE_ACTIVATION_RADIUS;
+    if (shouldBeActive === this.waterfallParticlesActive) return shouldBeActive;
+
+    this.waterfallParticlesActive = shouldBeActive;
+    for (const mesh of this.waterfallOverlayMeshes) mesh.setEnabled(shouldBeActive);
+    for (const system of this.waterfallParticleSystems) {
+      if (shouldBeActive) {
+        if (!system.isStarted()) system.start();
+      } else {
+        system.stop();
+        system.reset();
+      }
+    }
+
+    if (!shouldBeActive && this.waterfallDropletBurst) {
+      // Do not replay bursts skipped while the terminal area was inactive.
+      this.waterfallDropletBurst.nextBurstAt = Math.max(
+        this.waterfallDropletBurst.nextBurstAt,
+        this.animationTime + 0.2
+      );
+    }
+    return shouldBeActive;
+  }
+
+  private updateWaterfallDropletBursts() {
     const burst = this.waterfallDropletBurst;
     if (!burst) return;
-
-    const activationRadius = CAVE_LIGHT_ACTIVATION_RADIUS * 1.7;
-    const isNear =
-      !playerPosition ||
-      Vector3.DistanceSquared(playerPosition, burst.impactPoint) <=
-        activationRadius * activationRadius;
-    if (!isNear) {
-      // Avoid accumulating missed bursts that would all fire when the player
-      // re-enters the lagoon area.
-      burst.nextBurstAt = Math.max(burst.nextBurstAt, this.animationTime + 0.2);
-      return;
-    }
     if (this.animationTime < burst.nextBurstAt) return;
 
     const tuning = this.visualConfig.impact;

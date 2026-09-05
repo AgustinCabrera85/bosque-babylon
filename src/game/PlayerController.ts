@@ -28,6 +28,16 @@ type Settings = {
 };
 
 export type ViewMode = "first" | "third" | "front" | "iso";
+export type IsometricCameraAnchor = {
+  cameraPosition: Vector3;
+  targetPosition: Vector3;
+  orthographicHeight: number;
+  cameraFollowFactorX?: number;
+  maxCameraOffsetX?: number;
+  targetFollowFactor?: number;
+  maxTargetOffsetX?: number;
+  maxTargetOffsetZ?: number;
+};
 export type LookRay = {
   origin: Vector3;
   direction: Vector3;
@@ -113,6 +123,7 @@ const ISOMETRIC_INTERACTION_HEIGHT = 0.65;
 const ISOMETRIC_INTERACTION_RADIUS = 2.15;
 const ISOMETRIC_MOUSE_AIM_SPEED = 44;
 const ISOMETRIC_AIM_DEADZONE = 0.08;
+const ISOMETRIC_ANCHOR_BLEND_SPEED = 1.65;
 const TREADING_WATER_ENTER_DEPTH = 1.34;
 const TREADING_WATER_EXIT_DEPTH = 1.18;
 // The treading clip keeps its animated torso higher than the locomotion root.
@@ -170,6 +181,14 @@ export class PlayerController {
   private isometricAimY = -1;
   private viewMode: ViewMode = "third";
   private viewModeListeners = new Set<(mode: ViewMode) => void>();
+  private isometricCameraAnchor: IsometricCameraAnchor | null = null;
+  private isometricCameraAnchorEnabled = false;
+  private isometricCameraAnchorBlend = 0;
+  private cameraViewTransition: {
+    fromWorldPosition: Vector3;
+    elapsed: number;
+    duration: number;
+  } | null = null;
   private avatarRoot: TransformNode | null = null;
   private avatarMeshes: AbstractMesh[] = [];
   private animations = new Map<string, AnimationGroup>();
@@ -294,14 +313,45 @@ export class PlayerController {
     return () => this.viewModeListeners.delete(listener);
   }
 
-  setViewMode(mode: ViewMode) {
+  setViewMode(mode: ViewMode, transitionSeconds = 0) {
     if (this.viewMode === mode) return;
+    let transitionOrigin: Vector3 | null = null;
+    if (transitionSeconds > 0) {
+      this.root.computeWorldMatrix(true);
+      this.camera.computeWorldMatrix();
+      transitionOrigin = this.camera.globalPosition.clone();
+    }
+
     const previousMode = this.viewMode;
     this.viewMode = mode;
     if (mode === "iso" && previousMode !== "iso") this.syncIsometricAimFromYaw();
     this.clampPitchForView();
     this.applyCameraRig();
+    this.cameraViewTransition = transitionOrigin
+      ? {
+          fromWorldPosition: transitionOrigin,
+          elapsed: 0,
+          duration: Math.max(0.08, transitionSeconds),
+        }
+      : null;
     for (const listener of this.viewModeListeners) listener(mode);
+  }
+
+  setIsometricCameraAnchor(anchor: IsometricCameraAnchor | null) {
+    if (anchor) {
+      this.isometricCameraAnchor = anchor;
+      this.isometricCameraAnchorEnabled = true;
+      return;
+    }
+    this.isometricCameraAnchorEnabled = false;
+  }
+
+  get isUsingIsometricCameraAnchor() {
+    return (
+      this.viewMode === "iso" &&
+      this.isometricCameraAnchor !== null &&
+      this.isometricCameraAnchorBlend > 0.001
+    );
   }
 
   toggleViewMode() {
@@ -549,6 +599,7 @@ export class PlayerController {
     // Streaming and shader compilation can occasionally stall a frame. Never
     // convert that wall-clock pause into several metres of player movement.
     dt = Math.max(0, Math.min(dt, MAX_SIMULATION_DELTA_SECONDS));
+    this.updateIsometricCameraAnchorBlend(dt);
 
     if (this.movementLockTimer > 0) {
       this.movementLockTimer = Math.max(0, this.movementLockTimer - dt);
@@ -572,7 +623,7 @@ export class PlayerController {
       this.jumpQueued = false;
       this.updateMovementSfx("idle");
       this.updateAnimationFade(dt);
-      this.updateThirdPersonCameraCollision(segments, terrain);
+      this.updateThirdPersonCameraCollision(dt, segments, terrain);
       return;
     }
 
@@ -695,7 +746,7 @@ export class PlayerController {
     }
     this.jumpQueued = false;
 
-    this.updateThirdPersonCameraCollision(segments, terrain);
+    this.updateThirdPersonCameraCollision(dt, segments, terrain);
     this.updateAvatarAnimation(moveX, moveY, running);
     const moving = Math.abs(moveX) > 0.12 || Math.abs(moveY) > 0.12;
     this.updateMovementSfx(
@@ -887,7 +938,11 @@ export class PlayerController {
     if (state !== "idle") this.playSfx(state);
   }
 
-  private updateThirdPersonCameraCollision(segments: Segments, terrain: TerrainHandle) {
+  private updateThirdPersonCameraCollision(
+    deltaTime: number,
+    segments: Segments,
+    terrain: TerrainHandle
+  ) {
     this.configureCameraProjection();
     if (this.viewMode === "first") {
       this.positionFirstPersonCamera();
@@ -902,9 +957,17 @@ export class PlayerController {
     this.root.computeWorldMatrix(true);
     this.camera.computeWorldMatrix();
     const origin = Vector3.TransformCoordinates(target, this.root.getWorldMatrix());
-    const desired = this.camera.globalPosition.clone();
-    const blockerAdjusted = segments.resolveCameraPosition(origin, desired);
-    const adjusted = this.resolveCameraTerrainPosition(origin, blockerAdjusted, terrain);
+    const desired = this.applyCameraViewTransition(
+      this.camera.globalPosition.clone(),
+      deltaTime
+    );
+    const adjusted = this.isUsingIsometricCameraAnchor
+      ? desired
+      : this.resolveCameraTerrainPosition(
+          origin,
+          segments.resolveCameraPosition(origin, desired),
+          terrain
+        );
     const inverse = this.root.getWorldMatrix().clone().invert();
     this.camera.position.copyFrom(Vector3.TransformCoordinates(adjusted, inverse));
     this.lookAtLocal(target);
@@ -918,7 +981,13 @@ export class PlayerController {
   }
 
   private applySwimmingCameraDepth() {
-    if (!this.activeWaterSurface || this.swimmingCameraBlend <= 0) return;
+    // An isometric camera must stay above WaterMaterial. Submerging the remote
+    // map camera exposes the back side of the water and terrain at the lagoon.
+    if (
+      this.viewMode === "iso" ||
+      !this.activeWaterSurface ||
+      this.swimmingCameraBlend <= 0
+    ) return;
 
     // The controller only rotates around Y, therefore local and world vertical
     // deltas are identical. Constrain all camera modes below the WaterMaterial
@@ -1004,7 +1073,12 @@ export class PlayerController {
     }
 
     const aspect = this.canvas.clientWidth / Math.max(1, this.canvas.clientHeight);
-    const halfHeight = ISOMETRIC_ORTHO_HEIGHT * 0.5;
+    const anchorBlend = this.getSmoothedIsometricAnchorBlend();
+    const anchorHeight = this.isometricCameraAnchor?.orthographicHeight ?? ISOMETRIC_ORTHO_HEIGHT;
+    const orthoHeight =
+      ISOMETRIC_ORTHO_HEIGHT +
+      (anchorHeight - ISOMETRIC_ORTHO_HEIGHT) * anchorBlend;
+    const halfHeight = orthoHeight * 0.5;
     const halfWidth = halfHeight * Math.max(0.1, aspect);
     this.camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
     this.camera.orthoLeft = -halfWidth;
@@ -1039,17 +1113,110 @@ export class PlayerController {
     this.root.computeWorldMatrix(true);
     const rootWorld = this.root.getWorldMatrix();
     const targetWorld = Vector3.TransformCoordinates(target, rootWorld);
-    const desiredWorld = targetWorld.add(
+    let desiredWorld = targetWorld.add(
       new Vector3(ISOMETRIC_CAMERA_SIDE_OFFSET, ISOMETRIC_CAMERA_HEIGHT, -ISOMETRIC_CAMERA_DISTANCE)
     );
+    if (this.isometricCameraAnchor) {
+      const anchor = this.isometricCameraAnchor;
+      const cameraFollowFactorX = Math.max(
+        0,
+        Math.min(1, anchor.cameraFollowFactorX ?? 0)
+      );
+      const maxCameraOffsetX = Math.max(0, anchor.maxCameraOffsetX ?? 0);
+      const cameraOffsetX = Math.max(
+        -maxCameraOffsetX,
+        Math.min(
+          maxCameraOffsetX,
+          (this.root.position.x - anchor.targetPosition.x) * cameraFollowFactorX
+        )
+      );
+      const anchoredCameraPosition = anchor.cameraPosition.add(
+        new Vector3(cameraOffsetX, 0, 0)
+      );
+      desiredWorld = Vector3.Lerp(
+        desiredWorld,
+        anchoredCameraPosition,
+        this.getSmoothedIsometricAnchorBlend()
+      );
+    }
     const inverseRootWorld = rootWorld.clone().invert();
     this.camera.position.copyFrom(Vector3.TransformCoordinates(desiredWorld, inverseRootWorld));
     this.lookAtLocal(target);
   }
 
   private getCameraTargetLocal() {
-    if (this.viewMode === "iso") return new Vector3(0, ISOMETRIC_CAMERA_TARGET_HEIGHT, 0);
+    if (this.viewMode === "iso") {
+      const localTarget = new Vector3(0, ISOMETRIC_CAMERA_TARGET_HEIGHT, 0);
+      const anchor = this.isometricCameraAnchor;
+      if (!anchor || this.isometricCameraAnchorBlend <= 0) return localTarget;
+
+      this.root.computeWorldMatrix(true);
+      const rootWorld = this.root.getWorldMatrix();
+      const targetWorld = Vector3.TransformCoordinates(localTarget, rootWorld);
+      const anchoredTarget = this.getIsometricAnchorTargetWorld(anchor);
+      const blendedTarget = Vector3.Lerp(
+        targetWorld,
+        anchoredTarget,
+        this.getSmoothedIsometricAnchorBlend()
+      );
+      return Vector3.TransformCoordinates(blendedTarget, rootWorld.clone().invert());
+    }
     return this.getThirdPersonTargetLocal();
+  }
+
+  private getIsometricAnchorTargetWorld(anchor: IsometricCameraAnchor) {
+    const followFactor = Math.max(0, Math.min(1, anchor.targetFollowFactor ?? 0));
+    const maxX = Math.max(0, anchor.maxTargetOffsetX ?? 0);
+    const maxZ = Math.max(0, anchor.maxTargetOffsetZ ?? 0);
+    const offsetX = Math.max(
+      -maxX,
+      Math.min(maxX, (this.root.position.x - anchor.targetPosition.x) * followFactor)
+    );
+    const offsetZ = Math.max(
+      -maxZ,
+      Math.min(maxZ, (this.root.position.z - anchor.targetPosition.z) * followFactor)
+    );
+    return anchor.targetPosition.add(new Vector3(offsetX, 0, offsetZ));
+  }
+
+  private updateIsometricCameraAnchorBlend(deltaTime: number) {
+    const target = this.isometricCameraAnchorEnabled ? 1 : 0;
+    const step = Math.max(0, deltaTime) * ISOMETRIC_ANCHOR_BLEND_SPEED;
+    if (this.isometricCameraAnchorBlend < target) {
+      this.isometricCameraAnchorBlend = Math.min(
+        target,
+        this.isometricCameraAnchorBlend + step
+      );
+    } else if (this.isometricCameraAnchorBlend > target) {
+      this.isometricCameraAnchorBlend = Math.max(
+        target,
+        this.isometricCameraAnchorBlend - step
+      );
+    }
+
+    if (!this.isometricCameraAnchorEnabled && this.isometricCameraAnchorBlend <= 0) {
+      this.isometricCameraAnchor = null;
+    }
+  }
+
+  private getSmoothedIsometricAnchorBlend() {
+    const amount = Math.max(0, Math.min(1, this.isometricCameraAnchorBlend));
+    return amount * amount * (3 - 2 * amount);
+  }
+
+  private applyCameraViewTransition(desiredWorld: Vector3, deltaTime: number) {
+    const transition = this.cameraViewTransition;
+    if (!transition) return desiredWorld;
+
+    transition.elapsed = Math.min(
+      transition.duration,
+      transition.elapsed + Math.max(0, deltaTime)
+    );
+    const amount = transition.elapsed / transition.duration;
+    const smooth = amount * amount * (3 - 2 * amount);
+    const position = Vector3.Lerp(transition.fromWorldPosition, desiredWorld, smooth);
+    if (amount >= 1) this.cameraViewTransition = null;
+    return position;
   }
 
   private getThirdPersonTargetLocal() {

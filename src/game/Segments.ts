@@ -82,6 +82,11 @@ export type StaticWorldBlocker = {
   rotation?: number;
 };
 
+type WorldBounds = {
+  min: Vector3;
+  max: Vector3;
+};
+
 type SegTreePack = { nodes: TransformNode[]; lod: 0 | 1 | 2 };
 type SegRockPack = { nodes: TransformNode[] };
 type SegCandlePack = { nodes: TransformNode[] };
@@ -134,6 +139,8 @@ const CANDLE_LIGHT_FULL_INFLUENCE_RADIUS = 7;
 const CANDLE_LIGHT_FADE_RADIUS = 28;
 const CANDLE_LIGHT_INTENSITY_RESPONSE = 2.8;
 const CANDLE_LIGHT_POSITION_RESPONSE = 3.6;
+const CANDLE_LIGHT_ENABLE_INTENSITY = 0.015;
+const CANDLE_LIGHT_DISABLE_INTENSITY = 0.006;
 const STREAM_TREE_LOD: 0 | 1 | 2 = 1;
 const PLAYER_WORLD_COLLISION_RADIUS = 1.0;
 const PLAYER_HOUSE_COLLISION_RADIUS = 0.42;
@@ -204,6 +211,7 @@ export class Segments {
   private firstNoteCreated = false;
   private endHouseCheckpoint: Vector3 | null = null;
   private endHouseMeshes: AbstractMesh[] = [];
+  private endHouseBounds: WorldBounds | null = null;
   private worldPrewarmed = false;
 
   constructor(
@@ -232,6 +240,57 @@ export class Segments {
 
   getEndHouseMeshes(): readonly AbstractMesh[] {
     return this.endHouseMeshes;
+  }
+
+  prepareLightingForPosition(playerPosition: Vector3) {
+    this.updateCandleLightTargets(playerPosition);
+    for (const pool of this.candleLightPool) {
+      pool.currentIntensity = pool.targetIntensity;
+      pool.currentRange = pool.targetRange;
+      pool.light.intensity = pool.currentIntensity;
+      pool.light.range = pool.currentRange;
+
+      const shouldEnable = pool.currentIntensity >= CANDLE_LIGHT_ENABLE_INTENSITY;
+      if (shouldEnable) {
+        pool.light.position.copyFrom(pool.targetPosition);
+        pool.initialized = true;
+      } else {
+        pool.light.intensity = 0;
+        pool.initialized = false;
+      }
+      if (pool.light.isEnabled() !== shouldEnable) pool.light.setEnabled(shouldEnable);
+    }
+  }
+
+  isInsideEndHouseCameraZone(position: Vector3, travelDeltaZ = 0) {
+    const bounds = this.endHouseBounds;
+    if (!bounds) return false;
+
+    // Enter the safer indoor camera before the player crosses the front wall,
+    // so the transition starts while the isometric camera is still unobstructed.
+    const sideMargin = 6;
+    const frontMargin = 7;
+    const rearMargin = 5;
+    const insideHouseApproach =
+      position.x >= bounds.min.x - sideMargin &&
+      position.x <= bounds.max.x + sideMargin &&
+      position.z >= bounds.min.z - frontMargin &&
+      position.z <= bounds.max.z + rearMargin;
+    if (insideHouseApproach) return true;
+
+    // On the return trip the high lagoon camera can reveal the house roof from
+    // well behind it, particularly along the camera-facing bank. Catch only
+    // backward travel here so this wider zone does not cancel ISO while the
+    // player is entering the lagoon.
+    const returnSideMargin = 30;
+    const returnRearMargin = 42;
+    return (
+      travelDeltaZ < -0.001 &&
+      position.x >= bounds.min.x - returnSideMargin &&
+      position.x <= bounds.max.x + returnSideMargin &&
+      position.z >= bounds.min.z - frontMargin &&
+      position.z <= bounds.max.z + returnRearMargin
+    );
   }
 
   /**
@@ -852,6 +911,7 @@ export class Segments {
       light.intensity = 0;
       light.range = CANDLE_LIGHT_RANGE;
       light.renderPriority = CANDLE_LIGHT_RENDER_PRIORITY;
+      light.setEnabled(false);
 
       this.candleLightPool.push({
         side,
@@ -1341,6 +1401,21 @@ export class Segments {
           Math.sin(t * 18.7 + pool.side * 0.83) * 0.012;
         pool.light.intensity = Math.max(0, pool.currentIntensity * (1 + poolFlicker));
         pool.light.range = pool.currentRange;
+
+        if (
+          pool.light.isEnabled() &&
+          pool.targetIntensity <= CANDLE_LIGHT_DISABLE_INTENSITY &&
+          pool.currentIntensity <= CANDLE_LIGHT_DISABLE_INTENSITY
+        ) {
+          pool.light.intensity = 0;
+          pool.light.setEnabled(false);
+          pool.initialized = false;
+        } else if (
+          !pool.light.isEnabled() &&
+          pool.targetIntensity >= CANDLE_LIGHT_ENABLE_INTENSITY
+        ) {
+          pool.light.setEnabled(true);
+        }
       }
     });
   }
@@ -1397,6 +1472,12 @@ export class Segments {
       pool.targetIntensity =
         (weightedIntensity / totalWeight) * clamp(combinedInfluence, 0, 1);
       pool.targetRange = weightedRange / totalWeight;
+      if (
+        !pool.light.isEnabled() &&
+        pool.targetIntensity >= CANDLE_LIGHT_ENABLE_INTENSITY
+      ) {
+        pool.light.setEnabled(true);
+      }
     }
   }
 
@@ -1471,6 +1552,10 @@ export class Segments {
 
     const finalBounds = this.getHierarchyBounds(res.meshes);
     if (!finalBounds) return;
+    this.endHouseBounds = {
+      min: finalBounds.min.clone(),
+      max: finalBounds.max.clone(),
+    };
 
     this.noSpawnZones.push({
       x: (finalBounds.min.x + finalBounds.max.x) * 0.5,

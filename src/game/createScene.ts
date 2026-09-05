@@ -6,7 +6,13 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { RockLibrary } from "./RockLibrary";
 import { createTerrain } from "./Terrain";
-import { getNextPrimaryViewMode, PlayerController, type CharacterId, type ViewMode } from "./PlayerController";
+import {
+  getNextPrimaryViewMode,
+  PlayerController,
+  type CharacterId,
+  type IsometricCameraAnchor,
+  type ViewMode,
+} from "./PlayerController";
 import { Segments } from "./Segments";
 import { TreeLibrary } from "./TreeLibrary";
 import { GrassLibrary } from "./GrassLibrary";
@@ -294,6 +300,9 @@ export async function createScene(
   onProgress(0.08, "Creando escena...");
   const scene = new Scene(engine);
   installSceneMaterialLightBudgetGuard(scene);
+  // Water-contact and waterfall alpha effects render after WaterMaterial, but
+  // must keep the opaque world's depth or they appear through the whole map.
+  scene.setRenderingAutoClearDepthStencil(1, false, false, false);
 
   // =========================
   // Fog lúgubre (NOCHE)
@@ -480,6 +489,8 @@ const terrain = createTerrain(scene, {
 const FLASHLIGHT_BASE_INTENSITY = 4.4;
 const FLASHLIGHT_FILL_BASE_INTENSITY = 0.68;
 const FLASHLIGHT_REACH_BASE_INTENSITY = 0.78;
+const FLASHLIGHT_PRIMARY_RENDER_PRIORITY = 30;
+const FLASHLIGHT_FILL_RENDER_PRIORITY = 29;
 const initialLook = player.getFlashlightRay();
 const flashlight = new SpotLight(
   "flashlight",
@@ -496,6 +507,7 @@ flashlight.innerAngle = Math.PI / 13;
 
 flashlight.intensity = FLASHLIGHT_BASE_INTENSITY;
 flashlight.range = 52;
+flashlight.renderPriority = FLASHLIGHT_PRIMARY_RENDER_PRIORITY;
 
 flashlight.diffuse = new Color3(1.0, 0.96, 0.88); // cálida
 flashlight.specular = new Color3(0, 0, 0);
@@ -513,6 +525,7 @@ flashlightFill.falloffType = Light.FALLOFF_GLTF;
 flashlightFill.innerAngle = Math.PI / 9.5;
 flashlightFill.intensity = FLASHLIGHT_FILL_BASE_INTENSITY;
 flashlightFill.range = 42;
+flashlightFill.renderPriority = FLASHLIGHT_FILL_RENDER_PRIORITY;
 flashlightFill.diffuse = new Color3(0.82, 0.74, 0.58);
 flashlightFill.specular = new Color3(0, 0, 0);
 
@@ -553,6 +566,9 @@ const setFlashlightEnabled = (enabled: boolean) => {
   flashlight.intensity = enabled ? FLASHLIGHT_BASE_INTENSITY : 0;
   flashlightFill.intensity = enabled ? FLASHLIGHT_FILL_BASE_INTENSITY : 0;
   flashlightReach.intensity = enabled ? FLASHLIGHT_REACH_BASE_INTENSITY : 0;
+  for (const light of flashlightLights) {
+    if (light.isEnabled() !== enabled) light.setEnabled(enabled);
+  }
   flashlightButton?.classList.toggle("active", enabled);
   flashlightButton?.setAttribute("aria-pressed", String(enabled));
 };
@@ -675,6 +691,26 @@ scene.onBeforeRenderObservable.add(() => {
         segments.instantiateCandleAsset(name, scale),
     }
   ).generateWaterfallLagoonEnd(terminalConfig);
+  const lagoonIsometricCameraAnchor: IsometricCameraAnchor = {
+    // A high, stable world-space viewpoint keeps the orthographic camera away
+    // from the lagoon banks, waterfall ribbons and terrain underside.
+    cameraPosition: new Vector3(
+      terminalConfig.lagoonCenterX + 28,
+      terminalConfig.waterLevel + 32,
+      terminalConfig.lagoonCenterZ - 34
+    ),
+    targetPosition: new Vector3(
+      terminalConfig.lagoonCenterX,
+      terminalConfig.waterLevel + 0.8,
+      terminalConfig.lagoonCenterZ + 4
+    ),
+    orthographicHeight: 38,
+    cameraFollowFactorX: 0.42,
+    maxCameraOffsetX: 9.5,
+    targetFollowFactor: 0.36,
+    maxTargetOffsetX: 8,
+    maxTargetOffsetZ: 16,
+  };
   // The lagoon lights use explicit mesh lists to protect the global light
   // budget. Include the loaded avatar so a submerged third-person view keeps
   // the swimmer readable without adding another dynamic light.
@@ -704,6 +740,8 @@ scene.onBeforeRenderObservable.add(() => {
       }),
       getPlayerState: () => ({
         waterLocomotion: player.waterLocomotionState,
+        viewMode: player.currentViewMode,
+        isometricCameraAnchored: player.isUsingIsometricCameraAnchor,
         animation: player.currentAnimationName,
         registeredAnimations: player.getRegisteredAnimationNames(),
       }),
@@ -828,8 +866,15 @@ scene.onBeforeRenderObservable.add(() => {
   // wait indefinitely before the normal render loop has started.
   const initialPlayerPosition = player.position.clone();
   const houseWarmupPosition = segments.getEndHouseCheckpoint();
+  const terminalTransitionWarmupPosition = new Vector3(
+    terminalConfig.lagoonCenterX,
+    initialPlayerPosition.y,
+    terminalConfig.transitionStartZ + 6
+  );
   const lagoonWarmupPosition = terminalLandmark.waterfallImpactPoint.clone();
-  const prepareTransitionState = async (position: Vector3) => {
+  const prepareTransitionState = async (position: Vector3, frameCount = 2) => {
+    segments.update(position);
+    segments.prepareLightingForPosition(position);
     terminalLandmark.update(0, position);
     endTorches.update(position);
     // The regular guard runs in onBeforeRender, but these readiness passes run
@@ -837,18 +882,29 @@ scene.onBeforeRenderObservable.add(() => {
     // Babylon may generate 12-15-light shaders that exceed WebGL2 UBO limits.
     enforceSceneMaterialLightBudget(scene);
     synchronizeSceneLightPriorities(scene);
-    for (let frame = 0; frame < 2; frame++) {
+    for (let frame = 0; frame < frameCount; frame++) {
       scene.render();
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     }
   };
 
-  onProgress(0.965, "Compilando materiales del bosque...");
+  onProgress(0.96, "Compilando materiales del bosque...");
   await prepareTransitionState(initialPlayerPosition);
-  onProgress(0.975, "Compilando materiales de la casa...");
+  onProgress(0.97, "Compilando materiales de la casa...");
   await prepareTransitionState(houseWarmupPosition);
-  onProgress(0.985, "Compilando materiales del lago...");
+  onProgress(0.98, "Compilando transición al lago...");
+  await prepareTransitionState(terminalTransitionWarmupPosition);
+  onProgress(0.986, "Compilando materiales del lago...");
   await prepareTransitionState(lagoonWarmupPosition);
+  // The flashlight is normally on, but its off-state has a different stable
+  // light membership. Compile the three main regions once so toggling it does
+  // not move shader work into gameplay.
+  onProgress(0.991, "Compilando iluminación alternativa...");
+  setFlashlightEnabled(false);
+  await prepareTransitionState(initialPlayerPosition, 1);
+  await prepareTransitionState(houseWarmupPosition, 1);
+  await prepareTransitionState(lagoonWarmupPosition, 1);
+  setFlashlightEnabled(true);
   await prepareTransitionState(initialPlayerPosition);
   onProgress(0.995, "Preparando controles...");
 
@@ -856,10 +912,31 @@ scene.onBeforeRenderObservable.add(() => {
   // Loop
   // =========================
   let grassWindTimer = 0;
+  let previousCameraZonePlayerZ = player.position.z;
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.max(0, Math.min(engine.getDeltaTime() / 1000, 0.05));
     // Activate cached world content before collision and movement use it.
     segments.update(player.position);
+    const cameraZoneTravelDeltaZ = player.position.z - previousCameraZonePlayerZ;
+    previousCameraZonePlayerZ = player.position.z;
+    if (
+      player.currentViewMode === "iso" &&
+      segments.isInsideEndHouseCameraZone(player.position, cameraZoneTravelDeltaZ)
+    ) {
+      // Start outside the front wall, before the isometric collision ray can
+      // collapse the camera into the roof or floor meshes.
+      player.setViewMode("third", 0.78);
+    }
+    const lagoonIsometricCameraActive =
+      player.currentViewMode === "iso" &&
+      Math.abs(player.position.x - terminalConfig.lagoonCenterX) <=
+        terminalConfig.lagoonRadiusX + 24 &&
+      player.position.z >=
+        terminalConfig.lagoonCenterZ - terminalConfig.lagoonRadiusZ + 6 &&
+      player.position.z <= terminalConfig.backCliffZ + 16;
+    player.setIsometricCameraAnchor(
+      lagoonIsometricCameraActive ? lagoonIsometricCameraAnchor : null
+    );
     player.update(dt, terrain, segments);
     waterContactSystem.update(dt);
     waterInteractionVfx.update(dt);
@@ -868,7 +945,10 @@ scene.onBeforeRenderObservable.add(() => {
     lagoonUnderwaterEffect.update(dt);
     endTorches.update(player.position);
     synchronizeSceneLightPriorities(scene);
-    segments.updateIsometricOccluders(player.position, player.currentViewMode === "iso");
+    segments.updateIsometricOccluders(
+      player.position,
+      player.currentViewMode === "iso" && !lagoonIsometricCameraActive
+    );
     if (quality.grassWindInterval <= 0) {
       grassLibrary.updateWind(dt);
     } else {

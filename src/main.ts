@@ -14,6 +14,14 @@ const renderCanvas = canvas;
 const loadingScreen = document.getElementById("loadingScreen");
 const loadingText = document.getElementById("loadingText");
 const loadingBar = document.getElementById("loadingBar");
+const openingSequence = document.getElementById("openingSequence");
+const openingQuote = document.getElementById("openingQuote");
+
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+
+const nextFrame = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
 function setLoading(value: number, text: string) {
   if (loadingText) loadingText.textContent = text;
@@ -30,6 +38,51 @@ function showLoading() {
   if (!loadingScreen) return;
   loadingScreen.classList.remove("hidden");
   loadingScreen.setAttribute("aria-hidden", "false");
+}
+
+function armDesktopControlFromStartGesture() {
+  const startButton = document.getElementById("startCharacterButton");
+  startButton?.addEventListener(
+    "click",
+    () => {
+      if (!window.matchMedia("(pointer: fine)").matches) return;
+      renderCanvas.requestPointerLock?.().catch(() => {
+        // Some browsers refuse locking an obscured canvas. The normal canvas
+        // click remains available after the cinematic in that case.
+      });
+    },
+    { once: true }
+  );
+}
+
+async function playOpeningPresentation(startCinematic: () => Promise<void>) {
+  document.body.classList.add("opening-sequence-active");
+  openingSequence?.classList.remove("hidden", "active", "revealing");
+  openingSequence?.setAttribute("aria-hidden", "false");
+  openingQuote?.classList.remove("visible");
+
+  await nextFrame();
+  openingSequence?.classList.add("active");
+  await wait(720);
+  hideLoading();
+
+  openingQuote?.classList.add("visible");
+  await wait(3400);
+  openingQuote?.classList.remove("visible");
+  await wait(1050);
+
+  const cinematicFinished = startCinematic();
+  await nextFrame();
+  openingSequence?.classList.add("revealing");
+
+  try {
+    await Promise.all([cinematicFinished, wait(1950)]);
+  } finally {
+    openingSequence?.classList.add("hidden");
+    openingSequence?.classList.remove("active", "revealing");
+    openingSequence?.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("opening-sequence-active");
+  }
 }
 
 function shouldUseMobileQuality() {
@@ -54,6 +107,7 @@ engine.setHardwareScalingLevel(hardwareScaling);
 const musicPlayer = setupMusicPlayer();
 
 async function start() {
+  armDesktopControlFromStartGesture();
   const selectedCharacter = await setupCharacterSelection();
   document.body.classList.remove("character-selecting");
   showLoading();
@@ -62,7 +116,7 @@ async function start() {
   const inventory = setupInventory({ inspectItem: itemInspector.inspect });
 
   setLoading(0.02, `Iniciando motor (${quality.name})...`);
-  const scene = await createScene(
+  const { scene, playOpeningSequence } = await createScene(
     engine,
     renderCanvas,
     setLoading,
@@ -71,11 +125,16 @@ async function start() {
     musicPlayer
   );
 
-  scene.onAfterRenderObservable.addOnce(hideLoading);
+  const firstFrameReady = new Promise<void>((resolve) => {
+    scene.onAfterRenderObservable.addOnce(() => resolve());
+  });
   engine.runRenderLoop(() => {
     if (pauseMenu.isPaused() || itemInspector.isOpen() || inventory.isOpen()) return;
     scene.render();
   });
+
+  await firstFrameReady;
+  await playOpeningPresentation(playOpeningSequence);
 }
 
 start().catch((error) => {

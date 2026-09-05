@@ -349,6 +349,16 @@ body.character-selecting #renderCanvas {
   inset: 0;
   pointer-events: none;
   color: #dbe6df;
+  transition: opacity 500ms ease;
+}
+
+body.opening-sequence-active #hud {
+  opacity: 0;
+}
+
+body.opening-sequence-active #inventoryButton {
+  opacity: 0;
+  pointer-events: none;
 }
 
 #loadingScreen {
@@ -401,6 +411,80 @@ body.character-selecting #renderCanvas {
   border-radius: inherit;
   background: #9bc59d;
   transition: width 180ms ease;
+}
+
+.opening-sequence {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: clamp(28px, 8vw, 120px);
+  box-sizing: border-box;
+  overflow: hidden;
+  background: #000;
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 700ms ease-in;
+}
+
+.opening-sequence.hidden {
+  display: none;
+}
+
+.opening-sequence.active {
+  opacity: 1;
+}
+
+.opening-sequence.active.revealing {
+  opacity: 0;
+  transition-duration: 1900ms;
+  transition-timing-function: ease-in-out;
+}
+
+.opening-quote {
+  width: min(760px, 88vw);
+  margin: 0;
+  color: rgba(224, 216, 197, 0.92);
+  font: italic clamp(20px, 2.35vw, 34px) / 1.55 Georgia, "Times New Roman", serif;
+  letter-spacing: 0.025em;
+  text-align: center;
+  text-wrap: balance;
+  opacity: 0;
+  transform: translateY(9px);
+  filter: blur(3px);
+  text-shadow: 0 0 28px rgba(205, 190, 157, 0.14);
+  transition:
+    opacity 950ms ease,
+    transform 1100ms ease,
+    filter 1100ms ease;
+}
+
+.opening-quote.visible {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .opening-sequence {
+    padding: 24px;
+  }
+
+  .opening-quote {
+    width: min(560px, 90vw);
+    font-size: clamp(19px, 5.4vw, 27px);
+    line-height: 1.48;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opening-sequence,
+  .opening-sequence.active.revealing,
+  .opening-quote,
+  #hud {
+    transition-duration: 120ms;
+  }
 }
 
 #help {

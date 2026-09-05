@@ -154,6 +154,9 @@ const SOFIA_MATERIAL_ROUGHNESS = 0.92;
 const SOFIA_SPECULAR_INTENSITY = 0.24;
 const SOFIA_ENVIRONMENT_INTENSITY = 0.14;
 const SOFIA_DIELECTRIC_F0_FACTOR = 0.65;
+const OPENING_CAMERA_LOCAL_POSITION = new Vector3(0, 8.2, -8.4);
+const OPENING_CAMERA_MIN_DESCENT_SECONDS = 2.8;
+const OPENING_CAMERA_MAX_DESCENT_SECONDS = 12;
 const charactersWithPlayedOpeningAnimation = new Set<CharacterId>();
 
 export function getNextPrimaryViewMode(mode: ViewMode): ViewMode {
@@ -199,6 +202,13 @@ export class PlayerController {
   private fadeDuration = ANIMATION_BLEND_TIME;
   private actionPlaying = false;
   private openingAnimationPending = false;
+  private openingSequenceActive = false;
+  private openingCameraState: {
+    fromWorldPosition: Vector3;
+    phase: "holding" | "descending";
+    elapsed: number;
+    duration: number;
+  } | null = null;
   private movementLockTimer = 0;
   private enemyGrabPressureTimer = 0;
   private enemyGrabMovementMultiplier = 1;
@@ -244,23 +254,29 @@ export class PlayerController {
       if (target?.closest("#inventoryOverlay")) return;
       if (target?.closest("#inventoryButton")) return;
       if (target?.closest("#shadowAuraDebug")) return;
+      if (target?.closest("#openingSequence")) return;
+      if (this.openingSequenceActive) return;
       if (this.mobileEnabled) return;
       canvas.requestPointerLock?.();
     });
 
     window.addEventListener("mousemove", (event) => {
       if (document.pointerLockElement !== this.canvas) return;
+      if (this.openingSequenceActive) return;
       this.applyLook(event.movementX * 0.0012, event.movementY * 0.001);
     });
 
-    document.addEventListener("pointerlockchange", () => {
+    const updatePointerLockHelp = () => {
       const help = document.getElementById("help");
       const locked = document.pointerLockElement === canvas;
       if (help) help.style.display = locked || this.mobileEnabled ? "none" : "block";
-    });
+    };
+    document.addEventListener("pointerlockchange", updatePointerLockHelp);
+    updatePointerLockHelp();
 
     scene.onKeyboardObservable.add((kb) => {
       if (kb.type === KeyboardEventTypes.KEYDOWN) {
+        if (this.openingSequenceActive) return;
         const event = kb.event as KeyboardEvent;
         if (event.code === "KeyV" && !event.repeat) this.toggleViewMode();
         if (event.code === "Space" && !event.repeat) {
@@ -304,6 +320,10 @@ export class PlayerController {
     return this.currentAnimation;
   }
 
+  get isOpeningSequenceActive() {
+    return this.openingSequenceActive;
+  }
+
   setWaterSurfaceRegistry(registry: WaterSurfaceRegistry) {
     this.waterSurfaces = registry;
   }
@@ -323,6 +343,7 @@ export class PlayerController {
   }
 
   setViewMode(mode: ViewMode, transitionSeconds = 0) {
+    if (this.openingSequenceActive) return;
     if (this.viewMode === mode) return;
     let transitionOrigin: Vector3 | null = null;
     if (transitionSeconds > 0) {
@@ -412,12 +433,57 @@ export class PlayerController {
     }
   }
 
-  playOpeningAnimation() {
-    if (!this.openingAnimationPending) return false;
-    this.openingAnimationPending = false;
-    charactersWithPlayedOpeningAnimation.add(this.character);
-    this.playAction("standingUp", 1, STANDING_UP_BLEND_TIME);
-    return true;
+  prepareOpeningSequence() {
+    if (this.viewMode !== "third") this.setViewMode("third");
+    this.openingSequenceActive = true;
+    this.cameraViewTransition = null;
+    this.resetInputState();
+    this.applyCameraRig();
+    this.root.computeWorldMatrix(true);
+    this.openingCameraState = {
+      fromWorldPosition: Vector3.TransformCoordinates(
+        OPENING_CAMERA_LOCAL_POSITION,
+        this.root.getWorldMatrix()
+      ),
+      phase: "holding",
+      elapsed: 0,
+      duration: OPENING_CAMERA_MIN_DESCENT_SECONDS,
+    };
+  }
+
+  async playOpeningSequence() {
+    if (!this.openingSequenceActive) return;
+
+    let group: AnimationGroup | null = null;
+    if (this.openingAnimationPending) {
+      this.openingAnimationPending = false;
+      charactersWithPlayedOpeningAnimation.add(this.character);
+      group = this.playAction("standingUp", 1, STANDING_UP_BLEND_TIME);
+    }
+
+    const animationDuration = group ? this.getAnimationDurationSeconds(group) : 3.2;
+    if (this.openingCameraState) {
+      this.openingCameraState.phase = "descending";
+      this.openingCameraState.elapsed = 0;
+      this.openingCameraState.duration = Math.max(
+        OPENING_CAMERA_MIN_DESCENT_SECONDS,
+        Math.min(OPENING_CAMERA_MAX_DESCENT_SECONDS, animationDuration * 0.92)
+      );
+    }
+
+    try {
+      if (group) {
+        await new Promise<void>((resolve) => {
+          group?.onAnimationGroupEndObservable.addOnce(() => resolve());
+        });
+      } else {
+        await this.waitForSceneSeconds(animationDuration);
+      }
+    } finally {
+      this.openingCameraState = null;
+      this.openingSequenceActive = false;
+      this.resetInputState();
+    }
   }
 
   playInteractionAction(type?: string, movementLockSeconds?: number) {
@@ -536,20 +602,27 @@ export class PlayerController {
   }
 
   setMobileMove(x: number, y: number) {
+    if (this.openingSequenceActive) return;
     this.mobileMoveX = Math.max(-1, Math.min(1, x));
     this.mobileMoveY = Math.max(-1, Math.min(1, y));
   }
 
   setMobileRun(running: boolean) {
+    if (this.openingSequenceActive) {
+      this.mobileRun = false;
+      return;
+    }
     if (running && !this.mobileRun) this.waterActionQueued = true;
     this.mobileRun = running;
   }
 
   queueJump() {
+    if (this.openingSequenceActive) return;
     this.jumpQueued = true;
   }
 
   addMobileLook(deltaX: number, deltaY: number) {
+    if (this.openingSequenceActive) return;
     this.applyLook(deltaX * 0.0032, deltaY * 0.0027);
   }
 
@@ -654,7 +727,8 @@ export class PlayerController {
 
     this.refreshWaterEnvironment(terrain);
     this.refreshWaterLocomotionState();
-    const movementLocked = this.movementLockTimer > 0 || this.actionPlaying;
+    const movementLocked =
+      this.openingSequenceActive || this.movementLockTimer > 0 || this.actionPlaying;
     this.consumeWaterAction(movementLocked);
     this.updateSwimmingCameraBlend(dt);
 
@@ -1020,12 +1094,14 @@ export class PlayerController {
     this.root.computeWorldMatrix(true);
     this.camera.computeWorldMatrix();
     const origin = Vector3.TransformCoordinates(target, this.root.getWorldMatrix());
-    const desired = this.applyCameraViewTransition(
-      this.camera.globalPosition.clone(),
+    const desired = this.applyOpeningCameraTransition(
+      this.applyCameraViewTransition(this.camera.globalPosition.clone(), deltaTime),
       deltaTime
     );
     const adjusted = this.isUsingIsometricCameraAnchor
       ? desired
+      : this.openingCameraState
+        ? this.resolveCameraTerrainPosition(origin, desired, terrain)
       : this.resolveCameraTerrainPosition(
           origin,
           segments.resolveCameraPosition(origin, desired),
@@ -1282,6 +1358,47 @@ export class PlayerController {
     return position;
   }
 
+  private applyOpeningCameraTransition(desiredWorld: Vector3, deltaTime: number) {
+    const state = this.openingCameraState;
+    if (!state) return desiredWorld;
+    if (state.phase === "holding") return state.fromWorldPosition.clone();
+
+    state.elapsed = Math.min(state.duration, state.elapsed + Math.max(0, deltaTime));
+    const amount = state.elapsed / state.duration;
+    const smooth = amount * amount * (3 - 2 * amount);
+    const position = Vector3.Lerp(state.fromWorldPosition, desiredWorld, smooth);
+    if (amount >= 1) this.openingCameraState = null;
+    return position;
+  }
+
+  private getAnimationDurationSeconds(group: AnimationGroup) {
+    const firstAnimation = group.targetedAnimations[0]?.animation;
+    const frameRate = Math.max(1, firstAnimation?.framePerSecond ?? 30);
+    return Math.max(0.1, (group.to - group.from) / frameRate / Math.max(0.01, group.speedRatio));
+  }
+
+  private waitForSceneSeconds(duration: number) {
+    return new Promise<void>((resolve) => {
+      let elapsed = 0;
+      const observer = this.scene.onBeforeRenderObservable.add(() => {
+        elapsed += Math.max(0, Math.min(this.scene.getEngine().getDeltaTime() / 1000, 0.05));
+        if (elapsed < duration) return;
+        this.scene.onBeforeRenderObservable.remove(observer);
+        resolve();
+      });
+    });
+  }
+
+  private resetInputState() {
+    this.keys.clear();
+    this.mobileMoveX = 0;
+    this.mobileMoveY = 0;
+    this.mobileRun = false;
+    this.jumpQueued = false;
+    this.waterActionQueued = false;
+    this.updateMovementSfx("idle");
+  }
+
   private getThirdPersonTargetLocal() {
     return new Vector3(0, THIRD_PERSON_CAMERA_TARGET_HEIGHT, 0);
   }
@@ -1496,13 +1613,13 @@ export class PlayerController {
     speedRatio = 1,
     blendTime = ACTION_BLEND_TIME
   ) {
-    if (!this.animations.has(CHARACTER_ANIMATIONS[name])) return;
+    if (!this.animations.has(CHARACTER_ANIMATIONS[name])) return null;
 
     this.actionPlaying = true;
     const group = this.playAnimation(name, false, blendTime, speedRatio);
     if (!group) {
       this.actionPlaying = false;
-      return;
+      return null;
     }
 
     group.onAnimationGroupEndObservable.addOnce(() => {
@@ -1511,6 +1628,7 @@ export class PlayerController {
       this.currentAnimation = null;
       this.resumeIdleOrWaterAnimation();
     });
+    return group;
   }
 
   private resumeIdleOrWaterAnimation() {

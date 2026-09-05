@@ -761,6 +761,7 @@ scene.onBeforeRenderObservable.add(() => {
         viewMode: player.currentViewMode,
         isometricCameraAnchored: player.isUsingIsometricCameraAnchor,
         animation: player.currentAnimationName,
+        openingSequenceActive: player.isOpeningSequenceActive,
         registeredAnimations: player.getRegisteredAnimationNames(),
       }),
       getSpatialState: () => {
@@ -1087,9 +1088,12 @@ scene.onBeforeRenderObservable.add(() => {
     hints.set(looking ? "E: interactuar" : null);
   });
 
-  // Register only after all hidden warm-up renders. The opening action then
-  // begins after the first visible frame instead of completing under loading.
-  scene.onAfterRenderObservable.addOnce(() => player.playOpeningAnimation());
+  // Hold the player and the elevated opening camera before the first frame that
+  // can become visible. The UI presentation decides when both begin moving.
+  player.prepareOpeningSequence();
   onProgress(1, "Listo");
-  return scene;
+  return {
+    scene,
+    playOpeningSequence: () => player.playOpeningSequence(),
+  };
 }

@@ -15,7 +15,7 @@ export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
   const pauseStatus = document.getElementById("pauseStatus");
 
   let paused = false;
-  let wasPointerLocked = false;
+  let wasPointerLocked = document.pointerLockElement === canvas;
   let ignoreEscapeUntil = 0;
   let statusTimer: number | null = null;
 
@@ -40,6 +40,7 @@ export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
   };
 
   const setPaused = (next: boolean) => {
+    if (next && document.body.classList.contains("opening-sequence-active")) return;
     if (paused === next) return;
     paused = next;
 

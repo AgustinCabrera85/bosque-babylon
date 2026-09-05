@@ -54,6 +54,13 @@ import {
   installSceneMaterialLightBudgetGuard,
   synchronizeSceneLightPriorities,
 } from "../materials";
+import {
+  EnemyManager,
+  SHADOW_GRABBER_TYPE,
+  ShadowGrabberBehaviorSystem,
+  registerShadowGrabber,
+} from "./enemies";
+import { loadInitialForestEnemies } from "./levels/ForestEnemySpawns";
 
 
 
@@ -300,6 +307,11 @@ export async function createScene(
   onProgress(0.08, "Creando escena...");
   const scene = new Scene(engine);
   installSceneMaterialLightBudgetGuard(scene);
+  const enemyManager = new EnemyManager(scene);
+  registerShadowGrabber(enemyManager);
+  scene.metadata ??= {};
+  scene.metadata.enemyManager = enemyManager;
+  scene.onDisposeObservable.addOnce(() => enemyManager.dispose());
   // Water-contact and waterfall alpha effects render after WaterMaterial, but
   // must keep the opaque world's depth or they appear through the whole map.
   scene.setRenderingAutoClearDepthStencil(1, false, false, false);
@@ -677,6 +689,8 @@ scene.onBeforeRenderObservable.add(() => {
   await segments.loadCandles();
   await segments.loadStartBlocker();
   await segments.loadEndHouse();
+  onProgress(0.89, "Cargando enemigos...");
+  await enemyManager.preload(SHADOW_GRABBER_TYPE);
   const terminalLandmark = new TerminalLandmarkGenerator(
     scene,
     terrain,
@@ -859,6 +873,110 @@ scene.onBeforeRenderObservable.add(() => {
     onProgress(0.91 + ratio * 0.05, `Precargando bosque (${completed}/${total})...`);
   });
 
+  const shadowGrabberBehaviorSystem = new ShadowGrabberBehaviorSystem({
+    player: {
+      getPosition: () => player.position,
+      getGroundPositionToRef: (result) => player.getGroundContactPositionToRef(result),
+      getCollisionHeight: () => player.getCollisionHeight(),
+      getSanity: () => shadowAura.getSanity(),
+      applySanityDrain: (amount) => shadowAura.applySanityDrain(amount),
+      applyGrabPressure: (source, duration, movementMultiplier, pullSpeed) =>
+        player.applyEnemyGrabPressure(
+          source,
+          duration,
+          movementMultiplier,
+          pullSpeed
+        ),
+      onSanityHit: (intensity) => shadowAura.pulseSanityHit(intensity),
+    },
+    navigation: {
+      getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
+      isBlocked: (x, z) => segments.isColliding(x, z),
+    },
+    fixedSafeLightPositions: [
+      ...segments.getFixedSafeLightPositions(),
+      ...endTorches.safeLightPositions,
+    ],
+    getFlashlight: () => {
+      const ray = player.getFlashlightRay();
+      return {
+        enabled: flashlightEnabled,
+        origin: ray.origin,
+        direction: ray.direction,
+      };
+    },
+    onEvent: (id, event) => {
+      window.dispatchEvent(
+        new CustomEvent("bosque:shadow-grabber", {
+          detail: { id, event },
+        })
+      );
+    },
+    debug: {
+      enabled:
+        import.meta.env.DEV &&
+        new URLSearchParams(window.location.search).get("debugShadowGrabbers") === "1",
+      scene,
+    },
+  });
+  await loadInitialForestEnemies(enemyManager, shadowGrabberBehaviorSystem, {
+    getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
+  });
+  scene.metadata.shadowGrabberBehaviorSystem = shadowGrabberBehaviorSystem;
+  if (import.meta.env.DEV) {
+    const shadowGrabberDebug = {
+      getSnapshots: () => shadowGrabberBehaviorSystem.getDebugSnapshots(),
+      getPlayerPosition: () => player.position.clone(),
+      getSanity: () => shadowAura.getSanity(),
+      getPerformance: () => ({
+        fps: engine.getFps(),
+        frameTimeMs: engine.getDeltaTime(),
+      }),
+      setFxEnabled: (enabled: boolean) =>
+        shadowGrabberBehaviorSystem.setFxEnabled(enabled),
+      simulateShadowGrabbers: (seconds: number, stepSeconds = 1 / 60) => {
+        const committedStates = new Set([
+          "telegraphing",
+          "attacking",
+          "grabbing",
+          "holding",
+          "retracting",
+        ]);
+        const safeStep = Math.max(1 / 240, Math.min(0.05, stepSeconds));
+        const steps = Math.ceil(Math.max(0, Math.min(30, seconds)) / safeStep);
+        let maxCommitted = 0;
+        for (let index = 0; index < steps; index++) {
+          shadowGrabberBehaviorSystem.update(safeStep);
+          enemyManager.update(safeStep);
+          maxCommitted = Math.max(
+            maxCommitted,
+            shadowGrabberBehaviorSystem
+              .getDebugSnapshots()
+              .filter((snapshot) => committedStates.has(snapshot.state)).length
+          );
+        }
+        return { maxCommitted, steps };
+      },
+      teleportPlayer: (x: number, z: number) => {
+        player.root.position.set(
+          x,
+          player.getWalkableSurfaceHeight(terrain, x, z) + player.getCollisionHeight(),
+          z
+        );
+      },
+    };
+    const debugGlobal = globalThis as typeof globalThis & {
+      __bosqueShadowGrabberDebug?: typeof shadowGrabberDebug;
+    };
+    debugGlobal.__bosqueShadowGrabberDebug = shadowGrabberDebug;
+    scene.onDisposeObservable.addOnce(() => {
+      if (debugGlobal.__bosqueShadowGrabberDebug === shadowGrabberDebug) {
+        delete debugGlobal.__bosqueShadowGrabberDebug;
+      }
+    });
+  }
+  scene.onDisposeObservable.addOnce(() => shadowGrabberBehaviorSystem.dispose());
+
   // Render the exact light/material states encountered at the forest, house
   // entrance and lagoon while the loading overlay still hides incomplete RTTs.
   // Real frames both compile shaders and populate the water render targets;
@@ -938,6 +1056,8 @@ scene.onBeforeRenderObservable.add(() => {
       lagoonIsometricCameraActive ? lagoonIsometricCameraAnchor : null
     );
     player.update(dt, terrain, segments);
+    shadowGrabberBehaviorSystem.update(dt);
+    enemyManager.update(dt);
     waterContactSystem.update(dt);
     waterInteractionVfx.update(dt);
     musicPlayer?.updateListenerPosition(player.position);

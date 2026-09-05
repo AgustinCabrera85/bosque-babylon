@@ -3,6 +3,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import {
   ShadowGrabberBehavior,
   type ShadowGrabberBehaviorDebug,
+  type ShadowGrabberGameplayEvent,
   type ShadowGrabberNavigation,
   type ShadowGrabberTargetSnapshot,
 } from "./ShadowGrabberBehavior";
@@ -18,6 +19,13 @@ export type ShadowGrabberPlayerSource = {
   getCollisionHeight: () => number;
   getSanity: () => number;
   applySanityDrain: (amount: number) => void;
+  applyGrabPressure?: (
+    source: Vector3,
+    duration: number,
+    movementMultiplier: number,
+    pullSpeed: number
+  ) => void;
+  onSanityHit?: (intensity: number) => void;
 };
 
 export type ShadowGrabberBehaviorSystemOptions = {
@@ -25,7 +33,7 @@ export type ShadowGrabberBehaviorSystemOptions = {
   navigation: ShadowGrabberNavigation;
   fixedSafeLightPositions: readonly Vector3[];
   getFlashlight: () => FlashlightGameplayState;
-  maxConcurrentAttacks?: number;
+  onEvent?: (id: string, event: ShadowGrabberGameplayEvent) => void;
   debug?: {
     enabled: boolean;
     scene: Scene;
@@ -53,7 +61,7 @@ export class ShadowGrabberBehaviorSystem {
   private disposed = false;
 
   public constructor(private readonly options: ShadowGrabberBehaviorSystemOptions) {
-    this.coordinator = new ShadowGrabberCoordinator(options.maxConcurrentAttacks ?? 1);
+    this.coordinator = new ShadowGrabberCoordinator();
     this.lightQuery = new ShadowGrabberLightQuery(
       options.fixedSafeLightPositions,
       options.getFlashlight
@@ -76,6 +84,9 @@ export class ShadowGrabberBehaviorSystem {
       lightQuery: this.lightQuery,
       navigation: this.options.navigation,
       applySanityDrain: this.options.player.applySanityDrain,
+      applyGrabPressure: this.options.player.applyGrabPressure,
+      onSanityHit: this.options.player.onSanityHit,
+      onEvent: this.options.onEvent,
     });
     this.behaviors.set(controller.id, behavior);
     if (this.options.debug?.enabled) {
@@ -110,6 +121,12 @@ export class ShadowGrabberBehaviorSystem {
 
   public getDebugSnapshots(): ShadowGrabberBehaviorDebug[] {
     return [...this.behaviors.values()].map((behavior) => behavior.getDebugSnapshot());
+  }
+
+  public setFxEnabled(enabled: boolean) {
+    for (const behavior of this.behaviors.values()) {
+      behavior.controller.setFxEnabled(enabled);
+    }
   }
 
   public dispose() {

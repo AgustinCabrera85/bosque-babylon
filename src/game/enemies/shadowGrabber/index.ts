@@ -72,9 +72,14 @@ export {
   ShadowGrabberBehavior,
   ShadowGrabberBehaviorState,
   type ShadowGrabberBehaviorDebug,
+  type ShadowGrabberGameplayEvent,
   type ShadowGrabberNavigation,
   type ShadowGrabberTargetSnapshot,
 } from "./ShadowGrabberBehavior";
+export {
+  ShadowGrabberFxController,
+  type ShadowGrabberFxState,
+} from "./ShadowGrabberFxController";
 export {
   ShadowGrabberCoordinator,
   ShadowGrabberRole,
@@ -100,5 +105,6 @@ export {
   type ShadowGrabberAnimation,
   type ShadowGrabberConfig,
   type ShadowGrabberConfigOverrides,
+  type ShadowGrabberFxQuality,
   type ShadowGrabberMaterialConfig,
 } from "./ShadowGrabberConfig";

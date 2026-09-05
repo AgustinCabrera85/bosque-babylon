@@ -20,6 +20,10 @@ import {
   type ShadowGrabberAnimation,
   type ShadowGrabberConfig,
 } from "./ShadowGrabberConfig";
+import {
+  ShadowGrabberFxController,
+  type ShadowGrabberFxState,
+} from "./ShadowGrabberFxController";
 
 export interface ShadowGrabberAnimationOptions {
   loop?: boolean;
@@ -56,6 +60,8 @@ export class ShadowGrabberController extends BaseEnemyController {
   private resolvedSkeleton: Skeleton | null = null;
   private resolvedAttackPointBone: Bone | null = null;
   private resolvedFxRoot: TransformNode | null = null;
+  private fxController: ShadowGrabberFxController | null = null;
+  private fxState: ShadowGrabberFxState = "idle";
   private portalRootYOffset = 0;
 
   public constructor(
@@ -114,6 +120,13 @@ export class ShadowGrabberController extends BaseEnemyController {
     this.resolveAnimations();
     this.configureMaterials();
     this.createFxRoot();
+    if (this.resolvedFxRoot && this.config.fxQuality !== "off") {
+      this.fxController = new ShadowGrabberFxController(
+        this.root.getScene(),
+        this.resolvedFxRoot,
+        this.config.fxQuality
+      );
+    }
     this.measurePortalRootOffset();
     this.completeInitialization();
     this.setState(ShadowGrabberState.Idle);
@@ -124,9 +137,10 @@ export class ShadowGrabberController extends BaseEnemyController {
     const delta = Math.max(0, Math.min(deltaTimeSeconds, 0.1));
     this.resolvedPortalMesh.rotate(
       Axis.X,
-      this.portalRotationSpeed * delta,
+      this.portalRotationSpeed * delta * (this.fxState === "hunt" ? 1.2 : 1),
       Space.LOCAL
     );
+    this.fxController?.update(delta);
   }
 
   public setState(state: ShadowGrabberState) {
@@ -178,6 +192,15 @@ export class ShadowGrabberController extends BaseEnemyController {
 
   public getCurrentAnimation() {
     return this.currentAnimation;
+  }
+
+  public setFxState(state: ShadowGrabberFxState) {
+    this.fxState = state;
+    this.fxController?.setState(state);
+  }
+
+  public setFxEnabled(enabled: boolean) {
+    this.fxController?.setEnabled(enabled);
   }
 
   public setAnchorPosition(position: Vector3) {
@@ -267,6 +290,8 @@ export class ShadowGrabberController extends BaseEnemyController {
   }
 
   protected override onDispose() {
+    this.fxController?.dispose();
+    this.fxController = null;
     this.currentAnimation = null;
     this.animations.clear();
     this.resolvedArmatureRoot = null;

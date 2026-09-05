@@ -195,6 +195,7 @@ export class ShadowAuraController {
   private visualSanity = 1;
   private targetHealth = 1;
   private targetSanity = 1;
+  private sanityHitPulse = 0;
   private enabled: boolean;
   private visible = true;
   private surfaceOnly = false;
@@ -261,6 +262,23 @@ export class ShadowAuraController {
     this.targetSanity = normalizeStat(sanity);
   }
 
+  getSanity() {
+    return this.targetSanity;
+  }
+
+  /** Gameplay entry point shared by enemy effects and the existing aura/debug state. */
+  applySanityDrain(amount: number) {
+    if (!Number.isFinite(amount) || amount <= 0) return this.targetSanity;
+    this.targetSanity = clamp01(this.targetSanity - amount);
+    return this.targetSanity;
+  }
+
+  /** Reuses the existing corruption pipeline for a brief, non-flashing grab impact. */
+  pulseSanityHit(intensity = 1) {
+    if (!Number.isFinite(intensity) || intensity <= 0) return;
+    this.sanityHitPulse = Math.max(this.sanityHitPulse, clamp01(intensity));
+  }
+
   updateState(state: Partial<ShadowAuraState>) {
     if (state.health !== undefined) this.setHealth(state.health);
     if (state.sanity !== undefined) this.setSanity(state.sanity);
@@ -321,6 +339,7 @@ export class ShadowAuraController {
     const smoothing = 1 - Math.exp(-this.config.smoothingSpeed * safeDt);
     this.visualHealth = lerp(this.visualHealth, this.targetHealth, smoothing);
     this.visualSanity = lerp(this.visualSanity, this.targetSanity, smoothing);
+    this.sanityHitPulse = Math.max(0, this.sanityHitPulse - safeDt * 3.4);
     this.elapsed += safeDt;
 
     if (!this.enabled || !this.visible || !this.isWithinDistance()) {
@@ -329,7 +348,7 @@ export class ShadowAuraController {
     }
 
     const healthDamage = 1 - this.visualHealth;
-    const sanityDamage = 1 - this.visualSanity;
+    const sanityDamage = clamp01(1 - this.visualSanity + this.sanityHitPulse * 0.055);
     const coverage = clamp01(
       Math.max(healthDamage, sanityDamage * 0.65) + healthDamage * sanityDamage * 0.15
     );

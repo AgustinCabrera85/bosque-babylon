@@ -242,6 +242,20 @@ export class Segments {
     return this.endHouseMeshes;
   }
 
+  /** Authored candle positions for gameplay safe-zone queries; no scene-light scan. */
+  getFixedSafeLightPositions() {
+    const result: Vector3[] = [];
+    const seen = new Set<string>();
+    for (const entry of this.candleLights) {
+      const position = entry.root.getAbsolutePosition();
+      const key = `${position.x.toFixed(2)}:${position.z.toFixed(2)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(position.clone());
+    }
+    return result;
+  }
+
   prepareLightingForPosition(playerPosition: Vector3) {
     this.updateCandleLightTargets(playerPosition);
     for (const pool of this.candleLightPool) {

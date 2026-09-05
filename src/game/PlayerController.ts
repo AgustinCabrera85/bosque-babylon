@@ -199,6 +199,10 @@ export class PlayerController {
   private fadeDuration = ANIMATION_BLEND_TIME;
   private actionPlaying = false;
   private movementLockTimer = 0;
+  private enemyGrabPressureTimer = 0;
+  private enemyGrabMovementMultiplier = 1;
+  private enemyGrabPullSpeed = 0;
+  private readonly enemyGrabSource = Vector3.Zero();
   private sfxMovementState: "idle" | "walk" | "run" = "idle";
   private waterSurfaces: WaterSurfaceRegistry | null = null;
   private activeWaterSurface: WaterSurfaceInfo | null = null;
@@ -281,6 +285,10 @@ export class PlayerController {
     result.copyFrom(this.root.position);
     result.y -= this.settings.eyeHeight;
     return result;
+  }
+
+  getCollisionHeight() {
+    return this.settings.eyeHeight;
   }
 
   get currentViewMode() {
@@ -421,6 +429,22 @@ export class PlayerController {
   playThrowObject(movementLockSeconds = THROW_ACTION_MOVEMENT_LOCK_SECONDS) {
     this.lockMovement(movementLockSeconds);
     this.playAction("throwObject");
+  }
+
+  /** Keeps input responsive while a grab briefly slows and tugs the character. */
+  applyEnemyGrabPressure(
+    source: Vector3,
+    duration: number,
+    movementMultiplier: number,
+    pullSpeed: number
+  ) {
+    this.enemyGrabSource.copyFrom(source);
+    this.enemyGrabPressureTimer = Math.max(this.enemyGrabPressureTimer, duration);
+    this.enemyGrabMovementMultiplier = Math.min(
+      this.enemyGrabMovementMultiplier,
+      Math.max(0.35, Math.min(1, movementMultiplier))
+    );
+    this.enemyGrabPullSpeed = Math.max(this.enemyGrabPullSpeed, Math.max(0, pullSpeed));
   }
 
   private lockMovement(seconds: number) {
@@ -601,6 +625,14 @@ export class PlayerController {
     dt = Math.max(0, Math.min(dt, MAX_SIMULATION_DELTA_SECONDS));
     this.updateIsometricCameraAnchorBlend(dt);
 
+    if (this.enemyGrabPressureTimer > 0) {
+      this.enemyGrabPressureTimer = Math.max(0, this.enemyGrabPressureTimer - dt);
+      if (this.enemyGrabPressureTimer === 0) {
+        this.enemyGrabMovementMultiplier = 1;
+        this.enemyGrabPullSpeed = 0;
+      }
+    }
+
     if (this.movementLockTimer > 0) {
       this.movementLockTimer = Math.max(0, this.movementLockTimer - dt);
     }
@@ -669,7 +701,7 @@ export class PlayerController {
     }
 
     const running = this.mobileRun || this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
-    const speed =
+    const baseSpeed =
       this.waterLocomotionStateValue === "swimming"
         ? SWIMMING_SPEED
         : this.waterLocomotionStateValue === "treadingWater"
@@ -677,6 +709,9 @@ export class PlayerController {
           : running
             ? this.settings.runSpeed
             : this.settings.walkSpeed;
+    const speed =
+      baseSpeed *
+      (this.enemyGrabPressureTimer > 0 ? this.enemyGrabMovementMultiplier : 1);
 
     if (movementLocked) {
       moveX = 0;
@@ -695,6 +730,25 @@ export class PlayerController {
 
       const tryZ = pz + move.z;
       if (!segments.isColliding(this.root.position.x, tryZ)) this.root.position.z = tryZ;
+    }
+
+    if (this.enemyGrabPressureTimer > 0 && this.enemyGrabPullSpeed > 0) {
+      let pullX = this.enemyGrabSource.x - this.root.position.x;
+      let pullZ = this.enemyGrabSource.z - this.root.position.z;
+      const pullDistance = Math.hypot(pullX, pullZ);
+      if (pullDistance > 0.05) {
+        const pullStep = Math.min(pullDistance, this.enemyGrabPullSpeed * dt);
+        pullX = (pullX / pullDistance) * pullStep;
+        pullZ = (pullZ / pullDistance) * pullStep;
+        const pullTargetX = this.root.position.x + pullX;
+        if (!segments.isColliding(pullTargetX, this.root.position.z)) {
+          this.root.position.x = pullTargetX;
+        }
+        const pullTargetZ = this.root.position.z + pullZ;
+        if (!segments.isColliding(this.root.position.x, pullTargetZ)) {
+          this.root.position.z = pullTargetZ;
+        }
+      }
     }
 
     const maxX = 60;

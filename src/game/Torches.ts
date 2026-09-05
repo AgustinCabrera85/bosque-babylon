@@ -34,6 +34,7 @@ const END_TORCH_LIGHT_ACTIVATION_RADIUS = 80;
 
 export type EndTorchesHandle = {
   update: (playerPosition: Vector3) => void;
+  safeLightPositions: readonly Vector3[];
 };
 
 export type EndTorchesOptions = {
@@ -476,6 +477,9 @@ export async function createEndTorches(
 
   const activationRadiusSquared = END_TORCH_LIGHT_ACTIVATION_RADIUS ** 2;
   return {
+    safeLightPositions: placements.map(({ x, z }) =>
+      new Vector3(x, terrain.getHeightAt(x, z), z)
+    ),
     update(playerPosition) {
       for (const { light } of lights) {
         const distanceSquared = Vector3.DistanceSquared(playerPosition, light.position);

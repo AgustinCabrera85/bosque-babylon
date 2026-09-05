@@ -3,6 +3,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { LinesMesh } from "@babylonjs/core/Meshes/linesMesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
@@ -29,6 +30,9 @@ export class ShadowGrabberDebugView {
   private readonly detectionRange: Mesh;
   private readonly attackRange: Mesh;
   private readonly lightAvoidanceRange: Mesh;
+  private readonly modelForward: LinesMesh;
+  private readonly attackForward: LinesMesh;
+  private readonly grabLine: LinesMesh;
   private readonly label: Mesh;
   private readonly materials: StandardMaterial[];
   private readonly labelTexture: DynamicTexture;
@@ -54,13 +58,37 @@ export class ShadowGrabberDebugView {
     this.attackRange = this.makeRing("attackRange", controller.config.attackRange, magenta);
     this.lightAvoidanceRange = this.makeRing(
       "lightAvoidanceRange",
-      controller.config.safeLightHardRadius,
+      controller.config.hardLightAvoidanceRadius,
       orange
     );
+    this.modelForward = MeshBuilder.CreateLines(
+      `${this.root.name}:modelForward`,
+      { points: [Vector3.Zero(), new Vector3(0, 0, 2.4)], updatable: true },
+      scene
+    );
+    this.modelForward.parent = this.root;
+    this.modelForward.color = new Color3(0.2, 0.65, 1);
+    this.modelForward.isPickable = false;
+    this.attackForward = MeshBuilder.CreateLines(
+      `${this.root.name}:attackForward`,
+      { points: [Vector3.Zero(), new Vector3(0, 0, 3.2)], updatable: true },
+      scene
+    );
+    this.attackForward.parent = this.root;
+    this.attackForward.color = new Color3(1, 0.94, 0.75);
+    this.attackForward.isPickable = false;
+    this.grabLine = MeshBuilder.CreateLines(
+      `${this.root.name}:grabLine`,
+      { points: [Vector3.Zero(), new Vector3(0, 0, 1)], updatable: true },
+      scene
+    );
+    this.grabLine.parent = this.root;
+    this.grabLine.color = new Color3(1, 0.16, 0.12);
+    this.grabLine.isPickable = false;
 
     this.labelTexture = new DynamicTexture(
       `${this.root.name}:labelTexture`,
-      { width: 512, height: 96 },
+      { width: 512, height: 144 },
       scene,
       false
     );
@@ -73,7 +101,7 @@ export class ShadowGrabberDebugView {
     this.materials.push(labelMaterial);
     this.label = MeshBuilder.CreatePlane(
       `${this.root.name}:label`,
-      { width: 1.9, height: 0.34 },
+      { width: 2.3, height: 0.64 },
       scene
     );
     this.label.parent = this.root;
@@ -88,6 +116,24 @@ export class ShadowGrabberDebugView {
     this.tacticalTarget.position.copyFrom(snapshot.tacticalTarget);
     this.tacticalTarget.position.y += 0.12;
     this.grabTarget.position.copyFrom(snapshot.grabTarget);
+    const modelAngle = snapshot.rootRotationY;
+    const attackLocalAngle = Math.atan2(
+      this.controller.config.attackForwardAxis[0],
+      this.controller.config.attackForwardAxis[1]
+    );
+    this.updateDirectionLine(
+      this.modelForward,
+      snapshot.portalPosition,
+      modelAngle,
+      2.4
+    );
+    this.updateDirectionLine(
+      this.attackForward,
+      snapshot.portalPosition,
+      modelAngle + attackLocalAngle,
+      3.2
+    );
+    this.updateLineBetween(this.grabLine, snapshot.portalPosition, snapshot.grabTarget);
 
     const groundY = snapshot.anchor.y + 0.04;
     this.detectionRange.position.set(
@@ -104,24 +150,37 @@ export class ShadowGrabberDebugView {
       this.lightAvoidanceRange.setEnabled(false);
     }
     this.label.position.set(
-      this.controller.root.position.x,
-      this.controller.root.position.y + 2.25,
-      this.controller.root.position.z
+      snapshot.portalPosition.x,
+      snapshot.portalPosition.y + 1.65,
+      snapshot.portalPosition.z
     );
+    const camera = this.label.getScene().activeCamera;
+    const labelDistance = camera
+      ? Vector3.Distance(camera.globalPosition, this.label.position)
+      : 14;
+    const labelScale = Math.max(0.22, Math.min(0.85, labelDistance / 16));
+    this.label.scaling.set(labelScale, labelScale, labelScale);
 
-    const label = `${snapshot.role} | ${snapshot.state}`;
+    const slot = snapshot.attackSlotOwner === snapshot.id ? "OWN" : snapshot.attackSlotOwner ? "BUSY" : "FREE";
+    const label = [
+      `${snapshot.role} | ${snapshot.state} | ${snapshot.currentAnimation ?? "-"}`,
+      `v ${snapshot.currentSpeed.toFixed(2)}/${snapshot.targetSpeed.toFixed(2)}  cd ${snapshot.attackCooldownRemaining.toFixed(1)}  slot ${slot}`,
+      `dark ${Math.round(snapshot.darknessPressure * 100)}%  safe ${snapshot.playerInHardLight ? "YES" : "NO"}`,
+    ].join("\n");
     if (label !== this.lastLabel) {
       this.lastLabel = label;
-      this.labelTexture.drawText(
-        label,
-        null,
-        61,
-        "bold 28px monospace",
-        "white",
-        "rgba(0, 0, 0, 0.72)",
-        true,
-        true
-      );
+      const context = this.labelTexture.getContext() as unknown as CanvasRenderingContext2D;
+      context.clearRect(0, 0, 512, 144);
+      context.fillStyle = "rgba(0, 0, 0, 0.76)";
+      context.fillRect(0, 0, 512, 144);
+      context.font = "bold 20px monospace";
+      context.fillStyle = "white";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      label.split("\n").forEach((line, index) => {
+        context.fillText(line, 256, 34 + index * 38);
+      });
+      this.labelTexture.update(false);
     }
   }
 
@@ -153,5 +212,36 @@ export class ShadowGrabberDebugView {
     mesh.material = material;
     mesh.isPickable = false;
     return mesh;
+  }
+
+  private updateDirectionLine(
+    line: LinesMesh,
+    origin: Vector3,
+    angle: number,
+    length: number
+  ) {
+    MeshBuilder.CreateLines(
+      line.name,
+      {
+        points: [
+          origin,
+          new Vector3(
+            origin.x + Math.sin(angle) * length,
+            origin.y,
+            origin.z + Math.cos(angle) * length
+          ),
+        ],
+        instance: line,
+      },
+      line.getScene()
+    );
+  }
+
+  private updateLineBetween(line: LinesMesh, start: Vector3, end: Vector3) {
+    MeshBuilder.CreateLines(
+      line.name,
+      { points: [start, end], instance: line },
+      line.getScene()
+    );
   }
 }

@@ -1,4 +1,5 @@
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { BlackSmokeWrapSystem } from "../../BlackSmokeWrapSystem";
 import type { EnemyManager } from "../core/EnemyManager";
 import type { EnemySpawnOptions } from "../core/EnemyTypes";
 import { SkyEyeController } from "./SkyEyeController";
@@ -16,6 +17,7 @@ export interface SkyEyeSpawnOptions extends EnemySpawnOptions {
 
 export function registerSkyEye(
   manager: EnemyManager,
+  smokeSystem: BlackSmokeWrapSystem,
   overrides: SkyEyeConfigOverrides = {}
 ) {
   const baseConfig = createSkyEyeConfig(overrides);
@@ -40,7 +42,8 @@ export function registerSkyEye(
         context,
         options,
         config,
-        spawnOptions.getTargetPosition
+        spawnOptions.getTargetPosition,
+        smokeSystem
       );
     },
   });
@@ -61,4 +64,5 @@ export {
   createSkyEyeConfig,
   type SkyEyeConfig,
   type SkyEyeConfigOverrides,
+  type SkyEyeFxQuality,
 } from "./SkyEyeConfig";

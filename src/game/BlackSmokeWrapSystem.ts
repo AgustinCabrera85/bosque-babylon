@@ -51,6 +51,8 @@ export type BlackSmokeWrapOptions = {
   particleSize?: number;
   /** Stretches each smoke card into a wisp while preserving random rotation. */
   elongation?: number;
+  /** Keeps both billboard axes equal, using `particleSize` for radial volume. */
+  uniformParticleScale?: boolean;
   orbitSpeed?: number;
   upwardDrift?: number;
   density?: number;
@@ -71,6 +73,7 @@ type ResolvedOptions = {
   height: number;
   particleSize: number;
   elongation: number;
+  uniformParticleScale: boolean;
   orbitSpeed: number;
   upwardDrift: number;
   density: number;
@@ -113,6 +116,7 @@ function resolveOptions(
     height: positive(options.height, 2.1),
     particleSize: positive(options.particleSize, 0.86),
     elongation: clamp(options.elongation ?? 1, 0.5, 3),
+    uniformParticleScale: options.uniformParticleScale === true,
     orbitSpeed: clamp(options.orbitSpeed ?? 0.72, -4, 4),
     upwardDrift: clamp(options.upwardDrift ?? 0.28, -2, 2),
     density: clamp(options.density ?? 1, 0.2, 2),
@@ -182,10 +186,17 @@ export class BlackSmokeWrapEffect {
     this.particles.maxLifeTime = 3.75;
     this.particles.minSize = this.options.particleSize * 0.72;
     this.particles.maxSize = this.options.particleSize * 1.32;
-    this.particles.minScaleX = 0.5;
-    this.particles.maxScaleX = 1.05;
-    this.particles.minScaleY = 0.85 * this.options.elongation;
-    this.particles.maxScaleY = 1.25 * this.options.elongation;
+    if (this.options.uniformParticleScale) {
+      this.particles.minScaleX = 1;
+      this.particles.maxScaleX = 1;
+      this.particles.minScaleY = 1;
+      this.particles.maxScaleY = 1;
+    } else {
+      this.particles.minScaleX = 0.5;
+      this.particles.maxScaleX = 1.05;
+      this.particles.minScaleY = 0.85 * this.options.elongation;
+      this.particles.maxScaleY = 1.25 * this.options.elongation;
+    }
     this.particles.minAngularSpeed = -0.34;
     this.particles.maxAngularSpeed = 0.34;
     this.baseEmitRate = preset.emitRate * this.options.density;

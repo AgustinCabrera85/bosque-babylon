@@ -3,6 +3,8 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import type { Scene } from "@babylonjs/core/scene";
+import type { BlackSmokeWrapSystem } from "../../BlackSmokeWrapSystem";
 import { BaseEnemyController } from "../core/EnemyController";
 import type {
   EnemyControllerContext,
@@ -12,6 +14,7 @@ import {
   SKY_EYE_TYPE,
   type SkyEyeConfig,
 } from "./SkyEyeConfig";
+import { SkyEyeFxController } from "./SkyEyeFxController";
 
 const SKY_EYE_EMISSIVE_INTENSITY = 3;
 
@@ -26,8 +29,11 @@ function moveAngle(current: number, target: number, amount: number) {
 
 export class SkyEyeController extends BaseEnemyController {
   private readonly getTargetPosition: () => Vector3;
+  private readonly scene: Scene;
+  private readonly smokeSystem: BlackSmokeWrapSystem;
   private readonly blinkAnimations: AnimationGroup[] = [];
   private readonly importedMeshes: AbstractMesh[] = [];
+  private fxController: SkyEyeFxController | null = null;
   private idleAnimation: AnimationGroup | null = null;
   private blinkTimer = 0;
   private hasQueuedDoubleBlink = false;
@@ -36,26 +42,31 @@ export class SkyEyeController extends BaseEnemyController {
     context: EnemyControllerContext,
     options: EnemySpawnOptions,
     public readonly config: SkyEyeConfig,
-    getTargetPosition: () => Vector3
+    getTargetPosition: () => Vector3,
+    smokeSystem: BlackSmokeWrapSystem
   ) {
     super(context, options);
     if (options.type !== SKY_EYE_TYPE) {
       throw new Error(`SkyEye ${this.id}: invalid enemy type ${options.type}`);
     }
+    this.scene = context.scene;
+    this.smokeSystem = smokeSystem;
     this.getTargetPosition = getTargetPosition;
     this.blinkTimer = this.randomInitialBlinkDelay();
     if (!options.scaling) this.root.scaling.setAll(config.baseScale);
   }
 
   public get meshes(): readonly AbstractMesh[] {
-    return this.importedMeshes;
+    return this.fxController
+      ? [...this.importedMeshes, ...this.fxController.meshes]
+      : this.importedMeshes;
   }
 
   public async initialize() {
     this.assertUsable();
-    this.requireMesh(this.config.nodeNames.eyeball);
-    this.requireMesh(this.config.nodeNames.upperEyelid);
-    this.requireMesh(this.config.nodeNames.lowerEyelid);
+    const eyeball = this.requireMesh(this.config.nodeNames.eyeball);
+    const upperEyelid = this.requireMesh(this.config.nodeNames.upperEyelid);
+    const lowerEyelid = this.requireMesh(this.config.nodeNames.lowerEyelid);
     this.importedMeshes.push(...this.asset.meshes);
     for (const mesh of this.importedMeshes) {
       mesh.isPickable = false;
@@ -90,7 +101,17 @@ export class SkyEyeController extends BaseEnemyController {
       this.requireAnimation(this.config.animationGroupNames.upperBlink),
       this.requireAnimation(this.config.animationGroupNames.lowerBlink)
     );
+    if (this.config.fxQuality !== "off") {
+      this.fxController = new SkyEyeFxController(
+        this.scene,
+        this.root,
+        [eyeball, upperEyelid, lowerEyelid],
+        this.config,
+        this.smokeSystem
+      );
+    }
     this.completeInitialization();
+    this.fxController?.setEnabled(this.enabled);
     if (this.enabled) this.resumeAnimations();
   }
 
@@ -98,6 +119,7 @@ export class SkyEyeController extends BaseEnemyController {
     if (!this.enabled) return;
     const delta = Math.max(0, Math.min(deltaTimeSeconds, 0.1));
     this.turnToward(this.getTargetPosition(), delta);
+    this.fxController?.update(delta);
 
     this.blinkTimer -= delta;
     if (this.blinkTimer <= 0) {
@@ -120,6 +142,7 @@ export class SkyEyeController extends BaseEnemyController {
   public override setEnabled(enabled: boolean) {
     const wasEnabled = this.enabled;
     super.setEnabled(enabled);
+    this.fxController?.setEnabled(enabled);
     if (wasEnabled === enabled || !this.idleAnimation) return;
     if (enabled) {
       this.resumeAnimations();
@@ -139,6 +162,8 @@ export class SkyEyeController extends BaseEnemyController {
   }
 
   protected override onDispose() {
+    this.fxController?.dispose();
+    this.fxController = null;
     this.idleAnimation = null;
     this.blinkAnimations.length = 0;
     this.importedMeshes.length = 0;

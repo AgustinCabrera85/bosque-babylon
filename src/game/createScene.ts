@@ -326,7 +326,7 @@ export async function createScene(
   );
   const enemyManager = new EnemyManager(scene);
   registerShadowGrabber(enemyManager, blackSmokeWrapSystem);
-  registerSkyEye(enemyManager);
+  registerSkyEye(enemyManager, blackSmokeWrapSystem);
   scene.metadata ??= {};
   scene.metadata.blackSmokeWrapSystem = blackSmokeWrapSystem;
   scene.metadata.enemyManager = enemyManager;

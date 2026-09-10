@@ -30,11 +30,23 @@ export interface ShadowGrabberMaterialConfig {
   environmentIntensity: number;
 }
 
+export interface ShadowGrabberPortalMaterialConfig
+  extends ShadowGrabberMaterialConfig {
+  iridescenceIntensity: number;
+  iridescenceIorMin: number;
+  iridescenceIorMax: number;
+  iridescenceCycleSpeed: number;
+}
+
 export interface ShadowGrabberConfig {
   modelUrl: string;
   baseScale: number;
   fxQuality: ShadowGrabberFxQuality;
   portalRotationSpeed: number;
+  /** Uniform diameter reduction applied to the authored ShadowOrb_Core. */
+  portalVisualScale: number;
+  /** Additional compression along the arm axis so the core reads as a portal. */
+  portalDepthScale: number;
   animationSpeed: Record<ShadowGrabberAnimation, number>;
   animationLoop: Record<ShadowGrabberAnimation, boolean>;
   animationGroupNames: Record<ShadowGrabberAnimation, string>;
@@ -46,7 +58,7 @@ export interface ShadowGrabberConfig {
     attackPointBone: string;
   };
   armMaterial: ShadowGrabberMaterialConfig;
-  portalMaterial: ShadowGrabberMaterialConfig;
+  portalMaterial: ShadowGrabberPortalMaterialConfig;
   runningDetectionBonus: number;
   activationRange: number;
   deactivationRange: number;
@@ -132,7 +144,7 @@ export type ShadowGrabberConfigOverrides = Partial<
   animationGroupNames?: Partial<Record<ShadowGrabberAnimation, string>>;
   nodeNames?: Partial<ShadowGrabberConfig["nodeNames"]>;
   armMaterial?: Partial<ShadowGrabberMaterialConfig>;
-  portalMaterial?: Partial<ShadowGrabberMaterialConfig>;
+  portalMaterial?: Partial<ShadowGrabberPortalMaterialConfig>;
 };
 
 export const SHADOW_GRABBER_STATE_ANIMATION: Readonly<
@@ -153,6 +165,10 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   baseScale: 3.9,
   fxQuality: "low",
   portalRotationSpeed: 0.18,
+  // Large enough to read as a doorway, while remaining well below the original
+  // full-size orb that dominated the character silhouette.
+  portalVisualScale: 0.5,
+  portalDepthScale: 0.25,
   animationSpeed: {
     idle: 1,
     alert: 1.15,
@@ -195,10 +211,14 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
     environmentIntensity: 0.45,
   },
   portalMaterial: {
-    albedo: [0.0015, 0.001, 0.004],
+    albedo: [0.0015, 0.002, 0.005],
     metallic: 0,
-    roughness: 0.72,
-    environmentIntensity: 0.22,
+    roughness: 0.74,
+    environmentIntensity: 0.2,
+    iridescenceIntensity: 0.42,
+    iridescenceIorMin: 1.32,
+    iridescenceIorMax: 1.65,
+    iridescenceCycleSpeed: 0.72,
   },
   // Running is audible from farther away; walking retains the base range.
   runningDetectionBonus: 14,

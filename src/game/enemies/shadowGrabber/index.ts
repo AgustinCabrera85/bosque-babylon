@@ -1,6 +1,7 @@
 import type { EnemyManager } from "../core/EnemyManager";
 import type { EnemySpawnOptions } from "../core/EnemyTypes";
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { BlackSmokeWrapSystem } from "../../BlackSmokeWrapSystem";
 import { ShadowGrabberController } from "./ShadowGrabberController";
 import {
   SHADOW_GRABBER_TYPE,
@@ -10,6 +11,7 @@ import {
 
 export function registerShadowGrabber(
   manager: EnemyManager,
+  blackSmokeWrapSystem: BlackSmokeWrapSystem,
   overrides: ShadowGrabberConfigOverrides = {}
 ) {
   const baseConfig = createShadowGrabberConfig(overrides);
@@ -46,7 +48,12 @@ export function registerShadowGrabber(
           ...spawnOptions.configOverrides?.portalMaterial,
         },
       });
-      const controller = new ShadowGrabberController(context, options, config);
+      const controller = new ShadowGrabberController(
+        context,
+        options,
+        config,
+        blackSmokeWrapSystem
+      );
       if (spawnOptions.anchorPosition) controller.setAnchorPosition(spawnOptions.anchorPosition);
       return controller;
     },
@@ -107,4 +114,5 @@ export {
   type ShadowGrabberConfigOverrides,
   type ShadowGrabberFxQuality,
   type ShadowGrabberMaterialConfig,
+  type ShadowGrabberPortalMaterialConfig,
 } from "./ShadowGrabberConfig";

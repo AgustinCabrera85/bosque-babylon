@@ -8,6 +8,7 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import type { Node } from "@babylonjs/core/node";
+import type { BlackSmokeWrapSystem } from "../../BlackSmokeWrapSystem";
 import { BaseEnemyController } from "../core/EnemyController";
 import type {
   EnemyControllerContext,
@@ -60,14 +61,17 @@ export class ShadowGrabberController extends BaseEnemyController {
   private resolvedSkeleton: Skeleton | null = null;
   private resolvedAttackPointBone: Bone | null = null;
   private resolvedFxRoot: TransformNode | null = null;
+  private portalMaterial: PBRMaterial | null = null;
   private fxController: ShadowGrabberFxController | null = null;
   private fxState: ShadowGrabberFxState = "idle";
   private portalRootYOffset = 0;
+  private portalIridescencePhase = 0;
 
   public constructor(
     context: EnemyControllerContext,
     options: EnemySpawnOptions,
-    public readonly config: ShadowGrabberConfig
+    public readonly config: ShadowGrabberConfig,
+    private readonly blackSmokeWrapSystem: BlackSmokeWrapSystem
   ) {
     super(context, options);
     if (options.type !== SHADOW_GRABBER_TYPE) {
@@ -120,15 +124,24 @@ export class ShadowGrabberController extends BaseEnemyController {
     this.resolveAnimations();
     this.configureMaterials();
     this.createFxRoot();
-    if (this.resolvedFxRoot && this.config.fxQuality !== "off") {
+    if (
+      this.resolvedFxRoot &&
+      this.resolvedPortalMesh &&
+      this.portalMaterial &&
+      this.config.fxQuality !== "off"
+    ) {
       this.fxController = new ShadowGrabberFxController(
         this.root.getScene(),
         this.resolvedFxRoot,
-        this.config.fxQuality
+        this.resolvedPortalMesh,
+        this.portalMaterial,
+        this.config.fxQuality,
+        this.blackSmokeWrapSystem
       );
     }
     this.measurePortalRootOffset();
     this.completeInitialization();
+    this.fxController?.setOwnerEnabled(this.enabled);
     this.setState(ShadowGrabberState.Idle);
   }
 
@@ -140,6 +153,16 @@ export class ShadowGrabberController extends BaseEnemyController {
       this.portalRotationSpeed * delta * (this.fxState === "hunt" ? 1.2 : 1),
       Space.LOCAL
     );
+    if (this.portalMaterial) {
+      const portalConfig = this.config.portalMaterial;
+      this.portalIridescencePhase =
+        (this.portalIridescencePhase + delta * portalConfig.iridescenceCycleSpeed) %
+        (Math.PI * 2);
+      const iorMix = (Math.sin(this.portalIridescencePhase) + 1) * 0.5;
+      this.portalMaterial.iridescence.indexOfRefraction =
+        portalConfig.iridescenceIorMin +
+        (portalConfig.iridescenceIorMax - portalConfig.iridescenceIorMin) * iorMix;
+    }
     this.fxController?.update(delta);
   }
 
@@ -264,7 +287,9 @@ export class ShadowGrabberController extends BaseEnemyController {
   public override setEnabled(enabled: boolean) {
     const wasEnabled = this.enabled;
     super.setEnabled(enabled);
-    if (!this.resolvedPortalMesh || wasEnabled === enabled) return;
+    if (wasEnabled === enabled) return;
+    this.fxController?.setOwnerEnabled(enabled);
+    if (!this.resolvedPortalMesh) return;
 
     if (!enabled) {
       for (const group of this.animations.values()) {
@@ -300,6 +325,7 @@ export class ShadowGrabberController extends BaseEnemyController {
     this.resolvedSkeleton = null;
     this.resolvedAttackPointBone = null;
     this.resolvedFxRoot = null;
+    this.portalMaterial = null;
   }
 
   private resolveAnimations() {
@@ -333,7 +359,27 @@ export class ShadowGrabberController extends BaseEnemyController {
       new PBRMaterial(`shadowGrabber:${this.id}:portalMaterial`, this.root.getScene())
     );
     applyPbrConfig(portalMaterial, this.config.portalMaterial);
+    portalMaterial.iridescence.isEnabled = true;
+    portalMaterial.iridescence.intensity =
+      this.config.portalMaterial.iridescenceIntensity;
+    portalMaterial.iridescence.indexOfRefraction =
+      (this.config.portalMaterial.iridescenceIorMin +
+        this.config.portalMaterial.iridescenceIorMax) *
+      0.5;
+    portalMaterial.iridescence.minimumThickness = 170;
+    portalMaterial.iridescence.maximumThickness = 460;
+    portalMaterial.emissiveColor = new Color3(0.004, 0.006, 0.014);
+    const visualScale = Math.max(0.1, this.config.portalVisualScale);
+    const depthScale = Math.max(0.04, this.config.portalDepthScale);
+    portalMesh.scaling.multiplyInPlace(
+      new Vector3(visualScale * depthScale, visualScale, visualScale)
+    );
     portalMesh.material = portalMaterial;
+    portalMesh.isVisible = true;
+    // The authored low-poly core remains as a faint iridescent backing. The
+    // opaque procedural void and its smooth rim are created by the FX layer.
+    portalMesh.visibility = 0.18;
+    this.portalMaterial = portalMaterial;
   }
 
   private createFxRoot() {

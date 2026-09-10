@@ -65,6 +65,7 @@ import {
 } from "./enemies";
 import { loadInitialForestEnemies } from "./levels/ForestEnemySpawns";
 import { TerminalSkyEyeEncounter } from "./levels/TerminalSkyEyeEncounter";
+import { BlackSmokeWrapSystem } from "./BlackSmokeWrapSystem";
 
 
 
@@ -319,11 +320,17 @@ export async function createScene(
   onProgress(0.08, "Creando escena...");
   const scene = new Scene(engine);
   installSceneMaterialLightBudgetGuard(scene);
+  const blackSmokeWrapSystem = new BlackSmokeWrapSystem(
+    scene,
+    quality.name === "mobile" ? "low" : "medium"
+  );
   const enemyManager = new EnemyManager(scene);
-  registerShadowGrabber(enemyManager);
+  registerShadowGrabber(enemyManager, blackSmokeWrapSystem);
   registerSkyEye(enemyManager);
   scene.metadata ??= {};
+  scene.metadata.blackSmokeWrapSystem = blackSmokeWrapSystem;
   scene.metadata.enemyManager = enemyManager;
+  scene.onDisposeObservable.addOnce(() => blackSmokeWrapSystem.dispose());
   scene.onDisposeObservable.addOnce(() => enemyManager.dispose());
   // Water-contact and waterfall alpha effects render after WaterMaterial, but
   // must keep the opaque world's depth or they appear through the whole map.
@@ -1013,6 +1020,9 @@ scene.onBeforeRenderObservable.add(() => {
       getPerformance: () => ({
         fps: engine.getFps(),
         frameTimeMs: engine.getDeltaTime(),
+        portalSmokeEffects: blackSmokeWrapSystem.activeEffectCount,
+        portalSmokeParticles: blackSmokeWrapSystem.activeParticleCount,
+        portalSmokeCapacity: blackSmokeWrapSystem.particleCapacity,
       }),
       setFxEnabled: (enabled: boolean) =>
         shadowGrabberBehaviorSystem.setFxEnabled(enabled),

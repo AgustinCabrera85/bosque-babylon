@@ -122,7 +122,8 @@ async function start() {
     setLoading,
     quality,
     selectedCharacter,
-    musicPlayer
+    musicPlayer,
+    inventory
   );
 
   const firstFrameReady = new Promise<void>((resolve) => {

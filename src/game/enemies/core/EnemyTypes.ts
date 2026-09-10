@@ -41,6 +41,12 @@ export interface EnemyControllerContext {
   asset: EnemyAssetInstance;
 }
 
+export interface EnemyAttackHit {
+  damage: number;
+  point: Vector3;
+  direction: Vector3;
+}
+
 export interface EnemyController {
   readonly id: EnemyId;
   readonly type: EnemyType;
@@ -50,6 +56,10 @@ export interface EnemyController {
 
   initialize(): Promise<void>;
   update(deltaTimeSeconds: number): void;
+  updateCombatEffects(deltaTimeSeconds: number): void;
+  getAttackHitMeshes(): readonly AbstractMesh[];
+  getAttackTargetPositionToRef(result: Vector3): boolean;
+  receiveAttack(hit: EnemyAttackHit): void;
   setEnabled(enabled: boolean): void;
   setPosition(position: Vector3): void;
   setRotation(rotation: Vector3): void;

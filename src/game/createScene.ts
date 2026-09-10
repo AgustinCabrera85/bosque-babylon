@@ -30,6 +30,8 @@ import { WaterContactSystem } from "./WaterContactSystem";
 import { WaterInteractionVFX } from "./WaterInteractionVFX";
 import { WaterSurfaceRegistry } from "./WaterSurface";
 import type { MusicPlayerHandle } from "./MusicPlayer";
+import type { InventoryHandle } from "./Inventory";
+import { PlayerAttackSystem } from "./PlayerAttackSystem";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -204,6 +206,9 @@ function setupViewModeControls(player: PlayerController) {
     const isFirstPerson = mode === "first";
     const isFrontView = mode === "front";
     const isIsometricView = mode === "iso";
+    const aimViewport = player.getAttackAimViewportPosition();
+    reticle?.style.setProperty("--reticle-x", `${aimViewport.x * 100}%`);
+    reticle?.style.setProperty("--reticle-y", `${aimViewport.y * 100}%`);
     const nextMode = getNextPrimaryViewMode(
       mode,
       player.isIsometricViewAllowed
@@ -315,7 +320,8 @@ export async function createScene(
   onProgress: LoadingProgress = () => {},
   quality: QualityProfile = desktopQuality,
   selectedCharacter: CharacterId = "lautaro",
-  musicPlayer: MusicPlayerHandle | null = null
+  musicPlayer: MusicPlayerHandle | null = null,
+  inventory?: InventoryHandle
 ) {
   onProgress(0.08, "Creando escena...");
   const scene = new Scene(engine);
@@ -948,7 +954,22 @@ scene.onBeforeRenderObservable.add(() => {
     hints,
     (type, movementLockSeconds) => player.playInteractionAction(type, movementLockSeconds)
   );
-  setupMobileControls(player, () => interactSystem.tryInteract());
+  const attackLightSources = [
+    ...endTorches.safeLightPositions.map((position) => position.clone()),
+    terminalLandmark.caveCandleFocusPoint.clone(),
+  ];
+  const attackSystem = new PlayerAttackSystem(scene, player, enemyManager, {
+    canvas,
+    inventory,
+    getLightSourcePositions: () => attackLightSources,
+    getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
+    isBlocked: (x, z) => segments.isColliding(x, z),
+  });
+  setupMobileControls(player, () => interactSystem.tryInteract(), {
+    start: () => attackSystem.startCharging(true),
+    release: () => attackSystem.releaseCharge(),
+    cancel: () => attackSystem.cancelCharge(),
+  });
 
   // =========================
   // Lluvia
@@ -961,6 +982,7 @@ scene.onBeforeRenderObservable.add(() => {
     const ratio = total > 0 ? completed / total : 1;
     onProgress(0.91 + ratio * 0.05, `Precargando bosque (${completed}/${total})...`);
   });
+  attackLightSources.push(...segments.getFixedSafeLightPositions());
 
   const shadowGrabberBehaviorSystem = new ShadowGrabberBehaviorSystem({
     player: {
@@ -1141,6 +1163,7 @@ scene.onBeforeRenderObservable.add(() => {
     skyEyeEncounter.update(dt);
     shadowGrabberBehaviorSystem.update(dt);
     enemyManager.update(dt);
+    attackSystem.update(dt);
     waterContactSystem.update(dt);
     waterInteractionVfx.update(dt);
     musicPlayer?.updateListenerPosition(player.position);

@@ -27,6 +27,10 @@ type AddInventoryItemEvent = CustomEvent<InspectableItem>;
 
 export type InventoryHandle = {
   addItem: (item: InspectableItem) => void;
+  setItemCount: (item: InspectableItem, count: number) => void;
+  hasItem: (id: string) => boolean;
+  getItemCount: (id: string) => number;
+  consumeItem: (id: string, amount?: number) => boolean;
   isOpen: () => boolean;
 };
 
@@ -90,12 +94,34 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
     render();
   };
 
+  const setItemCount = (item: InspectableItem, count: number) => {
+    const safeCount = Math.max(0, Math.floor(count));
+    const existing = items.get(item.id);
+    if (existing) {
+      Object.assign(existing, item);
+      existing.count = safeCount;
+    } else {
+      items.set(item.id, { ...item, count: safeCount });
+      selectedId ??= item.id;
+    }
+    render();
+  };
+
+  const consumeItem = (id: string, amount = 1) => {
+    const item = items.get(id);
+    const safeAmount = Math.max(1, Math.floor(amount));
+    if (!item || item.count < safeAmount) return false;
+    item.count -= safeAmount;
+    render();
+    return true;
+  };
+
   dom.button.addEventListener("click", toggle);
   dom.closeButton.addEventListener("click", close);
   dom.inspectButton.addEventListener("click", () => {
     if (!selectedId) return;
     const item = items.get(selectedId);
-    if (!item) return;
+    if (!item || !canInspectItem(item)) return;
 
     close();
     inspectItem(item);
@@ -126,6 +152,10 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
 
   return {
     addItem,
+    setItemCount,
+    hasItem: (id) => items.has(id),
+    getItemCount: (id) => items.get(id)?.count ?? 0,
+    consumeItem,
     isOpen: () => open,
   };
 }
@@ -292,12 +322,24 @@ function renderItems(
 }
 
 function renderDetail(dom: InventoryDom, item: InventoryItem | null) {
-  const hasItem = !!item;
   dom.detailName.textContent = item?.name ?? "Sin objetos";
   dom.detailType.textContent = item?.typeLabel ?? "Inventario";
   dom.detailDescription.textContent =
     item?.description ?? "Los objetos encontrados apareceran aca.";
   dom.detailCount.textContent = item ? String(item.count) : "-";
-  dom.detailStatus.textContent = item ? "Guardado" : "-";
-  dom.inspectButton.disabled = !hasItem;
+  dom.detailStatus.textContent = item
+    ? item.typeLabel === "Municion"
+      ? "Equipado"
+      : "Guardado"
+    : "-";
+  dom.inspectButton.disabled = !item || !canInspectItem(item);
+}
+
+function canInspectItem(item: InspectableItem) {
+  return !!(
+    item.inspectMode ||
+    item.modelRootPath ||
+    item.contentImagePath ||
+    item.texturePath
+  );
 }

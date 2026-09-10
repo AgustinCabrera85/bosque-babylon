@@ -386,11 +386,11 @@ export class ShadowGrabberController extends BaseEnemyController {
     const portalMesh = this.resolvedPortalMesh;
     if (!portalMesh) return;
     const fxRoot = new TransformNode(`shadowGrabber:${this.id}:fxRoot`, this.root.getScene());
-    fxRoot.parent = this.root;
+    fxRoot.parent = this.visualRoot;
 
-    this.root.computeWorldMatrix(true);
+    this.visualRoot.computeWorldMatrix(true);
     portalMesh.computeWorldMatrix(true);
-    const inverseRoot = Matrix.Invert(this.root.getWorldMatrix());
+    const inverseRoot = Matrix.Invert(this.visualRoot.getWorldMatrix());
     Vector3.TransformCoordinatesToRef(
       portalMesh.getAbsolutePosition(),
       inverseRoot,

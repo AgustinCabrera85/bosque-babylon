@@ -38,7 +38,17 @@ function releasePointer(element: HTMLElement, pointerId: number) {
   }
 }
 
-export function setupMobileControls(player: PlayerController, onInteract: () => void) {
+export type MobileAttackActions = {
+  start: () => boolean;
+  release: () => void;
+  cancel: () => void;
+};
+
+export function setupMobileControls(
+  player: PlayerController,
+  onInteract: () => void,
+  attack?: MobileAttackActions
+) {
   if (!isMobileBrowser()) return;
 
   const root = document.getElementById("mobileControls");
@@ -48,9 +58,10 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
   const runButton = document.getElementById("runButton");
   const jumpButton = document.getElementById("jumpButton");
   const interactButton = document.getElementById("interactButton");
+  const attackButton = document.getElementById("attackButton");
   const cameraButton = document.getElementById("mobileCameraButton") as HTMLButtonElement | null;
 
-  if (!root || !stick || !thumb || !lookPad || !runButton || !jumpButton || !interactButton || !cameraButton) return;
+  if (!root || !stick || !thumb || !lookPad || !runButton || !jumpButton || !interactButton || !attackButton || !cameraButton) return;
 
   player.setMobileEnabled(true);
   root.classList.add("enabled");
@@ -59,6 +70,7 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
   let movePointer: number | null = null;
   let lookPointer: number | null = null;
   let runPointer: number | null = null;
+  let attackPointer: number | null = null;
   let lastLookX = 0;
   let lastLookY = 0;
 
@@ -143,6 +155,37 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
     stopRun();
   };
 
+  const stopAttack = (release: boolean) => {
+    const pointerId = attackPointer;
+    attackPointer = null;
+    if (pointerId !== null) releasePointer(attackButton, pointerId);
+    attackButton.classList.remove("active");
+    if (release) attack?.release();
+    else attack?.cancel();
+  };
+
+  const releaseAttackFromEvent = (event: PointerEvent) => {
+    if (attackPointer === null || event.pointerId !== attackPointer) return;
+    stopEvent(event);
+    stopAttack(true);
+  };
+
+  const cancelAttackFromEvent = (event: PointerEvent) => {
+    if (attackPointer === null || event.pointerId !== attackPointer) return;
+    stopEvent(event);
+    stopAttack(false);
+  };
+
+  const cancelAttackFromWindow = (event: PointerEvent) => {
+    if (attackPointer === null || event.pointerId !== attackPointer) return;
+    stopAttack(false);
+  };
+
+  const releaseAttackFromWindow = (event: PointerEvent) => {
+    if (attackPointer === null || event.pointerId !== attackPointer) return;
+    stopAttack(true);
+  };
+
   stick.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     if (movePointer !== null) resetStick();
@@ -206,6 +249,18 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
     onInteract();
   });
 
+  attackButton.addEventListener("pointerdown", (event) => {
+    stopEvent(event);
+    if (attackPointer !== null) stopAttack(false);
+    if (!attack?.start()) return;
+    attackPointer = event.pointerId;
+    capturePointer(attackButton, event.pointerId);
+    attackButton.classList.add("active");
+  });
+  attackButton.addEventListener("pointerup", releaseAttackFromEvent);
+  attackButton.addEventListener("pointercancel", cancelAttackFromEvent);
+  attackButton.addEventListener("lostpointercapture", cancelAttackFromWindow);
+
   player.onViewModeChange((mode) => {
     const nextMode = getNextPrimaryViewMode(
       mode,
@@ -230,6 +285,7 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
     resetStick();
     resetLook();
     stopRun();
+    stopAttack(false);
   };
 
   window.addEventListener("pointerup", resetStickFromWindow, true);
@@ -238,6 +294,8 @@ export function setupMobileControls(player: PlayerController, onInteract: () => 
   window.addEventListener("pointercancel", resetLookFromWindow, true);
   window.addEventListener("pointerup", stopRunFromWindow, true);
   window.addEventListener("pointercancel", stopRunFromWindow, true);
+  window.addEventListener("pointerup", releaseAttackFromWindow, true);
+  window.addEventListener("pointercancel", cancelAttackFromWindow, true);
   window.addEventListener("blur", resetMobileInput);
   window.addEventListener("resize", resetMobileInput);
   window.visualViewport?.addEventListener("resize", resetMobileInput);

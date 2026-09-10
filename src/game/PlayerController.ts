@@ -3,10 +3,12 @@ import { Scene } from "@babylonjs/core/scene";
 import { Camera } from "@babylonjs/core/Cameras/camera";
 import { UniversalCamera } from "@babylonjs/core/Cameras/universalCamera";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { Bone } from "@babylonjs/core/Bones/bone";
 import { Material as BabylonMaterial } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -96,7 +98,7 @@ const CHARACTER_FOOT_CLEARANCE = 0.03;
 const THIRD_PERSON_CAMERA_DISTANCE = 5.2;
 const THIRD_PERSON_CAMERA_HEIGHT = 1.25;
 const THIRD_PERSON_CAMERA_TARGET_HEIGHT = -0.35;
-const THIRD_PERSON_PITCH_MIN = -0.72;
+const THIRD_PERSON_PITCH_MIN = -1.18;
 const THIRD_PERSON_PITCH_MAX = 0.82;
 const PATH_HALF_WIDTH = 4.5;
 const PATH_START_Z = -800;
@@ -107,6 +109,21 @@ const ANIMATION_BLEND_TIME = 0.16;
 const ACTION_BLEND_TIME = 0.08;
 const STANDING_UP_BLEND_TIME = 0.18;
 const THROW_ACTION_MOVEMENT_LOCK_SECONDS = 1.15;
+const THROW_CHARGE_REFERENCE_FRAMES: Record<
+  CharacterId,
+  {
+    holdFrame: number;
+    releaseFrame: number;
+    endFrame: number;
+    totalFrames: number;
+  }
+> = {
+  lautaro: { holdFrame: 38, releaseFrame: 63, endFrame: 86, totalFrames: 194 },
+  sofia: { holdFrame: 13, releaseFrame: 17, endFrame: 25, totalFrames: 65 },
+};
+const CENTER_AIM_VIEWPORT_POSITION = { x: 0.5, y: 0.5 } as const;
+const THIRD_PERSON_AIM_VIEWPORT_POSITION = { x: 0.43, y: 0.46 } as const;
+const AIM_UNPROJECT_WORLD = Matrix.Identity();
 const PICKUP_ACTION_SPEED_RATIO = 1.35;
 const DOOR_OPEN_MOVEMENT_LOCK_SECONDS = 1.7;
 const THIRD_PERSON_FLASHLIGHT_PITCH_MIN = -0.58;
@@ -201,6 +218,10 @@ export class PlayerController {
   } | null = null;
   private avatarRoot: TransformNode | null = null;
   private avatarMeshes: AbstractMesh[] = [];
+  private throwHandMesh: Mesh | null = null;
+  private throwHandBone: Bone | null = null;
+  private throwHandMiddleBone: Bone | null = null;
+  private readonly throwHandMiddlePosition = Vector3.Zero();
   private animations = new Map<string, AnimationGroup>();
   private currentAnimation: string | null = null;
   private fadeFromAnimation: AnimationGroup | null = null;
@@ -208,6 +229,15 @@ export class PlayerController {
   private fadeElapsed = 0;
   private fadeDuration = ANIMATION_BLEND_TIME;
   private actionPlaying = false;
+  private chargedThrowAction: {
+    group: AnimationGroup;
+    holdFrame: number;
+    releaseFrame: number;
+    endFrame: number;
+    released: boolean;
+    launched: boolean;
+    launch: (() => void) | null;
+  } | null = null;
   private openingAnimationPending = false;
   private openingSequenceActive = false;
   private openingCameraState: {
@@ -442,6 +472,7 @@ export class PlayerController {
 
     this.avatarRoot = avatarRoot;
     this.avatarMeshes = res.meshes.filter((mesh) => mesh.getTotalVertices() > 0);
+    this.resolveThrowHandBones(res.meshes);
     for (const mesh of this.avatarMeshes) {
       mesh.isPickable = false;
       mesh.receiveShadows = true;
@@ -584,6 +615,64 @@ export class PlayerController {
     this.playAction("throwObject");
   }
 
+  /** Starts the authored throw and holds it immediately before the forward cast. */
+  beginChargedThrow() {
+    if (
+      this.controlsLocked ||
+      this.actionPlaying ||
+      this.waterLocomotionStateValue !== "grounded"
+    ) {
+      return false;
+    }
+
+    const group = this.playAction("throwObject");
+    if (!group) return false;
+    const frameSpan = group.to - group.from;
+    const chargeReference = THROW_CHARGE_REFERENCE_FRAMES[this.character];
+    const holdNormalizedFrame =
+      chargeReference.holdFrame / chargeReference.totalFrames;
+    const releaseNormalizedFrame =
+      chargeReference.releaseFrame / chargeReference.totalFrames;
+    const endNormalizedFrame =
+      chargeReference.endFrame / chargeReference.totalFrames;
+    this.chargedThrowAction = {
+      group,
+      holdFrame: group.from + frameSpan * holdNormalizedFrame,
+      releaseFrame: group.from + frameSpan * releaseNormalizedFrame,
+      endFrame: group.from + frameSpan * endNormalizedFrame,
+      released: false,
+      launched: false,
+      launch: null,
+    };
+    return true;
+  }
+
+  /** Resumes the held clip and emits the projectile at the authored release phase. */
+  releaseChargedThrow(launch: () => void) {
+    const state = this.chargedThrowAction;
+    if (!state || state.released) return false;
+    state.released = true;
+    state.launch = launch;
+    if (state.group.getCurrentFrame() >= state.releaseFrame) {
+      this.launchChargedThrowProjectile(state);
+    }
+    if (!state.group.isPlaying) state.group.restart();
+    return true;
+  }
+
+  cancelChargedThrow() {
+    const state = this.chargedThrowAction;
+    if (!state) return;
+    this.chargedThrowAction = null;
+    const wasCurrentAction = this.currentAnimation === state.group.name;
+    state.group.stop(true);
+    if (wasCurrentAction) {
+      this.actionPlaying = false;
+      this.currentAnimation = null;
+      this.resumeIdleOrWaterAnimation();
+    }
+  }
+
   /** Keeps input responsive while a grab briefly slows and tugs the character. */
   applyEnemyGrabPressure(
     source: Vector3,
@@ -632,6 +721,55 @@ export class PlayerController {
       origin: this.camera.globalPosition.clone(),
       direction,
     };
+  }
+
+  getAttackAimViewportPosition() {
+    return this.viewMode === "third"
+      ? THIRD_PERSON_AIM_VIEWPORT_POSITION
+      : CENTER_AIM_VIEWPORT_POSITION;
+  }
+
+  /** Ray passing through the visible combat reticle, including its 3P offset. */
+  getAttackAimRay(): LookRay {
+    if (this.viewMode !== "third") return this.getLookRay();
+
+    const engine = this.scene.getEngine();
+    const width = Math.max(1, engine.getRenderWidth());
+    const height = Math.max(1, engine.getRenderHeight());
+    const viewportPosition = this.getAttackAimViewportPosition();
+    this.camera.computeWorldMatrix();
+    const farPoint = Vector3.Unproject(
+      new Vector3(width * viewportPosition.x, height * viewportPosition.y, 1),
+      width,
+      height,
+      AIM_UNPROJECT_WORLD,
+      this.camera.getViewMatrix(true),
+      this.camera.getProjectionMatrix(true)
+    );
+    const origin = this.camera.globalPosition.clone();
+    const direction = farPoint.subtract(origin);
+    if (direction.lengthSquared() > 0) direction.normalize();
+    return { origin, direction };
+  }
+
+  /** Animated palm position used by the held orb and projectile release. */
+  getThrowHandWorldPositionToRef(result: Vector3) {
+    const mesh = this.throwHandMesh;
+    const hand = this.throwHandBone;
+    if (!mesh || !hand || !mesh.skeleton) return false;
+
+    this.root.computeWorldMatrix(true);
+    mesh.computeWorldMatrix(true);
+    mesh.skeleton.prepare(true);
+    hand.getAbsolutePositionToRef(mesh, result);
+    if (this.throwHandMiddleBone) {
+      this.throwHandMiddleBone.getAbsolutePositionToRef(
+        mesh,
+        this.throwHandMiddlePosition
+      );
+      Vector3.LerpToRef(result, this.throwHandMiddlePosition, 0.58, result);
+    }
+    return true;
   }
 
   getFlashlightRay(): LookRay {
@@ -783,6 +921,7 @@ export class PlayerController {
     // Streaming and shader compilation can occasionally stall a frame. Never
     // convert that wall-clock pause into several metres of player movement.
     dt = Math.max(0, Math.min(dt, MAX_SIMULATION_DELTA_SECONDS));
+    this.updateChargedThrowAction();
     this.updateIsometricCameraAnchorBlend(dt);
 
     if (this.enemyGrabPressureTimer > 0) {
@@ -1206,7 +1345,7 @@ export class PlayerController {
     this.camera.position.copyFrom(
       Vector3.TransformCoordinates(terrainSafePosition, inverse)
     );
-    this.lookAtLocal(target);
+    this.orientCameraForView(target);
   }
 
   private positionFirstPersonCamera() {
@@ -1343,12 +1482,17 @@ export class PlayerController {
     const target = this.getThirdPersonTargetLocal();
     const viewSign = this.viewMode === "front" ? 1 : -1;
     const orbitPitch = Math.max(THIRD_PERSON_PITCH_MIN, Math.min(THIRD_PERSON_PITCH_MAX, this.pitch));
+    // Looking upward used to lower the orbit into the terrain, where collision
+    // shortened the camera arm and effectively cancelled the available pitch.
+    // Keep the normal shoulder height for upward aim; downward aim may still
+    // raise the camera as before.
+    const positionPitch = this.viewMode === "third" ? Math.max(0, orbitPitch) : orbitPitch;
     const distance = THIRD_PERSON_CAMERA_DISTANCE;
-    const y = target.y + THIRD_PERSON_CAMERA_HEIGHT + Math.sin(orbitPitch) * 2.2;
-    const z = viewSign * distance * Math.cos(orbitPitch * 0.45);
+    const y = target.y + THIRD_PERSON_CAMERA_HEIGHT + Math.sin(positionPitch) * 2.2;
+    const z = viewSign * distance * Math.cos(positionPitch * 0.45);
 
     this.camera.position.set(0, y, z);
-    this.lookAtLocal(target);
+    this.orientCameraForView(target);
   }
 
   private positionIsometricCamera() {
@@ -1563,6 +1707,20 @@ export class PlayerController {
     this.camera.rotation.z = 0;
   }
 
+  private orientCameraForView(target: Vector3) {
+    this.lookAtLocal(target);
+    if (this.viewMode !== "third") return;
+
+    const neutralPitch = Math.atan2(
+      THIRD_PERSON_CAMERA_HEIGHT,
+      THIRD_PERSON_CAMERA_DISTANCE
+    );
+    this.camera.rotation.x = Math.max(
+      -1.42,
+      Math.min(1.42, neutralPitch + this.pitch)
+    );
+  }
+
   private normalizeAvatar() {
     if (!this.avatarRoot) return;
     this.avatarRoot.rotation.y = CHARACTER_YAW_OFFSET;
@@ -1585,6 +1743,29 @@ export class PlayerController {
     this.avatarRoot.position.x -= centerX - rootWorld.x;
     this.avatarRoot.position.y -= scaledBounds.min.y - groundY - CHARACTER_FOOT_CLEARANCE;
     this.avatarRoot.position.z -= centerZ - rootWorld.z;
+  }
+
+  private resolveThrowHandBones(meshes: readonly AbstractMesh[]) {
+    this.throwHandMesh = null;
+    this.throwHandBone = null;
+    this.throwHandMiddleBone = null;
+
+    for (const candidate of meshes) {
+      if (!(candidate instanceof Mesh) || !candidate.skeleton) continue;
+      const normalizedBones = candidate.skeleton.bones.map((bone) => ({
+        bone,
+        name: bone.name.toLowerCase().replace(/[^a-z0-9]/g, ""),
+      }));
+      const hand = normalizedBones.find(({ name }) => name.endsWith("righthand"));
+      if (!hand) continue;
+
+      this.throwHandMesh = candidate;
+      this.throwHandBone = hand.bone;
+      this.throwHandMiddleBone =
+        normalizedBones.find(({ name }) => name.endsWith("righthandmiddle1"))
+          ?.bone ?? null;
+      return;
+    }
   }
 
   getWalkableSurfaceHeight(
@@ -1727,12 +1908,63 @@ export class PlayerController {
     }
 
     group.onAnimationGroupEndObservable.addOnce(() => {
+      const chargedThrow = this.chargedThrowAction;
+      if (chargedThrow?.group === group) {
+        if (chargedThrow.released) this.launchChargedThrowProjectile(chargedThrow);
+        this.chargedThrowAction = null;
+      }
       if (this.currentAnimation !== group.name) return;
       this.actionPlaying = false;
       this.currentAnimation = null;
       this.resumeIdleOrWaterAnimation();
     });
     return group;
+  }
+
+  private updateChargedThrowAction() {
+    const state = this.chargedThrowAction;
+    if (!state) return;
+    const currentFrame = state.group.getCurrentFrame();
+
+    if (!state.released && state.group.isPlaying && currentFrame >= state.holdFrame) {
+      state.group.goToFrame(state.holdFrame, true);
+      state.group.pause();
+      return;
+    }
+
+    if (state.released && currentFrame >= state.releaseFrame) {
+      this.launchChargedThrowProjectile(state);
+    }
+
+    if (state.released && currentFrame >= state.endFrame) {
+      this.finishChargedThrowAction(state);
+    }
+  }
+
+  private launchChargedThrowProjectile(
+    state: NonNullable<PlayerController["chargedThrowAction"]>
+  ) {
+    if (state.launched) return;
+    state.launched = true;
+    const launch = state.launch;
+    state.launch = null;
+    launch?.();
+  }
+
+  private finishChargedThrowAction(
+    state: NonNullable<PlayerController["chargedThrowAction"]>
+  ) {
+    if (this.chargedThrowAction !== state) return;
+    this.launchChargedThrowProjectile(state);
+    state.group.goToFrame(state.endFrame, true);
+    state.group.pause();
+    this.chargedThrowAction = null;
+    if (this.currentAnimation !== state.group.name) return;
+
+    // Blend out at the authored recovery pose instead of waiting for the long
+    // remainder of the source clip. This also releases movement immediately.
+    this.actionPlaying = false;
+    this.resumeIdleOrWaterAnimation();
   }
 
   private resumeIdleOrWaterAnimation() {
@@ -1766,7 +1998,7 @@ export class PlayerController {
     next.start(loop);
     this.setAnimationWeight(next, previous && previous !== next ? 0 : 1);
 
-    if (previous && previous !== next && previous.isPlaying) {
+    if (previous && previous !== next && previous.isStarted) {
       this.fadeFromAnimation = previous;
       this.fadeToAnimation = next;
       this.fadeElapsed = 0;

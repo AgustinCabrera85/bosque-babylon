@@ -139,8 +139,13 @@ export class EnemyManager {
     for (const enemy of this.enemies.values()) {
       if (enemy.lifecycleState === EnemyLifecycleState.Ready && enemy.enabled) {
         enemy.update(deltaTimeSeconds);
+        enemy.updateCombatEffects(deltaTimeSeconds);
       }
     }
+  }
+
+  public getAll() {
+    return [...this.enemies.values()];
   }
 
   public getById<T extends EnemyController = EnemyController>(id: EnemyId) {

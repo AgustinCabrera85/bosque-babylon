@@ -510,8 +510,8 @@ body.sky-eye-cinematic-active #inventoryButton {
 
 #reticle {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  left: var(--reticle-x, 50%);
+  top: var(--reticle-y, 50%);
   width: 8px;
   height: 8px;
   transform: translate(-50%, -50%);
@@ -519,6 +519,120 @@ body.sky-eye-cinematic-active #inventoryButton {
   border: 1px solid rgba(255,255,255,0.55);
   box-shadow: 0 0 10px rgba(255,255,255,0.15);
   opacity: 0.65;
+  transition:
+    left 180ms ease,
+    top 180ms ease,
+    width 120ms ease,
+    height 120ms ease,
+    opacity 120ms ease;
+}
+
+body.attack-aiming #reticle {
+  width: 15px;
+  height: 15px;
+  border-color: rgba(128, 225, 255, 0.95);
+  box-shadow:
+    0 0 8px rgba(112, 220, 255, 0.9),
+    0 0 22px rgba(72, 145, 255, 0.55);
+  opacity: 1;
+}
+
+#attackHud {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 4;
+  width: 190px;
+  padding: 11px 12px 10px;
+  border: 1px solid rgba(118, 202, 234, 0.28);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 85% 10%, rgba(76, 168, 255, 0.13), transparent 42%),
+    rgba(2, 8, 14, 0.7);
+  box-shadow:
+    inset 0 0 18px rgba(62, 147, 220, 0.08),
+    0 7px 20px rgba(0, 0, 0, 0.4);
+  color: #d9f4ff;
+  font: 700 11px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  letter-spacing: 0.7px;
+  pointer-events: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+#attackHud.charging,
+#attackHud.recharging {
+  border-color: rgba(120, 225, 255, 0.72);
+  box-shadow:
+    inset 0 0 24px rgba(72, 175, 255, 0.18),
+    0 0 18px rgba(72, 175, 255, 0.2),
+    0 7px 20px rgba(0, 0, 0, 0.4);
+}
+
+#attackHud.empty {
+  border-color: rgba(212, 164, 96, 0.38);
+  filter: saturate(0.55);
+}
+
+.attack-hud-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-transform: uppercase;
+}
+
+.attack-hud-heading strong {
+  color: #f1fbff;
+  font-size: 13px;
+}
+
+.attack-ammo-pips {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.attack-ammo-pip {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(147, 208, 232, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(173, 224, 242, 0.12);
+}
+
+.attack-ammo-pip.filled {
+  background: #a9edff;
+  box-shadow:
+    0 0 6px rgba(118, 223, 255, 0.95),
+    0 0 12px rgba(67, 147, 255, 0.55);
+}
+
+.attack-power-track {
+  height: 4px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(153, 211, 231, 0.12);
+}
+
+.attack-power-track span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6db7ff, #e9fbff);
+  box-shadow: 0 0 8px rgba(110, 209, 255, 0.82);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.attack-status {
+  display: block;
+  min-height: 13px;
+  margin-top: 7px;
+  color: rgba(210, 237, 247, 0.7);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
 }
 
 .checkpoint-indicator-hud {
@@ -1551,6 +1665,19 @@ body.inventory-open #hud {
   bottom: max(34px, calc(env(safe-area-inset-bottom) + 34px));
 }
 
+#attackButton {
+  right: max(90px, calc(env(safe-area-inset-right) + 90px));
+  bottom: max(102px, calc(env(safe-area-inset-bottom) + 102px));
+  border-color: rgba(130, 221, 255, 0.42);
+  color: #d9f7ff;
+  box-shadow: 0 0 14px rgba(67, 155, 232, 0.18);
+}
+
+#attackButton.active {
+  background: rgba(84, 184, 235, 0.4);
+  box-shadow: 0 0 22px rgba(96, 205, 255, 0.48);
+}
+
 #mobileCameraButton {
   right: max(158px, calc(env(safe-area-inset-right) + 158px));
   bottom: max(34px, calc(env(safe-area-inset-bottom) + 34px));
@@ -1586,6 +1713,13 @@ body.inventory-open #hud {
   #hint {
     bottom: 168px;
     max-width: calc(100vw - 48px);
+  }
+
+  #attackHud {
+    right: 12px;
+    bottom: 172px;
+    width: 155px;
+    padding: 9px 10px;
   }
 
   #reticle {

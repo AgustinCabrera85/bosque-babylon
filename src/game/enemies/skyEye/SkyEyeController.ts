@@ -104,7 +104,7 @@ export class SkyEyeController extends BaseEnemyController {
     if (this.config.fxQuality !== "off") {
       this.fxController = new SkyEyeFxController(
         this.scene,
-        this.root,
+        this.visualRoot,
         [eyeball, upperEyelid, lowerEyelid],
         this.config,
         this.smokeSystem

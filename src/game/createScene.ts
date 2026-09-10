@@ -56,11 +56,15 @@ import {
 } from "../materials";
 import {
   EnemyManager,
+  SKY_EYE_TYPE,
   SHADOW_GRABBER_TYPE,
   ShadowGrabberBehaviorSystem,
+  registerSkyEye,
   registerShadowGrabber,
+  spawnSkyEye,
 } from "./enemies";
 import { loadInitialForestEnemies } from "./levels/ForestEnemySpawns";
+import { TerminalSkyEyeEncounter } from "./levels/TerminalSkyEyeEncounter";
 
 
 
@@ -317,6 +321,7 @@ export async function createScene(
   installSceneMaterialLightBudgetGuard(scene);
   const enemyManager = new EnemyManager(scene);
   registerShadowGrabber(enemyManager);
+  registerSkyEye(enemyManager);
   scene.metadata ??= {};
   scene.metadata.enemyManager = enemyManager;
   scene.onDisposeObservable.addOnce(() => enemyManager.dispose());
@@ -701,6 +706,7 @@ scene.onBeforeRenderObservable.add(() => {
     segments.loadStartBlocker(),
     segments.loadEndHouse(),
     enemyManager.preload(SHADOW_GRABBER_TYPE),
+    enemyManager.preload(SKY_EYE_TYPE),
   ]);
   onProgress(0.89, "Preparando tramo final...");
   const waterfallQuery = new URLSearchParams(window.location.search);
@@ -733,6 +739,57 @@ scene.onBeforeRenderObservable.add(() => {
         segments.instantiateCandleAsset(name, scale),
     }
   ).generateWaterfallLagoonEnd(terminalConfig);
+  terminalLandmark.waterfall.computeWorldMatrix(true);
+  const waterfallTopY =
+    terminalLandmark.waterfall.getBoundingInfo().boundingBox.maximumWorld.y;
+  // The scaled eye extends about five units below its pivot. One extra unit
+  // keeps the final pose fully above the water curtain from the shore view.
+  const skyEyeHoverClearance = 6;
+  const skyEyeHoverPosition = new Vector3(
+    terminalConfig.lagoonCenterX,
+    waterfallTopY + skyEyeHoverClearance,
+    terminalLandmark.caveCandleFocusPoint.z + 0.45
+  );
+  const skyEyeEmergencePosition = new Vector3(
+    terminalConfig.lagoonCenterX,
+    terminalConfig.waterLevel - 6.2,
+    terminalLandmark.waterfallImpactPoint.z - 1.8
+  );
+  const skyEye = await spawnSkyEye(enemyManager, {
+    id: "terminal-sky-eye",
+    type: SKY_EYE_TYPE,
+    position: skyEyeEmergencePosition,
+    enabled: false,
+    getTargetPosition: () => player.position,
+  });
+  for (const mesh of skyEye.meshes) {
+    terminalLandmark.lagoonWaterMaterial.addToRenderList(mesh);
+  }
+  const skyEyeEncounter = new TerminalSkyEyeEncounter({
+    player,
+    eye: skyEye,
+    waterSurface: terminalLandmark.waterSurface,
+    emergencePosition: skyEyeEmergencePosition,
+    hoverPosition: skyEyeHoverPosition,
+  });
+  scene.metadata.skyEyeEncounter = skyEyeEncounter;
+  scene.onDisposeObservable.addOnce(() => skyEyeEncounter.dispose());
+  if (import.meta.env.DEV) {
+    const skyEyeDebug = {
+      getSnapshot: () => skyEyeEncounter.getDebugSnapshot(),
+      startPresentation: () => skyEyeEncounter.startPresentation(),
+      finishPresentation: () => skyEyeEncounter.finishPresentation(),
+    };
+    const debugGlobal = globalThis as typeof globalThis & {
+      __bosqueSkyEyeDebug?: typeof skyEyeDebug;
+    };
+    debugGlobal.__bosqueSkyEyeDebug = skyEyeDebug;
+    scene.onDisposeObservable.addOnce(() => {
+      if (debugGlobal.__bosqueSkyEyeDebug === skyEyeDebug) {
+        delete debugGlobal.__bosqueSkyEyeDebug;
+      }
+    });
+  }
   if (import.meta.env.DEV && terminalLandmark.fluidWaterfall) {
     const fluidWaterfallDiagnostics = {
       getSnapshot: () => terminalLandmark.fluidWaterfall!.getDebugSnapshot(),
@@ -1038,6 +1095,9 @@ scene.onBeforeRenderObservable.add(() => {
   onProgress(0.98, "Compilando transición al lago...");
   await prepareTransitionState(terminalTransitionWarmupPosition);
   onProgress(0.986, "Compilando materiales del lago...");
+  skyEye.setPosition(skyEyeHoverPosition);
+  skyEye.setEnabled(true);
+  skyEye.snapLookAt(lagoonWarmupPosition);
   await prepareTransitionState(lagoonWarmupPosition);
   // The flashlight is normally on, but its off-state has a different stable
   // light membership. Compile the three main regions once so toggling it does
@@ -1049,6 +1109,8 @@ scene.onBeforeRenderObservable.add(() => {
   await prepareTransitionState(lagoonWarmupPosition, 1);
   setFlashlightEnabled(true);
   await prepareTransitionState(initialPlayerPosition);
+  skyEye.setEnabled(false);
+  skyEye.setPosition(skyEyeEmergencePosition);
   onProgress(0.995, "Preparando controles...");
 
   // =========================
@@ -1066,6 +1128,7 @@ scene.onBeforeRenderObservable.add(() => {
       0.78
     );
     player.update(dt, terrain, segments);
+    skyEyeEncounter.update(dt);
     shadowGrabberBehaviorSystem.update(dt);
     enemyManager.update(dt);
     waterContactSystem.update(dt);

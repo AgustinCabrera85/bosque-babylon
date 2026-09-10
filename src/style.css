@@ -352,11 +352,13 @@ body.character-selecting #renderCanvas {
   transition: opacity 500ms ease;
 }
 
-body.opening-sequence-active #hud {
+body.opening-sequence-active #hud,
+body.sky-eye-cinematic-active #hud {
   opacity: 0;
 }
 
-body.opening-sequence-active #inventoryButton {
+body.opening-sequence-active #inventoryButton,
+body.sky-eye-cinematic-active #inventoryButton {
   opacity: 0;
   pointer-events: none;
 }

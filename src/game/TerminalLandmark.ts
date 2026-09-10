@@ -92,6 +92,7 @@ export type TerminalLandmarkHandle = {
   waterfall: Mesh;
   waterfallLayers: readonly Mesh[];
   waterfallImpactPoint: Vector3;
+  caveCandleFocusPoint: Vector3;
   fluidWaterfall: FluidWaterfallController | null;
   passageAnchor: TerminalPassageAnchor;
   update: (deltaTime: number, playerPosition?: Vector3) => void;
@@ -276,6 +277,7 @@ type WaterfallMetrics = {
 type CaveCandleDecoration = {
   meshes: AbstractMesh[];
   lights: PointLight[];
+  focusPoint: Vector3;
 };
 
 type WaterfallDropletBurst = {
@@ -492,6 +494,7 @@ export class TerminalLandmarkGenerator {
       waterfall: waterfallLayers[0],
       waterfallLayers,
       waterfallImpactPoint: activeImpactPoint.clone(),
+      caveCandleFocusPoint: caveCandles.focusPoint.clone(),
       fluidWaterfall: this.fluidWaterfall,
       passageAnchor,
       update: (deltaTime, playerPosition) => this.updateAnimation(deltaTime, playerPosition),
@@ -931,8 +934,7 @@ export class TerminalLandmarkGenerator {
         layer.widthScale,
         layer.xOffset,
         layer.zOffset,
-        layer.phase,
-        hybrid
+        layer.phase
       );
       waterfall.material = this.createWaterfallMaterial(
         `${layer.name}Material`,
@@ -1021,8 +1023,7 @@ export class TerminalLandmarkGenerator {
     widthScale: number,
     xOffset: number,
     zOffset: number,
-    phase: number,
-    hybrid: boolean
+    phase: number
   ) {
     const paths: Vector3[][] = [];
     const columnCount = 7;
@@ -1049,13 +1050,12 @@ export class TerminalLandmarkGenerator {
         // converge on the authored impact point, which is guaranteed to be in
         // the lagoon, while the upper lip remains attached to the rock wall.
         const fallingProgress = 1 - vertical;
-        // A ballistic particle advances horizontally at a steady rate while
+        // A ballistic stream advances horizontally at a steady rate while
         // gravity accelerates it vertically, so z progress is approximately
-        // sqrt(y progress). Matching that curve keeps the detail particles on
-        // top of the hybrid sheet and leaves most of the lower fall vertical.
-        const trajectory = hybrid
-          ? Math.sqrt(fallingProgress)
-          : fallingProgress * fallingProgress;
+        // sqrt(y progress). Using the same curve for the authored sheet moves
+        // it in front of the terrain immediately below the lip instead of
+        // leaving its upper section buried inside the cliff.
+        const trajectory = Math.sqrt(fallingProgress);
         const baseZ = lerp(metrics.sourceZ, metrics.impactPoint.z, trajectory);
         const z =
           baseZ +
@@ -1502,12 +1502,15 @@ export class TerminalLandmarkGenerator {
   ): CaveCandleDecoration {
     const meshes: AbstractMesh[] = [];
     const lights: PointLight[] = [];
+    const z = config.waterfallZ - 3.6;
+    const ledgeY = metrics.bottom + metrics.height * 0.23;
+    const focusPoint = new Vector3(config.lagoonCenterX, ledgeY + 0.42, z);
     const instantiateCandleAsset = this.renderOptions.instantiateCandleAsset;
     if (!instantiateCandleAsset) {
       console.warn(
         "[TerminalLandmark] No candle asset factory was provided; cave candles were omitted."
       );
-      return { meshes, lights };
+      return { meshes, lights, focusPoint };
     }
 
     const flameMaterial = createCandleFireMaterial(this.scene);
@@ -1516,7 +1519,6 @@ export class TerminalLandmarkGenerator {
     const glowMaterial = createGlowMaterial(this.scene);
     glowMaterial.name = "terminalCaveCandleGlowMaterial";
     glowMaterial.fogEnabled = false;
-    const z = config.waterfallZ - 3.6;
     const candleScale = new Vector3(0.18, 0.085, 0.18);
     const flameWidth = 0.48;
     const flameHeight = 0.56;
@@ -1525,7 +1527,6 @@ export class TerminalLandmarkGenerator {
       const x = config.lagoonCenterX + side * config.waterfallWidth * 0.52;
       // The candles rest on protruding wall ledges. Keeping them above the far
       // shore silhouette makes both flames readable from the trail entrance.
-      const ledgeY = metrics.bottom + metrics.height * 0.23;
       const support = this.rockLibrary.instantiateByIndex(
         `terminalCaveCandleSupport_${index}`,
         this.scene,
@@ -1595,7 +1596,7 @@ export class TerminalLandmarkGenerator {
       meshes.push(flame, glow);
     });
 
-    return { meshes, lights };
+    return { meshes, lights, focusPoint };
   }
 
   private populateRockClosure(
@@ -1792,7 +1793,10 @@ export class TerminalLandmarkGenerator {
     for (const mesh of this.waterfallOverlayMeshes) mesh.setEnabled(shouldBeActive);
     for (const system of this.waterfallParticleSystems) {
       if (shouldBeActive) {
-        if (!system.isStarted()) system.start();
+        // Babylon keeps isStarted() true after stop(), so checking it here
+        // prevents systems stopped during the loading warmup from ever
+        // restarting when the player reaches the lagoon.
+        system.start();
       } else {
         system.stop();
         system.reset();

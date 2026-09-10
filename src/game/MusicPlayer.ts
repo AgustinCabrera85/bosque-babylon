@@ -22,6 +22,10 @@ type GameSfxEvent = CustomEvent<{
   active?: boolean;
 }>;
 
+type SkyEyeEvent = CustomEvent<{
+  state?: "presentation-started" | "watching";
+}>;
+
 type WorldPosition = {
   x: number;
   z: number;
@@ -80,6 +84,10 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   music.loop = true;
   music.preload = "auto";
 
+  const skyEyeMusic = new Audio(asset("assets/audio/music/The Eye Emerges.mp3"));
+  skyEyeMusic.loop = false;
+  skyEyeMusic.preload = "auto";
+
   const ambient = new Audio(asset("assets/audio/ambience/Gentle_cricket_chirp.mp3"));
   ambient.loop = true;
   ambient.preload = "auto";
@@ -99,6 +107,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   jumpSfx.preload = "auto";
 
   let started = false;
+  let skyEyeMusicActive = false;
   let ambientStarted = false;
   let waterfallStarted = false;
   let footstepMode: "idle" | "walk" | "run" = "idle";
@@ -235,10 +244,12 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
 
     if (!started) {
       started = true;
-      playbackRequests.push(music.play().catch((error) => {
-        started = false;
-        console.warn("[MusicPlayer] Music playback was blocked until the next user gesture.", error);
-      }));
+      if (!skyEyeMusicActive) {
+        playbackRequests.push(music.play().catch((error) => {
+          started = false;
+          console.warn("[MusicPlayer] Music playback was blocked until the next user gesture.", error);
+        }));
+      }
     }
 
     if (!ambientStarted) {
@@ -267,6 +278,8 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     if (channel === "music") {
       music.volume = next;
       music.muted = next <= 0;
+      skyEyeMusic.volume = next;
+      skyEyeMusic.muted = next <= 0;
       if (save) localStorage.setItem(MUSIC_VOLUME_KEY, String(next));
       renderMusic(next);
     }
@@ -317,6 +330,35 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       return;
     }
     playGameSfx(name);
+  });
+
+  window.addEventListener("bosque:sky-eye", (event) => {
+    const { state } = (event as SkyEyeEvent).detail ?? {};
+    if (state === "presentation-started") {
+      skyEyeMusicActive = true;
+      music.pause();
+      skyEyeMusic.currentTime = 0;
+      void skyEyeMusic.play().catch((error) => {
+        console.warn(
+          "[MusicPlayer] Sky-eye music playback was blocked.",
+          error
+        );
+      });
+      return;
+    }
+
+    if (state !== "watching" || !skyEyeMusicActive) return;
+    skyEyeMusicActive = false;
+    stopLoop(skyEyeMusic);
+    if (started) {
+      void music.play().catch((error) => {
+        started = false;
+        console.warn(
+          "[MusicPlayer] Background music could not resume.",
+          error
+        );
+      });
+    }
   });
 
   const startOnGesture = () => void start();

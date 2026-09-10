@@ -216,6 +216,11 @@ export class PlayerController {
     elapsed: number;
     duration: number;
   } | null = null;
+  private cinematicSequenceActive = false;
+  private cinematicCameraState: {
+    worldPosition: Vector3;
+    worldTarget: Vector3;
+  } | null = null;
   private movementLockTimer = 0;
   private enemyGrabPressureTimer = 0;
   private enemyGrabMovementMultiplier = 1;
@@ -262,14 +267,14 @@ export class PlayerController {
       if (target?.closest("#inventoryButton")) return;
       if (target?.closest("#shadowAuraDebug")) return;
       if (target?.closest("#openingSequence")) return;
-      if (this.openingSequenceActive) return;
+      if (this.controlsLocked) return;
       if (this.mobileEnabled) return;
       canvas.requestPointerLock?.();
     });
 
     window.addEventListener("mousemove", (event) => {
       if (document.pointerLockElement !== this.canvas) return;
-      if (this.openingSequenceActive) return;
+      if (this.controlsLocked) return;
       this.applyLook(event.movementX * 0.0012, event.movementY * 0.001);
     });
 
@@ -283,7 +288,7 @@ export class PlayerController {
 
     scene.onKeyboardObservable.add((kb) => {
       if (kb.type === KeyboardEventTypes.KEYDOWN) {
-        if (this.openingSequenceActive) return;
+        if (this.controlsLocked) return;
         const event = kb.event as KeyboardEvent;
         if (event.code === "KeyV" && !event.repeat) this.toggleViewMode();
         if (event.code === "Space" && !event.repeat) {
@@ -335,6 +340,14 @@ export class PlayerController {
     return this.openingSequenceActive;
   }
 
+  get isCinematicSequenceActive() {
+    return this.cinematicSequenceActive;
+  }
+
+  private get controlsLocked() {
+    return this.openingSequenceActive || this.cinematicSequenceActive;
+  }
+
   setWaterSurfaceRegistry(registry: WaterSurfaceRegistry) {
     this.waterSurfaces = registry;
   }
@@ -354,7 +367,7 @@ export class PlayerController {
   }
 
   setViewMode(mode: ViewMode, transitionSeconds = 0) {
-    if (this.openingSequenceActive) return;
+    if (this.controlsLocked) return;
     if (mode === "iso" && !this.isometricViewAllowed) return;
     if (this.viewMode === mode) return;
     let transitionOrigin: Vector3 | null = null;
@@ -512,6 +525,45 @@ export class PlayerController {
     }
   }
 
+  /** Locks gameplay input and hands camera framing to an in-world cinematic. */
+  beginCinematicSequence() {
+    if (this.controlsLocked) return false;
+    if (this.viewMode !== "third") this.setViewMode("third");
+    this.cinematicSequenceActive = true;
+    this.cameraViewTransition = null;
+    this.resetInputState();
+    return true;
+  }
+
+  setCinematicCamera(worldPosition: Vector3, worldTarget: Vector3) {
+    if (!this.cinematicSequenceActive) return;
+    if (!this.cinematicCameraState) {
+      this.cinematicCameraState = {
+        worldPosition: worldPosition.clone(),
+        worldTarget: worldTarget.clone(),
+      };
+      return;
+    }
+    this.cinematicCameraState.worldPosition.copyFrom(worldPosition);
+    this.cinematicCameraState.worldTarget.copyFrom(worldTarget);
+  }
+
+  /** Restores gameplay and blends from the last cinematic frame to the player rig. */
+  endCinematicSequence(transitionSeconds = 0.85) {
+    if (!this.cinematicSequenceActive) return;
+    this.root.computeWorldMatrix(true);
+    this.camera.computeWorldMatrix();
+    const transitionOrigin = this.camera.globalPosition.clone();
+    this.cinematicCameraState = null;
+    this.cinematicSequenceActive = false;
+    this.resetInputState();
+    this.cameraViewTransition = {
+      fromWorldPosition: transitionOrigin,
+      elapsed: 0,
+      duration: Math.max(0.08, transitionSeconds),
+    };
+  }
+
   playInteractionAction(type?: string, movementLockSeconds?: number) {
     if (type === "door") {
       this.lockMovement(movementLockSeconds ?? DOOR_OPEN_MOVEMENT_LOCK_SECONDS);
@@ -628,13 +680,13 @@ export class PlayerController {
   }
 
   setMobileMove(x: number, y: number) {
-    if (this.openingSequenceActive) return;
+    if (this.controlsLocked) return;
     this.mobileMoveX = Math.max(-1, Math.min(1, x));
     this.mobileMoveY = Math.max(-1, Math.min(1, y));
   }
 
   setMobileRun(running: boolean) {
-    if (this.openingSequenceActive) {
+    if (this.controlsLocked) {
       this.mobileRun = false;
       return;
     }
@@ -643,12 +695,12 @@ export class PlayerController {
   }
 
   queueJump() {
-    if (this.openingSequenceActive) return;
+    if (this.controlsLocked) return;
     this.jumpQueued = true;
   }
 
   addMobileLook(deltaX: number, deltaY: number) {
-    if (this.openingSequenceActive) return;
+    if (this.controlsLocked) return;
     this.applyLook(deltaX * 0.0032, deltaY * 0.0027);
   }
 
@@ -754,7 +806,7 @@ export class PlayerController {
     this.refreshWaterEnvironment(terrain);
     this.refreshWaterLocomotionState();
     const movementLocked =
-      this.openingSequenceActive || this.movementLockTimer > 0 || this.actionPlaying;
+      this.controlsLocked || this.movementLockTimer > 0 || this.actionPlaying;
     this.consumeWaterAction(movementLocked);
     this.updateSwimmingCameraBlend(dt);
 
@@ -1107,6 +1159,22 @@ export class PlayerController {
     terrain: TerrainHandle
   ) {
     this.configureCameraProjection();
+    if (this.cinematicCameraState) {
+      this.root.computeWorldMatrix(true);
+      const inverse = this.root.getWorldMatrix().clone().invert();
+      this.camera.position.copyFrom(
+        Vector3.TransformCoordinates(
+          this.cinematicCameraState.worldPosition,
+          inverse
+        )
+      );
+      const localTarget = Vector3.TransformCoordinates(
+        this.cinematicCameraState.worldTarget,
+        inverse
+      );
+      this.lookAtLocal(localTarget);
+      return;
+    }
     if (this.viewMode === "first") {
       this.positionFirstPersonCamera();
       this.applySwimmingCameraDepth();

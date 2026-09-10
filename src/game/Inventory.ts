@@ -61,6 +61,7 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
 
   const openInventory = () => {
     if (open) return;
+    if (document.body.classList.contains("sky-eye-cinematic-active")) return;
     if (document.pointerLockElement instanceof HTMLElement) document.exitPointerLock?.();
 
     open = true;

@@ -40,7 +40,11 @@ export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
   };
 
   const setPaused = (next: boolean) => {
-    if (next && document.body.classList.contains("opening-sequence-active")) return;
+    if (
+      next &&
+      (document.body.classList.contains("opening-sequence-active") ||
+        document.body.classList.contains("sky-eye-cinematic-active"))
+    ) return;
     if (paused === next) return;
     paused = next;
 

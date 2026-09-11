@@ -18,7 +18,7 @@ type SliderBinding = {
 };
 
 type GameSfxEvent = CustomEvent<{
-  name?: "jump" | "walk" | "run";
+  name?: "jump" | "walk" | "run" | "door";
   active?: boolean;
 }>;
 
@@ -100,11 +100,13 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   const walkSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_walking.mp3"));
   const runSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_running.mp3"));
   const jumpSfx = new Audio(asset("assets/audio/sfx/jump_on_road.mp3"));
+  const doorSfx = new Audio(asset("assets/audio/sfx/HouseInTheWoods-DoorOpen.mp3"));
   walkSfx.loop = true;
   runSfx.loop = true;
   walkSfx.preload = "auto";
   runSfx.preload = "auto";
   jumpSfx.preload = "auto";
+  doorSfx.preload = "auto";
 
   let started = false;
   let skyEyeMusicActive = false;
@@ -177,9 +179,11 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     walkSfx.volume = volume * 0.58;
     runSfx.volume = volume * 0.62;
     jumpSfx.volume = volume * 0.7;
+    doorSfx.volume = volume * 0.86;
     walkSfx.muted = volume <= 0;
     runSfx.muted = volume <= 0;
     jumpSfx.muted = volume <= 0;
+    doorSfx.muted = volume <= 0;
   }
 
   function updateWaterfallVolume() {
@@ -224,15 +228,17 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     if (mode === "run") void playLoop(runSfx);
   }
 
-  function playGameSfx(name: "jump" | "walk" | "run") {
+  function playGameSfx(name: "jump" | "walk" | "run" | "door") {
     if (volumes.sfx <= 0) return;
     if (name === "walk" || name === "run") {
       setFootstepMode(name);
       return;
     }
 
-    jumpSfx.currentTime = 0;
-    void playLoop(jumpSfx);
+    const oneShot = name === "door" ? doorSfx : jumpSfx;
+    oneShot.pause();
+    oneShot.currentTime = 0;
+    void playLoop(oneShot);
   }
 
   async function start() {

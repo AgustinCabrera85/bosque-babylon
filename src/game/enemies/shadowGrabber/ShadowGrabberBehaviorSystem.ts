@@ -18,7 +18,7 @@ export type ShadowGrabberPlayerSource = {
   getGroundPositionToRef: (result: Vector3) => Vector3;
   getCollisionHeight: () => number;
   getSanity: () => number;
-  applySanityDrain: (amount: number) => void;
+  applySanityDrain: (amount: number, sourceId: string) => void;
   applyGrabPressure?: (
     source: Vector3,
     duration: number,
@@ -83,7 +83,8 @@ export class ShadowGrabberBehaviorSystem {
       coordinator: this.coordinator,
       lightQuery: this.lightQuery,
       navigation: this.options.navigation,
-      applySanityDrain: this.options.player.applySanityDrain,
+      applySanityDrain: (amount) =>
+        this.options.player.applySanityDrain(amount, controller.id),
       applyGrabPressure: this.options.player.applyGrabPressure,
       onSanityHit: this.options.player.onSanityHit,
       onEvent: this.options.onEvent,

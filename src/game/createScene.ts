@@ -2,6 +2,7 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Ray } from "@babylonjs/core/Culling/ray";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { RockLibrary } from "./RockLibrary";
@@ -32,6 +33,12 @@ import { WaterSurfaceRegistry } from "./WaterSurface";
 import type { MusicPlayerHandle } from "./MusicPlayer";
 import type { InventoryHandle } from "./Inventory";
 import { PlayerAttackSystem } from "./PlayerAttackSystem";
+import { PlayerStatsSystem } from "./PlayerStatsSystem";
+import { PlayerStatusHud } from "./PlayerStatusHud";
+import {
+  PlayerSurvivalSystem,
+  isPlayerPhysicallySurrounded,
+} from "./PlayerSurvivalSystem";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -510,6 +517,34 @@ const terrain = createTerrain(scene, {
       },
     }
   );
+  const playerStats = new PlayerStatsSystem({
+    inventory,
+    debug:
+      import.meta.env.DEV &&
+      new URLSearchParams(window.location.search).get("debugSurvival") === "1",
+  });
+  const playerStatusHud = new PlayerStatusHud(playerStats);
+  let auraHealth = Number.NaN;
+  let auraSanity = Number.NaN;
+  const unsubscribePlayerStatsAura = playerStats.onChange((event) => {
+    const health = event.snapshot.health / event.snapshot.maxHealth;
+    const sanity = event.snapshot.sanity / event.snapshot.maxSanity;
+    if (health !== auraHealth) {
+      auraHealth = health;
+      shadowAura.setHealth(health);
+    }
+    if (sanity !== auraSanity) {
+      auraSanity = sanity;
+      shadowAura.setSanity(sanity);
+    }
+    if (event.type === "low-sanity-perception") {
+      window.dispatchEvent(
+        new CustomEvent("bosque:low-sanity-perception", {
+          detail: { sanity: event.snapshot.sanity },
+        })
+      );
+    }
+  });
   const shadowAuraDebug = createShadowAuraDebugControls(shadowAura);
   player.onViewModeChange((mode) => shadowAura.setVisible(mode !== "first"));
   const requestedShadowView = new URLSearchParams(window.location.search).get("shadowView");
@@ -521,7 +556,12 @@ const terrain = createTerrain(scene, {
   ) {
     player.setViewMode(requestedShadowView);
   }
-  scene.onDisposeObservable.add(() => shadowAuraDebug.dispose());
+  scene.onDisposeObservable.add(() => {
+    unsubscribePlayerStatsAura();
+    playerStatusHud.dispose();
+    playerStats.dispose();
+    shadowAuraDebug.dispose();
+  });
 
 // =========================
 // 🔦 FLASHLIGHT (SpotLight)
@@ -972,15 +1012,10 @@ scene.onBeforeRenderObservable.add(() => {
     canvas,
     desktopInputEnabled:
       !window.matchMedia("(pointer: coarse)").matches && navigator.maxTouchPoints === 0,
-    inventory,
+    stats: playerStats,
     getLightSourcePositions: () => attackLightSources,
     getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
     isBlocked: (x, z) => segments.isColliding(x, z),
-  });
-  setupMobileControls(player, () => interactSystem.tryInteract(), {
-    start: () => attackSystem.startCharging(true),
-    release: () => attackSystem.releaseCharge(),
-    cancel: () => attackSystem.cancelCharge(),
   });
   const houseArrivalCinematic = new HouseArrivalCinematic({
     player,
@@ -989,7 +1024,10 @@ scene.onBeforeRenderObservable.add(() => {
     segmentBoundaryZ: terminalConfig.houseFrontZ,
     getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
     compactFraming: quality.name === "mobile",
-    onStart: () => attackSystem.cancelCharge(),
+    onStart: () => {
+      attackSystem.cancelCharge();
+      playerStats.cancelLightAbsorption("controls-locked");
+    },
   });
   scene.metadata ??= {};
   scene.metadata.houseArrivalCinematic = houseArrivalCinematic;
@@ -1013,8 +1051,12 @@ scene.onBeforeRenderObservable.add(() => {
       getPosition: () => player.position,
       getGroundPositionToRef: (result) => player.getGroundContactPositionToRef(result),
       getCollisionHeight: () => player.getCollisionHeight(),
-      getSanity: () => shadowAura.getSanity(),
-      applySanityDrain: (amount) => shadowAura.applySanityDrain(amount),
+      getSanity: () => playerStats.normalizedSanity,
+      applySanityDrain: (amount, sourceId) =>
+        playerStats.queueContinuousSanityDrain(
+          `shadow-grabber:${sourceId}:hold`,
+          amount
+        ),
       applyGrabPressure: (source, duration, movementMultiplier, pullSpeed) =>
         player.applyEnemyGrabPressure(
           source,
@@ -1041,6 +1083,12 @@ scene.onBeforeRenderObservable.add(() => {
       };
     },
     onEvent: (id, event) => {
+      if (event === "detect") playerStats.noteEnemyAwareness("detected");
+      if (event === "alert") playerStats.noteEnemyAwareness("chase-started");
+      if (event === "grab") playerStats.beginShadowGrabberCapture(id);
+      if (event === "retract" || event === "lightRecoil") {
+        playerStats.endShadowGrabberCapture(id);
+      }
       window.dispatchEvent(
         new CustomEvent("bosque:shadow-grabber", {
           detail: { id, event },
@@ -1062,7 +1110,7 @@ scene.onBeforeRenderObservable.add(() => {
     const shadowGrabberDebug = {
       getSnapshots: () => shadowGrabberBehaviorSystem.getDebugSnapshots(),
       getPlayerPosition: () => player.position.clone(),
-      getSanity: () => shadowAura.getSanity(),
+      getSanity: () => playerStats.normalizedSanity,
       getPerformance: () => ({
         fps: engine.getFps(),
         frameTimeMs: engine.getDeltaTime(),
@@ -1114,6 +1162,107 @@ scene.onBeforeRenderObservable.add(() => {
     });
   }
   scene.onDisposeObservable.addOnce(() => shadowGrabberBehaviorSystem.dispose());
+
+  const ignoredLineOfSightMeshes = new Set([
+    ...player.getAvatarMeshes(),
+    ...skyEye.getAttackHitMeshes(),
+    ...enemyManager
+      .getAll()
+      .flatMap((enemy) => [...enemy.getAttackHitMeshes()]),
+  ]);
+  const hasGameplayLineOfSight = (origin: Vector3, target: Vector3) => {
+    const direction = target.subtract(origin);
+    const distance = direction.length();
+    if (distance <= 0.05) return true;
+    direction.scaleInPlace(1 / distance);
+    const hit = scene.pickWithRay(
+      new Ray(origin, direction, distance),
+      (mesh) =>
+        mesh.isEnabled() &&
+        mesh.isPickable &&
+        mesh.visibility > 0.05 &&
+        !ignoredLineOfSightMeshes.has(mesh) &&
+        !mesh.name.toLocaleLowerCase().includes("water")
+    );
+    return !hit?.hit || hit.distance >= distance - 0.35;
+  };
+  const sanctuaryLightSources = [
+    ...endTorches.safeLightPositions,
+    terminalLandmark.caveCandleFocusPoint,
+  ];
+  const isNearPlanarLight = (
+    position: Vector3,
+    sources: readonly Vector3[],
+    radius: number
+  ) => {
+    const radiusSquared = radius * radius;
+    return sources.some((source) => {
+      const dx = source.x - position.x;
+      const dz = source.z - position.z;
+      return dx * dx + dz * dz <= radiusSquared;
+    });
+  };
+  let survivalGameplayActive = false;
+  const survivalSystem = new PlayerSurvivalSystem({
+    player,
+    stats: playerStats,
+    isGameplayActive: () => survivalGameplayActive,
+    desktopInputEnabled:
+      !window.matchMedia("(pointer: coarse)").matches &&
+      navigator.maxTouchPoints === 0,
+    getEnvironment: () => {
+      const position = player.position;
+      const inSanctuary = isNearPlanarLight(
+        position,
+        sanctuaryLightSources,
+        6
+      );
+      const inWeakFixedLight = isNearPlanarLight(position, attackLightSources, 12);
+      return {
+        onLitPath:
+          Math.abs(position.x) <= 4.5 &&
+          position.z >= -800 &&
+          position.z <=
+            mapLayout.segmentLength * mapLayout.endHouseSegment - 8,
+        inWeakLight: flashlightEnabled || inWeakFixedLight,
+        inSanctuary,
+        inTotalDarkness:
+          !flashlightEnabled && !inWeakFixedLight && !inSanctuary,
+      };
+    },
+    isSurrounded: () =>
+      isPlayerPhysicallySurrounded(
+        player.position,
+        shadowGrabberBehaviorSystem.getDebugSnapshots(),
+        hasGameplayLineOfSight
+      ),
+    getEyeGaze: () => ({
+      active: skyEyeEncounter.state === "watching" && skyEye.enabled,
+      hasLineOfSight:
+        skyEyeEncounter.state === "watching" &&
+        skyEye.enabled &&
+        hasGameplayLineOfSight(skyEye.root.position, player.position),
+    }),
+  });
+  const disposeMobileControls = setupMobileControls(
+    player,
+    () => interactSystem.tryInteract(),
+    {
+      start: () => attackSystem.startCharging(true),
+      release: () => attackSystem.releaseCharge(),
+      cancel: () => attackSystem.cancelCharge(),
+    },
+    {
+      start: survivalSystem.startLightAbsorption,
+      release: survivalSystem.releaseLightAbsorption,
+      cancel: survivalSystem.cancelLightAbsorption,
+    }
+  );
+  scene.metadata.playerStats = playerStats;
+  scene.onDisposeObservable.addOnce(() => {
+    disposeMobileControls();
+    survivalSystem.dispose();
+  });
 
   // Render the exact light/material states encountered at the forest, house
   // entrance and lagoon while the loading overlay still hides incomplete RTTs.
@@ -1187,6 +1336,7 @@ scene.onBeforeRenderObservable.add(() => {
     shadowGrabberBehaviorSystem.update(dt);
     enemyManager.update(dt);
     attackSystem.update(dt);
+    survivalSystem.update(dt);
     waterContactSystem.update(dt);
     waterInteractionVfx.update(dt);
     musicPlayer?.updateListenerPosition(player.position);
@@ -1215,6 +1365,7 @@ scene.onBeforeRenderObservable.add(() => {
   // Hold the player and the elevated opening camera before the first frame that
   // can become visible. The UI presentation decides when both begin moving.
   player.prepareOpeningSequence();
+  survivalGameplayActive = true;
   onProgress(1, "Listo");
   return {
     scene,

@@ -2001,6 +2001,9 @@ export class Segments {
             target = 1;
             collider.active = false;
             openDelayTimer = null;
+            window.dispatchEvent(
+              new CustomEvent("bosque:sfx", { detail: { name: "door" } })
+            );
           }, DOOR_OPEN_ACTION_DELAY_SECONDS * 1000);
 
           return {
@@ -2014,6 +2017,9 @@ export class Segments {
         open = false;
         target = 0;
         collider.active = false;
+        window.dispatchEvent(
+          new CustomEvent("bosque:sfx", { detail: { name: "door" } })
+        );
         closeColliderTimer = window.setTimeout(() => {
           collider.active = true;
           closeColliderTimer = null;

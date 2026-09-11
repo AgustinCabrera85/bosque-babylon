@@ -44,12 +44,22 @@ export type MobileAttackActions = {
   cancel: () => void;
 };
 
+export type MobileAbsorptionActions = {
+  start: () => boolean;
+  release: () => void;
+  cancel: () => void;
+};
+
 export function setupMobileControls(
   player: PlayerController,
   onInteract: () => void,
-  attack?: MobileAttackActions
+  attack?: MobileAttackActions,
+  absorption?: MobileAbsorptionActions
 ) {
-  if (!isMobileBrowser()) return;
+  if (!isMobileBrowser()) return () => {};
+
+  const abortController = new AbortController();
+  const signal = abortController.signal;
 
   const root = document.getElementById("mobileControls");
   const stick = document.getElementById("moveStick");
@@ -59,9 +69,12 @@ export function setupMobileControls(
   const jumpButton = document.getElementById("jumpButton");
   const interactButton = document.getElementById("interactButton");
   const attackButton = document.getElementById("attackButton");
+  const absorbLightButton = document.getElementById("absorbLightButton");
   const cameraButton = document.getElementById("mobileCameraButton") as HTMLButtonElement | null;
 
-  if (!root || !stick || !thumb || !lookPad || !runButton || !jumpButton || !interactButton || !attackButton || !cameraButton) return;
+  if (!root || !stick || !thumb || !lookPad || !runButton || !jumpButton || !interactButton || !attackButton || !absorbLightButton || !cameraButton) {
+    return () => abortController.abort();
+  }
 
   player.setMobileEnabled(true);
   root.classList.add("enabled");
@@ -71,6 +84,7 @@ export function setupMobileControls(
   let lookPointer: number | null = null;
   let runPointer: number | null = null;
   let attackPointer: number | null = null;
+  let absorptionPointer: number | null = null;
   let lastLookX = 0;
   let lastLookY = 0;
 
@@ -186,23 +200,54 @@ export function setupMobileControls(
     stopAttack(true);
   };
 
+  const stopAbsorption = (release: boolean) => {
+    const pointerId = absorptionPointer;
+    absorptionPointer = null;
+    if (pointerId !== null) releasePointer(absorbLightButton, pointerId);
+    absorbLightButton.classList.remove("active");
+    if (release) absorption?.release();
+    else absorption?.cancel();
+  };
+
+  const releaseAbsorptionFromEvent = (event: PointerEvent) => {
+    if (absorptionPointer === null || event.pointerId !== absorptionPointer) return;
+    stopEvent(event);
+    stopAbsorption(true);
+  };
+
+  const cancelAbsorptionFromEvent = (event: PointerEvent) => {
+    if (absorptionPointer === null || event.pointerId !== absorptionPointer) return;
+    stopEvent(event);
+    stopAbsorption(false);
+  };
+
+  const releaseAbsorptionFromWindow = (event: PointerEvent) => {
+    if (absorptionPointer === null || event.pointerId !== absorptionPointer) return;
+    stopAbsorption(true);
+  };
+
+  const cancelAbsorptionFromWindow = (event: PointerEvent) => {
+    if (absorptionPointer === null || event.pointerId !== absorptionPointer) return;
+    stopAbsorption(false);
+  };
+
   stick.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     if (movePointer !== null) resetStick();
     movePointer = event.pointerId;
     capturePointer(stick, event.pointerId);
     updateStick(event);
-  });
+  }, { signal });
 
   stick.addEventListener("pointermove", (event) => {
     if (event.pointerId !== movePointer) return;
     stopEvent(event);
     updateStick(event);
-  });
+  }, { signal });
 
-  stick.addEventListener("pointerup", resetStickFromEvent);
-  stick.addEventListener("pointercancel", resetStickFromEvent);
-  stick.addEventListener("lostpointercapture", resetStickFromWindow);
+  stick.addEventListener("pointerup", resetStickFromEvent, { signal });
+  stick.addEventListener("pointercancel", resetStickFromEvent, { signal });
+  stick.addEventListener("lostpointercapture", resetStickFromWindow, { signal });
 
   lookPad.addEventListener("pointerdown", (event) => {
     stopEvent(event);
@@ -211,7 +256,7 @@ export function setupMobileControls(
     lastLookX = event.clientX;
     lastLookY = event.clientY;
     capturePointer(lookPad, event.pointerId);
-  });
+  }, { signal });
 
   lookPad.addEventListener("pointermove", (event) => {
     if (event.pointerId !== lookPointer) return;
@@ -219,11 +264,11 @@ export function setupMobileControls(
     player.addMobileLook(event.clientX - lastLookX, event.clientY - lastLookY);
     lastLookX = event.clientX;
     lastLookY = event.clientY;
-  });
+  }, { signal });
 
-  lookPad.addEventListener("pointerup", resetLookFromEvent);
-  lookPad.addEventListener("pointercancel", resetLookFromEvent);
-  lookPad.addEventListener("lostpointercapture", resetLookFromWindow);
+  lookPad.addEventListener("pointerup", resetLookFromEvent, { signal });
+  lookPad.addEventListener("pointercancel", resetLookFromEvent, { signal });
+  lookPad.addEventListener("lostpointercapture", resetLookFromWindow, { signal });
 
   runButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
@@ -232,22 +277,22 @@ export function setupMobileControls(
     capturePointer(runButton, event.pointerId);
     runButton.classList.add("active");
     player.setMobileRun(true);
-  });
+  }, { signal });
 
-  runButton.addEventListener("pointerup", stopRunFromEvent);
-  runButton.addEventListener("pointercancel", stopRunFromEvent);
-  runButton.addEventListener("lostpointercapture", stopRunFromWindow);
-  runButton.addEventListener("pointerleave", stopRun);
+  runButton.addEventListener("pointerup", stopRunFromEvent, { signal });
+  runButton.addEventListener("pointercancel", stopRunFromEvent, { signal });
+  runButton.addEventListener("lostpointercapture", stopRunFromWindow, { signal });
+  runButton.addEventListener("pointerleave", stopRun, { signal });
 
   jumpButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     player.queueJump();
-  });
+  }, { signal });
 
   interactButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     onInteract();
-  });
+  }, { signal });
 
   attackButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
@@ -256,12 +301,24 @@ export function setupMobileControls(
     attackPointer = event.pointerId;
     capturePointer(attackButton, event.pointerId);
     attackButton.classList.add("active");
-  });
-  attackButton.addEventListener("pointerup", releaseAttackFromEvent);
-  attackButton.addEventListener("pointercancel", cancelAttackFromEvent);
-  attackButton.addEventListener("lostpointercapture", cancelAttackFromWindow);
+  }, { signal });
+  attackButton.addEventListener("pointerup", releaseAttackFromEvent, { signal });
+  attackButton.addEventListener("pointercancel", cancelAttackFromEvent, { signal });
+  attackButton.addEventListener("lostpointercapture", cancelAttackFromWindow, { signal });
 
-  player.onViewModeChange((mode) => {
+  absorbLightButton.addEventListener("pointerdown", (event) => {
+    stopEvent(event);
+    if (absorptionPointer !== null) stopAbsorption(false);
+    if (!absorption?.start()) return;
+    absorptionPointer = event.pointerId;
+    capturePointer(absorbLightButton, event.pointerId);
+    absorbLightButton.classList.add("active");
+  }, { signal });
+  absorbLightButton.addEventListener("pointerup", releaseAbsorptionFromEvent, { signal });
+  absorbLightButton.addEventListener("pointercancel", cancelAbsorptionFromEvent, { signal });
+  absorbLightButton.addEventListener("lostpointercapture", cancelAbsorptionFromWindow, { signal });
+
+  const unsubscribeViewMode = player.onViewModeChange((mode) => {
     const nextMode = getNextPrimaryViewMode(
       mode,
       player.isIsometricViewAllowed
@@ -279,32 +336,44 @@ export function setupMobileControls(
   cameraButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     player.toggleViewMode();
-  });
+  }, { signal });
 
   const resetMobileInput = () => {
     resetStick();
     resetLook();
     stopRun();
     stopAttack(false);
+    stopAbsorption(false);
   };
 
-  window.addEventListener("pointerup", resetStickFromWindow, true);
-  window.addEventListener("pointercancel", resetStickFromWindow, true);
-  window.addEventListener("pointerup", resetLookFromWindow, true);
-  window.addEventListener("pointercancel", resetLookFromWindow, true);
-  window.addEventListener("pointerup", stopRunFromWindow, true);
-  window.addEventListener("pointercancel", stopRunFromWindow, true);
-  window.addEventListener("pointerup", releaseAttackFromWindow, true);
-  window.addEventListener("pointercancel", cancelAttackFromWindow, true);
-  window.addEventListener("blur", resetMobileInput);
-  window.addEventListener("resize", resetMobileInput);
-  window.visualViewport?.addEventListener("resize", resetMobileInput);
-  window.visualViewport?.addEventListener("scroll", resetMobileInput);
+  window.addEventListener("pointerup", resetStickFromWindow, { capture: true, signal });
+  window.addEventListener("pointercancel", resetStickFromWindow, { capture: true, signal });
+  window.addEventListener("pointerup", resetLookFromWindow, { capture: true, signal });
+  window.addEventListener("pointercancel", resetLookFromWindow, { capture: true, signal });
+  window.addEventListener("pointerup", stopRunFromWindow, { capture: true, signal });
+  window.addEventListener("pointercancel", stopRunFromWindow, { capture: true, signal });
+  window.addEventListener("pointerup", releaseAttackFromWindow, { capture: true, signal });
+  window.addEventListener("pointercancel", cancelAttackFromWindow, { capture: true, signal });
+  window.addEventListener("pointerup", releaseAbsorptionFromWindow, { capture: true, signal });
+  window.addEventListener("pointercancel", cancelAbsorptionFromWindow, { capture: true, signal });
+  window.addEventListener("blur", resetMobileInput, { signal });
+  window.addEventListener("resize", resetMobileInput, { signal });
+  window.visualViewport?.addEventListener("resize", resetMobileInput, { signal });
+  window.visualViewport?.addEventListener("scroll", resetMobileInput, { signal });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") resetMobileInput();
-  });
+  }, { signal });
   window.addEventListener("bosque:pause", (event) => {
     const paused = (event as CustomEvent<{ paused?: boolean }>).detail?.paused;
     if (paused) resetMobileInput();
-  });
+  }, { signal });
+
+  return () => {
+    resetMobileInput();
+    unsubscribeViewMode();
+    abortController.abort();
+    root.classList.remove("enabled");
+    root.setAttribute("aria-hidden", "true");
+    player.setMobileEnabled(false);
+  };
 }

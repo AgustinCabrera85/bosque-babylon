@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 112" role="img" aria-labelledby="statusTitle statusDesc">
+  <title id="statusTitle">Vida y Cordura</title>
+  <desc id="statusDesc">Dos receptáculos oscuros muestran los niveles de vida y cordura.</desc>
+
+  <defs>
+    <linearGradient id="bridgeFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#211a16"/>
+      <stop offset="0.3" stop-color="#0c0e0e"/>
+      <stop offset="0.72" stop-color="#060808"/>
+      <stop offset="1" stop-color="#17100d"/>
+    </linearGradient>
+    <linearGradient id="agedEdge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a28a56"/>
+      <stop offset="0.35" stop-color="#41351f"/>
+      <stop offset="0.72" stop-color="#746039"/>
+      <stop offset="1" stop-color="#261e13"/>
+    </linearGradient>
+    <linearGradient id="healthLiquid" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#33060c"/>
+      <stop offset="0.58" stop-color="#74121c"/>
+      <stop offset="1" stop-color="#c04a46"/>
+    </linearGradient>
+    <linearGradient id="sanityLiquid" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#101828"/>
+      <stop offset="0.55" stop-color="#263f55"/>
+      <stop offset="1" stop-color="#7292a0"/>
+    </linearGradient>
+    <radialGradient id="glassShade" cx="38%" cy="28%" r="78%">
+      <stop offset="0" stop-color="#dbe3dc" stop-opacity=".12"/>
+      <stop offset="0.52" stop-color="#080b0b" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".68"/>
+    </radialGradient>
+    <radialGradient id="emptyVessel">
+      <stop offset="0" stop-color="#0a0d0d"/>
+      <stop offset="0.72" stop-color="#030505"/>
+      <stop offset="1" stop-color="#16140f"/>
+    </radialGradient>
+
+    <clipPath id="healthVesselClip">
+      <circle cx="65" cy="48" r="30"/>
+    </clipPath>
+    <clipPath id="sanityVesselClip">
+      <circle cx="235" cy="48" r="30"/>
+    </clipPath>
+
+    <filter id="statusShadow" x="-20%" y="-35%" width="140%" height="180%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3.2" flood-color="#000" flood-opacity=".85"/>
+    </filter>
+    <filter id="healthGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="2.6" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values=".85 0 0 0 .3  0 .12 0 0 .01  0 0 .12 0 .01  0 0 0 .72 0" result="redGlow"/>
+      <feMerge><feMergeNode in="redGlow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="sanityGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="2.4" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values=".14 0 0 0 .05  0 .38 0 0 .22  0 0 .75 0 .46  0 0 0 .66 0" result="blueGlow"/>
+      <feMerge><feMergeNode in="blueGlow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="criticalGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <style>
+      .status-label {
+        font-family: 'Arial Narrow', 'Segoe UI', Arial, sans-serif;
+        font-size: 8px;
+        font-weight: 600;
+        letter-spacing: 1.7px;
+      }
+      .status-value {
+        font-family: 'Arial Narrow', 'Segoe UI', Arial, sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: .5px;
+      }
+      #health-orb.critical { animation: healthWarning .82s ease-in-out infinite; }
+      #sanity-orb.critical { animation: sanityWarning 1.15s steps(2,end) infinite; }
+      #sanity-shadow { animation: sanityDrift 3.4s ease-in-out infinite; }
+      @keyframes healthWarning { 0%,100%{opacity:.72} 50%{opacity:1} }
+      @keyframes sanityWarning { 0%,100%{opacity:.68} 47%{opacity:1} }
+      @keyframes sanityDrift { 0%,100%{opacity:.45} 50%{opacity:.78} }
+      @media (prefers-reduced-motion: reduce) {
+        #health-orb.critical, #sanity-orb.critical, #sanity-shadow { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <g id="status-frame" filter="url(#statusShadow)">
+    <!-- Narrow central spine keeps the two vessels related without making a web-style card. -->
+    <path d="M73 23 95 14H205L227 23 232 48 219 72 199 81H101L81 72 68 48Z"
+          fill="#020303" stroke="#020303" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M78 26 98 18H202L222 26 227 47 215 68 196 76H104L85 68 73 47Z"
+          fill="url(#bridgeFace)" stroke="url(#agedEdge)" stroke-width="1.35" stroke-linejoin="round"/>
+    <path d="M94 26H206M96 67H204" fill="none" stroke="#76623a" stroke-width=".7" opacity=".48"/>
+    <path d="M112 22 104 30M188 22 196 30M112 72 104 64M188 72 196 64"
+          fill="none" stroke="#8d7545" stroke-width="1" opacity=".58"/>
+
+    <!-- Central fracture visually links physical damage and mental instability. -->
+    <path d="M150 18 146 31 152 41 148 52 153 64 150 76" fill="none" stroke="#4e4128" stroke-width="1" opacity=".74"/>
+    <circle cx="150" cy="47" r="3" fill="#070909" stroke="#75613a" stroke-width=".8"/>
+
+    <!-- Dark housings. -->
+    <circle cx="65" cy="48" r="39" fill="#020303" stroke="#050606" stroke-width="5"/>
+    <circle cx="65" cy="48" r="35" fill="url(#emptyVessel)" stroke="url(#agedEdge)" stroke-width="1.7"/>
+    <circle cx="235" cy="48" r="39" fill="#020303" stroke="#050606" stroke-width="5"/>
+    <circle cx="235" cy="48" r="35" fill="url(#emptyVessel)" stroke="url(#agedEdge)" stroke-width="1.7"/>
+
+    <!-- Small root hooks maintain the established Bosque Babylon language. -->
+    <path d="M39 17C24 12 20 5 23 1M37 77C23 83 20 92 23 99M261 17C276 12 280 5 277 1M263 77C277 83 280 92 277 99"
+          fill="none" stroke="#675332" stroke-width="1.8" stroke-linecap="round" opacity=".76"/>
+  </g>
+
+  <!-- HEALTH VESSEL: previewed at 72%. -->
+  <g id="health-orb">
+    <circle cx="65" cy="48" r="30" fill="#070808"/>
+    <g clip-path="url(#healthVesselClip)" filter="url(#healthGlow)">
+      <rect id="health-fill" x="35" y="39.7" width="60" height="40.3" fill="url(#healthLiquid)"/>
+      <path id="health-surface" d="M35 40C45 36 55 43 65 39S85 42 95 39" fill="none" stroke="#d66a59" stroke-width="1.5" opacity=".82"/>
+      <path d="M44 49C51 45 57 53 63 49S76 47 84 51" fill="none" stroke="#f3a280" stroke-width=".65" opacity=".28"/>
+    </g>
+    <circle cx="65" cy="48" r="30" fill="url(#glassShade)"/>
+    <path d="M45 27C52 19 64 17 74 20" fill="none" stroke="#f6e8d0" stroke-width="1.5" stroke-linecap="round" opacity=".22"/>
+    <!-- Subtle pulse symbol, intentionally not a cartoon heart. -->
+    <path d="M48 49H56L60 42 66 56 71 47H82" fill="none" stroke="#f2d7c4" stroke-width="1.1" stroke-linejoin="round" opacity=".7"/>
+    <text id="health-value" class="status-value" x="65" y="66" fill="#f0d8cd" text-anchor="middle" opacity=".78">72</text>
+  </g>
+
+  <!-- SANITY VESSEL: previewed at 48%. -->
+  <g id="sanity-orb">
+    <circle cx="235" cy="48" r="30" fill="#070808"/>
+    <g clip-path="url(#sanityVesselClip)" filter="url(#sanityGlow)">
+      <rect id="sanity-fill" x="205" y="53.1" width="60" height="26.9" fill="url(#sanityLiquid)"/>
+      <path id="sanity-surface" d="M205 53C214 57 223 49 233 54S253 50 265 53" fill="none" stroke="#a9c5cc" stroke-width="1.25" opacity=".72"/>
+    </g>
+    <circle cx="235" cy="48" r="30" fill="url(#glassShade)"/>
+    <path d="M215 27C223 19 235 17 245 21" fill="none" stroke="#dce8e7" stroke-width="1.4" stroke-linecap="round" opacity=".2"/>
+    <!-- Eye/pupil becomes increasingly surrounded by shadow as sanity drops. -->
+    <path d="M218 48C226 39 244 39 252 48 244 57 226 57 218 48Z" fill="none" stroke="#c6d5d6" stroke-width="1" opacity=".68"/>
+    <circle cx="235" cy="48" r="4" fill="#0a0d10" stroke="#9bb9c3" stroke-width=".8"/>
+    <g id="sanity-shadow" fill="none" stroke="#050606" stroke-linecap="round">
+      <path d="M211 36C220 38 220 43 227 45M259 37C250 39 250 44 243 46" stroke-width="2.2"/>
+      <path d="M213 61C221 57 225 59 230 53M257 61C249 57 245 59 240 53" stroke-width="1.7"/>
+    </g>
+    <text id="sanity-value" class="status-value" x="235" y="66" fill="#d2dce0" text-anchor="middle" opacity=".78">48</text>
+  </g>
+
+  <!-- Labels remain outside the liquid for reliable readability. -->
+  <g fill="#b7ad98" class="status-label">
+    <text id="health-label" x="65" y="105" text-anchor="middle">VIDA</text>
+    <text id="sanity-label" x="235" y="105" text-anchor="middle">CORDURA</text>
+  </g>
+
+  <!--
+    Runtime contract for each value in the range 0..100:
+
+      const maxHeight = 60;
+      const baseline = 80;
+
+      function setVessel(fill, surface, value, surfacePathFactory) {
+        const p = Math.max(0, Math.min(100, value)) / 100;
+        const height = maxHeight * p;
+        const y = baseline - height;
+        fill.setAttribute('height', String(height));
+        fill.setAttribute('y', String(y));
+        surface.setAttribute('d', surfacePathFactory(y));
+      }
+
+      healthValue.textContent = String(Math.round(health));
+      sanityValue.textContent = String(Math.round(sanity));
+      healthOrb.classList.toggle('critical', health <= 25);
+      sanityOrb.classList.toggle('critical', sanity <= 25);
+
+    Suggested surface paths:
+      health: y => `M35 ${y}C45 ${y-4} 55 ${y+3} 65 ${y-1}S85 ${y+2} 95 ${y-1}`
+      sanity: y => `M205 ${y}C214 ${y+4} 223 ${y-4} 233 ${y+1}S253 ${y-3} 265 ${y}`
+
+    Optional numeric mode:
+      hide health-value and sanity-value for a purely diegetic presentation;
+      keep them visible when precise accessibility feedback is preferred.
+  -->
+</svg>

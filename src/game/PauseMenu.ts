@@ -82,6 +82,7 @@ export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
   saveButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     window.localStorage.setItem("bosque:lastManualSave", new Date().toISOString());
+    window.dispatchEvent(new CustomEvent("bosque:save"));
     setStatus("Guardado");
   });
 

@@ -11,7 +11,8 @@
     "vfx:generate-atlas": "node scripts/generate-shadow-flame-atlas.mjs",
     "vfx:generate-npe": "node scripts/generate-shadow-npe.mjs",
     "vfx:profile": "node scripts/profile-shadow-vfx.mjs",
-    "vfx:verify": "node scripts/verify-shadow-vfx.mjs"
+    "vfx:verify": "node scripts/verify-shadow-vfx.mjs",
+    "stats:verify": "node --experimental-strip-types scripts/verify-player-stats.mts"
   },
   "devDependencies": {
     "sharp": "^0.34.3",

@@ -1,3 +1,5 @@
+import { PLAYER_STATS_CONFIG } from "../../PlayerStatsSystem";
+
 export const SHADOW_GRABBER_TYPE = "shadow-grabber" as const;
 export const SHADOW_GRABBER_MODEL_URL =
   "/assets/models/enemies/shadow_grabber.glb";
@@ -284,7 +286,8 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   grabHitRadius: 1.15,
   grabActiveWindowStart: 0.12,
   grabActiveWindowEnd: 0.96,
-  grabSanityDrainPerSecond: 0.08,
+  // PlayerStats uses Cordura points (0..100), not the former normalized aura scale.
+  grabSanityDrainPerSecond: PLAYER_STATS_CONFIG.shadowGrabberHoldSanityDrainPerSecond,
   grabBreakDistance: 5.6,
   grabMovementMultiplier: 0.68,
   grabPullSpeed: 0.38,

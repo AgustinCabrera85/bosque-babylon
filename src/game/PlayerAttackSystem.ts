@@ -8,22 +8,11 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
-import type { InspectableItem } from "./ItemInspector";
-import type { InventoryHandle } from "./Inventory";
 import type { PlayerController } from "./PlayerController";
+import type { PlayerStatsSystem } from "./PlayerStatsSystem";
 import type { EnemyController } from "./enemies/core/EnemyTypes";
 import type { EnemyManager } from "./enemies/core/EnemyManager";
 
-const LIGHT_ORB_ITEM: InspectableItem = {
-  id: "light-orb-ammo",
-  name: "Esfera de luz",
-  typeLabel: "Municion",
-  description:
-    "Luz concentrada que puede arrojarse contra las criaturas del bosque. Se recupera cerca de velas y antorchas.",
-};
-
-const MAX_AMMO = 6;
-const INITIAL_AMMO = 3;
 const MAX_CHARGE_SECONDS = 1.5;
 const MIN_LAUNCH_SPEED = 16;
 const MAX_LAUNCH_SPEED = 48;
@@ -45,7 +34,7 @@ const TRAJECTORY_FREE_COLOR = new Color3(0.62, 0.78, 1);
 type AttackSystemOptions = {
   canvas: HTMLCanvasElement;
   desktopInputEnabled: boolean;
-  inventory?: InventoryHandle;
+  stats: PlayerStatsSystem;
   getLightSourcePositions: () => readonly Vector3[];
   getGroundHeight: (x: number, z: number) => number;
   isBlocked: (x: number, z: number) => boolean;
@@ -136,7 +125,7 @@ export class PlayerAttackSystem {
   private readonly hudArtworks = new Map<HTMLObjectElement, AttackHudArtwork>();
   private readonly projectiles: LightProjectile[] = [];
   private readonly impactBursts: ImpactBurst[] = [];
-  private ammo: number;
+  private unsubscribeStats: (() => void) | null = null;
   private charging = false;
   private chargeElapsed = 0;
   private heldOrbElapsed = 0;
@@ -163,11 +152,6 @@ export class PlayerAttackSystem {
       status: document.getElementById("attackStatus"),
       artworks: Array.from(document.querySelectorAll<HTMLObjectElement>(".attack-hud-art")),
     };
-    this.ammo = options.inventory?.hasItem(LIGHT_ORB_ITEM.id)
-      ? options.inventory.getItemCount(LIGHT_ORB_ITEM.id)
-      : INITIAL_AMMO;
-    this.ammo = Math.min(MAX_AMMO, this.ammo);
-    this.syncInventory();
     this.message = this.getIdleMessage();
 
     const trajectoryPoints = Array.from(
@@ -229,6 +213,10 @@ export class PlayerAttackSystem {
       artwork.addEventListener("load", () => this.bindHudArtwork(artwork), { signal });
       this.bindHudArtwork(artwork);
     }
+    this.unsubscribeStats = options.stats.onChange(() => {
+      this.renderedAmmo = -1;
+      this.renderHud();
+    });
     scene.onDisposeObservable.addOnce(() => this.dispose());
     this.renderHud();
   }
@@ -244,6 +232,7 @@ export class PlayerAttackSystem {
       this.showMessage("Espera a terminar la accion actual", 0.9);
       return false;
     }
+    this.options.stats.cancelLightAbsorption("attack");
 
     this.charging = true;
     this.chargeElapsed = 0;
@@ -323,7 +312,6 @@ export class PlayerAttackSystem {
   public update(deltaTimeSeconds: number) {
     if (this.disposed) return;
     const delta = Math.max(0, Math.min(deltaTimeSeconds, 0.05));
-    this.refreshAmmoFromInventory();
     this.timeSinceShot += delta;
     if (this.messageTimer > 0) {
       this.messageTimer = Math.max(0, this.messageTimer - delta);
@@ -348,6 +336,8 @@ export class PlayerAttackSystem {
     this.disposed = true;
     this.cancelCharge();
     this.abortController.abort();
+    this.unsubscribeStats?.();
+    this.unsubscribeStats = null;
     for (const projectile of this.projectiles) this.disposeProjectile(projectile);
     this.projectiles.length = 0;
     for (const burst of this.impactBursts) this.disposeImpactBurst(burst);
@@ -651,7 +641,8 @@ export class PlayerAttackSystem {
       if (enemyHit && (!worldHit || enemyHit.fraction <= worldHit.fraction)) {
         const direction = projectile.velocity.normalizeToNew();
         enemyHit.enemy.receiveAttack({
-          damage: PROJECTILE_DAMAGE,
+          damage:
+            PROJECTILE_DAMAGE * this.options.stats.getOutgoingDamageMultiplier(),
           point: enemyHit.point,
           direction,
         });
@@ -782,10 +773,10 @@ export class PlayerAttackSystem {
   private updateRecharge(delta: number) {
     if (
       this.charging ||
-      this.ammo >= MAX_AMMO ||
+      this.ammo >= this.options.stats.maxLightOrbs ||
       this.timeSinceShot < RECHARGE_DELAY_AFTER_SHOT
     ) {
-      if (this.ammo >= MAX_AMMO) this.rechargeProgress = 0;
+      if (this.ammo >= this.options.stats.maxLightOrbs) this.rechargeProgress = 0;
       return;
     }
 
@@ -807,36 +798,17 @@ export class PlayerAttackSystem {
     if (this.messageTimer <= 0) this.message = "Absorbiendo luz...";
     if (this.rechargeProgress < RECHARGE_SECONDS_PER_ORB) return;
     this.rechargeProgress -= RECHARGE_SECONDS_PER_ORB;
-    this.ammo = Math.min(MAX_AMMO, this.ammo + 1);
-    this.syncInventory();
+    this.options.stats.addLightOrbs(1, "light-recharge");
     this.showMessage(
-      this.ammo >= MAX_AMMO ? "Luz completa" : "+1 esfera de luz",
+      this.ammo >= this.options.stats.maxLightOrbs
+        ? "Luz completa"
+        : "+1 esfera de luz",
       0.8
     );
   }
 
   private consumeAmmo() {
-    if (this.ammo <= 0) return false;
-    if (this.options.inventory) {
-      if (!this.options.inventory.consumeItem(LIGHT_ORB_ITEM.id)) return false;
-      this.ammo = this.options.inventory.getItemCount(LIGHT_ORB_ITEM.id);
-    } else {
-      this.ammo -= 1;
-    }
-    return true;
-  }
-
-  private syncInventory() {
-    this.options.inventory?.setItemCount(LIGHT_ORB_ITEM, this.ammo);
-  }
-
-  private refreshAmmoFromInventory() {
-    const inventory = this.options.inventory;
-    if (!inventory) return;
-    const storedAmmo = inventory.getItemCount(LIGHT_ORB_ITEM.id);
-    const clampedAmmo = Math.min(MAX_AMMO, Math.max(0, storedAmmo));
-    if (storedAmmo !== clampedAmmo) inventory.setItemCount(LIGHT_ORB_ITEM, clampedAmmo);
-    this.ammo = clampedAmmo;
+    return this.options.stats.consumeLightOrb("light-orb-attack");
   }
 
   private showMessage(message: string, durationSeconds: number) {
@@ -846,7 +818,7 @@ export class PlayerAttackSystem {
 
   private renderHud() {
     if (this.dom.ammo) {
-      this.dom.ammo.textContent = `${this.ammo} de ${MAX_AMMO} esferas de luz.`;
+      this.dom.ammo.textContent = `${this.ammo} de ${this.options.stats.maxLightOrbs} esferas de luz.`;
     }
     if (this.dom.status) {
       this.dom.status.textContent = this.message;
@@ -879,9 +851,15 @@ export class PlayerAttackSystem {
     }
     this.dom.root?.classList.toggle(
       "recharging",
-      !this.charging && this.rechargeProgress > 0 && this.ammo < MAX_AMMO
+      !this.charging &&
+        this.rechargeProgress > 0 &&
+        this.ammo < this.options.stats.maxLightOrbs
     );
     this.dom.root?.classList.toggle("empty", this.ammo <= 0);
+    this.dom.root?.classList.toggle(
+      "depleted",
+      this.ammo <= 0 && this.rechargeProgress <= 0
+    );
   }
 
   private bindHudArtwork(element: HTMLObjectElement) {
@@ -913,8 +891,12 @@ export class PlayerAttackSystem {
     if (artwork.count) {
       artwork.count.textContent = artwork.representativeOrb
         ? String(this.ammo).padStart(2, "0")
-        : `${this.ammo} / ${MAX_AMMO}`;
+        : `${this.ammo} / ${this.options.stats.maxLightOrbs}`;
     }
+  }
+
+  private get ammo() {
+    return this.options.stats.lightOrbs;
   }
 
   private createHeldLightOrb(): HeldLightOrb {

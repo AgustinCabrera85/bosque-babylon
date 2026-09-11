@@ -381,6 +381,35 @@ export class PlayerController {
     return this.cinematicSequenceActive;
   }
 
+  get isGameplayControlLocked() {
+    return this.controlsLocked;
+  }
+
+  get isRunning() {
+    const hasMovementInput =
+      this.keys.has("KeyW") ||
+      this.keys.has("KeyS") ||
+      this.keys.has("KeyA") ||
+      this.keys.has("KeyD") ||
+      this.keys.has("ArrowUp") ||
+      this.keys.has("ArrowDown") ||
+      this.keys.has("ArrowLeft") ||
+      this.keys.has("ArrowRight") ||
+      Math.hypot(this.mobileMoveX, this.mobileMoveY) > 0.12;
+    return (
+      hasMovementInput &&
+      (this.mobileRun || this.keys.has("ShiftLeft") || this.keys.has("ShiftRight"))
+    );
+  }
+
+  get isUnderEnemyGrabPressure() {
+    return this.enemyGrabPressureTimer > 0;
+  }
+
+  get isDiving() {
+    return this.diving;
+  }
+
   private get controlsLocked() {
     return this.openingSequenceActive || this.cinematicSequenceActive;
   }

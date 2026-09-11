@@ -68,10 +68,31 @@
       <div id="help">
         Click para entrar<br/>
         <span class="small">V 1P/3P/ISO - F linterna - F8 sombras - Esc pausa</span><br/>
-        <span class="small">WASD mover - Shift correr - Space saltar/bucear - E interactuar - Clic mantener/soltar ataque</span>
+        <span class="small">WASD mover - Shift correr - Space saltar/bucear - E interactuar - RMB modo orbe + LMB lanzar - Q aferrarse a la luz</span>
       </div>
       <div id="hint" class="hidden"></div>
       <div id="reticle" aria-hidden="true"></div>
+
+      <div id="playerStatusHud" role="status" aria-live="polite" aria-atomic="true">
+        <object
+          class="player-status-hud-art player-status-hud-art-desktop"
+          data="/assets/ui/hud-vida-cordura-desktop.svg"
+          type="image/svg+xml"
+          tabindex="-1"
+          aria-hidden="true"
+        ></object>
+        <object
+          class="player-status-hud-art player-status-hud-art-mobile"
+          data="/assets/ui/hud-vida-cordura-mobile.svg"
+          type="image/svg+xml"
+          tabindex="-1"
+          aria-hidden="true"
+        ></object>
+        <span class="player-status-hud-announcer">
+          <strong id="playerHealthValue">Vida 100 de 100.</strong>
+          <span id="playerSanityValue">Cordura 100 de 100.</span>
+        </span>
+      </div>
 
       <div id="attackHud" role="status" aria-live="polite" aria-atomic="true">
         <object
@@ -111,6 +132,7 @@
         <button id="jumpButton" class="mobile-button" type="button" aria-label="Saltar">^</button>
         <button id="interactButton" class="mobile-button" type="button" aria-label="Interactuar">E</button>
         <button id="attackButton" class="mobile-button" type="button" aria-label="Mantener para cargar y soltar una esfera de luz">L</button>
+        <button id="absorbLightButton" class="mobile-button" type="button" aria-label="Mantener para aferrarse a la luz y recuperar cordura">C</button>
         <button id="mobileCameraButton" class="mobile-button" type="button" aria-label="Cambiar modo de camara" aria-pressed="false">1P</button>
       </div>
     </div>

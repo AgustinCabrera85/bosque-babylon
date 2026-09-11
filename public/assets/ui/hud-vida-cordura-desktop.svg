@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 172" role="img" aria-labelledby="desktopStatusTitle desktopStatusDesc">
+  <title id="desktopStatusTitle">Vida y Cordura — Desktop</title>
+  <desc id="desktopStatusDesc">HUD de escritorio con dos receptáculos detallados unidos por una reliquia oscura.</desc>
+
+  <defs>
+    <linearGradient id="dBridge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#241b16"/>
+      <stop offset="0.26" stop-color="#0f1110"/>
+      <stop offset="0.72" stop-color="#060808"/>
+      <stop offset="1" stop-color="#18100d"/>
+    </linearGradient>
+    <linearGradient id="dEdge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#aa9058"/>
+      <stop offset="0.3" stop-color="#41351f"/>
+      <stop offset="0.7" stop-color="#79643a"/>
+      <stop offset="1" stop-color="#251e13"/>
+    </linearGradient>
+    <linearGradient id="dHealth" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#240308"/>
+      <stop offset="0.5" stop-color="#6e0e18"/>
+      <stop offset="0.82" stop-color="#a52d31"/>
+      <stop offset="1" stop-color="#d16a59"/>
+    </linearGradient>
+    <linearGradient id="dSanity" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#0c111d"/>
+      <stop offset="0.48" stop-color="#203449"/>
+      <stop offset="0.82" stop-color="#48687a"/>
+      <stop offset="1" stop-color="#8ba8ae"/>
+    </linearGradient>
+    <radialGradient id="dGlass" cx="34%" cy="25%" r="82%">
+      <stop offset="0" stop-color="#edf2e8" stop-opacity=".16"/>
+      <stop offset="0.4" stop-color="#b9d0ca" stop-opacity=".04"/>
+      <stop offset="0.72" stop-color="#050707" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".78"/>
+    </radialGradient>
+    <radialGradient id="dEmpty">
+      <stop offset="0" stop-color="#0b0f0e"/>
+      <stop offset="0.72" stop-color="#030505"/>
+      <stop offset="1" stop-color="#17140f"/>
+    </radialGradient>
+    <radialGradient id="dRivet" cx="35%" cy="28%" r="75%">
+      <stop offset="0" stop-color="#a58b56"/>
+      <stop offset="0.45" stop-color="#493b25"/>
+      <stop offset="1" stop-color="#120f0a"/>
+    </radialGradient>
+
+    <clipPath id="dHealthClip"><circle cx="92" cy="78" r="49"/></clipPath>
+    <clipPath id="dSanityClip"><circle cx="428" cy="78" r="49"/></clipPath>
+
+    <filter id="dShadow" x="-20%" y="-40%" width="140%" height="190%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#000" flood-opacity=".88"/>
+    </filter>
+    <filter id="dHealthGlow" x="-65%" y="-65%" width="230%" height="230%">
+      <feGaussianBlur stdDeviation="3.4" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values=".85 0 0 0 .3  0 .1 0 0 .01  0 0 .1 0 .01  0 0 0 .68 0" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="dSanityGlow" x="-65%" y="-65%" width="230%" height="230%">
+      <feGaussianBlur stdDeviation="3.2" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values=".12 0 0 0 .03  0 .4 0 0 .2  0 0 .8 0 .48  0 0 0 .62 0" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <style>
+      .d-label {
+        font-family: 'Arial Narrow', 'Segoe UI', Arial, sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 2.2px;
+      }
+      .d-value {
+        font-family: 'Arial Narrow', 'Segoe UI', Arial, sans-serif;
+        font-size: 16px;
+        font-weight: 500;
+        letter-spacing: 1px;
+      }
+      #health-orb.critical { animation: dHealthCritical .8s ease-in-out infinite; }
+      #sanity-orb.critical { animation: dSanityCritical 1.1s steps(2,end) infinite; }
+      #sanity-shadow { animation: dShadowDrift 3.5s ease-in-out infinite; }
+      #health-motes { animation: dMotePulse 2.4s ease-in-out infinite; }
+      @keyframes dHealthCritical { 0%,100%{opacity:.7} 50%{opacity:1} }
+      @keyframes dSanityCritical { 0%,100%{opacity:.62} 48%{opacity:1} }
+      @keyframes dShadowDrift { 0%,100%{opacity:.42} 50%{opacity:.8} }
+      @keyframes dMotePulse { 0%,100%{opacity:.32} 50%{opacity:.7} }
+      @media (prefers-reduced-motion: reduce) {
+        #health-orb.critical, #sanity-orb.critical, #sanity-shadow, #health-motes { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <g id="desktop-status-frame" filter="url(#dShadow)">
+    <!-- Wide but shallow relic spine, intended for the lower-left desktop safe area. -->
+    <path d="M112 36 140 20H380L408 36 420 77 405 119 377 136H143L115 119 100 78Z"
+          fill="#020303" stroke="#020303" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M117 39 144 26H376L403 39 414 77 400 114 373 130H147L120 114 106 78Z"
+          fill="url(#dBridge)" stroke="url(#dEdge)" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M135 41H385M137 114H383" fill="none" stroke="#816a3e" stroke-width="1" opacity=".5"/>
+    <path d="M159 31 146 45M361 31 374 45M159 125 146 111M361 125 374 111"
+          fill="none" stroke="#8b7242" stroke-width="1.3" opacity=".64"/>
+
+    <!-- Central knot and branching fracture. -->
+    <path d="M260 27 253 47 263 64 255 82 265 101 260 129" fill="none" stroke="#554529" stroke-width="1.4" opacity=".82"/>
+    <circle cx="260" cy="78" r="8.5" fill="#050707" stroke="url(#dEdge)" stroke-width="1.4"/>
+    <circle cx="260" cy="78" r="2.5" fill="#9a8250" opacity=".58"/>
+    <path d="M249 78H172M271 78H348" fill="none" stroke="#4d4027" stroke-width="1" opacity=".7"/>
+    <circle cx="154" cy="43" r="2" fill="url(#dRivet)"/><circle cx="366" cy="43" r="2" fill="url(#dRivet)"/>
+    <circle cx="154" cy="113" r="2" fill="url(#dRivet)"/><circle cx="366" cy="113" r="2" fill="url(#dRivet)"/>
+
+    <!-- Vessel housings. -->
+    <circle cx="92" cy="78" r="66" fill="#020303" stroke="#050606" stroke-width="7"/>
+    <circle cx="92" cy="78" r="60.5" fill="url(#dEmpty)" stroke="url(#dEdge)" stroke-width="2.2"/>
+    <circle cx="428" cy="78" r="66" fill="#020303" stroke="#050606" stroke-width="7"/>
+    <circle cx="428" cy="78" r="60.5" fill="url(#dEmpty)" stroke="url(#dEdge)" stroke-width="2.2"/>
+
+    <!-- Incomplete rings feel handcrafted rather than perfectly ornamental. -->
+    <path d="M55 30A54 54 0 0 1 116 19M127 117A54 54 0 0 1 67 131" fill="none" stroke="#8e7646" stroke-width="1.6" opacity=".72"/>
+    <path d="M391 30A54 54 0 0 1 452 19M463 117A54 54 0 0 1 403 131" fill="none" stroke="#8e7646" stroke-width="1.6" opacity=".72"/>
+
+    <!-- Restrained root silhouettes at the exterior edges. -->
+    <path d="M51 25C31 19 23 9 27 1M48 128C30 136 24 150 29 169M469 25C489 19 497 9 493 1M472 128C490 136 496 150 491 169"
+          fill="none" stroke="#6a5633" stroke-width="2.4" stroke-linecap="round" opacity=".8"/>
+
+    <!-- Label plates. -->
+    <path d="M40 139 143 139 151 147 145 164H39L32 156 35 145Z" fill="#060808" stroke="url(#dEdge)" stroke-width="1.2"/>
+    <path d="M377 139 480 139 488 147 482 164H376L369 156 372 145Z" fill="#060808" stroke="url(#dEdge)" stroke-width="1.2"/>
+  </g>
+
+  <!-- HEALTH: previewed at 72%. -->
+  <g id="health-orb">
+    <circle cx="92" cy="78" r="49" fill="#070808"/>
+    <g clip-path="url(#dHealthClip)" filter="url(#dHealthGlow)">
+      <rect id="health-fill" x="43" y="60" width="98" height="72" fill="url(#dHealth)"/>
+      <path id="health-surface" d="M43 60C59 54 76 65 92 59S124 64 141 59" fill="none" stroke="#e07865" stroke-width="2" opacity=".85"/>
+      <path d="M52 75C64 70 75 81 87 75S112 72 128 79" fill="none" stroke="#f3a586" stroke-width=".85" opacity=".26"/>
+      <g id="health-motes" fill="#e58b73">
+        <circle cx="61" cy="91" r="1.4"/><circle cx="119" cy="104" r="1"/><circle cx="75" cy="116" r=".8"/>
+      </g>
+    </g>
+    <circle cx="92" cy="78" r="49" fill="url(#dGlass)"/>
+    <path d="M61 48C72 35 88 31 104 35" fill="none" stroke="#f6ead5" stroke-width="2.2" stroke-linecap="round" opacity=".23"/>
+    <path d="M65 79H76L83 66 94 94 103 75H119" fill="none" stroke="#f1d2c1" stroke-width="1.8" stroke-linejoin="round" opacity=".74"/>
+    <text id="health-value" class="d-value" x="92" y="110" fill="#f2d8cc" text-anchor="middle" opacity=".82">72</text>
+  </g>
+
+  <!-- SANITY: previewed at 48%. -->
+  <g id="sanity-orb">
+    <circle cx="428" cy="78" r="49" fill="#070808"/>
+    <g clip-path="url(#dSanityClip)" filter="url(#dSanityGlow)">
+      <rect id="sanity-fill" x="379" y="84" width="98" height="48" fill="url(#dSanity)"/>
+      <path id="sanity-surface" d="M379 84C394 91 410 77 426 86S459 78 477 84" fill="none" stroke="#b3cbd0" stroke-width="1.8" opacity=".75"/>
+      <path d="M391 105C406 98 418 111 432 103S458 104 469 99" fill="none" stroke="#95b7c2" stroke-width=".7" opacity=".24"/>
+    </g>
+    <circle cx="428" cy="78" r="49" fill="url(#dGlass)"/>
+    <path d="M397 48C408 35 424 31 440 35" fill="none" stroke="#e0eaE7" stroke-width="2.1" stroke-linecap="round" opacity=".21"/>
+    <path d="M401 78C414 63 442 63 455 78 442 93 414 93 401 78Z" fill="none" stroke="#c8d9da" stroke-width="1.6" opacity=".72"/>
+    <circle cx="428" cy="78" r="7" fill="#080b0d" stroke="#9fbcc4" stroke-width="1.2"/>
+    <circle cx="428" cy="78" r="2" fill="#bdd7d8" opacity=".48"/>
+    <g id="sanity-shadow" fill="none" stroke="#040505" stroke-linecap="round">
+      <path d="M389 57C404 61 406 69 417 73M467 57C452 61 450 69 439 73" stroke-width="3.4"/>
+      <path d="M392 99C405 92 411 96 420 85M464 99C451 92 445 96 436 85" stroke-width="2.5"/>
+      <path d="M404 42C412 49 415 55 419 65M452 42C444 49 441 55 437 65" stroke-width="1.5" opacity=".74"/>
+    </g>
+    <text id="sanity-value" class="d-value" x="428" y="110" fill="#d4e0e2" text-anchor="middle" opacity=".82">48</text>
+  </g>
+
+  <g class="d-label" fill="#c1b69f">
+    <text id="health-label" x="92" y="157" text-anchor="middle">VIDA</text>
+    <text id="sanity-label" x="428" y="157" text-anchor="middle">CORDURA</text>
+  </g>
+
+  <!--
+    Runtime contract — same IDs as the mobile version:
+
+      const maxHeight = 98;
+      const baseline = 132;
+
+      function updateVessel(fill, surface, value, surfacePathFactory) {
+        const normalized = Math.max(0, Math.min(100, value));
+        const height = maxHeight * normalized / 100;
+        const y = baseline - height;
+        fill.setAttribute('height', String(height));
+        fill.setAttribute('y', String(y));
+        surface.setAttribute('d', surfacePathFactory(y));
+      }
+
+      healthValue.textContent = String(Math.round(health));
+      sanityValue.textContent = String(Math.round(sanity));
+      healthOrb.classList.toggle('critical', health <= 25);
+      sanityOrb.classList.toggle('critical', sanity <= 25);
+
+    Suggested desktop surfaces:
+      health: y => `M43 ${y}C59 ${y-6} 76 ${y+5} 92 ${y-1}S124 ${y+4} 141 ${y-1}`
+      sanity: y => `M379 ${y}C394 ${y+7} 410 ${y-7} 426 ${y+2}S459 ${y-6} 477 ${y}`
+
+    Remove or hide health-value and sanity-value if the game uses purely visual feedback.
+  -->
+</svg>

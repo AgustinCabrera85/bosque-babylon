@@ -579,6 +579,10 @@ body.attack-aiming #reticle {
   filter: saturate(0.52) brightness(0.82) drop-shadow(0 9px 12px rgba(0, 0, 0, 0.45));
 }
 
+#attackHud.depleted {
+  opacity: 0;
+}
+
 .attack-hud-art {
   display: block;
   width: 100%;
@@ -593,6 +597,49 @@ body.attack-aiming #reticle {
 }
 
 .attack-hud-announcer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+#playerStatusHud {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  z-index: 4;
+  width: min(390px, 38vw);
+  aspect-ratio: 520 / 172;
+  pointer-events: none;
+  filter: drop-shadow(0 9px 12px rgba(0, 0, 0, 0.48));
+  transition: filter 180ms ease;
+}
+
+#playerStatusHud.absorbing {
+  filter:
+    drop-shadow(0 0 11px rgba(147, 210, 205, 0.28))
+    drop-shadow(0 9px 12px rgba(0, 0, 0, 0.48));
+}
+
+.player-status-hud-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.player-status-hud-art-mobile {
+  display: none;
+}
+
+.player-status-hud-announcer {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1647,6 +1694,19 @@ body.inventory-open #hud {
   box-shadow: 0 0 22px rgba(96, 205, 255, 0.48);
 }
 
+#absorbLightButton {
+  right: max(158px, calc(env(safe-area-inset-right) + 158px));
+  bottom: max(102px, calc(env(safe-area-inset-bottom) + 102px));
+  border-color: rgba(187, 220, 210, 0.38);
+  color: #e3f2ed;
+  box-shadow: 0 0 14px rgba(126, 190, 178, 0.16);
+}
+
+#absorbLightButton.active {
+  background: rgba(111, 181, 167, 0.4);
+  box-shadow: 0 0 22px rgba(143, 218, 204, 0.42);
+}
+
 #mobileCameraButton {
   right: max(158px, calc(env(safe-area-inset-right) + 158px));
   bottom: max(34px, calc(env(safe-area-inset-bottom) + 34px));
@@ -1689,6 +1749,22 @@ body.inventory-open #hud {
     bottom: 172px;
     width: min(208px, calc(100vw - 24px));
     aspect-ratio: 208 / 68;
+  }
+
+  #playerStatusHud {
+    left: 12px;
+    top: 68px;
+    bottom: auto;
+    width: min(210px, 56vw);
+    aspect-ratio: 300 / 112;
+  }
+
+  .player-status-hud-art-desktop {
+    display: none;
+  }
+
+  .player-status-hud-art-mobile {
+    display: block;
   }
 
   .attack-hud-art-desktop {

@@ -50,6 +50,16 @@ export type MobileAbsorptionActions = {
   cancel: () => void;
 };
 
+type MobileActionId =
+  | "light"
+  | "jump"
+  | "run"
+  | "view"
+  | "interact"
+  | "absorb";
+
+type MobileActionState = "active" | "pressed" | "disabled";
+
 export function setupMobileControls(
   player: PlayerController,
   onInteract: () => void,
@@ -71,14 +81,105 @@ export function setupMobileControls(
   const attackButton = document.getElementById("attackButton");
   const absorbLightButton = document.getElementById("absorbLightButton");
   const cameraButton = document.getElementById("mobileCameraButton") as HTMLButtonElement | null;
+  const artwork = document.getElementById("mobileActionHudArt") as HTMLObjectElement | null;
+  const joystickArtwork = document.getElementById("mobileJoystickArt") as HTMLObjectElement | null;
 
   if (!root || !stick || !thumb || !lookPad || !runButton || !jumpButton || !interactButton || !attackButton || !absorbLightButton || !cameraButton) {
     return () => abortController.abort();
   }
 
   player.setMobileEnabled(true);
+  document.body.classList.add("mobile-controls-enabled");
   root.classList.add("enabled");
   root.setAttribute("aria-hidden", "false");
+
+  let joystickArtworkRoot: SVGGElement | null = null;
+  let joystickMaxDisplacement = 72;
+  let joystickVisualX = 0;
+  let joystickVisualY = 0;
+  let joystickPressed = false;
+
+  const renderJoystickArtwork = () => {
+    if (!joystickArtworkRoot) return;
+    joystickArtworkRoot.style.setProperty("--joystick-x", `${joystickVisualX}px`);
+    joystickArtworkRoot.style.setProperty("--joystick-y", `${joystickVisualY}px`);
+    joystickArtworkRoot.classList.toggle("pressed", joystickPressed);
+    joystickArtworkRoot.classList.toggle("dragging", joystickPressed);
+    joystickArtworkRoot.classList.toggle(
+      "active",
+      Math.hypot(joystickVisualX, joystickVisualY) > 0.01
+    );
+  };
+
+  const bindJoystickArtwork = () => {
+    const svg = joystickArtwork?.contentDocument;
+    const svgRoot = svg?.querySelector<SVGGElement>("#joystick-mobile");
+    if (!svgRoot) return;
+    const knob = svg?.querySelector<SVGGElement>("#joystick-knob");
+    const authoredMaxDisplacement = Number(knob?.dataset.maxDisplacement);
+    if (Number.isFinite(authoredMaxDisplacement) && authoredMaxDisplacement > 0) {
+      joystickMaxDisplacement = authoredMaxDisplacement;
+    }
+    joystickArtworkRoot = svgRoot;
+    stick.classList.add("artwork-ready");
+    renderJoystickArtwork();
+  };
+
+  joystickArtwork?.addEventListener("load", bindJoystickArtwork, { signal });
+  bindJoystickArtwork();
+
+  const artworkActions = new Map<MobileActionId, SVGGElement>();
+  const artworkStates = new Map<MobileActionId, Set<MobileActionState>>();
+  const pulseTimers = new Map<MobileActionId, number>();
+
+  const applyArtworkState = (action: MobileActionId) => {
+    const element = artworkActions.get(action);
+    if (!element) return;
+    const states = artworkStates.get(action);
+    for (const state of ["active", "pressed", "disabled"] as const) {
+      element.classList.toggle(state, states?.has(state) ?? false);
+    }
+  };
+
+  const setArtworkState = (
+    action: MobileActionId,
+    state: MobileActionState,
+    enabled: boolean
+  ) => {
+    let states = artworkStates.get(action);
+    if (!states) {
+      states = new Set();
+      artworkStates.set(action, states);
+    }
+    if (enabled) states.add(state);
+    else states.delete(state);
+    applyArtworkState(action);
+  };
+
+  const bindArtwork = () => {
+    const svg = artwork?.contentDocument;
+    if (!svg?.documentElement) return;
+    artworkActions.clear();
+    for (const action of ["light", "jump", "run", "view", "interact", "absorb"] as const) {
+      const element = svg.querySelector<SVGGElement>(`#action-${action}`);
+      if (!element) continue;
+      artworkActions.set(action, element);
+      applyArtworkState(action);
+    }
+  };
+
+  const pulseArtwork = (action: MobileActionId) => {
+    const previousTimer = pulseTimers.get(action);
+    if (previousTimer !== undefined) window.clearTimeout(previousTimer);
+    setArtworkState(action, "pressed", true);
+    pulseTimers.set(action, window.setTimeout(() => {
+      setArtworkState(action, "pressed", false);
+      pulseTimers.delete(action);
+    }, 150));
+  };
+
+  artwork?.addEventListener("load", bindArtwork, { signal });
+  bindArtwork();
 
   let movePointer: number | null = null;
   let lookPointer: number | null = null;
@@ -99,6 +200,10 @@ export function setupMobileControls(
     if (pointerId !== null) releasePointer(stick, pointerId);
     player.setMobileMove(0, 0);
     thumb.style.transform = "translate(-50%, -50%)";
+    joystickVisualX = 0;
+    joystickVisualY = 0;
+    joystickPressed = false;
+    renderJoystickArtwork();
   };
 
   const resetStickFromEvent = (event: PointerEvent) => {
@@ -129,8 +234,13 @@ export function setupMobileControls(
     const x = rawX * scale;
     const y = rawY * scale;
 
+    const normalizedX = clamp(x / radius, -1, 1);
+    const normalizedY = clamp(y / radius, -1, 1);
     thumb.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
-    player.setMobileMove(clamp(x / radius, -1, 1), clamp(-y / radius, -1, 1));
+    joystickVisualX = normalizedX * joystickMaxDisplacement;
+    joystickVisualY = normalizedY * joystickMaxDisplacement;
+    renderJoystickArtwork();
+    player.setMobileMove(normalizedX, -normalizedY);
   };
 
   const resetLook = () => {
@@ -155,6 +265,7 @@ export function setupMobileControls(
     runPointer = null;
     if (pointerId !== null) releasePointer(runButton, pointerId);
     runButton.classList.remove("active");
+    setArtworkState("run", "active", false);
     player.setMobileRun(false);
   };
 
@@ -174,6 +285,7 @@ export function setupMobileControls(
     attackPointer = null;
     if (pointerId !== null) releasePointer(attackButton, pointerId);
     attackButton.classList.remove("active");
+    setArtworkState("light", "active", false);
     if (release) attack?.release();
     else attack?.cancel();
   };
@@ -205,6 +317,7 @@ export function setupMobileControls(
     absorptionPointer = null;
     if (pointerId !== null) releasePointer(absorbLightButton, pointerId);
     absorbLightButton.classList.remove("active");
+    setArtworkState("absorb", "active", false);
     if (release) absorption?.release();
     else absorption?.cancel();
   };
@@ -235,6 +348,7 @@ export function setupMobileControls(
     stopEvent(event);
     if (movePointer !== null) resetStick();
     movePointer = event.pointerId;
+    joystickPressed = true;
     capturePointer(stick, event.pointerId);
     updateStick(event);
   }, { signal });
@@ -276,6 +390,7 @@ export function setupMobileControls(
     runPointer = event.pointerId;
     capturePointer(runButton, event.pointerId);
     runButton.classList.add("active");
+    setArtworkState("run", "active", true);
     player.setMobileRun(true);
   }, { signal });
 
@@ -286,11 +401,13 @@ export function setupMobileControls(
 
   jumpButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
+    pulseArtwork("jump");
     player.queueJump();
   }, { signal });
 
   interactButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
+    pulseArtwork("interact");
     onInteract();
   }, { signal });
 
@@ -301,6 +418,7 @@ export function setupMobileControls(
     attackPointer = event.pointerId;
     capturePointer(attackButton, event.pointerId);
     attackButton.classList.add("active");
+    setArtworkState("light", "active", true);
   }, { signal });
   attackButton.addEventListener("pointerup", releaseAttackFromEvent, { signal });
   attackButton.addEventListener("pointercancel", cancelAttackFromEvent, { signal });
@@ -313,6 +431,7 @@ export function setupMobileControls(
     absorptionPointer = event.pointerId;
     capturePointer(absorbLightButton, event.pointerId);
     absorbLightButton.classList.add("active");
+    setArtworkState("absorb", "active", true);
   }, { signal });
   absorbLightButton.addEventListener("pointerup", releaseAbsorptionFromEvent, { signal });
   absorbLightButton.addEventListener("pointercancel", cancelAbsorptionFromEvent, { signal });
@@ -325,6 +444,7 @@ export function setupMobileControls(
     );
     const isDefaultView = mode === "third";
     cameraButton.classList.toggle("active", !isDefaultView);
+    setArtworkState("view", "active", !isDefaultView);
     cameraButton.textContent = getViewModeShortLabel(nextMode);
     cameraButton.setAttribute("aria-pressed", String(!isDefaultView));
     cameraButton.setAttribute(
@@ -335,6 +455,7 @@ export function setupMobileControls(
 
   cameraButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
+    pulseArtwork("view");
     player.toggleViewMode();
   }, { signal });
 
@@ -370,10 +491,16 @@ export function setupMobileControls(
 
   return () => {
     resetMobileInput();
+    for (const timer of pulseTimers.values()) window.clearTimeout(timer);
+    pulseTimers.clear();
+    artworkActions.clear();
+    joystickArtworkRoot = null;
+    stick.classList.remove("artwork-ready");
     unsubscribeViewMode();
     abortController.abort();
     root.classList.remove("enabled");
     root.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("mobile-controls-enabled");
     player.setMobileEnabled(false);
   };
 }

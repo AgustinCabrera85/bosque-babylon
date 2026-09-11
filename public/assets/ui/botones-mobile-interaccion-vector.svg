@@ -1,0 +1,355 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1320" height="1061" viewBox="0 0 1320 1061"
+     preserveAspectRatio="xMidYMid meet"
+     role="img" aria-labelledby="title description"
+     shape-rendering="geometricPrecision">
+  <title id="title">Controles mobile vectoriales de Bosque Babylon</title>
+  <desc id="description">Seis botones de acción independientes: esfera de luz, salto, correr, perspectiva, interacción y absorción.</desc>
+
+  <defs>
+    <linearGradient id="bronze" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#120908"/>
+      <stop offset=".20" stop-color="#49281f"/>
+      <stop offset=".42" stop-color="#a45e35"/>
+      <stop offset=".52" stop-color="#d69250"/>
+      <stop offset=".62" stop-color="#6e3826"/>
+      <stop offset=".82" stop-color="#7f482d"/>
+      <stop offset="1" stop-color="#160a08"/>
+    </linearGradient>
+    <linearGradient id="bronze-edge" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#100706"/>
+      <stop offset=".30" stop-color="#4c291f"/>
+      <stop offset=".49" stop-color="#95542f"/>
+      <stop offset=".56" stop-color="#d28b4c"/>
+      <stop offset=".67" stop-color="#54291c"/>
+      <stop offset="1" stop-color="#100706"/>
+    </linearGradient>
+    <radialGradient id="stone" cx="42%" cy="34%" r="75%">
+      <stop offset="0" stop-color="#163238"/>
+      <stop offset=".48" stop-color="#0b2025"/>
+      <stop offset=".82" stop-color="#061216"/>
+      <stop offset="1" stop-color="#02080a"/>
+    </radialGradient>
+    <radialGradient id="orb" cx="42%" cy="38%" r="62%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".16" stop-color="#d8fbff"/>
+      <stop offset=".42" stop-color="#59e8ff"/>
+      <stop offset=".72" stop-color="#0aa4c1"/>
+      <stop offset="1" stop-color="#04546b" stop-opacity=".15"/>
+    </radialGradient>
+    <radialGradient id="light-corona" cx="43%" cy="38%" r="67%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".18" stop-color="#e7ffff"/>
+      <stop offset=".43" stop-color="#73f5ff" stop-opacity=".96"/>
+      <stop offset=".70" stop-color="#11bbd7" stop-opacity=".72"/>
+      <stop offset="1" stop-color="#05758d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="light-ribbon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5ffff"/>
+      <stop offset=".34" stop-color="#9af9ff"/>
+      <stop offset=".72" stop-color="#29cfe8"/>
+      <stop offset="1" stop-color="#087d98" stop-opacity=".18"/>
+    </linearGradient>
+    <linearGradient id="cyan-stroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eaffff"/>
+      <stop offset=".42" stop-color="#7cf5ff"/>
+      <stop offset="1" stop-color="#16b9df"/>
+    </linearGradient>
+    <linearGradient id="eye-silver" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4ffff"/>
+      <stop offset=".28" stop-color="#d7e4df"/>
+      <stop offset=".54" stop-color="#829592"/>
+      <stop offset=".76" stop-color="#c9d8d4"/>
+      <stop offset="1" stop-color="#f1ffff"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="9" result="blur"/>
+      <feOffset dy="10" result="offset"/>
+      <feColorMatrix in="offset" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .8 0"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="cyan-glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="b1"/>
+      <feFlood flood-color="#35ddff" flood-opacity=".86" result="glow-color"/>
+      <feComposite in="glow-color" in2="b1" operator="in" result="blue"/>
+      <feMerge><feMergeNode in="blue"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="orb-glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="18" result="b1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b2"/>
+      <feMerge><feMergeNode in="b1"/><feMergeNode in="b2"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="stone-texture" x="-8%" y="-8%" width="116%" height="116%">
+      <feTurbulence type="fractalNoise" baseFrequency=".025" numOctaves="4" seed="19" result="noise"/>
+      <feColorMatrix in="noise" values=".18 0 0 0 0 0 .32 0 0 .03 0 0 .34 0 .04 0 0 0 .28 0" result="tinted"/>
+      <feComposite in="tinted" in2="SourceAlpha" operator="in" result="texture"/>
+      <feBlend in="SourceGraphic" in2="texture" mode="screen"/>
+    </filter>
+
+    <symbol id="small-frame" overflow="visible">
+      <!-- Base metálica segmentada -->
+      <g class="frame-base" filter="url(#shadow)">
+        <circle r="190" fill="none" stroke="#050708" stroke-width="28"/>
+        <circle r="187" fill="none" stroke="url(#bronze-edge)" stroke-width="17"/>
+        <circle r="180" fill="none" stroke="#24120f" stroke-width="7"/>
+        <circle r="174" fill="none" stroke="url(#bronze)" stroke-width="5"/>
+        <circle r="165" fill="none" stroke="#54e8f7" stroke-opacity=".48" stroke-width="3"/>
+      </g>
+
+      <!-- Placas superpuestas que rompen la simetría del aro -->
+      <g class="frame-plates" fill="none" stroke-linecap="round">
+        <path d="M-133-132 A187 187 0 0 1-44-181" stroke="#100806" stroke-width="24"/>
+        <path d="M-133-132 A187 187 0 0 1-44-181" stroke="url(#bronze-edge)" stroke-width="13"/>
+        <path d="M48-180 A187 187 0 0 1 137-128" stroke="#100806" stroke-width="24"/>
+        <path d="M48-180 A187 187 0 0 1 137-128" stroke="url(#bronze-edge)" stroke-width="13"/>
+        <path d="M132 134 A187 187 0 0 1 38 183" stroke="#100806" stroke-width="24"/>
+        <path d="M132 134 A187 187 0 0 1 38 183" stroke="url(#bronze-edge)" stroke-width="13"/>
+        <path d="M-42 182 A187 187 0 0 1-137 128" stroke="#100806" stroke-width="24"/>
+        <path d="M-42 182 A187 187 0 0 1-137 128" stroke="url(#bronze-edge)" stroke-width="13"/>
+        <path d="M-126-139 A187 187 0 0 1-60-177 M58-177 A187 187 0 0 1 123-142 M121 144 A187 187 0 0 1 57 178 M-58 178 A187 187 0 0 1-124 140"
+              stroke="#e2a161" stroke-width="2.5" opacity=".62"/>
+      </g>
+
+      <!-- Ramas de cobre envejecido que abrazan el botón -->
+      <g class="frame-vines" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M-119 137 C-154 118-177 88-174 53 C-190 31-191 4-174-18 C-187-47-174-82-145-101 C-151-119-140-136-117-145"
+              stroke="#130907" stroke-width="25"/>
+        <path d="M-119 137 C-154 118-177 88-174 53 C-190 31-191 4-174-18 C-187-47-174-82-145-101 C-151-119-140-136-117-145"
+              stroke="url(#bronze-edge)" stroke-width="14"/>
+        <path d="M-119 137 C-154 118-177 88-174 53 C-190 31-191 4-174-18 C-187-47-174-82-145-101 C-151-119-140-136-117-145"
+              stroke="#e0a05b" stroke-width="2.5" opacity=".58"/>
+
+        <path d="M119 137 C154 118 177 88 174 53 C190 31 191 4 174-18 C187-47 174-82 145-101 C151-119 140-136 117-145"
+              stroke="#130907" stroke-width="25"/>
+        <path d="M119 137 C154 118 177 88 174 53 C190 31 191 4 174-18 C187-47 174-82 145-101 C151-119 140-136 117-145"
+              stroke="url(#bronze-edge)" stroke-width="14"/>
+        <path d="M119 137 C154 118 177 88 174 53 C190 31 191 4 174-18 C187-47 174-82 145-101 C151-119 140-136 117-145"
+              stroke="#e0a05b" stroke-width="2.5" opacity=".58"/>
+
+        <path d="M-166 80 C-184 73-195 60-202 44 M-176 50 C-196 39-204 24-207 7 M-175-17 C-194-27-201-42-201-58 M-154-89 C-169-103-173-118-169-132"
+              stroke="#160a08" stroke-width="17"/>
+        <path d="M-166 80 C-184 73-195 60-202 44 M-176 50 C-196 39-204 24-207 7 M-175-17 C-194-27-201-42-201-58 M-154-89 C-169-103-173-118-169-132"
+              stroke="url(#bronze)" stroke-width="9"/>
+        <path d="M166 80 C184 73 195 60 202 44 M176 50 C196 39 204 24 207 7 M175-17 C194-27 201-42 201-58 M154-89 C169-103 173-118 169-132"
+              stroke="#160a08" stroke-width="17"/>
+        <path d="M166 80 C184 73 195 60 202 44 M176 50 C196 39 204 24 207 7 M175-17 C194-27 201-42 201-58 M154-89 C169-103 173-118 169-132"
+              stroke="url(#bronze)" stroke-width="9"/>
+      </g>
+
+      <!-- Garras interiores y grabados -->
+      <g class="frame-claws" fill="url(#bronze-edge)" stroke="#160a08" stroke-width="4" stroke-linejoin="round">
+        <path d="M-146-92 L-121-76 L-111-48 L-137-66Z"/>
+        <path d="M146-92 L121-76 L111-48 L137-66Z"/>
+        <path d="M-146 92 L-121 76 L-111 48 L-137 66Z"/>
+        <path d="M146 92 L121 76 L111 48 L137 66Z"/>
+      </g>
+      <path d="M-105-148 L-98-158 M-72-169 L-68-179 M72-169 L68-179 M105-148 L98-158 M-105 148 L-98 158 M-72 169 L-68 179 M72 169 L68 179 M105 148 L98 158"
+            fill="none" stroke="#d48a4d" stroke-width="4" stroke-linecap="round" opacity=".7"/>
+
+      <!-- Cresta superior integrada con las ramas -->
+      <g class="crest crest-top">
+        <path d="M0-222 L15-203 L37-195 L24-177 L9-151 L0-137 L-9-151 L-24-177 L-37-195 L-15-203Z"
+              fill="url(#bronze-edge)" stroke="#120806" stroke-width="6"/>
+        <path d="M0-205 L17-184 L0-153 L-17-184Z" fill="#0b1618" stroke="#b66c3d" stroke-width="4"/>
+        <path d="M0-194 L8-183 L0-169 L-8-183Z" fill="#77f4ff" filter="url(#cyan-glow)"/>
+        <path d="M-24-190 C-51-197-73-184-91-163 M24-190 C51-197 73-184 91-163"
+              fill="none" stroke="url(#bronze)" stroke-width="8" stroke-linecap="round"/>
+      </g>
+
+      <!-- Remate inferior más angosto y afilado -->
+      <g class="crest crest-bottom">
+        <path d="M0 218 L17 196 L32 187 L20 171 L7 148 L0 138 L-7 148 L-20 171 L-32 187 L-17 196Z"
+              fill="url(#bronze-edge)" stroke="#120806" stroke-width="6"/>
+        <path d="M0 202 L16 184 L0 154 L-16 184Z" fill="#0b1618" stroke="#b66c3d" stroke-width="4"/>
+        <path d="M0 191 L8 181 L0 168 L-8 181Z" fill="#77f4ff" filter="url(#cyan-glow)"/>
+      </g>
+    </symbol>
+
+    <style>
+      .action { cursor: pointer; outline: none; }
+      .button-face, .icon-layer, .energy-layer { transform-box: fill-box; transform-origin: center; transition: transform 130ms ease, opacity 130ms ease, filter 130ms ease; }
+      .hit-area { fill: #fff; fill-opacity: 0; pointer-events: all; }
+      .state-ring { fill: none; stroke: #87f5ff; stroke-width: 7; opacity: 0; filter: url(#cyan-glow); transition: opacity 130ms ease, stroke-width 130ms ease; pointer-events: none; }
+      .action:hover .state-ring, .action:focus .state-ring { opacity: .28; }
+      .action.pressed .button-face, .action:active .button-face { transform: scale(.965); }
+      .action.pressed .state-ring, .action:active .state-ring { opacity: .95; stroke-width: 12; }
+      .action.active .state-ring { opacity: .68; }
+      .action.active .energy-layer { opacity: 1; filter: url(#cyan-glow); }
+      .action.disabled { cursor: default; pointer-events: none; }
+      .action.disabled .button-face { opacity: .42; filter: saturate(.2); }
+      .action.disabled .icon-layer { opacity: .32; }
+      .action.disabled .state-ring { opacity: 0; }
+      .icon-line { fill: none; stroke: url(#cyan-stroke); stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; filter: url(#cyan-glow); }
+      .icon-fine { fill: none; stroke: #87f7ff; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+      .wisp { fill: none; stroke: #4fe8ff; stroke-width: 7; stroke-linecap: round; opacity: .32; }
+      @media (prefers-reduced-motion: reduce) { .button-face, .icon-layer, .energy-layer, .state-ring { transition: none; } }
+    </style>
+  </defs>
+
+  <!-- Esfera de luz: acción principal -->
+  <g id="action-light" class="action" transform="translate(970 735)" role="button" tabindex="0" aria-label="Esfera de luz">
+    <g id="light-button" class="button-face">
+      <g id="light-background">
+        <circle r="252" fill="url(#stone)" stroke="#071012" stroke-width="10" filter="url(#stone-texture)"/>
+        <circle r="239" fill="none" stroke="#17444b" stroke-width="4" opacity=".8"/>
+      </g>
+      <g id="light-energy" class="energy-layer">
+        <path d="M-204 78 C-158 39-152-30-111-76 C-71-122-8-136 45-116 C93-98 113-60 161-52 C184-48 200-57 213-73"
+              fill="none" stroke="#47eaff" stroke-width="7" stroke-linecap="round" opacity=".30"/>
+        <path d="M-182-102 C-139-90-119-50-128-12 C-140 37-105 87-52 104 C8 123 57 89 91 48 C125 7 154-2 199 17"
+              fill="none" stroke="#89f7ff" stroke-width="6" stroke-linecap="round" opacity=".38"/>
+        <path d="M-207-3 C-162 8-143 48-116 77 C-79 117-15 142 45 124 C94 109 118 77 143 43 C163 15 183 3 209 7"
+              fill="none" stroke="#22c7e5" stroke-width="5" stroke-linecap="round" opacity=".27"/>
+        <path d="M-118 8 C-100-57-38-99 28-91 C90-83 124-28 112 27 C101 79 47 109-1 95 C-42 84-67 48-58 16 C-50-12-19-30 8-21 C29-14 40 8 32 27"
+              fill="none" stroke="url(#light-ribbon)" stroke-width="11" stroke-linecap="round" opacity=".82"/>
+        <path d="M-91-73 C-58-112-4-131 45-113 M89-82 C126-60 145-22 139 18 M101 73 C70 111 20 130-30 118 M-85 88 C-118 62-132 23-122-17"
+              fill="none" stroke="#76f5ff" stroke-width="4" stroke-linecap="round" opacity=".58"/>
+        <g fill="#d9ffff" filter="url(#cyan-glow)">
+          <path d="M-154-99 l6 13 14 6-14 6-6 14-6-14-14-6 14-6Z" opacity=".78"/>
+          <path d="M161 72 l5 10 10 5-10 5-5 11-5-11-11-5 11-5Z" opacity=".72"/>
+          <circle cx="-164" cy="57" r="5" opacity=".70"/>
+          <circle cx="137" cy="-91" r="6" opacity=".82"/>
+          <circle cx="93" cy="118" r="4" opacity=".58"/>
+        </g>
+      </g>
+      <g id="light-icon" class="icon-layer">
+        <path d="M-1-100 C28-93 43-72 64-63 C92-51 105-27 96-2 C114 24 97 55 72 64 C57 91 24 105-3 92 C-31 106-62 91-70 65 C-99 53-108 20-91-3 C-103-30-85-59-59-66 C-47-88-24-103-1-100Z"
+              fill="url(#light-corona)" stroke="#75effa" stroke-width="4" opacity=".94" filter="url(#orb-glow)"/>
+        <path d="M-75 12 C-82-25-55-58-20-67 C14-76 53-60 66-29 C79 2 62 31 37 42 C15 52-8 46-17 29 C-25 14-17-3-3-8 C8-12 21-6 22 5"
+              fill="none" stroke="url(#light-ribbon)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" filter="url(#cyan-glow)"/>
+        <path d="M-54 52 C-25 74 20 73 47 47 C66 29 73 2 63-20 M-42-53 C-16-72 23-69 48-47"
+              fill="none" stroke="#c9fdff" stroke-width="6" stroke-linecap="round" opacity=".76"/>
+        <path d="M-33 4 C-29-24-3-43 23-34 C50-24 58 10 40 31 C23 51-9 49-25 29 C-32 21-35 13-33 4Z"
+              fill="url(#orb)" stroke="#e7ffff" stroke-width="5" filter="url(#orb-glow)"/>
+        <path d="M-13-18 C-2-27 15-24 21-13 C27-2 21 13 10 18 C-3 23-18 15-20 2 C-21-6-18-13-13-18Z"
+              fill="#f3ffff" opacity=".94"/>
+        <ellipse cx="-10" cy="-14" rx="10" ry="7" transform="rotate(-28 -10 -14)" fill="#ffffff"/>
+      </g>
+      <g id="light-frame"><use href="#small-frame" transform="scale(1.43)"/></g>
+    </g>
+    <circle class="state-ring" r="260"/>
+    <circle class="hit-area" r="320"/>
+  </g>
+
+  <!-- Salto -->
+  <g id="action-jump" class="action" transform="translate(690 175) scale(.7)" role="button" tabindex="0" aria-label="Saltar">
+    <g id="jump-button" class="button-face">
+      <g id="jump-background">
+        <circle r="165" fill="url(#stone)" filter="url(#stone-texture)"/>
+        <circle r="156" fill="none" stroke="#193f45" stroke-width="3"/>
+      </g>
+      <g id="jump-energy" class="energy-layer">
+        <path class="wisp" d="M-121 104 C-68 73-48 27-14 12 C24-5 61 23 92-12"/>
+        <path class="wisp" d="M-99 124 C-44 97-30 64 5 48"/>
+      </g>
+      <g id="jump-icon" class="icon-layer">
+        <path d="M72.5-102 L67.5-69 L61-61.5 L41-52.5 L30.5-44 L27.5-31 L17.5-14 L23-10.5 L51-6.5 L57.5 3 L57.5 13 L35 36.5 L2 58.5 L-19 81.5 L-32 82.5 L-31.5 68 L-35 65.5 L-46.5 78 L-53.5 93 L-50.5 100 L-53.5 110 L-46.5 118 L-46.5 126 L-39 132.5 L-36.5 130 L-42.5 124 L-40.5 122 L-44.5 118 L-44.5 106 L-37.5 91 L-32.5 88 L-38.5 98 L-37.5 121 L-25 128.5 L-16.5 129 L-26 142.5 L-44 145.5 L-73 136.5 L-65.5 132 L-79.5 112 L-80.5 93 L-83.5 88 L-76.5 64 L-57 33.5 L-72.5 78 L-71.5 99 L-69 101.5 L-66.5 99 L-66.5 86 L-56.5 55 L-46.5 46 L-48.5 43 L-42.5 40 L-41.5 32 L-34.5 20 L-38.5 7 L-21.5-25 L-22.5-35 L-28-42.5 L-43-43.5 L-64-35.5 L-76-22.5 L-88-23.5 L-91.5-31 L-83-42.5 L-74-45.5 L-56-58.5 L-9-69.5 L-3.5-78 L-2.5-88 L7-94.5 L24-93.5 L29.5-88 L33.5-77 L40-72.5 L48-76.5 L58.5-89 L51.5-101 L56-112.5 L67-111.5Z M-23.5 5 L-23.5 11 L-17 16.5 L2 18.5 L26.5 14 L8.5 38 L11 40.5 L33 25.5 L47.5 11 L47.5 5 L36-.5 L6 2.5 L-9.5 0 L-7.5-4 L-10.5-7 L-4-6.5 L.5-11 L5.5-18 L3.5-22 L14.5-33 L11.5-36 L14.5-41 L11.5-54 L22.5-70 L24.5-81 L14-87.5 L6.5-80 L7.5-64 L2.5-57 L5-52.5 L-7-58.5 L-13-58.5 L-21.5-53 L-8.5-46 L-5.5-35 L-9.5-32 L-8.5-21 L-13.5-11 L-11.5-9Z M-26.5 50 L-23 53.5 L-16.5 44 L-19 41.5Z M-16.5 56 L-13 58.5 L-1.5 50 L-4 47.5Z M-66.5 135 L-64 137.5 L-61.5 135 L-64 132.5Z"
+              fill="#e5fdff" fill-rule="evenodd" stroke="#28bedc" stroke-width="2" stroke-linejoin="round"/>
+      </g>
+      <g id="jump-frame"><use href="#small-frame"/></g>
+    </g>
+    <circle class="state-ring" r="164"/>
+    <circle class="hit-area" r="218"/>
+  </g>
+
+  <!-- Carrera -->
+  <g id="action-run" class="action" transform="translate(1030 260) scale(.7)" role="button" tabindex="0" aria-label="Correr">
+    <g id="run-button" class="button-face">
+      <g id="run-background">
+        <circle r="165" fill="url(#stone)" filter="url(#stone-texture)"/>
+        <circle r="156" fill="none" stroke="#193f45" stroke-width="3"/>
+      </g>
+      <g id="run-energy" class="energy-layer">
+        <path class="wisp" d="M-139-55 H-74 M-149-13 H-84 M-140 30 H-75 M-119 72 H-62"/>
+      </g>
+      <g id="run-icon" class="icon-layer">
+        <path d="M112.5-40 L111.5-33 L101.5-20 L80-.5 L72-.5 L52-15.5 L34.5-1 L38 3.5 L68 19.5 L78.5 31 L77.5 40 L68.5 52 L34.5 82 L37.5 93 L53 106.5 L82 111.5 L41 115.5 L35 118.5 L2 114.5 L-38 116.5 L-41 113.5 L-82 111.5 L-90 111.5 L-94 116.5 L-97.5 114 L-94.5 111 L-97 108.5 L-100 111.5 L-103 109.5 L-114.5 96 L-111.5 89 L-113.5 84 L-104 75.5 L-87 70.5 L-78 64.5 L-71 54.5 L-40.5 39 L-47 35.5 L-55 38.5 L-90 31.5 L-48 30.5 L-28.5 19 L-32 15.5 L-42 16.5 L-42 13.5 L-27 13.5 L-21.5 9 L-21.5 3 L-27-1.5 L-51-2.5 L-68 .5 L-71-2.5 L-100.5-4 L-36-10.5 L-13-14.5 L-9.5-18 L-22-20.5 L-44-15.5 L-51-19.5 L-84-19.5 L-79-22.5 L-56-21.5 L-52.5-26 L-53.5-32 L-42.5-45 L-45-47.5 L-59-47.5 L-72-43.5 L-73-48.5 L-86-50.5 L-53-53.5 L-11-69.5 L23-73.5 L40-71.5 L48-88.5 L63-93.5 L77-88.5 L80.5-80 L79.5-61 L71-51.5 L65-52.5 L62.5-50 L67.5-45 L69.5-33 L75.5-26 L82-23.5 L90.5-32 L91.5-44 L98-48.5 L105-48.5Z M-5.5 4 L-2 21.5 L14 22.5 L24 27.5 L34 27.5 L53 33.5 L55.5 38 L44.5 48 L33.5 68 L36 70.5 L51 58.5 L65.5 43 L70.5 32 L54 19.5 L24 7.5 L13.5 0 L19-4.5 L22-2.5 L45-23.5 L58-30.5 L58.5-24 L64-19.5 L66.5-22 L61.5-36 L54.5-41 L52.5-49 L62-61.5 L67-60.5 L72.5-66 L72.5-81 L61-85.5 L52.5-78 L53.5-66 L43-58.5 L32-63.5 L5-61.5 L2.5-59 L5-56.5 L25-50.5 L26.5-41 L22-42.5 L18.5-39 L19.5-33 L7.5-9Z M-27.5-32 L-27.5-26 L-24-22.5 L-10-22.5 L2-30.5 L6.5-39 L4-45.5 L-8-47.5Z M-14.5 1 L-12 3.5 L-9.5 1 L-12-1.5Z M-73.5 72 L-71 74.5 L-29 54.5 L4.5 28 L-9 16.5 L-12.5 25 L-23.5 33 L-25.5 39 L-40 53.5 L-53 55.5Z M-88.5 102 L-86 110.5 L-27 106.5 L-24.5 104 L-27 101.5 L-50 101.5 L-56 100.5 L-55 98.5 L-1 94.5 L1.5 90 L-8.5 86 L-1 85.5 L17 74.5 L40.5 41 L36 37.5 L10 33.5 L0 44.5 L-30 65.5 L-39 66.5 L-71 82.5Z M22.5 104 L26 107.5 L28.5 105 L25 101.5Z M27.5 109 L30 111.5 L33.5 109 L31 106.5Z"
+              fill="#e5fdff" fill-rule="evenodd" stroke="#28bedc" stroke-width="2" stroke-linejoin="round"/>
+      </g>
+      <g id="run-frame"><use href="#small-frame"/></g>
+    </g>
+    <circle class="state-ring" r="164"/>
+    <circle class="hit-area" r="218"/>
+  </g>
+
+  <!-- Cambio de perspectiva -->
+  <g id="action-view" class="action" transform="translate(390 830) scale(.7)" role="button" tabindex="0" aria-label="Cambiar perspectiva">
+    <g id="view-button" class="button-face">
+      <g id="view-background">
+        <circle r="165" fill="url(#stone)" filter="url(#stone-texture)"/>
+        <circle r="156" fill="none" stroke="#193f45" stroke-width="3"/>
+      </g>
+      <g id="view-energy" class="energy-layer">
+        <path class="wisp" d="M-116-58 C-59-115 54-114 117-47 M-116 59 C-54 111 56 112 117 50"/>
+      </g>
+      <g id="view-icon" class="icon-layer">
+        <g id="view-iris" filter="url(#cyan-glow)">
+          <circle r="51" fill="#06171b" stroke="#2cd4ee" stroke-width="7"/>
+          <circle r="40" fill="url(#orb)" stroke="#8ff7ff" stroke-width="3"/>
+          <circle r="27" fill="#07869f" opacity=".72"/>
+          <circle r="18" fill="#dffeff" opacity=".88"/>
+          <circle cx="-9" cy="-11" r="8" fill="#fff"/>
+          <path d="M-40-8 C-20-31 17-36 39-11 M-38 14 C-17 35 18 34 39 10"
+                fill="none" stroke="#9bf8ff" stroke-width="4" stroke-linecap="round" opacity=".68"/>
+        </g>
+        <path id="view-eyelids"
+              d="M130.5 8 L108 17.5 L83 37.5 L60 50.5 L44 56.5 L12 62.5 L-22 61.5 L-47 55.5 L-76 41.5 L-115 11.5 L-127.5 8 L-106-2.5 L-79-26.5 L-55-43.5 L-29-54.5 L-3-58.5 L-.5-61 L-3.5-64 L-.5-67 L-1-81.5 L1.5-81 L1.5-66 L3.5-64 L1.5-61 L4-58.5 L38-52.5 L58-43.5 L84-25.5 L110-1.5Z M-93.5 7 L-76 24.5 L-61 34.5 L-37 44.5 L-20 47.5 L-15 45.5 L-12 48.5 L-9.5 46 L-12 43.5 L-14 45.5 L-27 37.5 L-36.5 30 L-42.5 21 L-45.5 0 L-40.5-16 L-33-24.5 L-41.5-5 L-40.5 16 L-29 33.5 L-19 39.5 L-5 43.5 L16 39.5 L33.5 26 L40.5 8 L40.5-5 L36.5-15 L27.5-27 L31-26.5 L38.5-18 L43.5-2 L42.5 12 L39.5 20 L28 35.5 L10 43.5 L7.5 46 L10 48.5 L37 43.5 L51 38.5 L74 25.5 L94.5 7 L80-9.5 L61-24.5 L39-35.5 L15-42.5 L-16-42.5 L-33-37.5 L-64-20.5Z M16.5-4 L14.5 11 L0 19.5 L-10 14.5 L-17.5 5 L-15.5-11 L-2-19.5 L13-12.5Z M88.5 17 L96 22.5 L100 16.5 L103 18.5 L105 13.5 L108 14.5 L120.5 8 L118 5.5 L109 4.5 L109.5 2 L106-1.5 L102 .5 L98-3.5 L95.5 1 L99 4.5 L103 2.5 L105.5 6 L100 7.5Z M-116.5 8 L-110 12.5 L-107 9.5 L-105 10.5 L-100 17.5 L-97 15.5 L-95 17.5 L-92.5 15 L-100.5 7 L-97.5 4 L-102-2.5Z M7.5 92 L5 94.5 L-9.5 93 L-1.5 86 L-1 69.5 L.5 86Z"
+              fill="url(#eye-silver)" fill-rule="evenodd" stroke="#bdeff0" stroke-width="2.5" stroke-linejoin="round" filter="url(#cyan-glow)"/>
+        <g id="view-pupil-core" filter="url(#orb-glow)">
+          <circle r="25" fill="url(#orb)" stroke="#9af8ff" stroke-width="3"/>
+          <ellipse cx="-7" cy="-9" rx="7" ry="9" fill="#fff" opacity=".92"/>
+        </g>
+        <path d="M-72-32 L-60-25 M-44-47 L-35-37 M43-45 L34-35 M73-29 L61-22 M-73 32 L-59 25 M47 45 L36 35"
+              fill="none" stroke="#526966" stroke-width="4" stroke-linecap="round" opacity=".72"/>
+      </g>
+      <g id="view-frame"><use href="#small-frame"/></g>
+    </g>
+    <circle class="state-ring" r="164"/>
+    <circle class="hit-area" r="218"/>
+  </g>
+
+  <!-- Interacción genérica: mano a medio agarrar, sin objeto -->
+  <g id="action-interact" class="action" transform="translate(390 285) scale(.7)" role="button" tabindex="0" aria-label="Interactuar">
+    <g id="interact-button" class="button-face">
+      <g id="interact-background">
+        <circle r="165" fill="url(#stone)" filter="url(#stone-texture)"/>
+        <circle r="156" fill="none" stroke="#193f45" stroke-width="3"/>
+      </g>
+      <g id="interact-energy" class="energy-layer">
+        <path class="wisp" d="M-137 66 C-91 28-60-7-21-37 M-120 103 C-71 70-31 63 15 73"/>
+        <path class="wisp" d="M72-106 C111-76 126-38 118 3"/>
+      </g>
+      <g id="interact-icon" class="icon-layer">
+        <path d="M82.5-41 L80.5-35 L68.5-27 L74-20.5 L81.5-18 L78-12.5 L56-17.5 L30-32.5 L20.5-23 L28.5-15 L15-19.5 L3.5-4 L4.5 13 L11 22.5 L30 25.5 L51 21.5 L65.5 29 L67.5 36 L65 40.5 L39 50.5 L12 52.5 L-5 58.5 L-23 61.5 L-54 60.5 L-71 71.5 L-77 81.5 L-96 95.5 L-104 96.5 L-109 102.5 L-114.5 93 L-109 85.5 L-98.5 80 L-98.5 72 L-109.5 43 L-120 29.5 L-135 37.5 L-141 37.5 L-143.5 34 L-130 20.5 L-104 10.5 L-99 11.5 L-73-1.5 L-36-42.5 L-18-54.5 L10-81.5 L45-80.5 L70-72.5 L72.5-65 L63.5-54Z M-57.5-3 L-55-.5 L-51-3.5 L-23-32.5 L-7-38.5 L19-64.5 L46-66.5 L59-63.5 L61.5-66 L44-73.5 L10-72.5 L-35.5-31Z M-92.5 23 L-76 59.5 L-62 49.5 L-47 53.5 L-30 53.5 L21 43.5 L34 44.5 L44 39.5 L51.5 31 L44 28.5 L16 32.5 L8 31.5 L-4 24.5 L-7 20.5 L-2 23.5 L.5 21 L-4.5 1 L-2.5-10 L7.5-24 L29-41.5 L52-41.5 L64-36.5 L70.5-39 L53-50.5 L22-51.5 L-7-31.5 L-20-28.5 L-66 10.5 L-83 29.5 L-85.5 29 L-73.5 9 L-75 1.5Z M-108.5 15 L-106 17.5 L-103.5 15 L-106 12.5Z M-117.5 19 L-115 22.5 L-109.5 18 L-112 15.5Z M-111.5 29 L-94.5 70 L-91 72.5 L-81.5 66 L-86.5 45 L-95.5 29 L-101 23.5Z"
+              fill="#c8fbff" fill-rule="evenodd" stroke="#28bedc" stroke-width="2" stroke-linejoin="round" filter="url(#cyan-glow)"/>
+      </g>
+      <g id="interact-frame"><use href="#small-frame"/></g>
+    </g>
+    <circle class="state-ring" r="164"/>
+    <circle class="hit-area" r="218"/>
+  </g>
+
+  <!-- Absorber / aferrarse a la luz -->
+  <g id="action-absorb" class="action" transform="translate(245 555) scale(.7)" role="button" tabindex="0" aria-label="Absorber luz">
+    <g id="absorb-button" class="button-face">
+      <g id="absorb-background">
+        <circle r="165" fill="url(#stone)" filter="url(#stone-texture)"/>
+        <circle r="156" fill="none" stroke="#193f45" stroke-width="3"/>
+      </g>
+      <g id="absorb-energy" class="energy-layer">
+        <path class="wisp" d="M-113 92 C-142 34-119-15-78-50 M113 92 C142 34 119-15 78-50"/>
+        <path class="wisp" d="M-69-91 C-37-129 37-129 69-91"/>
+      </g>
+      <g id="absorb-icon" class="icon-layer">
+        <circle r="39" fill="url(#orb)" stroke="#dffeff" stroke-width="6" filter="url(#orb-glow)"/>
+        <path class="icon-line" d="M0-126 V-68 M-18-88 L0-67 L18-88 M0 126 V68 M-18 88 L0 67 L18 88 M-126 0 H-68 M-88-18 L-67 0 L-88 18 M126 0 H68 M88-18 L67 0 L88 18"/>
+        <path class="icon-fine" d="M-91-91 L-49-49 M-65-71 L-48-48 L-71-65 M91-91 L49-49 M65-71 L48-48 L71-65 M-91 91 L-49 49 M-65 71 L-48 48 L-71 65 M91 91 L49 49 M65 71 L48 48 L71 65" opacity=".88"/>
+      </g>
+      <g id="absorb-frame"><use href="#small-frame"/></g>
+    </g>
+    <circle class="state-ring" r="164"/>
+    <circle class="hit-area" r="218"/>
+  </g>
+</svg>

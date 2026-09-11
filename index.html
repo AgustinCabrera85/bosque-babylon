@@ -124,16 +124,32 @@
       </div>
 
       <div id="mobileControls" aria-hidden="true">
-        <div id="moveStick" class="stick" data-stick="move">
-          <div class="stick-thumb"></div>
+        <div id="moveStick" class="stick" data-stick="move" role="application" aria-label="Joystick de movimiento">
+          <object
+            id="mobileJoystickArt"
+            data="/assets/ui/joystick-mobile-cobrizo.svg"
+            type="image/svg+xml"
+            tabindex="-1"
+            aria-hidden="true"
+          ></object>
+          <div class="stick-thumb" aria-hidden="true"></div>
         </div>
         <div id="lookPad"></div>
-        <button id="runButton" class="mobile-button" type="button" aria-label="Correr o bucear">R</button>
-        <button id="jumpButton" class="mobile-button" type="button" aria-label="Saltar">^</button>
-        <button id="interactButton" class="mobile-button" type="button" aria-label="Interactuar">E</button>
-        <button id="attackButton" class="mobile-button" type="button" aria-label="Mantener para cargar y soltar una esfera de luz">L</button>
-        <button id="absorbLightButton" class="mobile-button" type="button" aria-label="Mantener para aferrarse a la luz y recuperar cordura">C</button>
-        <button id="mobileCameraButton" class="mobile-button" type="button" aria-label="Cambiar modo de camara" aria-pressed="false">1P</button>
+        <div id="mobileActionHud" role="group" aria-label="Controles de accion">
+          <object
+            id="mobileActionHudArt"
+            data="/assets/ui/botones-mobile-interaccion-vector.svg"
+            type="image/svg+xml"
+            tabindex="-1"
+            aria-hidden="true"
+          ></object>
+          <button id="attackButton" class="mobile-button mobile-button-primary" type="button" aria-label="Mantener para cargar y soltar una esfera de luz">L</button>
+          <button id="jumpButton" class="mobile-button" type="button" aria-label="Saltar">^</button>
+          <button id="runButton" class="mobile-button" type="button" aria-label="Correr o bucear">R</button>
+          <button id="mobileCameraButton" class="mobile-button" type="button" aria-label="Cambiar modo de camara" aria-pressed="false">1P</button>
+          <button id="interactButton" class="mobile-button" type="button" aria-label="Interactuar">E</button>
+          <button id="absorbLightButton" class="mobile-button" type="button" aria-label="Mantener para aferrarse a la luz y recuperar cordura">C</button>
+        </div>
       </div>
     </div>
 

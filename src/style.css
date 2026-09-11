@@ -754,6 +754,11 @@ body.attack-aiming #reticle {
   border-color: rgba(224, 174, 91, 0.5);
 }
 
+body.mobile-controls-enabled #cameraModeButton,
+body.mobile-controls-enabled #isometricCameraButton {
+  display: none;
+}
+
 #shadowAuraDebug {
   position: absolute;
   z-index: 5;
@@ -1617,6 +1622,25 @@ body.inventory-open #hud {
   display: block;
 }
 
+#mobileActionHud {
+  position: absolute;
+  right: max(6px, env(safe-area-inset-right));
+  bottom: max(6px, env(safe-area-inset-bottom));
+  z-index: 2;
+  width: clamp(210px, 32vw, 340px);
+  aspect-ratio: 1320 / 1061;
+  pointer-events: none;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
+}
+
+#mobileActionHudArt {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+}
+
 #lookPad {
   position: absolute;
   inset: 0;
@@ -1629,92 +1653,129 @@ body.inventory-open #hud {
   position: absolute;
   left: max(18px, env(safe-area-inset-left));
   bottom: max(22px, env(safe-area-inset-bottom));
-  width: 128px;
-  height: 128px;
+  width: clamp(128px, 40vw, 156px);
+  aspect-ratio: 1;
   border: 1px solid rgba(229, 239, 231, 0.24);
   border-radius: 999px;
   background: rgba(2, 5, 4, 0.34);
   pointer-events: auto;
   touch-action: none;
-  z-index: 2;
+  z-index: 3;
   box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.04);
+}
+
+#mobileJoystickArt {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.stick.artwork-ready {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.stick.artwork-ready #mobileJoystickArt {
+  opacity: 1;
 }
 
 .stick-thumb {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 54px;
-  height: 54px;
+  width: 35%;
+  aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border-radius: 999px;
   background: rgba(229, 239, 231, 0.26);
   border: 1px solid rgba(229, 239, 231, 0.28);
+  transition: opacity 120ms ease;
+}
+
+.stick.artwork-ready .stick-thumb {
+  opacity: 0;
 }
 
 .mobile-button {
   position: absolute;
-  width: 56px;
-  height: 56px;
-  border: 1px solid rgba(229, 239, 231, 0.24);
+  left: 50%;
+  top: 50%;
+  width: 24%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
   border-radius: 999px;
-  background: rgba(2, 5, 4, 0.42);
-  color: #e5efe7;
-  font: 700 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: transparent;
+  color: transparent;
+  font-size: 0;
+  transform: translate(-50%, -50%);
   pointer-events: auto;
   touch-action: none;
-  z-index: 2;
+  z-index: 3;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-button:active,
-.mobile-button.active {
-  background: rgba(155, 197, 157, 0.34);
+.mobile-button-primary {
+  width: 45%;
 }
 
-#jumpButton {
-  right: max(22px, env(safe-area-inset-right));
-  bottom: max(84px, calc(env(safe-area-inset-bottom) + 84px));
+.mobile-button::after {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border: 2px solid rgba(135, 245, 255, 0);
+  border-radius: inherit;
+  background: rgba(89, 232, 255, 0);
+  box-shadow: 0 0 0 rgba(53, 221, 255, 0);
+  transition:
+    border-color 130ms ease,
+    background-color 130ms ease,
+    box-shadow 130ms ease;
 }
 
-#interactButton {
-  right: max(90px, calc(env(safe-area-inset-right) + 90px));
-  bottom: max(34px, calc(env(safe-area-inset-bottom) + 34px));
+.mobile-button:active::after,
+.mobile-button.active::after,
+.mobile-button:focus-visible::after {
+  border-color: rgba(135, 245, 255, 0.88);
+  background: rgba(89, 232, 255, 0.08);
+  box-shadow:
+    0 0 12px rgba(53, 221, 255, 0.68),
+    inset 0 0 12px rgba(53, 221, 255, 0.24);
 }
 
 #attackButton {
-  right: max(90px, calc(env(safe-area-inset-right) + 90px));
-  bottom: max(102px, calc(env(safe-area-inset-bottom) + 102px));
-  border-color: rgba(130, 221, 255, 0.42);
-  color: #d9f7ff;
-  box-shadow: 0 0 14px rgba(67, 155, 232, 0.18);
+  left: 73.49%;
+  top: 69.27%;
 }
 
-#attackButton.active {
-  background: rgba(84, 184, 235, 0.4);
-  box-shadow: 0 0 22px rgba(96, 205, 255, 0.48);
-}
-
-#absorbLightButton {
-  right: max(158px, calc(env(safe-area-inset-right) + 158px));
-  bottom: max(102px, calc(env(safe-area-inset-bottom) + 102px));
-  border-color: rgba(187, 220, 210, 0.38);
-  color: #e3f2ed;
-  box-shadow: 0 0 14px rgba(126, 190, 178, 0.16);
-}
-
-#absorbLightButton.active {
-  background: rgba(111, 181, 167, 0.4);
-  box-shadow: 0 0 22px rgba(143, 218, 204, 0.42);
-}
-
-#mobileCameraButton {
-  right: max(158px, calc(env(safe-area-inset-right) + 158px));
-  bottom: max(34px, calc(env(safe-area-inset-bottom) + 34px));
+#jumpButton {
+  left: 52.27%;
+  top: 16.49%;
 }
 
 #runButton {
-  right: max(22px, env(safe-area-inset-right));
-  bottom: max(22px, env(safe-area-inset-bottom));
+  left: 78.03%;
+  top: 24.51%;
+}
+
+#mobileCameraButton {
+  left: 29.55%;
+  top: 78.23%;
+}
+
+#interactButton {
+  left: 29.55%;
+  top: 26.86%;
+}
+
+#absorbLightButton {
+  left: 18.56%;
+  top: 52.31%;
 }
 
 @media (pointer: fine) {
@@ -1740,13 +1801,13 @@ body.inventory-open #hud {
   }
 
   #hint {
-    bottom: 168px;
+    bottom: calc(env(safe-area-inset-bottom) + clamp(176px, 27vw, 286px));
     max-width: calc(100vw - 48px);
   }
 
   #attackHud {
     right: 12px;
-    bottom: 172px;
+    bottom: calc(env(safe-area-inset-bottom) + clamp(176px, 27vw, 286px));
     width: min(208px, calc(100vw - 24px));
     aspect-ratio: 208 / 68;
   }

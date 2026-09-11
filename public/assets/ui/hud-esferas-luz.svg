@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" role="img" aria-labelledby="hudTitle hudDesc">
+  <title id="hudTitle">HUD Esferas de Luz</title>
+  <desc id="hudDesc">Medidor de seis esferas con estética de reliquia oscura para Bosque Babylon.</desc>
+
+  <defs>
+    <linearGradient id="charredWood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#221b16"/>
+      <stop offset="0.44" stop-color="#0d0c0b"/>
+      <stop offset="1" stop-color="#17110e"/>
+    </linearGradient>
+    <linearGradient id="blackIron" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#323230"/>
+      <stop offset="0.28" stop-color="#0b0d0d"/>
+      <stop offset="0.7" stop-color="#24211e"/>
+      <stop offset="1" stop-color="#050606"/>
+    </linearGradient>
+    <linearGradient id="agedBrass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b59b63"/>
+      <stop offset="0.28" stop-color="#6d5932"/>
+      <stop offset="0.7" stop-color="#302615"/>
+      <stop offset="1" stop-color="#8b7442"/>
+    </linearGradient>
+    <radialGradient id="orbCore" cx="42%" cy="34%" r="64%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.2" stop-color="#fff9d8"/>
+      <stop offset="0.54" stop-color="#e9f7ed"/>
+      <stop offset="0.78" stop-color="#8ed6d9"/>
+      <stop offset="1" stop-color="#17434b"/>
+    </radialGradient>
+    <radialGradient id="orbDead" cx="42%" cy="34%" r="64%">
+      <stop offset="0" stop-color="#625e54"/>
+      <stop offset="0.5" stop-color="#292a27"/>
+      <stop offset="1" stop-color="#080909"/>
+    </radialGradient>
+    <radialGradient id="socketDepth">
+      <stop offset="0.66" stop-color="#020303"/>
+      <stop offset="0.82" stop-color="#111515"/>
+      <stop offset="1" stop-color="#000"/>
+    </radialGradient>
+
+    <filter id="frameShadow" x="-20%" y="-30%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity="0.85"/>
+    </filter>
+    <filter id="orbGlow" x="-130%" y="-130%" width="360%" height="360%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0.35 0 0 0 0.20  0 0.9 0 0 0.88  0 0 1 0 1  0 0 0 0.9 0" result="cyanGlow"/>
+      <feMerge>
+        <feMergeNode in="cyanGlow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="subtleGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="distress" x="-10%" y="-15%" width="120%" height="130%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035 0.22" numOctaves="2" seed="17" result="noise"/>
+      <feColorMatrix in="noise" type="saturate" values="0" result="grayNoise"/>
+      <feBlend in="SourceGraphic" in2="grayNoise" mode="soft-light"/>
+    </filter>
+
+    <style>
+      .hud-copy { font-family: Georgia, 'Times New Roman', serif; letter-spacing: 1.7px; }
+      .sphere .halo { opacity: .52; }
+      .sphere .orb-body { fill: url(#orbCore); }
+      .sphere .orb-shine { opacity: .9; }
+      .sphere.active { animation: living-light 2.8s ease-in-out infinite; }
+      .sphere:nth-of-type(2) { animation-delay: -.45s; }
+      .sphere:nth-of-type(3) { animation-delay: -1.1s; }
+      .sphere:nth-of-type(4) { animation-delay: -.2s; }
+      .sphere:nth-of-type(5) { animation-delay: -1.55s; }
+      .sphere:nth-of-type(6) { animation-delay: -.85s; }
+      .sphere.depleted { animation: none; opacity: .72; }
+      .sphere.depleted .halo, .sphere.depleted .orb-shine { opacity: 0; }
+      .sphere.depleted .orb-body { fill: url(#orbDead); }
+      #charge-fill { transition: width .08s linear; }
+      @keyframes living-light {
+        0%, 100% { opacity: .84; }
+        52% { opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .sphere.active { animation: none; }
+        #charge-fill { transition: none; }
+      }
+    </style>
+  </defs>
+
+  <!-- Irregular silhouette: transparent everywhere outside this relic. -->
+  <g id="relic-frame" filter="url(#frameShadow)">
+    <path d="M49 43 94 26 864 29 910 48 922 77 917 207 893 235 843 250 105 247 61 229 39 198 43 81Z"
+          fill="url(#charredWood)" stroke="#050606" stroke-width="12" stroke-linejoin="round"/>
+    <path d="M61 55 103 39 851 41 897 57 906 83 902 198 879 222 836 236 116 234 74 218 55 192 58 87Z"
+          fill="none" stroke="url(#agedBrass)" stroke-width="3" opacity=".82"/>
+    <path d="M73 101C150 88 214 96 284 91S426 99 487 91 616 99 685 91 820 100 892 94"
+          fill="none" stroke="#6f5b39" stroke-width="1.5" opacity=".36"/>
+    <path d="M71 178C143 188 211 177 287 185S421 176 491 184 624 177 697 184 823 176 893 185"
+          fill="none" stroke="#000" stroke-width="3" opacity=".72"/>
+
+    <!-- Restrained root fragments at the outer corners. -->
+    <g fill="none" stroke-linecap="round">
+      <path d="M73 54C48 43 36 25 41 12M65 62C40 67 24 56 16 42M62 207C38 218 27 242 35 264"
+            stroke="#17130f" stroke-width="12"/>
+      <path d="M884 56C911 48 925 28 921 10M893 67C920 69 938 56 945 40M895 208C919 220 930 244 924 266"
+            stroke="#17130f" stroke-width="12"/>
+      <path d="M73 54C48 43 36 25 41 12M65 62C40 67 24 56 16 42M62 207C38 218 27 242 35 264"
+            stroke="#695437" stroke-width="2" opacity=".62"/>
+      <path d="M884 56C911 48 925 28 921 10M893 67C920 69 938 56 945 40M895 208C919 220 930 244 924 266"
+            stroke="#695437" stroke-width="2" opacity=".62"/>
+    </g>
+
+    <!-- Engraved title and counter plaques. -->
+    <g>
+      <path d="M98 49 525 49 540 61 529 91 96 91 83 78 88 59Z" fill="url(#blackIron)" stroke="url(#agedBrass)" stroke-width="2"/>
+      <path d="M756 50 858 50 874 62 866 90 750 90 740 77 744 60Z" fill="url(#blackIron)" stroke="url(#agedBrass)" stroke-width="2"/>
+      <path d="M178 210 787 210 801 222 791 244 170 244 159 231 164 218Z" fill="url(#blackIron)" stroke="url(#agedBrass)" stroke-width="1.7"/>
+    </g>
+    <g fill="#76613d">
+      <circle cx="100" cy="70" r="3"/><circle cx="518" cy="70" r="3"/>
+      <circle cx="758" cy="70" r="3"/><circle cx="856" cy="70" r="3"/>
+      <circle cx="179" cy="227" r="2.5"/><circle cx="782" cy="227" r="2.5"/>
+    </g>
+    <rect x="181" y="238" width="598" height="2.5" rx="1.25" fill="#33413e" opacity=".62"/>
+    <rect id="charge-fill" data-max-width="598" x="181" y="238" width="0" height="2.5" rx="1.25" fill="#a9f8ff" opacity=".9" filter="url(#subtleGlow)"/>
+
+    <!-- Six recessed sockets. -->
+    <g id="sockets">
+      <g transform="translate(170 148)"><circle r="42" fill="url(#socketDepth)" stroke="#080909" stroke-width="8"/><circle r="39" fill="none" stroke="url(#agedBrass)" stroke-width="2.5" opacity=".8"/></g>
+      <g transform="translate(294 148)"><circle r="42" fill="url(#socketDepth)" stroke="#080909" stroke-width="8"/><circle r="39" fill="none" stroke="url(#agedBrass)" stroke-width="2.5" opacity=".8"/></g>
+      <g transform="translate(418 148)"><circle r="42" fill="url(#socketDepth)" stroke="#080909" stroke-width="8"/><circle r="39" fill="none" stroke="url(#agedBrass)" stroke-width="2.5" opacity=".8"/></g>
+      <g transform="translate(542 148)"><circle r="42" fill="url(#socketDepth)" stroke="#080909" stroke-width="8"/><circle r="39" fill="none" stroke="url(#agedBrass)" stroke-width="2.5" opacity=".8"/></g>
+      <g transform="translate(666 148)"><circle r="42" fill="url(#socketDepth)" stroke="#080909" stroke-width="8"/><circle r="39" fill="none" stroke="url(#agedBrass)" stroke-width="2.5" opacity=".8"/></g>
+      <g transform="translate(790 148)"><circle r="42" fill="url(#socketDepth)" stroke="#080909" stroke-width="8"/><circle r="39" fill="none" stroke="url(#agedBrass)" stroke-width="2.5" opacity=".8"/></g>
+    </g>
+  </g>
+
+  <!-- Editable text: change these nodes directly or replace them with HTML overlays. -->
+  <g id="labels" class="hud-copy" fill="#e9e3cf">
+    <text id="label-title" x="114" y="77" font-size="19" font-weight="700">ESFERAS DE LUZ</text>
+    <text id="label-count" x="807" y="77" font-size="20" font-weight="700" text-anchor="middle">6 / 6</text>
+    <text id="label-help" x="480" y="234" font-size="13" fill="#9aa7a2" text-anchor="middle">MANTENÉ CLIC PARA APUNTAR</text>
+  </g>
+
+  <!-- Dynamic state: change class="sphere active" to class="sphere depleted". -->
+  <g id="spheres">
+    <g id="sphere-1" class="sphere active" transform="translate(170 148)" filter="url(#orbGlow)">
+      <circle class="halo" r="34" fill="#a9f8ff" opacity=".45"/>
+      <circle class="orb-body" r="25" stroke="#dffff5" stroke-width="1.8"/>
+      <ellipse class="orb-shine" cx="-8" cy="-10" rx="8" ry="5" fill="#fff" transform="rotate(-28)"/>
+    </g>
+    <g id="sphere-2" class="sphere active" transform="translate(294 148)" filter="url(#orbGlow)">
+      <circle class="halo" r="34" fill="#a9f8ff" opacity=".45"/>
+      <circle class="orb-body" r="25" stroke="#dffff5" stroke-width="1.8"/>
+      <ellipse class="orb-shine" cx="-8" cy="-10" rx="8" ry="5" fill="#fff" transform="rotate(-28)"/>
+    </g>
+    <g id="sphere-3" class="sphere active" transform="translate(418 148)" filter="url(#orbGlow)">
+      <circle class="halo" r="34" fill="#a9f8ff" opacity=".45"/>
+      <circle class="orb-body" r="25" stroke="#dffff5" stroke-width="1.8"/>
+      <ellipse class="orb-shine" cx="-8" cy="-10" rx="8" ry="5" fill="#fff" transform="rotate(-28)"/>
+    </g>
+    <g id="sphere-4" class="sphere active" transform="translate(542 148)" filter="url(#orbGlow)">
+      <circle class="halo" r="34" fill="#a9f8ff" opacity=".45"/>
+      <circle class="orb-body" r="25" stroke="#dffff5" stroke-width="1.8"/>
+      <ellipse class="orb-shine" cx="-8" cy="-10" rx="8" ry="5" fill="#fff" transform="rotate(-28)"/>
+    </g>
+    <g id="sphere-5" class="sphere active" transform="translate(666 148)" filter="url(#orbGlow)">
+      <circle class="halo" r="34" fill="#a9f8ff" opacity=".45"/>
+      <circle class="orb-body" r="25" stroke="#dffff5" stroke-width="1.8"/>
+      <ellipse class="orb-shine" cx="-8" cy="-10" rx="8" ry="5" fill="#fff" transform="rotate(-28)"/>
+    </g>
+    <g id="sphere-6" class="sphere active" transform="translate(790 148)" filter="url(#orbGlow)">
+      <circle class="halo" r="34" fill="#a9f8ff" opacity=".45"/>
+      <circle class="orb-body" r="25" stroke="#dffff5" stroke-width="1.8"/>
+      <ellipse class="orb-shine" cx="-8" cy="-10" rx="8" ry="5" fill="#fff" transform="rotate(-28)"/>
+    </g>
+  </g>
+</svg>

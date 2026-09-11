@@ -53,9 +53,20 @@ type AttackSystemOptions = {
 type AttackDom = {
   root: HTMLElement | null;
   ammo: HTMLElement | null;
-  pips: HTMLElement | null;
-  power: HTMLElement | null;
   status: HTMLElement | null;
+  artworks: HTMLObjectElement[];
+};
+
+type AttackHudArtwork = {
+  spheres: SVGGElement[];
+  representativeOrb: SVGGElement | null;
+  count: SVGTextElement | null;
+  status: SVGTextElement | null;
+  progress: SVGRectElement | null;
+  progressMaxWidth: number;
+  progressMaxHeight: number;
+  progressBaseline: number;
+  progressGlint: SVGPathElement | null;
 };
 
 type AimSolution = {
@@ -121,6 +132,7 @@ export class PlayerAttackSystem {
   private readonly trajectoryEndMaterial: StandardMaterial;
   private readonly heldOrb: HeldLightOrb;
   private readonly abortController = new AbortController();
+  private readonly hudArtworks = new Map<HTMLObjectElement, AttackHudArtwork>();
   private readonly projectiles: LightProjectile[] = [];
   private readonly impactBursts: ImpactBurst[] = [];
   private ammo: number;
@@ -146,9 +158,8 @@ export class PlayerAttackSystem {
     this.dom = {
       root: document.getElementById("attackHud"),
       ammo: document.getElementById("attackAmmo"),
-      pips: document.getElementById("attackAmmoPips"),
-      power: document.getElementById("attackPowerFill"),
       status: document.getElementById("attackStatus"),
+      artworks: Array.from(document.querySelectorAll<HTMLObjectElement>(".attack-hud-art")),
     };
     this.ammo = options.inventory?.hasItem(LIGHT_ORB_ITEM.id)
       ? options.inventory.getItemCount(LIGHT_ORB_ITEM.id)
@@ -205,6 +216,10 @@ export class PlayerAttackSystem {
     window.addEventListener("blur", this.cancelCharge, { signal });
     document.addEventListener("pointerlockchange", this.onPointerLockChange, { signal });
     window.addEventListener("bosque:pause", this.onPause, { signal });
+    for (const artwork of this.dom.artworks) {
+      artwork.addEventListener("load", () => this.bindHudArtwork(artwork), { signal });
+      this.bindHudArtwork(artwork);
+    }
     scene.onDisposeObservable.addOnce(() => this.dispose());
     this.renderHud();
   }
@@ -790,31 +805,76 @@ export class PlayerAttackSystem {
   }
 
   private renderHud() {
-    if (this.dom.ammo) this.dom.ammo.textContent = `${this.ammo}/${MAX_AMMO}`;
-    if (this.dom.power) {
-      const power = this.charging
-        ? this.getChargePower()
-        : clamp01(this.rechargeProgress / RECHARGE_SECONDS_PER_ORB);
-      this.dom.power.style.transform = `scaleX(${power.toFixed(3)})`;
+    if (this.dom.ammo) {
+      this.dom.ammo.textContent = `${this.ammo} de ${MAX_AMMO} esferas de luz.`;
     }
     if (this.dom.status) {
       this.dom.status.textContent = this.message;
     }
-    if (this.dom.pips && this.renderedAmmo !== this.ammo) {
-      const pips = Array.from({ length: MAX_AMMO }, (_, index) => {
-        const pip = document.createElement("span");
-        pip.className = "attack-ammo-pip";
-        pip.classList.toggle("filled", index < this.ammo);
-        return pip;
-      });
-      this.dom.pips.replaceChildren(...pips);
+    if (this.renderedAmmo !== this.ammo) {
+      for (const artwork of this.hudArtworks.values()) {
+        this.renderHudArtworkAmmo(artwork);
+      }
       this.renderedAmmo = this.ammo;
+    }
+    const power = this.charging
+      ? this.getChargePower()
+      : clamp01(this.rechargeProgress / RECHARGE_SECONDS_PER_ORB);
+    for (const artwork of this.hudArtworks.values()) {
+      if (artwork.status) artwork.status.textContent = this.message.toLocaleUpperCase("es-AR");
+      if (artwork.progress) {
+        if (artwork.progressMaxHeight > 0) {
+          const height = artwork.progressMaxHeight * power;
+          const y = artwork.progressBaseline - height;
+          artwork.progress.setAttribute("height", height.toFixed(2));
+          artwork.progress.setAttribute("y", y.toFixed(2));
+          if (artwork.progressGlint) {
+            artwork.progressGlint.setAttribute("d", `M175 ${(y + 0.5).toFixed(2)}H185`);
+            artwork.progressGlint.style.opacity = power > 0 ? ".82" : "0";
+          }
+        } else {
+          artwork.progress.setAttribute("width", (artwork.progressMaxWidth * power).toFixed(2));
+        }
+      }
     }
     this.dom.root?.classList.toggle(
       "recharging",
       !this.charging && this.rechargeProgress > 0 && this.ammo < MAX_AMMO
     );
     this.dom.root?.classList.toggle("empty", this.ammo <= 0);
+  }
+
+  private bindHudArtwork(element: HTMLObjectElement) {
+    const svg = element.contentDocument;
+    if (!svg?.documentElement) return;
+    const progress = svg.querySelector<SVGRectElement>("#charge-fill, #recharge-fill");
+    const artwork: AttackHudArtwork = {
+      spheres: Array.from(svg.querySelectorAll<SVGGElement>(".sphere")),
+      representativeOrb: svg.querySelector<SVGGElement>("#orb-indicator"),
+      count: svg.querySelector<SVGTextElement>("#label-count, #ammo-count"),
+      status: svg.querySelector<SVGTextElement>("#label-help"),
+      progress,
+      progressMaxWidth: Number(progress?.dataset.maxWidth ?? 0),
+      progressMaxHeight: Number(progress?.dataset.maxHeight ?? 0),
+      progressBaseline: Number(progress?.dataset.baseline ?? 0),
+      progressGlint: svg.querySelector<SVGPathElement>("#recharge-glint"),
+    };
+    this.hudArtworks.set(element, artwork);
+    this.renderHudArtworkAmmo(artwork);
+  }
+
+  private renderHudArtworkAmmo(artwork: AttackHudArtwork) {
+    artwork.spheres.forEach((sphere, index) => {
+      const filled = index < this.ammo;
+      sphere.classList.toggle("active", filled);
+      sphere.classList.toggle("depleted", !filled);
+    });
+    artwork.representativeOrb?.classList.toggle("unavailable", this.ammo <= 0);
+    if (artwork.count) {
+      artwork.count.textContent = artwork.representativeOrb
+        ? String(this.ammo).padStart(2, "0")
+        : `${this.ammo} / ${MAX_AMMO}`;
+    }
   }
 
   private createHeldLightOrb(): HeldLightOrb {

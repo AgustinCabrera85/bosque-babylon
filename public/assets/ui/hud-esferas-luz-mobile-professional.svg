@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 208 68" role="img" aria-labelledby="hudTitle hudDesc">
+  <title id="hudTitle">Esferas de Luz</title>
+  <desc id="hudDesc">HUD móvil refinado con una luz cautiva, contador y recarga vertical.</desc>
+
+  <defs>
+    <linearGradient id="frameFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#211b17"/>
+      <stop offset="0.24" stop-color="#0d0f0f"/>
+      <stop offset="0.7" stop-color="#070808"/>
+      <stop offset="1" stop-color="#18110e"/>
+    </linearGradient>
+    <linearGradient id="frameEdge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9e8754"/>
+      <stop offset="0.33" stop-color="#40351f"/>
+      <stop offset="0.7" stop-color="#75613a"/>
+      <stop offset="1" stop-color="#241d13"/>
+    </linearGradient>
+    <linearGradient id="rechargeGradient" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#3f7f83"/>
+      <stop offset="0.62" stop-color="#8bcfd0"/>
+      <stop offset="1" stop-color="#f3e7b5"/>
+    </linearGradient>
+    <radialGradient id="socketGradient">
+      <stop offset="0" stop-color="#071011"/>
+      <stop offset="0.7" stop-color="#030505"/>
+      <stop offset="1" stop-color="#151410"/>
+    </radialGradient>
+    <radialGradient id="coreGradient" cx="40%" cy="31%" r="70%">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset="0.25" stop-color="#fff5c9"/>
+      <stop offset="0.57" stop-color="#e6f4dd"/>
+      <stop offset="0.82" stop-color="#8ac9c9"/>
+      <stop offset="1" stop-color="#285b5e"/>
+    </radialGradient>
+    <radialGradient id="deadCore">
+      <stop offset="0" stop-color="#4e4b42"/>
+      <stop offset="0.62" stop-color="#202321"/>
+      <stop offset="1" stop-color="#060707"/>
+    </radialGradient>
+    <clipPath id="rechargeWindow">
+      <path d="M174 16H183L186 19V49L182 53H174Z"/>
+    </clipPath>
+    <filter id="frameShadow" x="-25%" y="-55%" width="150%" height="210%">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="2.7" flood-color="#000" flood-opacity=".84"/>
+    </filter>
+    <filter id="softOrbGlow" x="-160%" y="-160%" width="420%" height="420%">
+      <feGaussianBlur stdDeviation="3.1" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values=".2 0 0 0 .18  0 .72 0 0 .68  0 0 .82 0 .78  0 0 0 .72 0" result="tinted"/>
+      <feMerge><feMergeNode in="tinted"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="rechargeGlow" x="-140%" y="-20%" width="380%" height="140%">
+      <feGaussianBlur stdDeviation="1.4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      #orb-indicator { animation: captivePulse 2.9s ease-in-out infinite; }
+      #orb-indicator .core { fill: url(#coreGradient); }
+      #orb-indicator .aura { opacity: .32; }
+      #orb-indicator .wisp { opacity: .62; }
+      #orb-indicator .spark { opacity: .82; }
+      #orb-indicator.unavailable { animation: none; opacity: .58; }
+      #orb-indicator.unavailable .core { fill: url(#deadCore); stroke: #49473f; }
+      #orb-indicator.unavailable .aura,
+      #orb-indicator.unavailable .wisp,
+      #orb-indicator.unavailable .spark { opacity: 0; }
+      #recharge-fill { animation: rechargeFlicker 1.35s ease-in-out infinite; }
+      @keyframes captivePulse { 0%,100%{opacity:.85} 48%{opacity:1} 65%{opacity:.92} }
+      @keyframes rechargeFlicker { 0%,100%{opacity:.76} 50%{opacity:1} }
+      @media (prefers-reduced-motion: reduce) {
+        #orb-indicator, #recharge-fill { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <g id="hud-shell" filter="url(#frameShadow)">
+    <!-- A thin asymmetrical clasp instead of a large fantasy panel. -->
+    <path d="M29 8 174 8 197 19 202 33 198 50 180 60 29 60 14 51 7 36 12 21Z"
+          fill="#020303" stroke="#020303" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M31 10 172 10 193 20 198 33 194 47 177 57 30 57 17 49 11 36 16 23Z"
+          fill="url(#frameFace)" stroke="url(#frameEdge)" stroke-width="1.4" stroke-linejoin="round"/>
+
+    <!-- Fine, imperfect edge details. -->
+    <path d="M64 15H169L186 23M63 52H171L187 45" fill="none" stroke="#806b40" stroke-width=".65" opacity=".45"/>
+    <path d="M14 18C7 14 5 8 7 3M15 53C8 56 6 61 8 66M193 20C201 16 203 10 201 4"
+          fill="none" stroke="#665331" stroke-width="1.5" stroke-linecap="round" opacity=".72"/>
+    <circle cx="69" cy="18" r="1.1" fill="#8b7447" opacity=".62"/>
+    <circle cx="69" cy="50" r="1.1" fill="#55472d" opacity=".62"/>
+
+    <!-- Recessed socket overlaps the frame and becomes the visual anchor. -->
+    <circle cx="38" cy="34" r="26" fill="#030404" stroke="#050606" stroke-width="4"/>
+    <circle cx="38" cy="34" r="22.5" fill="url(#socketGradient)" stroke="url(#frameEdge)" stroke-width="1.35"/>
+    <path d="M23 25A18 18 0 0 1 50 18M54 42A18 18 0 0 1 27 50" fill="none" stroke="#75623d" stroke-width="1" opacity=".72"/>
+
+    <!-- The number sits directly on the artifact; no oversized boxed plaque. -->
+    <path d="M76 20 86 14M76 48 86 54" stroke="#625235" stroke-width="1" opacity=".68"/>
+    <text id="ammo-count" x="106" y="42" fill="#ded7c7" font-family="'Arial Narrow', 'Segoe UI', Arial, sans-serif" font-size="22" font-weight="500" letter-spacing="1" text-anchor="middle">00</text>
+    <path d="M137 18V50" stroke="#5f5032" stroke-width=".8" opacity=".52"/>
+
+    <!-- Recharge is built into the right edge. -->
+    <path id="recharge-track" d="M171 13H185L190 18V50L183 56H171Z" fill="#030505" stroke="url(#frameEdge)" stroke-width="1.15"/>
+    <g clip-path="url(#rechargeWindow)">
+      <rect id="recharge-fill" data-max-height="37" data-baseline="53" x="174" y="53" width="12" height="0" fill="url(#rechargeGradient)" filter="url(#rechargeGlow)"/>
+    </g>
+    <g stroke="#2d4645" stroke-width=".65" opacity=".7">
+      <path d="M174 25H185M174 34H186M174 43H186"/>
+    </g>
+    <path id="recharge-glint" d="M175 53.5H185" stroke="#f7eabb" stroke-width="1" stroke-linecap="round" opacity="0"/>
+  </g>
+
+  <!-- Organic captive light: no glossy button ring and no perfect blue disk. -->
+  <g id="orb-indicator" class="unavailable" transform="translate(38 34)" filter="url(#softOrbGlow)">
+    <circle class="aura" r="16" fill="#79c8cb"/>
+    <path class="wisp" d="M-15-2C-10-15 7-19 15-7M14 4C8 16-9 18-15 7" fill="none" stroke="#a9e3df" stroke-width="1.35" stroke-linecap="round"/>
+    <path class="wisp" d="M-11 10C-17 1-12-10-3-15M11-10C17-2 15 8 7 14" fill="none" stroke="#d6edda" stroke-width=".75" stroke-linecap="round" opacity=".6"/>
+    <path class="core" d="M0-11C7-9 11-3 9 4 8 10 3 13-3 11-9 10-12 5-10-1-9-7-5-10 0-11Z" stroke="#ecf9df" stroke-width=".8"/>
+    <ellipse cx="-3.3" cy="-4" rx="3.7" ry="2.2" fill="#fff" opacity=".88" transform="rotate(-24)"/>
+    <path d="M-13-6C-8-13-1-14 5-12M9 8C4 13-4 14-9 10" fill="none" stroke="#070a0a" stroke-width="1.3" stroke-linecap="round" opacity=".62"/>
+    <circle class="spark" cx="14" cy="-7" r="1" fill="#e7c57a"/>
+    <circle class="spark" cx="-13" cy="9" r=".75" fill="#cce8db"/>
+    <circle class="spark" cx="10" cy="13" r=".65" fill="#e7c57a"/>
+  </g>
+
+  <!--
+    Runtime contract:
+
+    ammo-count.textContent = String(ammo).padStart(2, '0');
+    orb-indicator.classList.toggle('unavailable', ammo <= 0);
+
+    Recharge progress p is clamped to 0..1:
+      const maxHeight = 37;
+      const baseline = 53;
+      const height = maxHeight * p;
+      rechargeFill.setAttribute('height', String(height));
+      rechargeFill.setAttribute('y', String(baseline - height));
+      rechargeGlint.setAttribute('d', `M175 ${baseline - height + 0.5}H185`);
+
+    The HUD remains visible at zero so the empty captive-light socket communicates
+    that the player has no ammunition left.
+  -->
+</svg>

@@ -73,16 +73,25 @@
       <div id="hint" class="hidden"></div>
       <div id="reticle" aria-hidden="true"></div>
 
-      <div id="attackHud" aria-live="polite">
-        <div class="attack-hud-heading">
-          <span>Esferas de luz</span>
-          <strong id="attackAmmo">0/6</strong>
-        </div>
-        <div id="attackAmmoPips" class="attack-ammo-pips" aria-hidden="true"></div>
-        <div class="attack-power-track" aria-hidden="true">
-          <span id="attackPowerFill"></span>
-        </div>
-        <span id="attackStatus" class="attack-status">Mantene clic para apuntar</span>
+      <div id="attackHud" role="status" aria-live="polite" aria-atomic="true">
+        <object
+          class="attack-hud-art attack-hud-art-desktop"
+          data="/assets/ui/hud-esferas-luz.svg"
+          type="image/svg+xml"
+          tabindex="-1"
+          aria-hidden="true"
+        ></object>
+        <object
+          class="attack-hud-art attack-hud-art-mobile"
+          data="/assets/ui/hud-esferas-luz-mobile-professional.svg"
+          type="image/svg+xml"
+          tabindex="-1"
+          aria-hidden="true"
+        ></object>
+        <span class="attack-hud-announcer">
+          <strong id="attackAmmo">0 de 6 esferas de luz.</strong>
+          <span id="attackStatus">Mantene clic para apuntar</span>
+        </span>
       </div>
 
       <div id="viewControls" aria-label="Modo de camara">

@@ -250,6 +250,13 @@ export class PlayerController {
   private cinematicCameraState: {
     worldPosition: Vector3;
     worldTarget: Vector3;
+    roll: number;
+    fieldOfView: number;
+  } | null = null;
+  private cinematicReturnState: {
+    viewMode: ViewMode;
+    yaw: number;
+    pitch: number;
   } | null = null;
   private movementLockTimer = 0;
   private enemyGrabPressureTimer = 0;
@@ -559,6 +566,11 @@ export class PlayerController {
   /** Locks gameplay input and hands camera framing to an in-world cinematic. */
   beginCinematicSequence() {
     if (this.controlsLocked) return false;
+    this.cinematicReturnState = {
+      viewMode: this.viewMode,
+      yaw: this.yaw,
+      pitch: this.pitch,
+    };
     if (this.viewMode !== "third") this.setViewMode("third");
     this.cinematicSequenceActive = true;
     this.cameraViewTransition = null;
@@ -566,17 +578,26 @@ export class PlayerController {
     return true;
   }
 
-  setCinematicCamera(worldPosition: Vector3, worldTarget: Vector3) {
+  setCinematicCamera(
+    worldPosition: Vector3,
+    worldTarget: Vector3,
+    roll = 0,
+    fieldOfView = PLAYER_CAMERA_FOV
+  ) {
     if (!this.cinematicSequenceActive) return;
     if (!this.cinematicCameraState) {
       this.cinematicCameraState = {
         worldPosition: worldPosition.clone(),
         worldTarget: worldTarget.clone(),
+        roll,
+        fieldOfView,
       };
       return;
     }
     this.cinematicCameraState.worldPosition.copyFrom(worldPosition);
     this.cinematicCameraState.worldTarget.copyFrom(worldTarget);
+    this.cinematicCameraState.roll = roll;
+    this.cinematicCameraState.fieldOfView = fieldOfView;
   }
 
   /** Restores gameplay and blends from the last cinematic frame to the player rig. */
@@ -585,8 +606,22 @@ export class PlayerController {
     this.root.computeWorldMatrix(true);
     this.camera.computeWorldMatrix();
     const transitionOrigin = this.camera.globalPosition.clone();
+    const returnState = this.cinematicReturnState;
+    this.cinematicReturnState = null;
     this.cinematicCameraState = null;
     this.cinematicSequenceActive = false;
+    if (returnState) {
+      this.yaw = returnState.yaw;
+      this.pitch = returnState.pitch;
+      if (this.viewMode !== returnState.viewMode) {
+        this.setViewMode(returnState.viewMode);
+      } else {
+        this.applyCameraRig();
+      }
+    }
+    // Never let cinematic roll or a widened lens leak into gameplay.
+    this.camera.rotation.z = 0;
+    this.camera.fov = PLAYER_CAMERA_FOV;
     this.resetInputState();
     this.cameraViewTransition = {
       fromWorldPosition: transitionOrigin,
@@ -1312,6 +1347,8 @@ export class PlayerController {
         inverse
       );
       this.lookAtLocal(localTarget);
+      this.camera.rotation.z = this.cinematicCameraState.roll;
+      this.camera.fov = this.cinematicCameraState.fieldOfView;
       return;
     }
     if (this.viewMode === "first") {

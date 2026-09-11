@@ -411,7 +411,12 @@ export async function createEndTorches(
   ];
   const fireMaterial = createFireMaterial(scene);
   const glowMaterial = createGlowMaterial(scene);
-  const lights: { light: PointLight; baseIntensity: number; phase: number }[] = [];
+  const lights: {
+    light: PointLight;
+    baseIntensity: number;
+    phase: number;
+    active: boolean;
+  }[] = [];
   const torchMeshes: AbstractMesh[] = [];
 
   for (let i = 0; i < placements.length; i++) {
@@ -445,17 +450,17 @@ export async function createEndTorches(
     );
     light.diffuse = new Color3(1.0, 0.5, 0.18);
     light.specular = new Color3(1.0, 0.54, 0.22);
-    light.intensity = 3.75;
+    const baseIntensity = 3.75;
+    light.intensity = 0;
     light.range = 45;
     light.falloffType = Light.FALLOFF_STANDARD;
     light.renderPriority = 10;
-    light.setEnabled(false);
-
-    lights.push({ light, baseIntensity: light.intensity, phase: i * 2.19 });
+    lights.push({ light, baseIntensity, phase: i * 2.19, active: false });
   }
 
-  // These lights used to affect every mesh in the scene. Enabling them near
-  // the house consequently invalidated all forest and lagoon shaders at once.
+  // Restrict the receivers, then leave light membership stable for the whole
+  // run. Distance only changes intensity, so arrival cannot invalidate the
+  // house, forest and lagoon shader variants at once.
   const litMeshes = [...new Set([
     terrain.mesh as AbstractMesh,
     ...(options.includedOnlyMeshes ?? []),
@@ -467,7 +472,12 @@ export async function createEndTorches(
   scene.onBeforeRenderObservable.add(() => {
     t += scene.getEngine().getDeltaTime() * 0.001;
 
-    for (const { light, baseIntensity, phase } of lights) {
+    for (const entry of lights) {
+      const { light, baseIntensity, phase } = entry;
+      if (!entry.active) {
+        light.intensity = 0;
+        continue;
+      }
       const flicker =
         Math.sin(t * 11.0 + phase) * 0.12 +
         Math.sin(t * 21.0 + phase * 0.7) * 0.07;
@@ -481,10 +491,11 @@ export async function createEndTorches(
       new Vector3(x, terrain.getHeightAt(x, z), z)
     ),
     update(playerPosition) {
-      for (const { light } of lights) {
+      for (const entry of lights) {
+        const { light } = entry;
         const distanceSquared = Vector3.DistanceSquared(playerPosition, light.position);
-        const shouldBeEnabled = distanceSquared <= activationRadiusSquared;
-        if (light.isEnabled() !== shouldBeEnabled) light.setEnabled(shouldBeEnabled);
+        entry.active = distanceSquared <= activationRadiusSquared;
+        if (!entry.active) light.intensity = 0;
       }
     },
   };

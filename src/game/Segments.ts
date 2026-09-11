@@ -424,7 +424,7 @@ export class Segments {
   // =========================
   // UPDATE
   // =========================
-  update(playerPositionOrZ: Vector3 | number): void {
+  update(playerPositionOrZ: Vector3 | number, minimumActiveSegment?: number): void {
     const playerPosition =
       typeof playerPositionOrZ === "number"
         ? new Vector3(0, 0, playerPositionOrZ)
@@ -445,10 +445,17 @@ export class Segments {
     // The terminal landmark extends beyond the last procedural forest segment.
     // Treat that whole authored area as the final segment so crossing the lagoon
     // boundary never empties and restores the last forest buffers.
-    const currentSeg =
+    const boundedPlayerSegment =
       this.cfg.maxGeneratedSegment === undefined
         ? playerSegment
         : Math.min(playerSegment, this.cfg.maxGeneratedSegment);
+    const boundedMinimumSegment =
+      minimumActiveSegment === undefined
+        ? boundedPlayerSegment
+        : this.cfg.maxGeneratedSegment === undefined
+          ? Math.floor(minimumActiveSegment)
+          : Math.min(Math.floor(minimumActiveSegment), this.cfg.maxGeneratedSegment);
+    const currentSeg = Math.max(boundedPlayerSegment, boundedMinimumSegment);
     const segmentChanged = this.lastSegment !== currentSeg;
 
     const grassNeeded = this.segmentRange(currentSeg, this.cfg.behind, this.cfg.ahead);

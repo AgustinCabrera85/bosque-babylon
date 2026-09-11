@@ -353,11 +353,17 @@ body.character-selecting #renderCanvas {
 }
 
 body.opening-sequence-active #hud,
+body.house-arrival-cinematic-active #hud,
 body.sky-eye-cinematic-active #hud {
   opacity: 0;
 }
 
+body.house-arrival-cinematic-active #hud {
+  pointer-events: none;
+}
+
 body.opening-sequence-active #inventoryButton,
+body.house-arrival-cinematic-active #inventoryButton,
 body.sky-eye-cinematic-active #inventoryButton {
   opacity: 0;
   pointer-events: none;
@@ -537,6 +543,18 @@ body.attack-aiming #reticle {
   opacity: 1;
 }
 
+@media (pointer: fine) {
+  body.desktop-orb-mode:not(.attack-aiming) #reticle {
+    width: 12px;
+    height: 12px;
+    border-color: rgba(146, 225, 246, 0.86);
+    box-shadow:
+      0 0 7px rgba(112, 220, 255, 0.68),
+      0 0 17px rgba(72, 145, 255, 0.32);
+    opacity: 0.92;
+  }
+}
+
 #attackHud {
   position: absolute;
   right: 18px;
@@ -550,7 +568,8 @@ body.attack-aiming #reticle {
 }
 
 #attackHud.charging,
-#attackHud.recharging {
+#attackHud.recharging,
+#attackHud.orb-mode {
   filter:
     drop-shadow(0 0 11px rgba(137, 225, 218, 0.3))
     drop-shadow(0 9px 12px rgba(0, 0, 0, 0.45));

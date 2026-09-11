@@ -36,6 +36,7 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
+import { RenderTargetTexture } from "@babylonjs/core/Materials/Textures/renderTargetTexture";
 import { PhotoDome } from "@babylonjs/core/Helpers/photoDome";
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight";
@@ -66,6 +67,7 @@ import {
   spawnSkyEye,
 } from "./enemies";
 import { loadInitialForestEnemies } from "./levels/ForestEnemySpawns";
+import { HouseArrivalCinematic } from "./levels/HouseArrivalCinematic";
 import { TerminalSkyEyeEncounter } from "./levels/TerminalSkyEyeEncounter";
 import { BlackSmokeWrapSystem } from "./BlackSmokeWrapSystem";
 
@@ -598,14 +600,21 @@ frontViewFill.specular = new Color3(0, 0, 0);
 
 const flashlightLights = [flashlight, flashlightFill, flashlightReach];
 let flashlightEnabled = true;
+let flashlightShadowMap: RenderTargetTexture | null = null;
 const flashlightButton = document.getElementById("flashlightButton") as HTMLButtonElement | null;
 const setFlashlightEnabled = (enabled: boolean) => {
   flashlightEnabled = enabled;
   flashlight.intensity = enabled ? FLASHLIGHT_BASE_INTENSITY : 0;
   flashlightFill.intensity = enabled ? FLASHLIGHT_FILL_BASE_INTENSITY : 0;
   flashlightReach.intensity = enabled ? FLASHLIGHT_REACH_BASE_INTENSITY : 0;
-  for (const light of flashlightLights) {
-    if (light.isEnabled() !== enabled) light.setEnabled(enabled);
+  // Keep the lights in every material's stable light list. Calling setEnabled
+  // here invalidates shader variants across the visible forest on the first
+  // toggle; zero intensity produces the same image without that runtime spike.
+  if (flashlightShadowMap) {
+    flashlightShadowMap.refreshRate = enabled
+      ? RenderTargetTexture.REFRESHRATE_RENDER_ONEVERYFRAME
+      : RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
+    flashlightShadowMap.resetRefreshCounter();
   }
   flashlightButton?.classList.toggle("active", enabled);
   flashlightButton?.setAttribute("aria-pressed", String(enabled));
@@ -628,6 +637,7 @@ const shadows = new ShadowGenerator(quality.shadowMapSize, flashlight);
 shadows.useBlurExponentialShadowMap = true;
 shadows.blurKernel = quality.shadowBlurKernel;
 shadows.darkness = 0.65;
+flashlightShadowMap = shadows.getShadowMap();
 
 // Si tenés meshes importantes:
 scene.meshes.forEach(m => {
@@ -960,6 +970,8 @@ scene.onBeforeRenderObservable.add(() => {
   ];
   const attackSystem = new PlayerAttackSystem(scene, player, enemyManager, {
     canvas,
+    desktopInputEnabled:
+      !window.matchMedia("(pointer: coarse)").matches && navigator.maxTouchPoints === 0,
     inventory,
     getLightSourcePositions: () => attackLightSources,
     getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
@@ -970,6 +982,18 @@ scene.onBeforeRenderObservable.add(() => {
     release: () => attackSystem.releaseCharge(),
     cancel: () => attackSystem.cancelCharge(),
   });
+  const houseArrivalCinematic = new HouseArrivalCinematic({
+    player,
+    housePosition: segments.getEndHouseCheckpoint(),
+    triggerZ: terminalConfig.houseFrontZ - DEFAULT_WORLD_SEGMENT_LENGTH,
+    segmentBoundaryZ: terminalConfig.houseFrontZ,
+    getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
+    compactFraming: quality.name === "mobile",
+    onStart: () => attackSystem.cancelCharge(),
+  });
+  scene.metadata ??= {};
+  scene.metadata.houseArrivalCinematic = houseArrivalCinematic;
+  scene.onDisposeObservable.addOnce(() => houseArrivalCinematic.dispose());
 
   // =========================
   // Lluvia
@@ -1131,15 +1155,7 @@ scene.onBeforeRenderObservable.add(() => {
   skyEye.setEnabled(true);
   skyEye.snapLookAt(lagoonWarmupPosition);
   await prepareTransitionState(lagoonWarmupPosition);
-  // The flashlight is normally on, but its off-state has a different stable
-  // light membership. Compile the three main regions once so toggling it does
-  // not move shader work into gameplay.
-  onProgress(0.991, "Compilando iluminación alternativa...");
-  setFlashlightEnabled(false);
-  await prepareTransitionState(initialPlayerPosition, 1);
-  await prepareTransitionState(houseWarmupPosition, 1);
-  await prepareTransitionState(lagoonWarmupPosition, 1);
-  setFlashlightEnabled(true);
+  onProgress(0.991, "Restaurando bosque...");
   await prepareTransitionState(initialPlayerPosition);
   skyEye.setEnabled(false);
   skyEye.setPosition(skyEyeEmergencePosition);
@@ -1151,8 +1167,15 @@ scene.onBeforeRenderObservable.add(() => {
   let grassWindTimer = 0;
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.max(0, Math.min(engine.getDeltaTime() / 1000, 0.05));
-    // Activate cached world content before collision and movement use it.
-    segments.update(player.position);
+    houseArrivalCinematic.update(dt);
+    // During the reveal, upload the already-preassembled final streaming window
+    // before the player crosses the boundary that used to expose the hitch.
+    segments.update(
+      player.position,
+      houseArrivalCinematic.shouldPrepareHouseSegment
+        ? DEFAULT_END_HOUSE_SEGMENT
+        : undefined
+    );
     // From the house onward, close cameras are part of the level design: they
     // avoid the expensive distant lake view and preserve underwater searching.
     player.setIsometricViewAllowed(

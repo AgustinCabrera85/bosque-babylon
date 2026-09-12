@@ -26,6 +26,8 @@ import {
   type ShadowGrabberFxState,
 } from "./ShadowGrabberFxController";
 
+const MAX_HEALTH = 1.5; // Two ordinary light orbs defeat a minor enemy.
+
 export interface ShadowGrabberAnimationOptions {
   loop?: boolean;
   speedRatio?: number;
@@ -73,7 +75,7 @@ export class ShadowGrabberController extends BaseEnemyController {
     public readonly config: ShadowGrabberConfig,
     private readonly blackSmokeWrapSystem: BlackSmokeWrapSystem
   ) {
-    super(context, options);
+    super(context, options, MAX_HEALTH);
     if (options.type !== SHADOW_GRABBER_TYPE) {
       throw new Error(`ShadowGrabber ${this.id}: invalid enemy type ${options.type}`);
     }
@@ -287,11 +289,12 @@ export class ShadowGrabberController extends BaseEnemyController {
   public override setEnabled(enabled: boolean) {
     const wasEnabled = this.enabled;
     super.setEnabled(enabled);
-    if (wasEnabled === enabled) return;
-    this.fxController?.setOwnerEnabled(enabled);
+    const nowEnabled = this.enabled;
+    if (wasEnabled === nowEnabled) return;
+    this.fxController?.setOwnerEnabled(nowEnabled);
     if (!this.resolvedPortalMesh) return;
 
-    if (!enabled) {
+    if (!nowEnabled) {
       for (const group of this.animations.values()) {
         if (group.isPlaying) group.pause();
       }
@@ -380,6 +383,10 @@ export class ShadowGrabberController extends BaseEnemyController {
     // opaque procedural void and its smooth rim are created by the FX layer.
     portalMesh.visibility = 0.18;
     this.portalMaterial = portalMaterial;
+  }
+
+  protected override onDeath() {
+    this.fxController?.setOwnerEnabled(false);
   }
 
   private createFxRoot() {

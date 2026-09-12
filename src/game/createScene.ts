@@ -77,6 +77,7 @@ import { loadInitialForestEnemies } from "./levels/ForestEnemySpawns";
 import { HouseArrivalCinematic } from "./levels/HouseArrivalCinematic";
 import { TerminalSkyEyeEncounter } from "./levels/TerminalSkyEyeEncounter";
 import { BlackSmokeWrapSystem } from "./BlackSmokeWrapSystem";
+import { EnemyHealthHud } from "./EnemyHealthHud";
 
 
 
@@ -835,8 +836,10 @@ scene.onBeforeRenderObservable.add(() => {
     emergencePosition: skyEyeEmergencePosition,
     hoverPosition: skyEyeHoverPosition,
   });
+  const enemyHealthHud = new EnemyHealthHud(skyEye.id);
   scene.metadata.skyEyeEncounter = skyEyeEncounter;
   scene.onDisposeObservable.addOnce(() => skyEyeEncounter.dispose());
+  scene.onDisposeObservable.addOnce(() => enemyHealthHud.dispose());
   if (import.meta.env.DEV) {
     const skyEyeDebug = {
       getSnapshot: () => skyEyeEncounter.getDebugSnapshot(),
@@ -1336,6 +1339,12 @@ scene.onBeforeRenderObservable.add(() => {
     shadowGrabberBehaviorSystem.update(dt);
     enemyManager.update(dt);
     attackSystem.update(dt);
+    enemyHealthHud.update(
+      dt,
+      skyEyeEncounter.state === "watching" && skyEye.enabled,
+      skyEye.health,
+      skyEye.maxHealth
+    );
     survivalSystem.update(dt);
     waterContactSystem.update(dt);
     waterInteractionVfx.update(dt);

@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1280" height="230" viewBox="0 0 1280 230"
+     preserveAspectRatio="xMidYMid meet"
+     role="img" aria-labelledby="title description"
+     shape-rendering="geometricPrecision">
+  <title id="title">HUD de vida del jefe final</title>
+  <desc id="description">Barra de vida roja con daño perdido negro y destello amarillo temporal sobre el tramo recién descontado.</desc>
+
+  <metadata>
+    Barra útil: x=145, y=127, width=990, height=48.
+    Actualizar el ancho de boss-health-fill entre 0 y 990.
+    En cada impacto, posicionar boss-damage-flash desde la nueva vida hasta la vida anterior,
+    ajustar su ancho y ejecutar boss-damage-flash-animation.beginElement().
+  </metadata>
+
+  <defs>
+    <linearGradient id="bronze" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#090403"/>
+      <stop offset=".18" stop-color="#28130f"/>
+      <stop offset=".39" stop-color="#704027"/>
+      <stop offset=".51" stop-color="#b56b3d"/>
+      <stop offset=".62" stop-color="#583022"/>
+      <stop offset=".83" stop-color="#321812"/>
+      <stop offset="1" stop-color="#080302"/>
+    </linearGradient>
+    <linearGradient id="bronze-edge" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#080302"/>
+      <stop offset=".27" stop-color="#2d1510"/>
+      <stop offset=".48" stop-color="#7b4429"/>
+      <stop offset=".57" stop-color="#b96e3e"/>
+      <stop offset=".68" stop-color="#4a251a"/>
+      <stop offset="1" stop-color="#080302"/>
+    </linearGradient>
+    <linearGradient id="forged-copper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3d2118"/>
+      <stop offset=".18" stop-color="#754129"/>
+      <stop offset=".34" stop-color="#26120e"/>
+      <stop offset=".62" stop-color="#130907"/>
+      <stop offset=".80" stop-color="#4f291d"/>
+      <stop offset="1" stop-color="#0a0403"/>
+    </linearGradient>
+    <linearGradient id="boss-red" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ef4a3c"/>
+      <stop offset=".17" stop-color="#c91c18"/>
+      <stop offset=".52" stop-color="#8a0708"/>
+      <stop offset=".81" stop-color="#4a0205"/>
+      <stop offset="1" stop-color="#1b0103"/>
+    </linearGradient>
+    <linearGradient id="boss-red-gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd6b8" stop-opacity=".58"/>
+      <stop offset=".28" stop-color="#ff6b53" stop-opacity=".18"/>
+      <stop offset=".54" stop-color="#3c0003" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#140002" stop-opacity=".66"/>
+    </linearGradient>
+    <linearGradient id="damage-black" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#120b0a"/>
+      <stop offset=".42" stop-color="#050505"/>
+      <stop offset="1" stop-color="#000000"/>
+    </linearGradient>
+    <linearGradient id="hit-yellow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffae16"/>
+      <stop offset=".38" stop-color="#fff6a5"/>
+      <stop offset=".64" stop-color="#ffd83d"/>
+      <stop offset="1" stop-color="#ff8a0b"/>
+    </linearGradient>
+    <radialGradient id="blood-gem" cx="38%" cy="31%" r="72%">
+      <stop offset="0" stop-color="#ffebba"/>
+      <stop offset=".16" stop-color="#ff6650"/>
+      <stop offset=".48" stop-color="#b10d12"/>
+      <stop offset=".78" stop-color="#510309"/>
+      <stop offset="1" stop-color="#180004"/>
+    </radialGradient>
+    <linearGradient id="name-silver" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#efe8d4"/>
+      <stop offset=".34" stop-color="#bcb19b"/>
+      <stop offset=".62" stop-color="#696157"/>
+      <stop offset="1" stop-color="#c9c0ac"/>
+    </linearGradient>
+
+    <clipPath id="boss-health-window">
+      <rect x="145" y="127" width="990" height="48" rx="17"/>
+    </clipPath>
+    <clipPath id="boss-current-health-window">
+      <rect id="boss-health-fill" x="145" y="127" width="693" height="48" rx="17"/>
+    </clipPath>
+
+    <filter id="frame-shadow" x="-15%" y="-80%" width="130%" height="260%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+      <feOffset dy="10" result="offset"/>
+      <feColorMatrix in="offset" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .86 0"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="red-glow" x="-25%" y="-160%" width="150%" height="420%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feFlood flood-color="#e20c16" flood-opacity=".56" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="hit-glow" x="-60%" y="-180%" width="220%" height="460%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feFlood flood-color="#ffe34d" flood-opacity=".94" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="plate-texture" x="-5%" y="-40%" width="110%" height="180%">
+      <feTurbulence type="fractalNoise" baseFrequency=".022 .14" numOctaves="3" seed="41" result="noise"/>
+      <feColorMatrix in="noise" values=".22 0 0 0 .02 0 .12 0 0 .01 0 0 .08 0 0 0 0 0 .23 0" result="tint"/>
+      <feComposite in="tint" in2="SourceAlpha" operator="in" result="texture"/>
+      <feBlend in="SourceGraphic" in2="texture" mode="soft-light"/>
+    </filter>
+
+    <style>
+      #boss-hud { transform-origin: center; }
+      #boss-frame, #boss-damage-flash, #boss-health-current, #boss-name {
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      #boss-damage-flash { pointer-events: none; }
+      #boss-hud.taking-damage #boss-damage-flash {
+        animation: boss-damage-css-flash .68s ease-out both;
+      }
+      #boss-hud.taking-damage #boss-frame {
+        animation: boss-hit-shake .24s ease-out;
+      }
+      #boss-hud.critical #boss-health-current {
+        animation: boss-critical-pulse 1.1s ease-in-out infinite;
+      }
+      #boss-hud.defeated #boss-frame,
+      #boss-hud.defeated #boss-name { opacity: .45; filter: saturate(.15); }
+      #boss-hud.defeated #boss-health-current { opacity: 0; }
+      @keyframes boss-damage-css-flash {
+        0% { opacity: 1; }
+        22% { opacity: 1; }
+        58% { opacity: .68; }
+        100% { opacity: 0; }
+      }
+      @keyframes boss-hit-shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-4px); }
+        55% { transform: translateX(3px); }
+        78% { transform: translateX(-1px); }
+      }
+      @keyframes boss-critical-pulse {
+        0%, 100% { filter: url(#red-glow); opacity: .78; }
+        50% { filter: url(#red-glow); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boss-hud.taking-damage #boss-frame,
+        #boss-hud.critical #boss-health-current { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <g id="boss-hud" aria-label="Vida del jefe">
+    <g id="boss-frame" filter="url(#frame-shadow)">
+      <!-- Silueta principal de metal ennegrecido -->
+      <path d="M78 120 L111 91 L210 87 L258 96 L545 96 L590 83 L614 64 L640 44 L666 64 L690 83 L735 96 L1022 96 L1070 87 L1169 91 L1202 120 L1184 143 L1207 164 L1170 196 L1068 191 L1018 181 L262 181 L212 191 L110 196 L73 164 L96 143Z"
+            fill="#050303" stroke="#020202" stroke-width="13"/>
+      <path d="M91 121 L121 99 L209 96 L260 104 L548 104 L598 89 L621 68 L640 52 L659 68 L682 89 L732 104 L1020 104 L1071 96 L1159 99 L1189 121 L1172 143 L1191 161 L1159 185 L1072 181 L1019 170 L261 170 L208 181 L121 185 L89 161 L108 143Z"
+            fill="url(#forged-copper)" stroke="#1a0a07" stroke-width="7" filter="url(#plate-texture)"/>
+      <path d="M112 122 L143 106 L228 106 L270 114 L1010 114 L1052 106 L1137 106 L1168 122 L1152 143 L1168 161 L1137 177 L1050 171 L1008 162 L272 162 L230 171 L143 177 L112 161 L128 143Z"
+            fill="#090606" stroke="#744128" stroke-width="3"/>
+      <path d="M137 121 L164 112 H1116 L1143 121 L1133 143 L1144 164 L1115 171 H165 L136 164 L147 143Z"
+            fill="#030303" stroke="#21100c" stroke-width="5"/>
+
+      <!-- Ramas forjadas, menos simétricas y con brillo contenido -->
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M88 119 C144 80 199 91 247 101 C312 115 365 91 430 99 C486 106 537 100 588 79"
+              stroke="#0c0504" stroke-width="20"/>
+        <path d="M88 119 C144 80 199 91 247 101 C312 115 365 91 430 99 C486 106 537 100 588 79"
+              stroke="url(#bronze)" stroke-width="9"/>
+        <path d="M1191 116 C1145 86 1092 85 1043 100 C980 119 916 92 851 99 C793 105 749 99 695 79"
+              stroke="#0c0504" stroke-width="20"/>
+        <path d="M1191 116 C1145 86 1092 85 1043 100 C980 119 916 92 851 99 C793 105 749 99 695 79"
+              stroke="url(#bronze)" stroke-width="9"/>
+        <path d="M103 173 C162 204 222 182 280 176 C350 169 405 192 476 180"
+              stroke="#0c0504" stroke-width="17"/>
+        <path d="M103 173 C162 204 222 182 280 176 C350 169 405 192 476 180"
+              stroke="url(#bronze)" stroke-width="8"/>
+        <path d="M1178 169 C1127 202 1061 184 1004 175 C938 165 879 193 807 180"
+              stroke="#0c0504" stroke-width="17"/>
+        <path d="M1178 169 C1127 202 1061 184 1004 175 C938 165 879 193 807 180"
+              stroke="url(#bronze)" stroke-width="8"/>
+        <path d="M173 98 C153 78 130 70 106 73 M216 97 C198 74 177 64 153 64 M1101 99 C1127 77 1148 70 1172 73 M1059 97 C1082 72 1105 63 1130 64"
+              stroke="#3d1d15" stroke-width="6"/>
+        <path d="M194 184 C169 211 141 217 114 211 M1091 183 C1115 210 1142 216 1166 207"
+              stroke="#3d1d15" stroke-width="6"/>
+        <path d="M111 109 C166 91 211 97 257 105 M1168 108 C1121 93 1076 94 1027 105"
+              stroke="#c17543" stroke-width="2.5" opacity=".48"/>
+      </g>
+
+      <!-- Herrajes y garras laterales -->
+      <g fill="url(#bronze-edge)" stroke="#160805" stroke-width="5" stroke-linejoin="round">
+        <path d="M106 111 L64 124 L87 143 L57 164 L107 169 L133 143Z"/>
+        <path d="M1174 111 L1216 124 L1193 143 L1223 164 L1173 169 L1147 143Z"/>
+        <path d="M187 99 L211 87 L230 106 L205 118Z"/>
+        <path d="M1093 99 L1069 87 L1050 106 L1075 118Z"/>
+        <path d="M188 181 L210 194 L231 174 L204 164Z"/>
+        <path d="M1092 181 L1070 194 L1049 174 L1076 164Z"/>
+      </g>
+      <path d="M75 143 H111 M1169 143 H1205" stroke="#cf7a42" stroke-width="3" opacity=".58"/>
+
+      <!-- Placa oscura para integrar el nombre -->
+      <g id="boss-nameplate">
+        <path d="M426 7 H854 L872 24 L854 48 H694 L677 58 H603 L586 48 H426 L408 24Z"
+              fill="#030303" stroke="#0b0403" stroke-width="8"/>
+        <path d="M434 12 H846 L860 25 L846 42 H690 L672 52 H608 L590 42 H434 L420 25Z"
+              fill="url(#forged-copper)" stroke="#7a4228" stroke-width="3" filter="url(#plate-texture)"/>
+        <path d="M450 17 H830 L840 26 L830 36 H681 L666 45 H614 L599 36 H450 L440 26Z"
+              fill="#0b0807" stroke="#1c0d0a" stroke-width="3"/>
+        <path d="M454 18 H826" stroke="#c47a47" stroke-width="2" opacity=".38"/>
+        <path d="M424 25 H397 M856 25 H883" stroke="url(#bronze)" stroke-width="7" stroke-linecap="round"/>
+      </g>
+
+      <!-- Sello central, parcialmente fundido con la placa -->
+      <g id="boss-crest">
+        <path d="M640 42 L658 58 L683 71 L669 90 L655 111 L640 122 L625 111 L611 90 L597 71 L622 58Z"
+              fill="url(#bronze-edge)" stroke="#160805" stroke-width="7"/>
+        <path d="M640 52 L656 72 L640 108 L624 72Z"
+              fill="#070304" stroke="#875033" stroke-width="4"/>
+        <path d="M640 60 L649 74 L640 94 L631 74Z"
+              fill="url(#blood-gem)" stroke="#d95d43" stroke-width="2" filter="url(#red-glow)"/>
+        <path d="M615 64 C583 54 552 61 526 83 M665 64 C697 54 728 61 754 83"
+              fill="none" stroke="url(#bronze)" stroke-width="7" stroke-linecap="round"/>
+        <path d="M614 72 C585 70 564 75 544 89 M666 72 C695 70 716 75 736 89"
+              fill="none" stroke="#b5683b" stroke-width="2.5" stroke-linecap="round" opacity=".52"/>
+      </g>
+    </g>
+
+    <!-- Nombre editable -->
+    <text id="boss-name" x="640" y="35" text-anchor="middle"
+          fill="url(#name-silver)" stroke="#080303" stroke-width="3" paint-order="stroke fill"
+          font-family="Georgia, 'Times New Roman', serif" font-size="25" font-weight="700"
+          letter-spacing="5.5">JEFE DEL NIVEL</text>
+
+    <!-- Interior negro: queda visible donde la vida ya fue perdida -->
+    <g id="boss-health-track" clip-path="url(#boss-health-window)">
+      <rect id="boss-damage-fill" x="145" y="127" width="990" height="48" fill="url(#damage-black)"/>
+      <path d="M154 135 C332 129 478 139 640 134 C814 129 965 140 1126 134"
+            fill="none" stroke="#35211b" stroke-width="3" opacity=".58"/>
+      <path d="M154 169 H1126" stroke="#000" stroke-width="8" opacity=".88"/>
+      <g opacity=".24" stroke="#6a372b" stroke-width="2" stroke-linecap="round">
+        <path d="M226 130 L213 141 L228 151 L218 171 M328 129 L338 140 L329 151 M473 129 L460 143 L474 154 L468 172 M586 129 L596 139 L589 150 M744 130 L732 143 L745 156 L738 173 M874 130 L885 142 L876 153 M1015 129 L1004 141 L1018 153 L1010 172"/>
+      </g>
+    </g>
+
+    <!-- Vida roja actual; el clip boss-health-fill controla su ancho -->
+    <g id="boss-health-current" clip-path="url(#boss-current-health-window)" filter="url(#red-glow)">
+      <rect id="boss-health-red" x="145" y="127" width="990" height="48" fill="url(#boss-red)"/>
+      <rect id="boss-health-highlight" x="145" y="127" width="990" height="48" fill="url(#boss-red-gloss)"/>
+      <path d="M151 136 C278 128 408 141 541 134 C681 126 823 140 952 134 C1021 131 1075 132 1129 134"
+            fill="none" stroke="#ff9175" stroke-width="2.5" opacity=".38"/>
+      <path d="M151 165 C267 174 379 160 494 168 C627 177 739 159 861 167 C968 174 1050 164 1129 169"
+            fill="none" stroke="#2b0003" stroke-width="6" opacity=".62"/>
+      <g fill="none" stroke="#5d0006" stroke-width="2.5" stroke-linecap="round" opacity=".50">
+        <path d="M224 130 C218 140 232 145 226 158 C221 166 229 170 230 174"/>
+        <path d="M376 128 C383 137 373 145 380 154 C386 161 378 168 377 174"/>
+        <path d="M538 129 C530 139 543 148 535 160 C531 165 535 170 540 173"/>
+        <path d="M702 128 C711 139 697 148 707 158 C714 165 707 171 704 174"/>
+        <path d="M918 128 C910 140 923 148 915 159 C910 166 917 171 921 174"/>
+      </g>
+    </g>
+
+    <!-- Segmento recién perdido: configurar x/width y disparar beginElement() -->
+    <rect id="boss-damage-flash" x="838" y="127" width="119" height="48" rx="3"
+          fill="url(#hit-yellow)" opacity="0" clip-path="url(#boss-health-window)"
+          filter="url(#hit-glow)">
+      <animate id="boss-damage-flash-animation"
+               attributeName="opacity"
+               values="0;1;1;.62;0"
+               keyTimes="0;.08;.28;.64;1"
+               dur=".68s"
+               begin="indefinite"
+               fill="remove"/>
+    </rect>
+
+    <!-- Labio interior por encima de todas las capas -->
+    <rect x="142" y="124" width="996" height="54" rx="20"
+          fill="none" stroke="#020101" stroke-width="9" pointer-events="none"/>
+    <rect x="145" y="127" width="990" height="48" rx="17"
+          fill="none" stroke="#8d4d2e" stroke-width="3" opacity=".72" pointer-events="none"/>
+    <path d="M160 124 H1120" stroke="#d48a4f" stroke-width="2" opacity=".34" pointer-events="none"/>
+
+    <!-- Marcas de fase -->
+    <g id="boss-phase-marks" fill="url(#bronze-edge)" stroke="#120604" stroke-width="3">
+      <path d="M390 116 L399 125 L390 136 L381 125Z"/>
+      <path d="M640 114 L651 125 L640 139 L629 125Z"/>
+      <path d="M890 116 L899 125 L890 136 L881 125Z"/>
+    </g>
+  </g>
+</svg>

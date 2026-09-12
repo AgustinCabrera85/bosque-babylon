@@ -1,5 +1,6 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
+import { EnemyLifecycleState } from "../core/EnemyTypes";
 import {
   ShadowGrabberBehavior,
   type ShadowGrabberBehaviorDebug,
@@ -106,7 +107,17 @@ export class ShadowGrabberBehaviorSystem {
     this.updatePlayerSnapshot(dt);
     this.lightQuery.updateFlashlightState();
     this.coordinator.update(dt);
-    for (const behavior of this.behaviors.values()) {
+    for (const [id, behavior] of this.behaviors) {
+      if (
+        behavior.controller.lifecycleState === EnemyLifecycleState.Dying ||
+        behavior.controller.lifecycleState === EnemyLifecycleState.Disposed
+      ) {
+        behavior.dispose();
+        this.behaviors.delete(id);
+        this.debugViews.get(id)?.dispose();
+        this.debugViews.delete(id);
+        continue;
+      }
       behavior.update(dt, this.targetSnapshot);
     }
     if (this.debugViews.size > 0) {

@@ -4,6 +4,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { EnemyAshEffect } from "./EnemyAshEffect";
 import {
   EnemyLifecycleState,
   type EnemyAttackHit,
@@ -17,6 +18,11 @@ const HIT_REACTION_SECONDS = 1.5;
 const HIT_IRIDESCENCE_MAX_IOR = 2.8;
 const HIT_SHAKE_AMPLITUDE = 0.13;
 const HIT_EMISSIVE_COLOR = new Color3(0.24, 0.62, 1);
+const MINOR_DEATH_DISSOLVE_SECONDS = 0.7;
+const MINOR_ASH_CLOUD_SECONDS = 2;
+const BOSS_GRAY_SECONDS = 0.55;
+const BOSS_FADE_SECONDS = 1.1;
+const BOSS_ASH_CLOUD_SECONDS = 2.8;
 
 type PbrHitMaterialState = {
   material: PBRMaterial;
@@ -46,6 +52,7 @@ export abstract class BaseEnemyController implements EnemyController {
   public readonly type: string;
   public readonly root: TransformNode;
   public readonly metadata: Readonly<Record<string, unknown>>;
+  public readonly maxHealth: number;
 
   protected readonly asset: EnemyAssetInstance;
   protected readonly visualRoot: TransformNode;
@@ -53,10 +60,22 @@ export abstract class BaseEnemyController implements EnemyController {
   private readonly ownedMaterials = new Set<Material>();
   private currentLifecycleState = EnemyLifecycleState.Initializing;
   private hitReaction: HitReactionState | null = null;
+  private remainingHealth: number;
+  private ashEffect: EnemyAshEffect | null = null;
+  private deathElapsed = 0;
 
-  protected constructor(context: EnemyControllerContext, options: EnemySpawnOptions) {
+  protected constructor(
+    context: EnemyControllerContext,
+    options: EnemySpawnOptions,
+    maxHealth: number
+  ) {
+    if (!Number.isFinite(maxHealth) || maxHealth <= 0) {
+      throw new Error(`Enemy ${options.id ?? options.type}: invalid maximum health`);
+    }
     this.id = options.id ?? options.type;
     this.type = options.type;
+    this.maxHealth = maxHealth;
+    this.remainingHealth = maxHealth;
     this.asset = context.asset;
     this.metadata = { ...options.metadata };
     this.requestedInitialEnabled = options.enabled ?? true;
@@ -80,9 +99,13 @@ export abstract class BaseEnemyController implements EnemyController {
 
   public get enabled() {
     return (
-      this.currentLifecycleState !== EnemyLifecycleState.Disposed &&
+      this.currentLifecycleState === EnemyLifecycleState.Ready &&
       this.root.isEnabled()
     );
+  }
+
+  public get health() {
+    return this.remainingHealth;
   }
 
   public get lifecycleState() {
@@ -94,6 +117,11 @@ export abstract class BaseEnemyController implements EnemyController {
   public abstract update(deltaTimeSeconds: number): void;
 
   public updateCombatEffects(deltaTimeSeconds: number) {
+    if (this.currentLifecycleState === EnemyLifecycleState.Dying) {
+      this.updateDeath(deltaTimeSeconds);
+      return;
+    }
+    if (this.currentLifecycleState !== EnemyLifecycleState.Ready) return;
     const reaction = this.hitReaction;
     if (!reaction) return;
 
@@ -184,7 +212,9 @@ export abstract class BaseEnemyController implements EnemyController {
   }
 
   public receiveAttack(hit: EnemyAttackHit) {
-    if (!this.enabled || this.currentLifecycleState === EnemyLifecycleState.Disposed) return;
+    if (!this.enabled || !Number.isFinite(hit.damage) || hit.damage <= 0) return;
+    const damage = Math.min(this.remainingHealth, hit.damage);
+    this.remainingHealth = Math.max(0, this.remainingHealth - damage);
 
     if (!this.hitReaction) {
       const pbrMaterials: PbrHitMaterialState[] = [];
@@ -221,13 +251,24 @@ export abstract class BaseEnemyController implements EnemyController {
 
     window.dispatchEvent(
       new CustomEvent("bosque:enemy-hit", {
-        detail: { id: this.id, type: this.type, damage: hit.damage, point: hit.point.clone() },
+        detail: {
+          id: this.id,
+          type: this.type,
+          damage,
+          health: this.remainingHealth,
+          maxHealth: this.maxHealth,
+          point: hit.point.clone(),
+        },
       })
     );
+    if (this.remainingHealth <= 0) this.beginDeath();
   }
 
   public setEnabled(enabled: boolean) {
-    if (this.currentLifecycleState === EnemyLifecycleState.Disposed) return;
+    if (
+      this.currentLifecycleState === EnemyLifecycleState.Disposed ||
+      this.currentLifecycleState === EnemyLifecycleState.Dying
+    ) return;
     if (!enabled) this.finishHitReaction();
     this.root.setEnabled(enabled);
     if (this.currentLifecycleState !== EnemyLifecycleState.Initializing) {
@@ -257,6 +298,8 @@ export abstract class BaseEnemyController implements EnemyController {
     if (this.currentLifecycleState === EnemyLifecycleState.Disposed) return;
     this.currentLifecycleState = EnemyLifecycleState.Disposed;
     this.finishHitReaction();
+    this.ashEffect?.dispose();
+    this.ashEffect = null;
     this.onDispose();
 
     for (const animationGroup of this.asset.animationGroups) {
@@ -291,6 +334,93 @@ export abstract class BaseEnemyController implements EnemyController {
   }
 
   protected onDispose() {}
+
+  protected onDeath() {}
+
+  protected get deathVisualStyle(): "shrink" | "ashenFade" {
+    return "shrink";
+  }
+
+  protected onDeathProgress(_grayProgress: number, _fadeProgress: number) {}
+
+  private beginDeath() {
+    this.currentLifecycleState = EnemyLifecycleState.Dying;
+    this.finishHitReaction();
+    for (const animationGroup of this.asset.animationGroups) animationGroup.stop(true);
+    this.onDeath();
+    if (this.deathVisualStyle === "shrink") {
+      const { minimum, maximum } = this.getAssetWorldBounds();
+      this.ashEffect = new EnemyAshEffect(
+        this.root.getScene(),
+        this.id,
+        minimum,
+        maximum,
+        false
+      );
+    }
+    window.dispatchEvent(
+      new CustomEvent("bosque:enemy-death", {
+        detail: { id: this.id, type: this.type },
+      })
+    );
+  }
+
+  private updateDeath(deltaTimeSeconds: number) {
+    this.deathElapsed += Math.max(0, deltaTimeSeconds);
+    if (this.deathVisualStyle === "ashenFade") {
+      const grayProgress = Math.min(1, this.deathElapsed / BOSS_GRAY_SECONDS);
+      const fadeProgress = Math.min(
+        1,
+        Math.max(0, this.deathElapsed - BOSS_GRAY_SECONDS) / BOSS_FADE_SECONDS
+      );
+      this.onDeathProgress(grayProgress, fadeProgress);
+      if (grayProgress >= 1 && !this.ashEffect) {
+        const { minimum, maximum } = this.getAssetWorldBounds();
+        this.ashEffect = new EnemyAshEffect(
+          this.root.getScene(),
+          this.id,
+          minimum,
+          maximum,
+          true
+        );
+      }
+      if (fadeProgress >= 1) this.root.setEnabled(false);
+      if (this.deathElapsed >= BOSS_ASH_CLOUD_SECONDS) this.dispose();
+      return;
+    }
+    const progress = Math.min(1, this.deathElapsed / MINOR_DEATH_DISSOLVE_SECONDS);
+    this.visualRoot.scaling.setAll(Math.max(0.001, 1 - progress));
+    if (progress >= 1) this.root.setEnabled(false);
+    if (this.deathElapsed >= MINOR_ASH_CLOUD_SECONDS) this.dispose();
+  }
+
+  private getAssetWorldBounds() {
+    const minimum = new Vector3(
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY
+    );
+    const maximum = new Vector3(
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY
+    );
+    let found = false;
+    for (const mesh of this.asset.meshes) {
+      if (mesh.getTotalVertices() <= 0) continue;
+      mesh.computeWorldMatrix(true);
+      const box = mesh.getBoundingInfo().boundingBox;
+      minimum.copyFrom(Vector3.Minimize(minimum, box.minimumWorld));
+      maximum.copyFrom(Vector3.Maximize(maximum, box.maximumWorld));
+      found = true;
+    }
+    if (!found) {
+      minimum.copyFrom(this.root.getAbsolutePosition());
+      maximum.copyFrom(minimum);
+      maximum.y += 1;
+    }
+    return { minimum, maximum };
+  }
 
   private finishHitReaction() {
     const reaction = this.hitReaction;

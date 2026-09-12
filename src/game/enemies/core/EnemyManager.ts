@@ -136,11 +136,14 @@ export class EnemyManager {
 
   public update(deltaTimeSeconds: number) {
     if (this.disposed) return;
-    for (const enemy of this.enemies.values()) {
+    for (const [id, enemy] of this.enemies) {
       if (enemy.lifecycleState === EnemyLifecycleState.Ready && enemy.enabled) {
         enemy.update(deltaTimeSeconds);
         enemy.updateCombatEffects(deltaTimeSeconds);
+      } else if (enemy.lifecycleState === EnemyLifecycleState.Dying) {
+        enemy.updateCombatEffects(deltaTimeSeconds);
       }
+      if (enemy.lifecycleState === EnemyLifecycleState.Disposed) this.enemies.delete(id);
     }
   }
 
@@ -166,7 +169,11 @@ export class EnemyManager {
 
   public setEnabled(id: EnemyId, enabled: boolean) {
     const enemy = this.enemies.get(id);
-    if (!enemy) return false;
+    if (
+      !enemy ||
+      enemy.lifecycleState === EnemyLifecycleState.Dying ||
+      enemy.lifecycleState === EnemyLifecycleState.Disposed
+    ) return false;
     enemy.setEnabled(enabled);
     return true;
   }

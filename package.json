@@ -12,7 +12,8 @@
     "vfx:generate-npe": "node scripts/generate-shadow-npe.mjs",
     "vfx:profile": "node scripts/profile-shadow-vfx.mjs",
     "vfx:verify": "node scripts/verify-shadow-vfx.mjs",
-    "stats:verify": "node --experimental-strip-types scripts/verify-player-stats.mts"
+    "stats:verify": "node --experimental-strip-types scripts/verify-player-stats.mts",
+    "enemies:verify": "esbuild scripts/verify-enemy-combat.mts --bundle --platform=node --format=esm --target=node22 --outfile=dist/verify-enemy-combat.mjs && node dist/verify-enemy-combat.mjs"
   },
   "devDependencies": {
     "sharp": "^0.34.3",

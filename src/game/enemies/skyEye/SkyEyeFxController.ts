@@ -15,6 +15,8 @@ import type {
 import type { SkyEyeConfig } from "./SkyEyeConfig";
 
 const TAU = Math.PI * 2;
+const TENDRIL_EMISSIVE = new Color3(0.008, 0.01, 0.018);
+const ASHEN_TENDRIL_EMISSIVE = new Color3(0.18, 0.18, 0.19);
 
 type TendrilVisual = {
   mesh: Mesh;
@@ -129,6 +131,27 @@ export class SkyEyeFxController {
     this.enabled = enabled;
     this.fxRoot.setEnabled(enabled);
     this.smokeDisc.setEnabled(enabled);
+  }
+
+  public beginDeath() {
+    // Existing smoke drifts away naturally while the eye and tendrils remain visible.
+    this.smokeDisc.setEmissionMultiplier(0);
+  }
+
+  public setDeathAppearance(grayProgress: number, fadeProgress: number) {
+    Color3.LerpToRef(
+      TENDRIL_EMISSIVE,
+      ASHEN_TENDRIL_EMISSIVE,
+      grayProgress,
+      this.tendrilMaterial.emissiveColor
+    );
+    if (fadeProgress > 0) {
+      if (this.tendrilMaterial.transparencyMode !== Material.MATERIAL_ALPHABLEND) {
+        this.tendrilMaterial.transparencyMode = Material.MATERIAL_ALPHABLEND;
+      }
+      this.tendrilMaterial.alpha = Math.max(0, 1 - fadeProgress);
+    }
+    if (fadeProgress >= 1) this.setEnabled(false);
   }
 
   public update(deltaTimeSeconds: number) {
@@ -246,7 +269,7 @@ export class SkyEyeFxController {
       scene
     );
     material.diffuseColor = new Color3(0.0015, 0.002, 0.0045);
-    material.emissiveColor = new Color3(0.008, 0.01, 0.018);
+    material.emissiveColor = TENDRIL_EMISSIVE.clone();
     material.specularColor.setAll(0);
     material.alpha = 1;
     material.disableLighting = true;

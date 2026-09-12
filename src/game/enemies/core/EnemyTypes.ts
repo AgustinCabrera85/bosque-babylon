@@ -14,6 +14,7 @@ export enum EnemyLifecycleState {
   Initializing = "initializing",
   Ready = "ready",
   Disabled = "disabled",
+  Dying = "dying",
   Disposed = "disposed",
 }
 
@@ -53,6 +54,8 @@ export interface EnemyController {
   readonly root: TransformNode;
   readonly enabled: boolean;
   readonly lifecycleState: EnemyLifecycleState;
+  readonly health: number;
+  readonly maxHealth: number;
 
   initialize(): Promise<void>;
   update(deltaTimeSeconds: number): void;

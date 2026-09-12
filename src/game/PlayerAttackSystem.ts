@@ -641,8 +641,8 @@ export class PlayerAttackSystem {
       if (enemyHit && (!worldHit || enemyHit.fraction <= worldHit.fraction)) {
         const direction = projectile.velocity.normalizeToNew();
         enemyHit.enemy.receiveAttack({
-          damage:
-            PROJECTILE_DAMAGE * this.options.stats.getOutgoingDamageMultiplier(),
+          // Durability is measured in whole light orbs, independent of sanity.
+          damage: PROJECTILE_DAMAGE,
           point: enemyHit.point,
           direction,
         });

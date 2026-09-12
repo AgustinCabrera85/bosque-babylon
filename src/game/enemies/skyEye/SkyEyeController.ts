@@ -1,8 +1,11 @@
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import { Material } from "@babylonjs/core/Materials/material";
+import { ColorCurves } from "@babylonjs/core/Materials/colorCurves";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Scene } from "@babylonjs/core/scene";
 import type { BlackSmokeWrapSystem } from "../../BlackSmokeWrapSystem";
 import { BaseEnemyController } from "../core/EnemyController";
@@ -17,6 +20,15 @@ import {
 import { SkyEyeFxController } from "./SkyEyeFxController";
 
 const SKY_EYE_EMISSIVE_INTENSITY = 3;
+const MAX_HEALTH = 18; // Eighteen light orbs at base projectile damage.
+
+type DeathMaterialState = {
+  material: PBRMaterial | StandardMaterial;
+  curves: ColorCurves;
+  saturation: number;
+  alpha: number;
+  emissiveIntensity: number;
+};
 
 function hasSourceName(instanceName: string, sourceName: string) {
   return instanceName === sourceName || instanceName.endsWith(`:${sourceName}`);
@@ -33,6 +45,7 @@ export class SkyEyeController extends BaseEnemyController {
   private readonly smokeSystem: BlackSmokeWrapSystem;
   private readonly blinkAnimations: AnimationGroup[] = [];
   private readonly importedMeshes: AbstractMesh[] = [];
+  private readonly deathMaterials: DeathMaterialState[] = [];
   private fxController: SkyEyeFxController | null = null;
   private idleAnimation: AnimationGroup | null = null;
   private blinkTimer = 0;
@@ -45,7 +58,7 @@ export class SkyEyeController extends BaseEnemyController {
     getTargetPosition: () => Vector3,
     smokeSystem: BlackSmokeWrapSystem
   ) {
-    super(context, options);
+    super(context, options, MAX_HEALTH);
     if (options.type !== SKY_EYE_TYPE) {
       throw new Error(`SkyEye ${this.id}: invalid enemy type ${options.type}`);
     }
@@ -142,9 +155,9 @@ export class SkyEyeController extends BaseEnemyController {
   public override setEnabled(enabled: boolean) {
     const wasEnabled = this.enabled;
     super.setEnabled(enabled);
-    this.fxController?.setEnabled(enabled);
-    if (wasEnabled === enabled || !this.idleAnimation) return;
-    if (enabled) {
+    this.fxController?.setEnabled(this.enabled);
+    if (wasEnabled === this.enabled || !this.idleAnimation) return;
+    if (this.enabled) {
       this.resumeAnimations();
       return;
     }
@@ -164,9 +177,50 @@ export class SkyEyeController extends BaseEnemyController {
   protected override onDispose() {
     this.fxController?.dispose();
     this.fxController = null;
+    this.deathMaterials.length = 0;
     this.idleAnimation = null;
     this.blinkAnimations.length = 0;
     this.importedMeshes.length = 0;
+  }
+
+  protected override get deathVisualStyle(): "ashenFade" {
+    return "ashenFade";
+  }
+
+  protected override onDeath() {
+    this.fxController?.beginDeath();
+    for (const material of this.asset.materials) {
+      if (!(material instanceof PBRMaterial || material instanceof StandardMaterial)) continue;
+      const processing = material.imageProcessingConfiguration.clone();
+      const curves = processing.colorCurves?.clone() ?? new ColorCurves();
+      processing.colorCurves = curves;
+      processing.colorCurvesEnabled = true;
+      material.imageProcessingConfiguration = processing;
+      this.deathMaterials.push({
+        material,
+        curves,
+        saturation: curves.globalSaturation,
+        alpha: material.alpha,
+        emissiveIntensity: material instanceof PBRMaterial ? material.emissiveIntensity : 0,
+      });
+    }
+  }
+
+  protected override onDeathProgress(grayProgress: number, fadeProgress: number) {
+    const gray = grayProgress * grayProgress * (3 - 2 * grayProgress);
+    for (const state of this.deathMaterials) {
+      state.curves.globalSaturation = state.saturation + (-100 - state.saturation) * gray;
+      if (state.material instanceof PBRMaterial) {
+        state.material.emissiveIntensity = state.emissiveIntensity * (1 - gray * 0.6);
+      }
+      if (fadeProgress > 0) {
+        if (state.material.transparencyMode !== Material.MATERIAL_ALPHABLEND) {
+          state.material.transparencyMode = Material.MATERIAL_ALPHABLEND;
+        }
+        state.material.alpha = state.alpha * (1 - fadeProgress);
+      }
+    }
+    this.fxController?.setDeathAppearance(gray, fadeProgress);
   }
 
   private turnToward(target: Vector3, deltaTime: number, snap = false) {

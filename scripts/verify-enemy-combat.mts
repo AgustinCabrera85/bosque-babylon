@@ -178,6 +178,8 @@ async function verify() {
     "minorEnemyHealthFill",
     "bossEnemyHealthHud",
     "bossEnemyHealthArt",
+    "bossEnemyHealthArtPortrait",
+    "bossEnemyHealthArtLandscape",
   ];
   function fakeElement() {
     const events = new EventTarget();
@@ -203,20 +205,36 @@ async function verify() {
     };
   }
   const elements = new Map(elementIds.map((id) => [id, fakeElement()]));
-  const svgElements = new Map([
-    ["#boss-hud", fakeElement()],
-    ["#boss-health-fill", fakeElement()],
-    ["#boss-damage-flash", fakeElement()],
-  ]);
-  let flashCount = 0;
-  const bossArt = elements.get("bossEnemyHealthArt")! as ReturnType<typeof fakeElement> & {
-    contentDocument?: { querySelector: (selector: string) => unknown };
-  };
-  bossArt.contentDocument = {
-    querySelector: (selector: string) => selector === "#boss-damage-flash-animation"
-      ? { beginElement: () => flashCount++ }
-      : svgElements.get(selector) ?? null,
-  };
+  const svgConfigs = [
+    { id: "bossEnemyHealthArt", x: 145, width: 990 },
+    { id: "bossEnemyHealthArtPortrait", x: 43, width: 394 },
+    { id: "bossEnemyHealthArtLandscape", x: 54, width: 652 },
+  ];
+  const artworks = svgConfigs.map(({ id, x, width }) => {
+    const art = elements.get(id)! as ReturnType<typeof fakeElement> & {
+      contentDocument?: { querySelector: (selector: string) => unknown };
+    };
+    const root = fakeElement();
+    const fill = fakeElement();
+    const flash = fakeElement();
+    const fullBar = fakeElement();
+    fill.setAttribute("x", String(x));
+    fullBar.setAttribute("width", String(width));
+    let flashCount = 0;
+    const svgElements = new Map([
+      ["#boss-hud", root],
+      ["#boss-health-fill", fill],
+      ["#boss-health-red", fullBar],
+      ["#boss-damage-flash", flash],
+    ]);
+    const document = {
+      querySelector: (selector: string) => selector === "#boss-damage-flash-animation"
+        ? { beginElement: () => flashCount++ }
+        : svgElements.get(selector) ?? null,
+    };
+    art.contentDocument = document;
+    return { art, root, fill, flash, document, x, width, get flashCount() { return flashCount; } };
+  });
   Object.assign(globalThis, {
     document: { getElementById: (id: string) => elements.get(id) ?? null },
   });
@@ -224,11 +242,10 @@ async function verify() {
   const minorHud = elements.get("minorEnemyHealthHud")!;
   const minorFill = elements.get("minorEnemyHealthFill")!;
   const bossHud = elements.get("bossEnemyHealthHud")!;
-  const bossFill = svgElements.get("#boss-health-fill")!;
-  const bossFlash = svgElements.get("#boss-damage-flash")!;
-  const bossSvgRoot = svgElements.get("#boss-hud")!;
   assert.equal(minorHud.classList.contains("visible"), false);
-  assert.equal(bossFill.getAttribute("width"), "990", "the authored SVG preview must load at full health");
+  for (const artwork of artworks) {
+    assert.equal(artwork.fill.getAttribute("width"), String(artwork.width), "each SVG preview must load at full health");
+  }
   window.dispatchEvent(new CustomEvent("bosque:enemy-hit", {
     detail: { id: "minor", health: 0.5, maxHealth: 1.5 },
   }));
@@ -239,42 +256,44 @@ async function verify() {
   hud.update(0, true, 18, 18);
   assert.equal(bossHud.classList.contains("visible"), true);
   hud.update(0, true, 17, 18);
-  assert.equal(bossFill.getAttribute("width"), String(990 * 17 / 18));
-  assert.equal(bossFlash.getAttribute("x"), String(145 + 990 * 17 / 18));
-  assert.equal(bossFlash.getAttribute("width"), "55");
-  assert.equal(flashCount, 1);
+  for (const artwork of artworks) {
+    assert.equal(artwork.fill.getAttribute("width"), String(Math.round(artwork.width * 17 / 18 * 100) / 100));
+    assert.equal(artwork.flash.getAttribute("x"), String(Math.round((artwork.x + artwork.width * 17 / 18) * 100) / 100));
+    assert.equal(artwork.flash.getAttribute("width"), String(Math.round(artwork.width / 18 * 100) / 100));
+    assert.equal(artwork.flashCount, 1);
+  }
   window.dispatchEvent(new CustomEvent("bosque:enemy-hit", {
     detail: { id: "boss", health: 16, maxHealth: 18 },
   }));
-  assert.equal(bossFill.getAttribute("width"), "880");
-  assert.equal(flashCount, 2, "each hit restarts the damage flash");
-  assert.equal(bossSvgRoot.classList.contains("taking-damage"), true);
+  for (const artwork of artworks) {
+    assert.equal(artwork.fill.getAttribute("width"), String(Math.round(artwork.width * 16 / 18 * 100) / 100));
+    assert.equal(artwork.flashCount, 2, "each hit restarts the damage flash in every layout");
+    assert.equal(artwork.root.classList.contains("taking-damage"), true);
+  }
   window.dispatchEvent(new CustomEvent("bosque:enemy-hit", {
     detail: { id: "boss", health: 0, maxHealth: 18 },
   }));
   hud.update(0, false, 0, 18);
   assert.equal(bossHud.classList.contains("visible"), true, "the final hit stays visible briefly");
-  assert.equal(bossSvgRoot.classList.contains("defeated"), true);
+  for (const artwork of artworks) assert.equal(artwork.root.classList.contains("defeated"), true);
   assert.equal(bossHud.getAttribute("aria-valuenow"), "0");
   hud.update(1.2, false, 0, 18);
   assert.equal(bossHud.classList.contains("visible"), false);
   hud.dispose();
 
-  bossArt.contentDocument = undefined;
+  for (const artwork of artworks) artwork.art.contentDocument = undefined;
   const lateHud = new EnemyHealthHud("boss");
   lateHud.update(0, true, 18, 18);
   window.dispatchEvent(new CustomEvent("bosque:enemy-hit", {
     detail: { id: "boss", health: 17, maxHealth: 18 },
   }));
-  const flashesBeforeLoad = flashCount;
-  bossArt.contentDocument = {
-    querySelector: (selector: string) => selector === "#boss-damage-flash-animation"
-      ? { beginElement: () => flashCount++ }
-      : svgElements.get(selector) ?? null,
-  };
-  bossArt.dispatchEvent(new Event("load"));
-  assert.equal(bossFill.getAttribute("width"), "935", "late SVG load must catch up with current health");
-  assert.equal(flashCount, flashesBeforeLoad + 1, "damage before SVG load must still flash");
+  for (const artwork of artworks) {
+    const flashesBeforeLoad = artwork.flashCount;
+    artwork.art.contentDocument = artwork.document;
+    artwork.art.dispatchEvent(new Event("load"));
+    assert.equal(artwork.fill.getAttribute("width"), String(Math.round(artwork.width * 17 / 18 * 100) / 100), "late SVG load must catch up with current health");
+    assert.equal(artwork.flashCount, flashesBeforeLoad + 1, "damage before SVG load must still flash");
+  }
   lateHud.dispose();
 
   console.log("Enemy combat: 2/18 hits, gray-to-ash boss death and SVG HUD OK");

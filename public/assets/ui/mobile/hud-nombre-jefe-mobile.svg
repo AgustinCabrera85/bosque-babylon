@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="480" height="48" viewBox="0 0 480 48"
+     preserveAspectRatio="xMidYMid meet"
+     role="img" aria-labelledby="title description"
+     shape-rendering="geometricPrecision">
+  <title id="title">Nombre de Testigo Acusador para mobile</title>
+  <desc id="description">Placa compacta independiente con nombre editable.</desc>
+
+  <defs>
+    <linearGradient id="copper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#090403"/>
+      <stop offset=".24" stop-color="#351a13"/>
+      <stop offset=".47" stop-color="#82502f"/>
+      <stop offset=".57" stop-color="#b87342"/>
+      <stop offset=".70" stop-color="#4f281d"/>
+      <stop offset="1" stop-color="#080302"/>
+    </linearGradient>
+    <linearGradient id="forged" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#57301f"/>
+      <stop offset=".30" stop-color="#28140f"/>
+      <stop offset=".64" stop-color="#100706"/>
+      <stop offset="1" stop-color="#3c1e15"/>
+    </linearGradient>
+    <linearGradient id="name-silver" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f0e9d6"/>
+      <stop offset=".40" stop-color="#b9ae99"/>
+      <stop offset=".72" stop-color="#696158"/>
+      <stop offset="1" stop-color="#cbc1ae"/>
+    </linearGradient>
+    <filter id="shadow" x="-15%" y="-80%" width="130%" height="260%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/>
+      <feOffset dy="3.5" result="offset"/>
+      <feColorMatrix in="offset" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .88 0"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      #boss-name-hud {
+        transform-origin: center;
+        transition: opacity .24s ease, transform .24s ease;
+      }
+      #boss-name-hud.hidden { opacity: 0; transform: translateY(-5px); pointer-events: none; }
+      #boss-name-hud.intro { animation: name-intro .7s ease-out both; }
+      @keyframes name-intro {
+        from { opacity: 0; transform: translateY(-7px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boss-name-hud { transition: none; }
+        #boss-name-hud.intro { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <g id="boss-name-hud" filter="url(#shadow)">
+    <path d="M44 7 H436 L450 19 L439 39 H287 L272 46 H208 L193 39 H41 L30 19Z"
+          fill="#030202" stroke="#090302" stroke-width="6"/>
+    <path d="M51 10 H429 L441 20 L432 34 H282 L268 41 H212 L198 34 H48 L39 20Z"
+          fill="url(#forged)" stroke="#714028" stroke-width="2.5"/>
+    <path d="M64 14 H416 L423 20 L416 29 H277 L264 36 H216 L203 29 H64 L57 20Z"
+          fill="#0a0706" stroke="#1c0d0a" stroke-width="2"/>
+    <path d="M30 20 H12 M450 20 H468" stroke="url(#copper)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M55 12 H425" stroke="#c47a46" stroke-width="1.5" opacity=".38"/>
+
+    <text id="boss-name" x="240" y="29" text-anchor="middle"
+          fill="url(#name-silver)" stroke="#070202" stroke-width="2" paint-order="stroke fill"
+          font-family="Georgia, 'Times New Roman', serif" font-size="18" font-weight="700"
+          letter-spacing="4">TESTIGO ACUSADOR</text>
+  </g>
+</svg>

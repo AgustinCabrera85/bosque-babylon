@@ -6,8 +6,6 @@ type EnemyHitDetail = {
 
 const MINOR_BAR_SECONDS = 2.4;
 const BOSS_DEFEAT_SECONDS = 1.1;
-const BOSS_BAR_X = 145;
-const BOSS_BAR_WIDTH = 990;
 const barCoordinate = (value: number) => String(Math.round(value * 100) / 100);
 
 type BossArtwork = {
@@ -15,6 +13,9 @@ type BossArtwork = {
   fill: SVGRectElement;
   flash: SVGRectElement;
   flashAnimation: SVGAnimationElement | null;
+  barX: number;
+  barWidth: number;
+  lastFlashSequence: number;
 };
 
 /** Screen-space enemy health: never projects a target's world position. */
@@ -23,20 +24,30 @@ export class EnemyHealthHud {
   private readonly minorTrack = EnemyHealthHud.requireElement("minorEnemyHealthTrack");
   private readonly minorFill = EnemyHealthHud.requireElement("minorEnemyHealthFill");
   private readonly bossRoot = EnemyHealthHud.requireElement("bossEnemyHealthHud");
-  private readonly bossArt = EnemyHealthHud.requireElement("bossEnemyHealthArt") as HTMLObjectElement;
+  private readonly bossArts = [
+    "bossEnemyHealthArt",
+    "bossEnemyHealthArtPortrait",
+    "bossEnemyHealthArtLandscape",
+  ].map((id) => EnemyHealthHud.requireElement(id) as HTMLObjectElement);
   private minorId: string | null = null;
   private minorTimeRemaining = 0;
   private bossVisible = false;
   private bossFraction = 1;
-  private bossArtwork: BossArtwork | null = null;
+  private readonly bossArtworks = new Map<HTMLObjectElement, BossArtwork>();
+  private readonly bossArtworkLoadListeners = new Map<HTMLObjectElement, () => void>();
   private pendingBossFlash: { previous: number; current: number } | null = null;
+  private bossFlashSequence = 0;
   private bossDefeatRemaining = 0;
 
   public constructor(private readonly bossId: string) {
     this.setVisible(this.minorRoot, false);
     this.setVisible(this.bossRoot, false);
-    this.bossArt.addEventListener("load", this.bindBossArtwork);
-    this.bindBossArtwork();
+    for (const art of this.bossArts) {
+      const onLoad = () => this.bindBossArtwork(art);
+      this.bossArtworkLoadListeners.set(art, onLoad);
+      art.addEventListener("load", onLoad);
+      this.bindBossArtwork(art);
+    }
     window.addEventListener("bosque:enemy-hit", this.onEnemyHit);
     window.addEventListener("bosque:enemy-death", this.onEnemyDeath);
   }
@@ -59,13 +70,15 @@ export class EnemyHealthHud {
   }
 
   public dispose() {
-    this.bossArt.removeEventListener("load", this.bindBossArtwork);
+    for (const [art, onLoad] of this.bossArtworkLoadListeners) art.removeEventListener("load", onLoad);
+    this.bossArtworkLoadListeners.clear();
     window.removeEventListener("bosque:enemy-hit", this.onEnemyHit);
     window.removeEventListener("bosque:enemy-death", this.onEnemyDeath);
     this.hideMinor();
     this.setVisible(this.bossRoot, false);
     this.bossVisible = false;
-    this.bossArtwork = null;
+    this.bossArtworks.clear();
+    this.pendingBossFlash = null;
   }
 
   private readonly onEnemyHit = (event: Event) => {
@@ -102,23 +115,29 @@ export class EnemyHealthHud {
     if (death?.id === this.minorId) this.hideMinor();
   };
 
-  private readonly bindBossArtwork = () => {
-    const svg = this.bossArt.contentDocument;
+  private bindBossArtwork(art: HTMLObjectElement) {
+    const svg = art.contentDocument;
     const fill = svg?.querySelector<SVGRectElement>("#boss-health-fill");
     const flash = svg?.querySelector<SVGRectElement>("#boss-damage-flash");
-    if (!fill || !flash) return;
-    if (this.bossArtwork?.fill === fill) return;
-    this.bossArtwork = {
+    const fullBar = svg?.querySelector<SVGRectElement>("#boss-health-red");
+    const barX = Number(fill?.getAttribute("x"));
+    const barWidth = Number(fullBar?.getAttribute("width"));
+    if (!fill || !flash || !fullBar || !Number.isFinite(barX) || !Number.isFinite(barWidth) || barWidth <= 0) return;
+    if (this.bossArtworks.get(art)?.fill === fill) return;
+    this.bossArtworks.set(art, {
       root: svg?.querySelector<SVGGElement>("#boss-hud") ?? null,
       fill,
       flash,
       flashAnimation: svg?.querySelector<SVGAnimationElement>("#boss-damage-flash-animation") ?? null,
-    };
+      barX,
+      barWidth,
+      lastFlashSequence: 0,
+    });
     fill.style.transition = "width 420ms ease-out";
     this.renderBossFraction();
     flash.setAttribute("width", "0");
     this.playPendingBossFlash();
-  };
+  }
 
   private setBossFraction(value: number) {
     const fraction = Math.max(0, Math.min(1, value));
@@ -128,29 +147,36 @@ export class EnemyHealthHud {
     this.renderBossFraction();
     if (fraction < previous) {
       this.pendingBossFlash = { previous, current: fraction };
+      this.bossFlashSequence += 1;
       this.playPendingBossFlash();
+    } else {
+      this.pendingBossFlash = null;
     }
   }
 
   private renderBossFraction() {
     this.bossRoot.setAttribute("aria-valuenow", String(Math.round(this.bossFraction * 100)));
-    this.bossArtwork?.fill.setAttribute("width", barCoordinate(BOSS_BAR_WIDTH * this.bossFraction));
-    this.bossArtwork?.root?.classList.toggle("critical", this.bossFraction > 0 && this.bossFraction <= 0.25);
-    this.bossArtwork?.root?.classList.toggle("defeated", this.bossFraction === 0);
+    for (const artwork of this.bossArtworks.values()) {
+      artwork.fill.setAttribute("width", barCoordinate(artwork.barWidth * this.bossFraction));
+      artwork.root?.classList.toggle("critical", this.bossFraction > 0 && this.bossFraction <= 0.25);
+      artwork.root?.classList.toggle("defeated", this.bossFraction === 0);
+    }
   }
 
   private playPendingBossFlash() {
-    const artwork = this.bossArtwork;
     const damage = this.pendingBossFlash;
-    if (!artwork || !damage) return;
-    artwork.flash.setAttribute("x", barCoordinate(BOSS_BAR_X + BOSS_BAR_WIDTH * damage.current));
-    artwork.flash.setAttribute("width", barCoordinate(BOSS_BAR_WIDTH * (damage.previous - damage.current)));
-    artwork.root?.classList.remove("taking-damage");
-    // Restart the SVG's CSS animation even when several hits arrive quickly.
-    artwork.root?.getBoundingClientRect();
-    artwork.root?.classList.add("taking-damage");
-    artwork.flashAnimation?.beginElement();
-    this.pendingBossFlash = null;
+    if (!damage) return;
+    for (const artwork of this.bossArtworks.values()) {
+      if (artwork.lastFlashSequence === this.bossFlashSequence) continue;
+      artwork.flash.setAttribute("x", barCoordinate(artwork.barX + artwork.barWidth * damage.current));
+      artwork.flash.setAttribute("width", barCoordinate(artwork.barWidth * (damage.previous - damage.current)));
+      artwork.root?.classList.remove("taking-damage");
+      // Restart the SVG's CSS animation even when several hits arrive quickly.
+      artwork.root?.getBoundingClientRect();
+      artwork.root?.classList.add("taking-damage");
+      artwork.flashAnimation?.beginElement();
+      artwork.lastFlashSequence = this.bossFlashSequence;
+    }
   }
 
   private hideMinor() {

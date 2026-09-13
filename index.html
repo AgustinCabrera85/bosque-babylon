@@ -74,14 +74,17 @@
       <div id="reticle" aria-hidden="true"></div>
 
       <div id="minorEnemyHealthHud" class="enemy-health-hud minor-enemy-health-hud" aria-hidden="true">
-        <span class="enemy-health-label">ENEMIGO HERIDO</span>
-        <div id="minorEnemyHealthTrack" class="enemy-health-track" role="progressbar" aria-label="Vida del enemigo herido" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+        <span class="enemy-health-label">ATRAPASOMBRAS</span>
+        <div id="minorEnemyHealthTrack" class="enemy-health-track" role="progressbar" aria-label="Vida de Atrapasombras" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
           <div id="minorEnemyHealthFill" class="enemy-health-fill"></div>
         </div>
       </div>
 
-      <div id="bossEnemyHealthHud" class="enemy-health-hud boss-enemy-health-hud" role="progressbar" aria-label="Vida del jefe" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-hidden="true">
-        <object id="bossEnemyHealthArt" class="boss-enemy-health-art" data="/assets/ui/hud-vida-jefe-final.svg" type="image/svg+xml" aria-hidden="true" tabindex="-1"></object>
+      <div id="bossEnemyHealthHud" class="enemy-health-hud boss-enemy-health-hud" role="progressbar" aria-label="Vida de Testigo Acusador" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-hidden="true">
+        <object id="bossEnemyHealthArt" class="boss-enemy-health-art boss-enemy-health-art-desktop" data="/assets/ui/hud-vida-jefe-final.svg" type="image/svg+xml" aria-hidden="true" tabindex="-1"></object>
+        <object class="boss-enemy-health-art boss-enemy-name-art-mobile" data="/assets/ui/mobile/hud-nombre-jefe-mobile.svg" type="image/svg+xml" aria-hidden="true" tabindex="-1"></object>
+        <object id="bossEnemyHealthArtPortrait" class="boss-enemy-health-art boss-enemy-health-art-mobile boss-enemy-health-art-mobile-portrait" data="/assets/ui/mobile/hud-jefe-mobile-portrait.svg" type="image/svg+xml" aria-hidden="true" tabindex="-1"></object>
+        <object id="bossEnemyHealthArtLandscape" class="boss-enemy-health-art boss-enemy-health-art-mobile boss-enemy-health-art-mobile-landscape" data="/assets/ui/mobile/hud-jefe-mobile-landscape.svg" type="image/svg+xml" aria-hidden="true" tabindex="-1"></object>
       </div>
 
       <div id="playerStatusHud" role="status" aria-live="polite" aria-atomic="true">

@@ -4,7 +4,7 @@
      preserveAspectRatio="xMidYMid meet"
      role="img" aria-labelledby="title description"
      shape-rendering="geometricPrecision">
-  <title id="title">HUD de vida del jefe final</title>
+  <title id="title">HUD de vida de Testigo Acusador</title>
   <desc id="description">Barra de vida roja con daño perdido negro y destello amarillo temporal sobre el tramo recién descontado.</desc>
 
   <metadata>
@@ -152,7 +152,7 @@
     </style>
   </defs>
 
-  <g id="boss-hud" aria-label="Vida del jefe">
+  <g id="boss-hud" aria-label="Vida de Testigo Acusador">
     <g id="boss-frame" filter="url(#frame-shadow)">
       <!-- Silueta principal de metal ennegrecido -->
       <path d="M78 120 L111 91 L210 87 L258 96 L545 96 L590 83 L614 64 L640 44 L666 64 L690 83 L735 96 L1022 96 L1070 87 L1169 91 L1202 120 L1184 143 L1207 164 L1170 196 L1068 191 L1018 181 L262 181 L212 191 L110 196 L73 164 L96 143Z"
@@ -232,7 +232,7 @@
     <text id="boss-name" x="640" y="35" text-anchor="middle"
           fill="url(#name-silver)" stroke="#080303" stroke-width="3" paint-order="stroke fill"
           font-family="Georgia, 'Times New Roman', serif" font-size="25" font-weight="700"
-          letter-spacing="5.5">JEFE DEL NIVEL</text>
+          letter-spacing="5.5">TESTIGO ACUSADOR</text>
 
     <!-- Interior negro: queda visible donde la vida ya fue perdida -->
     <g id="boss-health-track" clip-path="url(#boss-health-window)">

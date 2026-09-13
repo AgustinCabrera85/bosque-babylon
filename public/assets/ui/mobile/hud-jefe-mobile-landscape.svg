@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="760" height="70" viewBox="0 0 760 70"
+     preserveAspectRatio="xMidYMid meet"
+     role="img" aria-labelledby="title description"
+     shape-rendering="geometricPrecision">
+  <title id="title">Vida de Testigo Acusador para mobile landscape</title>
+  <desc id="description">Barra horizontal compacta sin nombre, con vida roja, daño negro y destello amarillo.</desc>
+
+  <metadata>
+    Barra útil: x=54, y=22, width=652, height=26.
+    Actualizar boss-health-fill entre 0 y 652.
+    Configurar x/width de boss-damage-flash y ejecutar boss-damage-flash-animation.beginElement().
+  </metadata>
+
+  <defs>
+    <linearGradient id="copper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#090403"/>
+      <stop offset=".22" stop-color="#351a13"/>
+      <stop offset=".45" stop-color="#82502f"/>
+      <stop offset=".55" stop-color="#b87342"/>
+      <stop offset=".68" stop-color="#4f281d"/>
+      <stop offset="1" stop-color="#080302"/>
+    </linearGradient>
+    <linearGradient id="forged" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#633a25"/>
+      <stop offset=".25" stop-color="#3c2017"/>
+      <stop offset=".48" stop-color="#160a08"/>
+      <stop offset=".76" stop-color="#0b0504"/>
+      <stop offset="1" stop-color="#48241a"/>
+    </linearGradient>
+    <linearGradient id="health-red" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f14b3e"/>
+      <stop offset=".18" stop-color="#c91d18"/>
+      <stop offset=".56" stop-color="#870607"/>
+      <stop offset=".86" stop-color="#410204"/>
+      <stop offset="1" stop-color="#160102"/>
+    </linearGradient>
+    <linearGradient id="health-gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd1ad" stop-opacity=".54"/>
+      <stop offset=".29" stop-color="#ff765e" stop-opacity=".12"/>
+      <stop offset=".58" stop-color="#360003" stop-opacity=".03"/>
+      <stop offset="1" stop-color="#100001" stop-opacity=".70"/>
+    </linearGradient>
+    <linearGradient id="damage-black" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#130c0a"/>
+      <stop offset=".44" stop-color="#050505"/>
+      <stop offset="1" stop-color="#000"/>
+    </linearGradient>
+    <linearGradient id="hit-yellow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff9209"/>
+      <stop offset=".34" stop-color="#fff2a0"/>
+      <stop offset=".64" stop-color="#ffdc43"/>
+      <stop offset="1" stop-color="#ff7e07"/>
+    </linearGradient>
+    <radialGradient id="marker-gem" cx="36%" cy="30%" r="72%">
+      <stop offset="0" stop-color="#fff1be"/>
+      <stop offset=".18" stop-color="#ff654e"/>
+      <stop offset=".50" stop-color="#ad0b11"/>
+      <stop offset=".82" stop-color="#410207"/>
+      <stop offset="1" stop-color="#120002"/>
+    </radialGradient>
+
+    <clipPath id="boss-health-window">
+      <rect x="54" y="22" width="652" height="26" rx="9"/>
+    </clipPath>
+    <clipPath id="boss-current-health-window">
+      <rect id="boss-health-fill" x="54" y="22" width="456" height="26" rx="9"/>
+    </clipPath>
+
+    <filter id="frame-shadow" x="-10%" y="-100%" width="120%" height="300%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3.2" result="blur"/>
+      <feOffset dy="4" result="offset"/>
+      <feColorMatrix in="offset" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .90 0"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="red-glow" x="-18%" y="-130%" width="136%" height="360%">
+      <feGaussianBlur stdDeviation="3.2" result="blur"/>
+      <feFlood flood-color="#d40b14" flood-opacity=".48" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="hit-glow" x="-55%" y="-170%" width="210%" height="440%">
+      <feGaussianBlur stdDeviation="3.8" result="blur"/>
+      <feFlood flood-color="#ffe64d" flood-opacity=".92" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="metal-texture" x="-4%" y="-55%" width="108%" height="210%">
+      <feTurbulence type="fractalNoise" baseFrequency=".03 .16" numOctaves="3" seed="53" result="noise"/>
+      <feColorMatrix in="noise" values=".18 0 0 0 .02 0 .10 0 0 .01 0 0 .06 0 0 0 0 0 .20 0" result="tint"/>
+      <feComposite in="tint" in2="SourceAlpha" operator="in" result="texture"/>
+      <feBlend in="SourceGraphic" in2="texture" mode="soft-light"/>
+    </filter>
+
+    <style>
+      #boss-hud, #boss-frame, #boss-health-current, #boss-damage-flash {
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      #boss-hud.taking-damage #boss-damage-flash { animation: damage-flash .64s ease-out both; }
+      #boss-hud.taking-damage #boss-frame { animation: hit-shake .20s ease-out; }
+      #boss-hud.critical #boss-health-current { animation: critical-pulse 1.05s ease-in-out infinite; }
+      #boss-hud.defeated #boss-frame { opacity: .42; filter: saturate(.15); }
+      #boss-hud.defeated #boss-health-current { opacity: 0; }
+      @keyframes damage-flash {
+        0% { opacity: 1; }
+        25% { opacity: 1; }
+        62% { opacity: .58; }
+        100% { opacity: 0; }
+      }
+      @keyframes hit-shake {
+        0%, 100% { transform: translateX(0); }
+        30% { transform: translateX(-2.5px); }
+        64% { transform: translateX(2px); }
+      }
+      @keyframes critical-pulse {
+        0%, 100% { filter: url(#red-glow); opacity: .78; }
+        50% { filter: url(#red-glow); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boss-hud.taking-damage #boss-frame,
+        #boss-hud.critical #boss-health-current { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <g id="boss-hud" aria-label="Vida de Testigo Acusador">
+    <g id="boss-frame" filter="url(#frame-shadow)">
+      <path d="M35 17 L60 9 L158 13 L198 17 H562 L602 13 L700 9 L725 17 L716 34 L728 49 L702 61 L601 56 L562 52 H198 L159 56 L58 61 L32 49 L44 34Z"
+            fill="#030202" stroke="#010101" stroke-width="6"/>
+      <path d="M44 19 L64 14 L157 18 L197 22 H563 L603 18 L696 14 L716 19 L707 34 L718 47 L697 55 L602 51 L563 47 H197 L158 51 L63 55 L42 47 L53 34Z"
+            fill="url(#forged)" stroke="#170906" stroke-width="3" filter="url(#metal-texture)"/>
+      <path d="M52 22 L72 18 H688 L708 22 L700 34 L709 48 L687 52 H73 L51 48 L60 34Z"
+            fill="#060404" stroke="#6f3e27" stroke-width="2"/>
+
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M39 18 C82 3 122 10 160 15 C214 23 257 14 315 20"
+              stroke="#0a0403" stroke-width="10"/>
+        <path d="M39 18 C82 3 122 10 160 15 C214 23 257 14 315 20"
+              stroke="url(#copper)" stroke-width="5"/>
+        <path d="M721 18 C678 3 638 10 600 15 C546 23 503 14 445 20"
+              stroke="#0a0403" stroke-width="10"/>
+        <path d="M721 18 C678 3 638 10 600 15 C546 23 503 14 445 20"
+              stroke="url(#copper)" stroke-width="5"/>
+        <path d="M42 52 C83 68 122 58 160 53 M718 52 C677 68 638 58 600 53"
+              stroke="#0a0403" stroke-width="8"/>
+        <path d="M42 52 C83 68 122 58 160 53 M718 52 C677 68 638 58 600 53"
+              stroke="url(#copper)" stroke-width="4"/>
+      </g>
+
+      <g fill="url(#copper)" stroke="#120604" stroke-width="3" stroke-linejoin="round">
+        <path d="M51 19 L20 25 L35 35 L17 47 L51 52 L67 34Z"/>
+        <path d="M709 19 L740 25 L725 35 L743 47 L709 52 L693 34Z"/>
+        <path d="M111 14 L126 8 L138 18 L122 24Z"/>
+        <path d="M649 14 L634 8 L622 18 L638 24Z"/>
+      </g>
+    </g>
+
+    <g id="boss-health-track" clip-path="url(#boss-health-window)">
+      <rect id="boss-damage-fill" x="54" y="22" width="652" height="26" fill="url(#damage-black)"/>
+      <path d="M61 27 H699" stroke="#32201a" stroke-width="1.5" opacity=".46"/>
+      <path d="M61 45 H699" stroke="#000" stroke-width="4" opacity=".92"/>
+    </g>
+
+    <g id="boss-health-current" clip-path="url(#boss-current-health-window)" filter="url(#red-glow)">
+      <rect id="boss-health-red" x="54" y="22" width="652" height="26" fill="url(#health-red)"/>
+      <rect id="boss-health-highlight" x="54" y="22" width="652" height="26" fill="url(#health-gloss)"/>
+      <path d="M61 27 H699" stroke="#ff967d" stroke-width="1.5" opacity=".34"/>
+    </g>
+
+    <rect id="boss-damage-flash" x="510" y="22" width="78" height="26" rx="2"
+          fill="url(#hit-yellow)" opacity="0" clip-path="url(#boss-health-window)"
+          filter="url(#hit-glow)">
+      <animate id="boss-damage-flash-animation"
+               attributeName="opacity"
+               values="0;1;1;.58;0"
+               keyTimes="0;.08;.30;.66;1"
+               dur=".64s"
+               begin="indefinite"
+               fill="remove"/>
+    </rect>
+
+    <rect x="51" y="19" width="658" height="32" rx="12"
+          fill="none" stroke="#010101" stroke-width="6" pointer-events="none"/>
+    <rect x="54" y="22" width="652" height="26" rx="9"
+          fill="none" stroke="#82482c" stroke-width="2" opacity=".76" pointer-events="none"/>
+
+    <g id="boss-phase-marks" fill="url(#copper)" stroke="#100503" stroke-width="2">
+      <path d="M217 16 L224 23 L217 31 L210 23Z"/>
+      <path d="M543 16 L550 23 L543 31 L536 23Z"/>
+    </g>
+
+    <!-- Dibujado al final: siempre queda por delante de la barra -->
+    <g id="boss-center-marker" pointer-events="none">
+      <path d="M380 4 L393 17 L380 38 L367 17Z"
+            fill="url(#copper)" stroke="#100503" stroke-width="3"/>
+      <path d="M380 10 L387 18 L380 30 L373 18Z"
+            fill="url(#marker-gem)" stroke="#d15a40" stroke-width="1.5" filter="url(#red-glow)"/>
+      <path d="M374 18 H386" stroke="#f1a16e" stroke-width="1" opacity=".44"/>
+    </g>
+  </g>
+</svg>

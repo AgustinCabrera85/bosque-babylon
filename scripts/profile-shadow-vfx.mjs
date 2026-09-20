@@ -254,7 +254,7 @@ try {
       );
       const scene = globalThis.__bosqueWaterContactDebug.playerRoot.getScene();
       const surface = scene.meshes.find((mesh) =>
-        mesh.name.includes(snapshot.id) && mesh.name.endsWith(':proceduralPortal')
+        mesh.name.includes(snapshot.id) && mesh.name.endsWith(':electricCore')
       );
       surface.computeWorldMatrix(true);
       const center = surface.getAbsolutePosition();
@@ -266,7 +266,7 @@ try {
       };
     })()`);
     await client.evaluate(`(() => {
-      globalThis.__bosqueShadowGrabberDebug.teleportPlayer(${target.x + 3.5}, ${target.z - 3.5});
+      globalThis.__bosqueShadowGrabberDebug.teleportPlayer(${target.x + 1.5}, ${target.z - 1.5});
       globalThis.__bosqueShadowGrabberDebug.facePlayerAt(${target.x}, ${target.z});
       globalThis.__bosqueShadowGrabberDebug.aimPlayerAt(${target.x}, ${target.y}, ${target.z});
       return true;
@@ -294,7 +294,7 @@ try {
           .find((entry) => entry.id === ${JSON.stringify(target.id)});
         const scene = globalThis.__bosqueWaterContactDebug.playerRoot.getScene();
         const surface = scene.meshes.find((mesh) =>
-          mesh.name.includes(value.id) && mesh.name.endsWith(':proceduralPortal')
+          mesh.name.includes(value.id) && mesh.name.endsWith(':electricCore')
         );
         surface.computeWorldMatrix(true);
         const center = surface.getAbsolutePosition();
@@ -302,13 +302,13 @@ try {
       })()`);
       await client.evaluate(
         `(() => {
-          globalThis.__bosqueShadowGrabberDebug.teleportPlayer(${current.x + 3.5}, ${current.z - 3.5});
+          globalThis.__bosqueShadowGrabberDebug.teleportPlayer(${current.x + 1.5}, ${current.z - 1.5});
           globalThis.__bosqueShadowGrabberDebug.facePlayerAt(${current.x}, ${current.z});
           globalThis.__bosqueShadowGrabberDebug.aimPlayerAt(${current.x}, ${current.y}, ${current.z});
           return true;
         })()`
       );
-      await delay(120);
+      await delay(20);
     };
     const grabberScreenshots = [];
     await recenterPlayer();

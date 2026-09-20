@@ -491,6 +491,7 @@ const terrain = createTerrain(scene, {
   setupViewModeControls(player);
   const vintageFilm = createVintageFilmPostProcess(scene, player.camera, {
     enabled: true,
+    intensity: 0,
   });
 
   player.onViewModeChange((mode) => {
@@ -537,6 +538,9 @@ const terrain = createTerrain(scene, {
     if (sanity !== auraSanity) {
       auraSanity = sanity;
       shadowAura.setSanity(sanity);
+      // At full Cordura the shader is an exact pass-through. Its VHS treatment
+      // then grows linearly until reaching the authored preset at zero Cordura.
+      vintageFilm.setIntensity(1 - sanity);
     }
     if (event.type === "low-sanity-perception") {
       window.dispatchEvent(

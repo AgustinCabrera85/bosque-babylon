@@ -37,6 +37,10 @@ export function registerSkyEye(
           ...overrides.nodeNames,
           ...spawnOptions.configOverrides?.nodeNames,
         },
+        portalFx: {
+          ...overrides.portalFx,
+          ...spawnOptions.configOverrides?.portalFx,
+        },
       });
       return new SkyEyeController(
         context,

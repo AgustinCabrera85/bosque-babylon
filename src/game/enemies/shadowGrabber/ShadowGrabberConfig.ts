@@ -50,6 +50,10 @@ export interface ShadowGrabberPortalMaterialConfig
 /** Runtime-only artistic controls for the procedural portal shader. */
 export interface ShadowGrabberPortalFxConfig {
   spawnDuration: number;
+  /** Geometry multiplier applied only to the electric portal disc. */
+  coreDiscScale: number;
+  /** Geometry multiplier applied only to the smoke torus. */
+  smokeTorusScale: number;
   noiseScale: number;
   noiseSpeed: number;
   dissolveSoftness: number;
@@ -76,6 +80,11 @@ export interface ShadowGrabberPortalFxConfig {
   smokeOpacity: number;
   smokeRadiusScale: number;
   smokeDensity: number;
+  smokeTubeThickness: number;
+  smokeTurbulence: number;
+  smokeOrbitSpeed: number;
+  smokeDisplacement: number;
+  smokeAlphaThreshold: number;
 }
 
 export interface ShadowGrabberConfig {
@@ -214,6 +223,8 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   portalDepthScale: 0.25,
   portalFx: {
     spawnDuration: 1.65,
+    coreDiscScale: 1,
+    smokeTorusScale: 1,
     noiseScale: 2.35,
     noiseSpeed: 0.36,
     dissolveSoftness: 0.1,
@@ -239,7 +250,12 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
     smokeIntensity: 1.18,
     smokeOpacity: 0.9,
     smokeRadiusScale: 1.12,
-    smokeDensity: 1.9,
+    smokeDensity: 2.28,
+    smokeTubeThickness: 0.58,
+    smokeTurbulence: 1.08,
+    smokeOrbitSpeed: 0.42,
+    smokeDisplacement: 0.16,
+    smokeAlphaThreshold: 0.43,
   },
   animationSpeed: {
     idle: 1,

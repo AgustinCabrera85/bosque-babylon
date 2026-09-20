@@ -8,10 +8,8 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
-import type {
-  BlackSmokeWrapEffect,
-  BlackSmokeWrapSystem,
-} from "../../BlackSmokeWrapSystem";
+import type { BlackSmokeWrapSystem } from "../../BlackSmokeWrapSystem";
+import { ShadowGrabberFxController } from "../shadowGrabber/ShadowGrabberFxController";
 import type { SkyEyeConfig } from "./SkyEyeConfig";
 
 const TAU = Math.PI * 2;
@@ -29,11 +27,12 @@ type RootLocalBounds = {
   size: Vector3;
 };
 
-/** Rear smoke disc and animated tendril crown aligned to the eye's local X axis. */
+/** Procedural shadow portal and animated tendril crown aligned to the eye. */
 export class SkyEyeFxController {
   private readonly fxRoot: TransformNode;
+  private readonly portalRoot: TransformNode;
+  private readonly portal: ShadowGrabberFxController;
   private readonly tendrilRoot: TransformNode;
-  private readonly smokeDisc: BlackSmokeWrapEffect;
   private readonly tendrils: TendrilVisual[];
   private readonly tendrilMaterial: StandardMaterial;
   private readonly visualMeshes: Mesh[];
@@ -49,26 +48,18 @@ export class SkyEyeFxController {
   ) {
     const bounds = this.measureRootLocalBounds(ownerRoot, sourceMeshes);
     const eyeDiameter = Math.max(bounds.size.y, bounds.size.z);
-    const smokeDiameter = eyeDiameter * config.smokeDiscScale;
     const ringRadius = eyeDiameter * config.tendrilRingScale * 0.5;
     const frontDepthOffset = Math.max(
       bounds.size.x * 0.34,
       eyeDiameter * 0.08
-    );
-    const ownerWorldScale = Vector3.One();
-    ownerRoot.computeWorldMatrix(true).decompose(ownerWorldScale);
-    const particleWorldScale = Math.max(
-      Math.abs(ownerWorldScale.x),
-      Math.abs(ownerWorldScale.y),
-      Math.abs(ownerWorldScale.z)
     );
     const source = sourceMeshes[0];
 
     this.fxRoot = new TransformNode(`${ownerRoot.name}:skyEyeFx`, scene);
     this.fxRoot.parent = ownerRoot;
     this.fxRoot.position.copyFrom(bounds.center);
-    // The authored visible face lies toward local -X. Keep the tendril crown
-    // near that face while the smoke receives its own rearward offset below.
+    // The authored visible face lies toward local -X, so the preserved
+    // tendril crown stays slightly in front of the portal and eyeball.
     this.fxRoot.position.x -= frontDepthOffset;
 
     this.tendrilRoot = new TransformNode(
@@ -88,37 +79,45 @@ export class SkyEyeFxController {
     );
     this.visualMeshes = this.tendrils.map((tendril) => tendril.mesh);
 
-    this.smokeDisc = smokeSystem.attach(this.fxRoot, {
-      name: `${ownerRoot.name}:skyEyeSmokeDisc`,
-      quality: config.fxQuality === "high" ? "high" : "medium",
-      // Cancel the crown's frontal shift, then enter the middle of the +X
-      // posterior half. This keeps the translucent cards behind the eyeball.
-      offset: new Vector3(
-        frontDepthOffset + bounds.size.x * config.smokeDepthOffset,
-        0,
-        0
-      ),
-      axis: Vector3.Right(),
-      radiusX: smokeDiameter * 0.5,
-      radiusZ: smokeDiameter * 0.5,
-      innerRadiusRatio: 0.05,
-      height: eyeDiameter * 0.1,
-      // Particle cards are world-sized even though their orbit is local to the
-      // owner, so include the owner's world scale to match the visible eye.
-      particleSize:
-        eyeDiameter * config.smokeParticleScale * particleWorldScale,
-      elongation: 1,
-      uniformParticleScale: true,
-      orbitSpeed: 0.72,
-      upwardDrift: 0,
-      density: config.fxQuality === "high" ? 2 : 1.65,
-      opacity: config.smokeDiscOpacity,
-      color: new Color3(0.016, 0.018, 0.027),
-      renderingGroupId: source?.renderingGroupId ?? 0,
-      layerMask: source?.layerMask ?? 0x0fffffff,
-      applyFog: false,
-      enabled: false,
-    });
+    this.portalRoot = new TransformNode(
+      `${ownerRoot.name}:skyEyePortal`,
+      scene
+    );
+    this.portalRoot.parent = ownerRoot;
+    this.portalRoot.position.copyFrom(bounds.center);
+
+    // The shared portal controller reads authored bounds once. A short-lived
+    // proxy gives it stable eye-sized bounds without coupling the shader to
+    // animated eyelid or eyeball transforms.
+    const portalDiameter = eyeDiameter * config.portalVisualScale;
+    const portalBounds = MeshBuilder.CreateBox(
+      `${ownerRoot.name}:skyEyePortalBounds`,
+      {
+        width: Math.max(0.001, portalDiameter * config.portalDepthScale),
+        height: portalDiameter,
+        depth: portalDiameter,
+      },
+      scene
+    );
+    portalBounds.parent = this.portalRoot;
+    portalBounds.isVisible = false;
+    portalBounds.visibility = 0;
+    portalBounds.isPickable = false;
+    portalBounds.renderingGroupId = source?.renderingGroupId ?? 0;
+    portalBounds.layerMask = source?.layerMask ?? 0x0fffffff;
+
+    this.portal = new ShadowGrabberFxController(
+      scene,
+      this.portalRoot,
+      portalBounds,
+      config.fxQuality === "high" ? "high" : "low",
+      smokeSystem,
+      config.portalFx
+    );
+    this.portal.setState("hunt");
+    this.portal.setOwnerEnabled(false);
+    this.portal.playSpawn();
+    portalBounds.dispose(false, false);
     this.fxRoot.setEnabled(false);
   }
 
@@ -130,12 +129,11 @@ export class SkyEyeFxController {
     if (this.enabled === enabled) return;
     this.enabled = enabled;
     this.fxRoot.setEnabled(enabled);
-    this.smokeDisc.setEnabled(enabled);
+    this.portal.setOwnerEnabled(enabled);
   }
 
   public beginDeath() {
-    // Existing smoke drifts away naturally while the eye and tendrils remain visible.
-    this.smokeDisc.setEmissionMultiplier(0);
+    this.portal.setState("lightRecoil");
   }
 
   public setDeathAppearance(grayProgress: number, fadeProgress: number) {
@@ -158,6 +156,7 @@ export class SkyEyeFxController {
     if (!this.enabled) return;
     const delta = Math.max(0, Math.min(deltaTimeSeconds, 0.1));
     this.elapsed += delta;
+    this.portal.update(delta);
     this.tendrilRoot.rotate(
       Axis.X,
       delta * this.config.tendrilOrbitSpeed,
@@ -182,7 +181,8 @@ export class SkyEyeFxController {
   }
 
   public dispose() {
-    this.smokeDisc.dispose();
+    this.portal.dispose();
+    this.portalRoot.dispose(false, false);
     this.fxRoot.dispose(false, false);
     this.tendrilMaterial.dispose(false, false);
     this.visualMeshes.length = 0;

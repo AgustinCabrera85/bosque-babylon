@@ -37,7 +37,7 @@ export const PLAYER_STATS_CONFIG = {
   sanctuarySanityRecoveryPerSecond: 1.2,
   sanctuarySanityRecoveryCap: 100,
   absorptionSecondsPerOrb: 0.8,
-  absorptionSanityPerOrb: 10,
+  absorptionSanityPerOrbRatio: 0.3,
   absorptionMaxOrbs: 3,
   healthRegenerationSanityThreshold: 55,
   healthRegenerationDelaySeconds: 5,
@@ -572,7 +572,10 @@ export class PlayerStatsSystem {
         break;
       }
       this.absorptionOrbsConsumed += 1;
-      this.modifySanity(this.config.absorptionSanityPerOrb, "absorption");
+      this.modifySanity(
+        this.maxSanity * this.config.absorptionSanityPerOrbRatio,
+        "absorption"
+      );
       this.emit("light-orb-absorbed", "absorption", {
         orbsConsumed: this.absorptionOrbsConsumed,
       });

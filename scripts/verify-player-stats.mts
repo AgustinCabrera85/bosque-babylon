@@ -92,27 +92,27 @@ const tests: Array<[string, () => void]> = [
     advance(sanctuary, 60, { recoveryMode: "sanctuary" });
     close(sanctuary.sanity, 100);
   }],
-  ["9. absorcion de una esfera recupera 10", () => {
+  ["9. absorcion de una esfera recupera 30%", () => {
     const stats = createStats({ initialSanity: 50 });
     assert.equal(stats.startLightAbsorption(), true);
     advance(stats, 0.81);
     stats.releaseLightAbsorption();
-    close(stats.sanity, 60);
+    close(stats.sanity, 80);
     assert.equal(stats.lightOrbs, 2);
   }],
-  ["10. absorcion de dos esferas recupera 20", () => {
-    const stats = createStats({ initialSanity: 50 });
+  ["10. absorcion de dos esferas recupera 60%", () => {
+    const stats = createStats({ initialSanity: 20 });
     stats.startLightAbsorption();
     advance(stats, 1.61);
     stats.releaseLightAbsorption();
-    close(stats.sanity, 70);
+    close(stats.sanity, 80);
     assert.equal(stats.lightOrbs, 1);
   }],
-  ["11. absorcion se limita a tres esferas y 30", () => {
-    const stats = createStats({ initialSanity: 40, initialLightOrbs: 6 });
+  ["11. absorcion se limita a tres esferas y 90%", () => {
+    const stats = createStats({ initialSanity: 0, initialLightOrbs: 6 });
     stats.startLightAbsorption();
     advance(stats, 3);
-    close(stats.sanity, 70);
+    close(stats.sanity, 90);
     assert.equal(stats.lightOrbs, 3);
     assert.equal(stats.isAbsorbingLight, false);
   }],

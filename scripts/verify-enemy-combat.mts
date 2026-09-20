@@ -88,6 +88,28 @@ function hit(enemy: BaseEnemyController, damage = 1) {
 }
 
 async function verify() {
+  const skyEyePortal = createSkyEyeConfig();
+  const coreDiameter =
+    skyEyePortal.portalVisualScale *
+    0.92 *
+    skyEyePortal.portalFx.coreDiscScale;
+  const smokeOuterDiameter =
+    skyEyePortal.portalVisualScale *
+    skyEyePortal.portalFx.smokeTorusScale *
+    (0.78 * skyEyePortal.portalFx.smokeRadiusScale +
+      Math.max(
+        0.28,
+        Math.min(0.82, skyEyePortal.portalFx.smokeTubeThickness)
+      ));
+  assert.ok(
+    coreDiameter >= 3,
+    "the Sky Eye portal background must remain clearly wider than the eye"
+  );
+  assert.ok(
+    Math.abs(coreDiameter - smokeOuterDiameter) <= 0.02,
+    "the Sky Eye smoke torus must meet the dark outer edge of the portal disc"
+  );
+
   const minor = createEnemy("minor", 1.5);
   await minor.initialize();
   assert.equal(minor.maxHealth, 1.5);

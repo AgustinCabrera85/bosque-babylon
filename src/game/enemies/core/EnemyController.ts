@@ -4,6 +4,8 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { Observer } from "@babylonjs/core/Misc/observable";
+import type { Scene } from "@babylonjs/core/scene";
 import { EnemyAshEffect } from "./EnemyAshEffect";
 import {
   EnemyLifecycleState,
@@ -23,6 +25,42 @@ const MINOR_ASH_CLOUD_SECONDS = 2;
 const BOSS_GRAY_SECONDS = 0.55;
 const BOSS_FADE_SECONDS = 1.1;
 const BOSS_ASH_CLOUD_SECONDS = 2.8;
+const DEFERRED_DISPOSAL_BUDGET_MS = 0.8;
+
+type DisposalTask = () => void;
+
+function disposeOverFrames(scene: Scene, tasks: DisposalTask[]) {
+  if (tasks.length === 0 || scene.isDisposed) return;
+  let cursor = 0;
+  let afterRenderObserver: Observer<Scene> | null = null;
+  let sceneDisposeObserver: Observer<Scene> | null = null;
+
+  const detachObservers = () => {
+    if (afterRenderObserver) {
+      scene.onAfterRenderObservable.remove(afterRenderObserver);
+      afterRenderObserver = null;
+    }
+    if (sceneDisposeObserver) {
+      scene.onDisposeObservable.remove(sceneDisposeObserver);
+      sceneDisposeObserver = null;
+    }
+  };
+
+  sceneDisposeObserver = scene.onDisposeObservable.addOnce(() => {
+    // Scene disposal owns every remaining Babylon resource.
+    detachObservers();
+  });
+  afterRenderObserver = scene.onAfterRenderObservable.add(() => {
+    const started = performance.now();
+    do {
+      tasks[cursor++]();
+    } while (
+      cursor < tasks.length &&
+      performance.now() - started < DEFERRED_DISPOSAL_BUDGET_MS
+    );
+    if (cursor >= tasks.length) detachObservers();
+  });
+}
 
 type PbrHitMaterialState = {
   material: PBRMaterial;
@@ -294,22 +332,52 @@ export abstract class BaseEnemyController implements EnemyController {
     this.root.scaling.copyFrom(scaling);
   }
 
-  public dispose() {
+  public dispose(deferResourceDisposal = false) {
     if (this.currentLifecycleState === EnemyLifecycleState.Disposed) return;
     this.currentLifecycleState = EnemyLifecycleState.Disposed;
+    this.root.setEnabled(false);
     this.finishHitReaction();
     this.ashEffect?.dispose();
     this.ashEffect = null;
+    const scene = this.root.getScene();
+    const animationGroups = [...this.asset.animationGroups];
+    const skeletons = [...this.asset.skeletons];
+    const materials = [...this.ownedMaterials];
+    const nodes = deferResourceDisposal
+      ? this.root.getDescendants(false).reverse()
+      : [];
+    this.ownedMaterials.clear();
     this.onDispose();
 
-    for (const animationGroup of this.asset.animationGroups) {
-      animationGroup.stop(true);
-      animationGroup.dispose();
+    if (!deferResourceDisposal) {
+      for (const animationGroup of animationGroups) {
+        animationGroup.stop(true);
+        animationGroup.dispose();
+      }
+      this.root.dispose(false, false);
+      for (const skeleton of skeletons) skeleton.dispose();
+      for (const material of materials) material.dispose(false, false);
+      return;
     }
-    this.root.dispose(false, false);
-    for (const skeleton of this.asset.skeletons) skeleton.dispose();
-    for (const material of this.ownedMaterials) material.dispose(false, false);
-    this.ownedMaterials.clear();
+
+    const tasks: DisposalTask[] = [];
+    for (const animationGroup of animationGroups) {
+      // Death already stopped every animation; disposal can now be amortized.
+      tasks.push(() => animationGroup.dispose());
+    }
+    for (const node of nodes) {
+      tasks.push(() => {
+        if (!node.isDisposed()) node.dispose(true, false);
+      });
+    }
+    tasks.push(() => {
+      if (!this.root.isDisposed()) this.root.dispose(true, false);
+    });
+    for (const skeleton of skeletons) tasks.push(() => skeleton.dispose());
+    for (const material of materials) {
+      tasks.push(() => material.dispose(false, false));
+    }
+    disposeOverFrames(scene, tasks);
   }
 
   protected completeInitialization() {
@@ -346,7 +414,9 @@ export abstract class BaseEnemyController implements EnemyController {
   private beginDeath() {
     this.currentLifecycleState = EnemyLifecycleState.Dying;
     this.finishHitReaction();
-    for (const animationGroup of this.asset.animationGroups) animationGroup.stop(true);
+    for (const animationGroup of this.asset.animationGroups) {
+      if (animationGroup.isStarted) animationGroup.stop(true);
+    }
     this.onDeath();
     if (this.deathVisualStyle === "shrink") {
       const { minimum, maximum } = this.getAssetWorldBounds();
@@ -385,13 +455,13 @@ export abstract class BaseEnemyController implements EnemyController {
         );
       }
       if (fadeProgress >= 1) this.root.setEnabled(false);
-      if (this.deathElapsed >= BOSS_ASH_CLOUD_SECONDS) this.dispose();
+      if (this.deathElapsed >= BOSS_ASH_CLOUD_SECONDS) this.dispose(true);
       return;
     }
     const progress = Math.min(1, this.deathElapsed / MINOR_DEATH_DISSOLVE_SECONDS);
     this.visualRoot.scaling.setAll(Math.max(0.001, 1 - progress));
     if (progress >= 1) this.root.setEnabled(false);
-    if (this.deathElapsed >= MINOR_ASH_CLOUD_SECONDS) this.dispose();
+    if (this.deathElapsed >= MINOR_ASH_CLOUD_SECONDS) this.dispose(true);
   }
 
   private getAssetWorldBounds() {

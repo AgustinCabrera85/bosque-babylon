@@ -6,6 +6,7 @@ import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Node } from "@babylonjs/core/node";
 import type { Scene } from "@babylonjs/core/scene";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
+import { EnemyAshEffect } from "./EnemyAshEffect";
 import { EnemyLifecycleState } from "./EnemyTypes";
 import type {
   EnemyAssetInstance,
@@ -81,7 +82,9 @@ export class EnemyManager {
   private readonly assetContainers = new Map<string, AssetContainer>();
   private disposed = false;
 
-  public constructor(private readonly scene: Scene) {}
+  public constructor(private readonly scene: Scene) {
+    EnemyAshEffect.prewarm(scene);
+  }
 
   public registerType(registration: EnemyTypeRegistration) {
     this.assertActive();

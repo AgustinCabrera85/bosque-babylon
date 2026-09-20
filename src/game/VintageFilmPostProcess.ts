@@ -23,6 +23,7 @@ export type VintageFilmSettings = {
 
 export type VintageFilmOptions = Partial<VintageFilmSettings> & {
   enabled?: boolean;
+  intensity?: number;
 };
 
 export type VintageFilmHandle = {
@@ -30,6 +31,8 @@ export type VintageFilmHandle = {
   isEnabled: () => boolean;
   setEnabled: (enabled: boolean) => void;
   toggle: () => boolean;
+  getIntensity: () => number;
+  setIntensity: (intensity: number) => void;
   update: (settings: Partial<VintageFilmSettings>) => void;
   dispose: () => void;
 };
@@ -69,6 +72,7 @@ uniform float lutStrength;
 uniform float contrast;
 uniform float saturation;
 uniform float exposure;
+uniform float effectIntensity;
 
 float random(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
@@ -149,12 +153,19 @@ void main(void) {
   color *= 1.0 - vignette * vignetteIntensity;
 
   color += glitchBand * vec3(0.035, -0.012, 0.02);
-  gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+  vec3 sourceColor = texture2D(textureSampler, vUV).rgb;
+  vec3 filteredColor = clamp(color, 0.0, 1.0);
+  gl_FragColor = vec4(mix(sourceColor, filteredColor, effectIntensity), 1.0);
 }
 `;
 
 function registerShader() {
   Effect.ShadersStore[`${SHADER_NAME}FragmentShader`] = fragmentShader;
+}
+
+function clamp01(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
 }
 
 function readStoredEnabled(defaultEnabled: boolean) {
@@ -192,9 +203,15 @@ export function createVintageFilmPostProcess(
 ): VintageFilmHandle {
   registerShader();
 
+  const {
+    enabled: defaultEnabled = false,
+    intensity: initialIntensity = 0,
+    ...settingOverrides
+  } = options;
+
   const settings: VintageFilmSettings = {
     ...fridayThe13thVintagePreset,
-    ...options,
+    ...settingOverrides,
   };
 
   const postProcess = new PostProcess(
@@ -215,6 +232,7 @@ export function createVintageFilmPostProcess(
       "contrast",
       "saturation",
       "exposure",
+      "effectIntensity",
     ],
     null,
     1,
@@ -225,8 +243,21 @@ export function createVintageFilmPostProcess(
   );
 
   let enabled = false;
+  let attached = false;
+  let intensity = clamp01(initialIntensity);
   let elapsed = 0;
   let buttonRender: (() => void) | null = null;
+
+  const syncAttachment = () => {
+    const shouldAttach = enabled && intensity > 0;
+    if (attached === shouldAttach) return;
+    attached = shouldAttach;
+    if (attached) {
+      camera.attachPostProcess(postProcess);
+    } else {
+      camera.detachPostProcess(postProcess);
+    }
+  };
 
   const beforeRenderObserver: Observer<Scene> | null = scene.onBeforeRenderObservable.add(() => {
     elapsed += scene.getEngine().getDeltaTime() * 0.001;
@@ -250,6 +281,7 @@ export function createVintageFilmPostProcess(
     effect.setFloat("contrast", settings.contrast);
     effect.setFloat("saturation", settings.saturation);
     effect.setFloat("exposure", settings.exposure);
+    effect.setFloat("effectIntensity", intensity);
   });
 
   const handle: VintageFilmHandle = {
@@ -258,11 +290,7 @@ export function createVintageFilmPostProcess(
     setEnabled(next) {
       if (enabled === next) return;
       enabled = next;
-      if (enabled) {
-        camera.attachPostProcess(postProcess);
-      } else {
-        camera.detachPostProcess(postProcess);
-      }
+      syncAttachment();
       window.localStorage.setItem(STORAGE_KEY, String(enabled));
       buttonRender?.();
     },
@@ -270,11 +298,16 @@ export function createVintageFilmPostProcess(
       handle.setEnabled(!enabled);
       return enabled;
     },
+    getIntensity: () => intensity,
+    setIntensity(nextIntensity) {
+      intensity = clamp01(nextIntensity);
+      syncAttachment();
+    },
     update(nextSettings) {
       Object.assign(settings, nextSettings);
     },
     dispose() {
-      if (enabled) camera.detachPostProcess(postProcess);
+      if (attached) camera.detachPostProcess(postProcess);
       if (beforeRenderObserver) scene.onBeforeRenderObservable.remove(beforeRenderObserver);
       postProcess.dispose();
     },
@@ -285,7 +318,7 @@ export function createVintageFilmPostProcess(
     if (toggle) toggle.checked = enabled;
   };
 
-  const initialEnabled = readStoredEnabled(options.enabled ?? false);
+  const initialEnabled = readStoredEnabled(defaultEnabled);
   if (initialEnabled) handle.setEnabled(true);
 
   bindMenuToggle(handle);

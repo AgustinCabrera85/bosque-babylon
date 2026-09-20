@@ -4,9 +4,11 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import type { Observer } from "@babylonjs/core/Misc/observable";
-import type { Scene } from "@babylonjs/core/scene";
 import { EnemyAshEffect } from "./EnemyAshEffect";
+import {
+  deferSceneDisposal,
+  type DeferredDisposalTask,
+} from "./DeferredSceneDisposal";
 import {
   EnemyLifecycleState,
   type EnemyAttackHit,
@@ -25,43 +27,6 @@ const MINOR_ASH_CLOUD_SECONDS = 2;
 const BOSS_GRAY_SECONDS = 0.55;
 const BOSS_FADE_SECONDS = 1.1;
 const BOSS_ASH_CLOUD_SECONDS = 2.8;
-const DEFERRED_DISPOSAL_BUDGET_MS = 0.8;
-
-type DisposalTask = () => void;
-
-function disposeOverFrames(scene: Scene, tasks: DisposalTask[]) {
-  if (tasks.length === 0 || scene.isDisposed) return;
-  let cursor = 0;
-  let afterRenderObserver: Observer<Scene> | null = null;
-  let sceneDisposeObserver: Observer<Scene> | null = null;
-
-  const detachObservers = () => {
-    if (afterRenderObserver) {
-      scene.onAfterRenderObservable.remove(afterRenderObserver);
-      afterRenderObserver = null;
-    }
-    if (sceneDisposeObserver) {
-      scene.onDisposeObservable.remove(sceneDisposeObserver);
-      sceneDisposeObserver = null;
-    }
-  };
-
-  sceneDisposeObserver = scene.onDisposeObservable.addOnce(() => {
-    // Scene disposal owns every remaining Babylon resource.
-    detachObservers();
-  });
-  afterRenderObserver = scene.onAfterRenderObservable.add(() => {
-    const started = performance.now();
-    do {
-      tasks[cursor++]();
-    } while (
-      cursor < tasks.length &&
-      performance.now() - started < DEFERRED_DISPOSAL_BUDGET_MS
-    );
-    if (cursor >= tasks.length) detachObservers();
-  });
-}
-
 type PbrHitMaterialState = {
   material: PBRMaterial;
   iridescenceEnabled: boolean;
@@ -347,7 +312,7 @@ export abstract class BaseEnemyController implements EnemyController {
       ? this.root.getDescendants(false).reverse()
       : [];
     this.ownedMaterials.clear();
-    this.onDispose();
+    this.onDispose(deferResourceDisposal);
 
     if (!deferResourceDisposal) {
       for (const animationGroup of animationGroups) {
@@ -360,7 +325,7 @@ export abstract class BaseEnemyController implements EnemyController {
       return;
     }
 
-    const tasks: DisposalTask[] = [];
+    const tasks: DeferredDisposalTask[] = [];
     for (const animationGroup of animationGroups) {
       // Death already stopped every animation; disposal can now be amortized.
       tasks.push(() => animationGroup.dispose());
@@ -377,7 +342,7 @@ export abstract class BaseEnemyController implements EnemyController {
     for (const material of materials) {
       tasks.push(() => material.dispose(false, false));
     }
-    disposeOverFrames(scene, tasks);
+    deferSceneDisposal(scene, tasks);
   }
 
   protected completeInitialization() {
@@ -401,7 +366,7 @@ export abstract class BaseEnemyController implements EnemyController {
     }
   }
 
-  protected onDispose() {}
+  protected onDispose(_deferResourceDisposal = false) {}
 
   protected onDeath() {}
 

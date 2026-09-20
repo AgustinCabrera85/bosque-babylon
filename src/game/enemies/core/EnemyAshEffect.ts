@@ -4,7 +4,9 @@ import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture";
 import type { Scene } from "@babylonjs/core/scene";
 
-const PREWARMED_MINOR_SYSTEMS = 3;
+// The authored forest encounter has four Shadow Grabbers. Prewarm one ash
+// system per enemy so rapid consecutive defeats never allocate during combat.
+const PREWARMED_MINOR_SYSTEMS = 4;
 const PREWARMED_BOSS_SYSTEMS = 1;
 
 type PooledAshSystem = {

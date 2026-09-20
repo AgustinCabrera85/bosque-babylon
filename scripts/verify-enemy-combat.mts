@@ -7,6 +7,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Scene } from "@babylonjs/core/scene";
 import { EnemyHealthHud } from "../src/game/EnemyHealthHud.ts";
 import { BaseEnemyController } from "../src/game/enemies/core/EnemyController.ts";
+import { getDeferredSceneDisposalStats } from "../src/game/enemies/core/DeferredSceneDisposal.ts";
 import {
   EnemyLifecycleState,
   type EnemyControllerContext,
@@ -183,6 +184,21 @@ async function verify() {
   assert.equal(boss.visualScale, 1);
   boss.updateCombatEffects(1.2);
   assert.equal(boss.lifecycleState, EnemyLifecycleState.Disposed);
+  const disposalStats = getDeferredSceneDisposalStats(scene);
+  assert.equal(
+    disposalStats.observerActive,
+    true,
+    "all defeated enemies share one deferred-disposal observer"
+  );
+  assert.ok(disposalStats.pendingTasks > 0);
+  for (let frame = 0; frame < 64; frame++) {
+    scene.onAfterRenderObservable.notifyObservers(scene);
+    if (!getDeferredSceneDisposalStats(scene).observerActive) break;
+  }
+  assert.deepEqual(getDeferredSceneDisposalStats(scene), {
+    pendingTasks: 0,
+    observerActive: false,
+  });
 
   const eyeMesh = MeshBuilder.CreateBox("eye:body", { size: 1 }, scene);
   const eyeMaterial = new PBRMaterial("eye:material", scene);

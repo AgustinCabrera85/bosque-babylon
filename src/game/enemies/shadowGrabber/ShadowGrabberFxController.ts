@@ -11,6 +11,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import type { BlackSmokeWrapSystem } from "../../BlackSmokeWrapSystem";
+import { deferSceneDisposal } from "../core/DeferredSceneDisposal";
 import type {
   ShadowGrabberFxQuality,
   ShadowGrabberPortalFxConfig,
@@ -549,6 +550,7 @@ export class ShadowGrabberFxController {
   private deathProgressValue = 0;
   private spawning = true;
   private manualFormation = false;
+  private lightRetired = false;
 
   public constructor(
     scene: Scene,
@@ -668,6 +670,15 @@ export class ShadowGrabberFxController {
     this.syncEnabled();
   }
 
+  /** Keeps the scene light list stable when a minor portal dies. */
+  public retireLight() {
+    if (this.lightRetired || this.portalLight.isDisposed()) return;
+    this.portalLight.intensity = 0;
+    this.portalLight.parent = null;
+    this.portalLight.setEnabled(true);
+    this.lightRetired = true;
+  }
+
   public update(dt: number) {
     if (!this.active) return;
     const safeDt = Math.max(0, Math.min(0.1, dt));
@@ -701,12 +712,28 @@ export class ShadowGrabberFxController {
     this.applyFormationState(lightPulse);
   }
 
-  public dispose() {
-    this.portalLight.dispose();
-    this.smokeTorus.dispose(false, false);
-    this.coreDisc.dispose(false, false);
-    this.smokeShader.dispose(false, false);
-    this.coreShader.dispose(false, false);
+  public dispose(deferResources = false) {
+    this.portalLight.intensity = 0;
+    const tasks = [
+      () => {
+        if (!this.lightRetired && !this.portalLight.isDisposed()) {
+          this.portalLight.dispose();
+        }
+      },
+      () => {
+        if (!this.smokeTorus.isDisposed()) this.smokeTorus.dispose(false, false);
+      },
+      () => {
+        if (!this.coreDisc.isDisposed()) this.coreDisc.dispose(false, false);
+      },
+      () => this.smokeShader.dispose(false, false),
+      () => this.coreShader.dispose(false, false),
+    ];
+    if (deferResources) {
+      deferSceneDisposal(this.root.getScene(), tasks);
+      return;
+    }
+    for (const task of tasks) task();
   }
 
   private syncEnabled() {
@@ -715,7 +742,7 @@ export class ShadowGrabberFxController {
     this.active = active;
     this.smokeTorus.setEnabled(active);
     this.coreDisc.setEnabled(active);
-    this.portalLight.setEnabled(active);
+    if (!this.lightRetired) this.portalLight.setEnabled(true);
     if (!active) this.portalLight.intensity = 0;
   }
 

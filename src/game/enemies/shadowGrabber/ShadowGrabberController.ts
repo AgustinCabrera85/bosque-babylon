@@ -330,8 +330,8 @@ export class ShadowGrabberController extends BaseEnemyController {
     });
   }
 
-  protected override onDispose() {
-    this.fxController?.dispose();
+  protected override onDispose(deferResourceDisposal: boolean) {
+    this.fxController?.dispose(deferResourceDisposal);
     this.fxController = null;
     this.currentAnimation = null;
     this.animations.clear();
@@ -393,6 +393,7 @@ export class ShadowGrabberController extends BaseEnemyController {
 
   protected override onDeath() {
     this.fxController?.setOwnerEnabled(false);
+    this.fxController?.retireLight();
   }
 
   private createFxRoot() {

@@ -196,8 +196,8 @@ export class SkyEyeController extends BaseEnemyController {
     this.eyeModelRoot.scaling.setAll(0.56 + eye * 0.44);
   }
 
-  protected override onDispose() {
-    this.fxController?.dispose();
+  protected override onDispose(deferResourceDisposal: boolean) {
+    this.fxController?.dispose(deferResourceDisposal);
     this.fxController = null;
     this.deathMaterials.length = 0;
     this.idleAnimation = null;

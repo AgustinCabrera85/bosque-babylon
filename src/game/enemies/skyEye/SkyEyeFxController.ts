@@ -9,6 +9,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import type { BlackSmokeWrapSystem } from "../../BlackSmokeWrapSystem";
+import { deferSceneDisposal } from "../core/DeferredSceneDisposal";
 import { ShadowGrabberFxController } from "../shadowGrabber/ShadowGrabberFxController";
 import type { SkyEyeConfig } from "./SkyEyeConfig";
 
@@ -233,11 +234,22 @@ export class SkyEyeFxController {
     }
   }
 
-  public dispose() {
-    this.portal.dispose();
-    this.portalRoot.dispose(false, false);
-    this.fxRoot.dispose(false, false);
-    this.tendrilMaterial.dispose(false, false);
+  public dispose(deferResources = false) {
+    this.portal.dispose(deferResources);
+    const tasks = [
+      () => {
+        if (!this.portalRoot.isDisposed()) this.portalRoot.dispose(false, false);
+      },
+      () => {
+        if (!this.fxRoot.isDisposed()) this.fxRoot.dispose(false, false);
+      },
+      () => this.tendrilMaterial.dispose(false, false),
+    ];
+    if (deferResources) {
+      deferSceneDisposal(this.fxRoot.getScene(), tasks);
+    } else {
+      for (const task of tasks) task();
+    }
     this.visualMeshes.length = 0;
     this.tendrils.length = 0;
   }

@@ -27,6 +27,27 @@ type RootLocalBounds = {
   size: Vector3;
 };
 
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
+/** Uses the gray phase for ignition, then completes the breakup during fading. */
+export function getSkyEyePortalDeathProgress(
+  grayProgress: number,
+  fadeProgress: number
+) {
+  const gray = clamp01(grayProgress);
+  const fade = clamp01(fadeProgress);
+  return fade > 0 ? 0.28 + fade * 0.72 : gray * 0.28;
+}
+
+export type SkyEyePresentationProgress = {
+  disc: number;
+  smoke: number;
+  tendrils: number;
+  eye: number;
+};
+
 /** Procedural shadow portal and animated tendril crown aligned to the eye. */
 export class SkyEyeFxController {
   private readonly fxRoot: TransformNode;
@@ -36,18 +57,25 @@ export class SkyEyeFxController {
   private readonly tendrils: TendrilVisual[];
   private readonly tendrilMaterial: StandardMaterial;
   private readonly visualMeshes: Mesh[];
+  private readonly eyeModelBasePosition: Vector3;
+  private readonly eyeModelBaseScaling: Vector3;
+  private readonly eyeEmergenceDepth: number;
   private enabled = false;
   private elapsed = 0;
 
   public constructor(
     scene: Scene,
     ownerRoot: TransformNode,
+    private readonly eyeModelRoot: TransformNode,
     sourceMeshes: readonly AbstractMesh[],
     private readonly config: SkyEyeConfig,
     smokeSystem: BlackSmokeWrapSystem
   ) {
     const bounds = this.measureRootLocalBounds(ownerRoot, sourceMeshes);
     const eyeDiameter = Math.max(bounds.size.y, bounds.size.z);
+    this.eyeModelBasePosition = eyeModelRoot.position.clone();
+    this.eyeModelBaseScaling = eyeModelRoot.scaling.clone();
+    this.eyeEmergenceDepth = eyeDiameter * 0.72;
     const ringRadius = eyeDiameter * config.tendrilRingScale * 0.5;
     const frontDepthOffset = Math.max(
       bounds.size.x * 0.34,
@@ -125,6 +153,28 @@ export class SkyEyeFxController {
     return this.visualMeshes;
   }
 
+  public setPresentationProgress(progress: SkyEyePresentationProgress) {
+    const disc = clamp01(progress.disc);
+    const smoke = clamp01(progress.smoke);
+    const tendrils = clamp01(progress.tendrils);
+    const eye = clamp01(progress.eye);
+    this.portal.setFormationProgress(disc, smoke);
+
+    this.tendrilRoot.setEnabled(tendrils > 0.001);
+    this.tendrilRoot.scaling.setAll(0.04 + tendrils * 0.96);
+    this.tendrilMaterial.alpha = tendrils;
+    this.tendrilMaterial.transparencyMode =
+      tendrils >= 0.999
+        ? Material.MATERIAL_OPAQUE
+        : Material.MATERIAL_ALPHABLEND;
+
+    this.eyeModelRoot.setEnabled(eye > 0.001);
+    this.eyeModelRoot.position.copyFrom(this.eyeModelBasePosition);
+    this.eyeModelRoot.position.x += this.eyeEmergenceDepth * (1 - eye);
+    this.eyeModelRoot.scaling.copyFrom(this.eyeModelBaseScaling);
+    this.eyeModelRoot.scaling.scaleInPlace(0.56 + eye * 0.44);
+  }
+
   public setEnabled(enabled: boolean) {
     if (this.enabled === enabled) return;
     this.enabled = enabled;
@@ -137,6 +187,9 @@ export class SkyEyeFxController {
   }
 
   public setDeathAppearance(grayProgress: number, fadeProgress: number) {
+    this.portal.setDeathDissolve(
+      getSkyEyePortalDeathProgress(grayProgress, fadeProgress)
+    );
     Color3.LerpToRef(
       TENDRIL_EMISSIVE,
       ASHEN_TENDRIL_EMISSIVE,

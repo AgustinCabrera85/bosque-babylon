@@ -61,6 +61,7 @@ export async function spawnSkyEye(
 }
 
 export { SkyEyeController } from "./SkyEyeController";
+export type { SkyEyePresentationProgress } from "./SkyEyeFxController";
 export {
   DEFAULT_SKY_EYE_CONFIG,
   SKY_EYE_MODEL_URL,

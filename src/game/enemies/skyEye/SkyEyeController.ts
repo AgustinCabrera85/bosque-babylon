@@ -7,6 +7,7 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Scene } from "@babylonjs/core/scene";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { BlackSmokeWrapSystem } from "../../BlackSmokeWrapSystem";
 import { BaseEnemyController } from "../core/EnemyController";
 import type {
@@ -17,7 +18,10 @@ import {
   SKY_EYE_TYPE,
   type SkyEyeConfig,
 } from "./SkyEyeConfig";
-import { SkyEyeFxController } from "./SkyEyeFxController";
+import {
+  SkyEyeFxController,
+  type SkyEyePresentationProgress,
+} from "./SkyEyeFxController";
 
 const SKY_EYE_EMISSIVE_INTENSITY = 3;
 const MAX_HEALTH = 18; // Eighteen light orbs at base projectile damage.
@@ -43,6 +47,7 @@ export class SkyEyeController extends BaseEnemyController {
   private readonly getTargetPosition: () => Vector3;
   private readonly scene: Scene;
   private readonly smokeSystem: BlackSmokeWrapSystem;
+  private readonly eyeModelRoot: TransformNode;
   private readonly blinkAnimations: AnimationGroup[] = [];
   private readonly importedMeshes: AbstractMesh[] = [];
   private readonly deathMaterials: DeathMaterialState[] = [];
@@ -65,6 +70,12 @@ export class SkyEyeController extends BaseEnemyController {
     this.scene = context.scene;
     this.smokeSystem = smokeSystem;
     this.getTargetPosition = getTargetPosition;
+    this.eyeModelRoot = new TransformNode(
+      `skyEye:${this.id}:modelRoot`,
+      context.scene
+    );
+    this.eyeModelRoot.parent = this.visualRoot;
+    for (const node of this.asset.rootNodes) node.parent = this.eyeModelRoot;
     this.blinkTimer = this.randomInitialBlinkDelay();
     if (!options.scaling) this.root.scaling.setAll(config.baseScale);
   }
@@ -118,6 +129,7 @@ export class SkyEyeController extends BaseEnemyController {
       this.fxController = new SkyEyeFxController(
         this.scene,
         this.visualRoot,
+        this.eyeModelRoot,
         [eyeball, upperEyelid, lowerEyelid],
         this.config,
         this.smokeSystem
@@ -172,6 +184,16 @@ export class SkyEyeController extends BaseEnemyController {
 
   public snapLookAt(target: Vector3) {
     this.turnToward(target, 1, true);
+  }
+
+  public setPresentationProgress(progress: SkyEyePresentationProgress) {
+    if (this.fxController) {
+      this.fxController.setPresentationProgress(progress);
+      return;
+    }
+    const eye = Math.max(0, Math.min(1, progress.eye));
+    this.eyeModelRoot.setEnabled(eye > 0.001);
+    this.eyeModelRoot.scaling.setAll(0.56 + eye * 0.44);
   }
 
   protected override onDispose() {

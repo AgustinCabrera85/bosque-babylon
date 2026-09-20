@@ -40,6 +40,7 @@ uniform float smokeDisplacement;
 uniform float smokeTurbulence;
 uniform float stateChaos;
 uniform float statePull;
+uniform float deathProgress;
 
 varying vec3 vLocalPosition;
 varying vec3 vLocalNormal;
@@ -63,7 +64,11 @@ void main(void) {
     breathing *
     formation *
     (0.86 + stateChaos * 0.34);
+  float deathBurst = 1.0 - pow(1.0 - clamp(deathProgress, 0.0, 1.0), 3.0);
+  displacement *= 1.0 + deathBurst * 1.8;
   vec3 displacedPosition = position + normal * displacement;
+  displacedPosition +=
+    normalize(position) * localRadius * deathBurst * churn * 0.08;
 
   vLocalPosition = displacedPosition;
   vLocalNormal = normal;
@@ -86,6 +91,7 @@ uniform float smokeIntensity;
 uniform float portalIntensity;
 uniform float stateChaos;
 uniform float statePull;
+uniform float deathProgress;
 
 varying vec3 vLocalPosition;
 varying vec3 vLocalNormal;
@@ -179,10 +185,35 @@ void main(void) {
     portalIntensity *
     formation;
 
+  float death = clamp(deathProgress, 0.0, 1.0);
+  float fragmentField = clamp(
+    folded * 0.48 + broad * 0.34 + radialFold * 0.18,
+    0.0,
+    1.0
+  );
+  float fragmentThreshold = death * 1.26 - 0.18;
+  float survivingFragments = smoothstep(
+    fragmentThreshold,
+    fragmentThreshold + 0.18,
+    fragmentField
+  );
+  float breakup = smoothstep(0.04, 0.22, death);
+  float deathFade = 1.0 - smoothstep(0.82, 1.0, death);
+  float fragmentEdge =
+    survivingFragments *
+    (1.0 - smoothstep(
+      fragmentThreshold + 0.18,
+      fragmentThreshold + 0.29,
+      fragmentField
+    )) *
+    breakup;
+  alpha *= mix(1.0, survivingFragments, breakup) * deathFade;
+
   float foldHighlight = smoothstep(0.48, 0.86, folded);
   vec3 color = vec3(0.0025, 0.003, 0.0045);
   color += vec3(0.014, 0.016, 0.026) *
     (broad * 0.12 + foldHighlight * 0.16);
+  color += vec3(0.055, 0.11, 0.31) * fragmentEdge * (0.3 + death * 0.7);
 
   if (alpha < 0.018) discard;
   gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.92));
@@ -232,6 +263,7 @@ uniform float stateChaos;
 uniform float statePull;
 uniform float lightPulse;
 uniform float flarePulse;
+uniform float deathProgress;
 
 varying vec2 vUV;
 
@@ -429,6 +461,43 @@ void main(void) {
   alpha += originVisibility * 0.12 + electricity * 0.18;
   alpha *= portalIntensity;
 
+  float death = clamp(deathProgress, 0.0, 1.0);
+  float breakupField = clamp(
+    coreFbm(
+      warped * 4.8 +
+      vec2(motionTime * 0.41, -motionTime * 0.34) +
+      crossing * 0.57
+    ) * 0.68 +
+    edgeNoise * 0.2 +
+    (1.0 - clamp(radius, 0.0, 1.0)) * 0.12,
+    0.0,
+    1.0
+  );
+  float fragmentThreshold = death * 1.23 - 0.17;
+  float survivingFragments = smoothstep(
+    fragmentThreshold,
+    fragmentThreshold + 0.16,
+    breakupField
+  );
+  float breakup = smoothstep(0.03, 0.2, death);
+  float deathFade = 1.0 - smoothstep(0.86, 1.0, death);
+  float fragmentEdge =
+    survivingFragments *
+    (1.0 - smoothstep(
+      fragmentThreshold + 0.16,
+      fragmentThreshold + 0.27,
+      breakupField
+    )) *
+    breakup;
+  float shockRadius = death * 1.24;
+  float shockRing =
+    (1.0 - smoothstep(0.035, 0.115, abs(radius - shockRadius))) *
+    smoothstep(0.015, 0.1, death) *
+    (1.0 - smoothstep(0.72, 0.9, death)) *
+    coreMask;
+  alpha *= mix(1.0, survivingFragments, breakup) * deathFade;
+  alpha += shockRing * 0.24 * portalIntensity;
+
   vec3 voidBlack = vec3(0.0003, 0.00045, 0.001);
   vec3 charcoal = vec3(0.005, 0.006, 0.011);
   vec3 pressureViolet = vec3(0.021, 0.024, 0.047);
@@ -443,6 +512,8 @@ void main(void) {
   color += originPeak * originCore * (0.29 + originPulse * 0.67) * originIntensity;
   color += arcBlue * electricity * 0.48;
   color += arcPeak * electricCore * (0.24 + lightPulse * 0.14);
+  color += originPeak * fragmentEdge * (0.48 + death * 0.72);
+  color += arcPeak * shockRing * 0.82;
 
   if (alpha < 0.008) discard;
   gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.96));
@@ -473,7 +544,11 @@ export class ShadowGrabberFxController {
   private stateElapsed = 0;
   private spawnElapsed = 0;
   private spawnProgressValue = 0;
+  private coreSpawnProgressValue = 0;
+  private smokeSpawnProgressValue = 0;
+  private deathProgressValue = 0;
   private spawning = true;
+  private manualFormation = false;
 
   public constructor(
     scene: Scene,
@@ -535,9 +610,44 @@ export class ShadowGrabberFxController {
   public playSpawn() {
     this.spawnElapsed = 0;
     this.spawnProgressValue = 0;
+    this.coreSpawnProgressValue = 0;
+    this.smokeSpawnProgressValue = 0;
+    this.deathProgressValue = 0;
     this.spawning = true;
+    this.manualFormation = false;
     this.portalLight.intensity = 0;
     this.applyShaderUniforms();
+  }
+
+  /** Drives the disc and smoke independently for authored reveal sequences. */
+  public setFormationProgress(coreProgress: number, smokeProgress: number) {
+    this.coreSpawnProgressValue = clamp01(coreProgress);
+    this.smokeSpawnProgressValue = clamp01(smokeProgress);
+    this.spawnProgressValue = Math.max(
+      this.coreSpawnProgressValue,
+      this.smokeSpawnProgressValue
+    );
+    this.spawning = false;
+    this.manualFormation = true;
+    this.applyFormationState();
+  }
+
+  /** Expands and procedurally erodes an already formed portal. */
+  public setDeathDissolve(progress: number) {
+    this.deathProgressValue = clamp01(progress);
+    const deathTime = this.elapsed + this.deathProgressValue * 2.4;
+    const chaos = this.getStateChaos();
+    const lightPulse = this.getLightPulse(chaos);
+    this.smokeShader.setFloat("time", deathTime);
+    this.smokeShader.setFloat("stateChaos", chaos);
+    this.smokeShader.setFloat("statePull", this.getStatePull());
+    this.coreShader.setFloat("time", deathTime);
+    this.coreShader.setFloat("stateChaos", chaos);
+    this.coreShader.setFloat("statePull", this.getStatePull());
+    this.coreShader.setFloat("lightPulse", lightPulse);
+    this.coreShader.setFloat("flarePulse", this.getFlarePulse(lightPulse));
+    this.coreShader.setFloat("filamentActivity", this.getFilamentActivity());
+    this.applyFormationState(lightPulse);
   }
 
   public setState(state: ShadowGrabberFxState) {
@@ -569,6 +679,8 @@ export class ShadowGrabberFxController {
       const duration = Math.max(0.05, this.config.spawnDuration);
       this.spawnElapsed = Math.min(duration, this.spawnElapsed + safeDt);
       this.spawnProgressValue = this.spawnElapsed / duration;
+      this.coreSpawnProgressValue = this.spawnProgressValue;
+      this.smokeSpawnProgressValue = this.spawnProgressValue;
       this.spawning = this.spawnElapsed < duration;
     }
 
@@ -578,31 +690,15 @@ export class ShadowGrabberFxController {
     const flarePulse = this.getFlarePulse(lightPulse);
     const filamentActivity = this.getFilamentActivity();
     this.smokeShader.setFloat("time", this.elapsed);
-    this.smokeShader.setFloat("spawnProgress", this.spawnProgressValue);
     this.smokeShader.setFloat("stateChaos", chaos);
     this.smokeShader.setFloat("statePull", statePull);
     this.coreShader.setFloat("time", this.elapsed);
-    this.coreShader.setFloat("spawnProgress", this.spawnProgressValue);
     this.coreShader.setFloat("stateChaos", chaos);
     this.coreShader.setFloat("statePull", statePull);
     this.coreShader.setFloat("lightPulse", lightPulse);
     this.coreShader.setFloat("flarePulse", flarePulse);
     this.coreShader.setFloat("filamentActivity", filamentActivity);
-
-    const smokeFormation = smoothstep01((this.spawnProgressValue - 0.02) / 0.34);
-    const coreFormation = smoothstep01((this.spawnProgressValue - 0.16) / 0.34);
-    // State changes may alter churn, pull and electrical activity, but the
-    // fully formed portal keeps a stable diameter while the arm animates.
-    this.smokeTorus.scaling.setAll(0.58 + smokeFormation * 0.42);
-    this.coreDisc.scaling.setAll(0.48 + coreFormation * 0.52);
-
-    const lightFormation = smoothstep01((this.spawnProgressValue - 0.1) / 0.5);
-    this.portalLight.intensity =
-      Math.max(0, this.config.lightIntensity) *
-      clamp01(this.config.portalIntensity) *
-      lightFormation *
-      (0.08 + lightPulse * 0.92) *
-      this.getStateLightMultiplier();
+    this.applyFormationState(lightPulse);
   }
 
   public dispose() {
@@ -623,9 +719,59 @@ export class ShadowGrabberFxController {
     if (!active) this.portalLight.intensity = 0;
   }
 
+  private applyFormationState(
+    lightPulse = this.getLightPulse(this.getStateChaos())
+  ) {
+    const smokeProgress = this.smokeSpawnProgressValue;
+    const coreProgress = this.coreSpawnProgressValue;
+    this.smokeShader.setFloat("spawnProgress", smokeProgress);
+    this.smokeShader.setFloat("deathProgress", this.deathProgressValue);
+    this.coreShader.setFloat("spawnProgress", coreProgress);
+    this.coreShader.setFloat("deathProgress", this.deathProgressValue);
+
+    const smokeFormation = this.manualFormation
+      ? smoothstep01(smokeProgress)
+      : smoothstep01((smokeProgress - 0.02) / 0.34);
+    const coreFormation = this.manualFormation
+      ? smoothstep01(coreProgress)
+      : smoothstep01((coreProgress - 0.16) / 0.34);
+    const smokeStartScale = this.manualFormation ? 0.02 : 0.58;
+    const coreStartScale = this.manualFormation ? 0.02 : 0.48;
+    // Manual cinematics can explode outward from a point. Regular Shadow
+    // Grabber spawns preserve their established partial-size formation.
+    const deathBurst = 1 - Math.pow(1 - this.deathProgressValue, 3);
+    const smokeScale =
+      (smokeStartScale + smokeFormation * (1 - smokeStartScale)) *
+      (1 + deathBurst * 0.62);
+    const coreScale =
+      (coreStartScale + coreFormation * (1 - coreStartScale)) *
+      (1 + deathBurst * 0.28);
+    this.smokeTorus.scaling.setAll(smokeScale);
+    this.coreDisc.scaling.setAll(coreScale);
+
+    const lightFormation = this.manualFormation
+      ? smoothstep01(coreProgress)
+      : smoothstep01((coreProgress - 0.1) / 0.5);
+    const deathFlash = Math.sin(
+      Math.min(1, this.deathProgressValue / 0.24) * Math.PI
+    );
+    const deathLightFade = 1 - smoothstep01(
+      (this.deathProgressValue - 0.12) / 0.88
+    );
+    this.portalLight.intensity =
+      Math.max(0, this.config.lightIntensity) *
+      clamp01(this.config.portalIntensity) *
+      lightFormation *
+      (0.08 + lightPulse * 0.92) *
+      this.getStateLightMultiplier() *
+      (1 + deathFlash * 2.4) *
+      deathLightFade;
+  }
+
   private applyShaderUniforms() {
     this.smokeShader.setFloat("time", this.elapsed);
-    this.smokeShader.setFloat("spawnProgress", this.spawnProgressValue);
+    this.smokeShader.setFloat("spawnProgress", this.smokeSpawnProgressValue);
+    this.smokeShader.setFloat("deathProgress", this.deathProgressValue);
     this.smokeShader.setFloat(
       "smokeTurbulence",
       Math.max(
@@ -657,7 +803,8 @@ export class ShadowGrabberFxController {
     this.smokeShader.setFloat("statePull", this.getStatePull());
 
     this.coreShader.setFloat("time", this.elapsed);
-    this.coreShader.setFloat("spawnProgress", this.spawnProgressValue);
+    this.coreShader.setFloat("spawnProgress", this.coreSpawnProgressValue);
+    this.coreShader.setFloat("deathProgress", this.deathProgressValue);
     this.coreShader.setFloat("noiseScale", Math.max(0.1, this.config.noiseScale));
     this.coreShader.setFloat("noiseSpeed", Math.max(0, this.config.noiseSpeed));
     this.coreShader.setFloat(
@@ -713,6 +860,7 @@ export class ShadowGrabberFxController {
     this.coreShader.setFloat("statePull", this.getStatePull());
     this.coreShader.setFloat("lightPulse", 0);
     this.coreShader.setFloat("flarePulse", 0);
+    this.applyFormationState(0);
   }
 
   private getStateSpeed() {
@@ -876,6 +1024,7 @@ export class ShadowGrabberFxController {
           "portalIntensity",
           "stateChaos",
           "statePull",
+          "deathProgress",
         ],
         defines: this.quality === "high" ? ["#define HIGH_QUALITY"] : [],
         needAlphaBlending: true,
@@ -921,6 +1070,7 @@ export class ShadowGrabberFxController {
           "statePull",
           "lightPulse",
           "flarePulse",
+          "deathProgress",
         ],
         defines: this.quality === "high" ? ["#define HIGH_QUALITY"] : [],
         needAlphaBlending: true,

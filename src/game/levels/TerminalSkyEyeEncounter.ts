@@ -1,7 +1,10 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { PlayerController } from "../PlayerController";
 import { isPointInsideWaterSurface, type WaterSurfaceInfo } from "../WaterSurface";
-import type { SkyEyeController } from "../enemies";
+import type {
+  SkyEyeController,
+  SkyEyePresentationProgress,
+} from "../enemies";
 
 export const SKY_EYE_PRESENTATION_SECONDS = 8;
 
@@ -14,7 +17,6 @@ export type TerminalSkyEyeEncounterOptions = {
   player: PlayerController;
   eye: SkyEyeController;
   waterSurface: WaterSurfaceInfo;
-  emergencePosition: Vector3;
   hoverPosition: Vector3;
   triggerMargin?: number;
   presentationSeconds?: number;
@@ -29,12 +31,29 @@ function smoothstep(edge0: number, edge1: number, value: number) {
   return amount * amount * (3 - 2 * amount);
 }
 
-/** One-shot terminal encounter: lake trigger, eight-second reveal, then watch state. */
+function easeOutCubic(edge0: number, edge1: number, value: number) {
+  const amount = clamp01((value - edge0) / Math.max(0.0001, edge1 - edge0));
+  return 1 - Math.pow(1 - amount, 3);
+}
+
+/** Ordered reveal: disc, smoke, tendrils, then the eye crossing the portal. */
+export function getSkyEyePresentationProgress(
+  progress: number
+): SkyEyePresentationProgress {
+  const amount = clamp01(progress);
+  return {
+    disc: easeOutCubic(0, 0.3, amount),
+    smoke: smoothstep(0.32, 0.52, amount),
+    tendrils: smoothstep(0.54, 0.72, amount),
+    eye: smoothstep(0.74, 0.96, amount),
+  };
+}
+
+/** One-shot terminal encounter: lake trigger, portal reveal, then watch state. */
 export class TerminalSkyEyeEncounter {
   private readonly player: PlayerController;
   private readonly eye: SkyEyeController;
   private readonly waterSurface: WaterSurfaceInfo;
-  private readonly emergencePosition: Vector3;
   private readonly hoverPosition: Vector3;
   private readonly triggerMargin: number;
   private readonly presentationSeconds: number;
@@ -46,7 +65,6 @@ export class TerminalSkyEyeEncounter {
     this.player = options.player;
     this.eye = options.eye;
     this.waterSurface = options.waterSurface;
-    this.emergencePosition = options.emergencePosition.clone();
     this.hoverPosition = options.hoverPosition.clone();
     this.triggerMargin = options.triggerMargin ?? 1.25;
     this.presentationSeconds = Math.max(
@@ -54,7 +72,7 @@ export class TerminalSkyEyeEncounter {
       options.presentationSeconds ?? SKY_EYE_PRESENTATION_SECONDS
     );
 
-    this.eye.setPosition(this.emergencePosition);
+    this.eye.setPosition(this.hoverPosition);
     this.eye.setEnabled(false);
   }
 
@@ -92,7 +110,8 @@ export class TerminalSkyEyeEncounter {
     this.currentState = "presenting";
     this.elapsed = 0;
     this.presentationStartedAt = performance.now();
-    this.eye.setPosition(this.emergencePosition);
+    this.eye.setPosition(this.hoverPosition);
+    this.eye.setPresentationProgress(getSkyEyePresentationProgress(0));
     this.eye.setEnabled(true);
     this.eye.snapLookAt(this.player.position);
     document.body.classList.add("sky-eye-cinematic-active");
@@ -124,7 +143,9 @@ export class TerminalSkyEyeEncounter {
       state: this.currentState,
       elapsed: this.elapsed,
       duration: this.presentationSeconds,
-      emergencePosition: this.emergencePosition.clone(),
+      presentation: getSkyEyePresentationProgress(
+        this.elapsed / this.presentationSeconds
+      ),
       hoverPosition: this.hoverPosition.clone(),
       eyePosition: this.eye.root.position.clone(),
     };
@@ -139,27 +160,17 @@ export class TerminalSkyEyeEncounter {
 
   private applyPresentationFrame(progress: number) {
     const amount = clamp01(progress);
-    const emergence = smoothstep(0.06, 0.78, amount);
-    const eyePosition = Vector3.Lerp(
-      this.emergencePosition,
-      this.hoverPosition,
-      emergence
-    );
-    this.eye.setPosition(eyePosition);
+    this.eye.setPosition(this.hoverPosition);
+    this.eye.setPresentationProgress(getSkyEyePresentationProgress(amount));
 
-    // A single lateral take reveals the scale of the eye while its vertical
-    // motion remains readable against the waterfall and both candle flames.
+    // Keep the portal fixed in the sky while a restrained lateral take reveals
+    // each layer without reintroducing the old rise from the lagoon.
     const pan = smoothstep(0, 0.94, amount);
     const cameraPosition = new Vector3(
       this.hoverPosition.x + (-19 + pan * 38),
       this.waterSurface.waterLevel + 7.5 + pan * 7.5,
       this.hoverPosition.z - 27 + Math.sin(pan * Math.PI) * 2.5
     );
-    const target = Vector3.Lerp(
-      eyePosition,
-      this.hoverPosition,
-      smoothstep(0.58, 1, amount) * 0.35
-    );
-    this.player.setCinematicCamera(cameraPosition, target);
+    this.player.setCinematicCamera(cameraPosition, this.hoverPosition);
   }
 }

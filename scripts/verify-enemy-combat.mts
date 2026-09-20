@@ -13,6 +13,8 @@ import {
 } from "../src/game/enemies/core/EnemyTypes.ts";
 import { createSkyEyeConfig, SKY_EYE_TYPE } from "../src/game/enemies/skyEye/SkyEyeConfig.ts";
 import { SkyEyeController } from "../src/game/enemies/skyEye/SkyEyeController.ts";
+import { getSkyEyePortalDeathProgress } from "../src/game/enemies/skyEye/SkyEyeFxController.ts";
+import { getSkyEyePresentationProgress } from "../src/game/levels/TerminalSkyEyeEncounter.ts";
 
 // The combat controller emits browser events; EventTarget is enough here.
 Object.assign(globalThis, { window: new EventTarget() });
@@ -109,6 +111,34 @@ async function verify() {
     Math.abs(coreDiameter - smokeOuterDiameter) <= 0.02,
     "the Sky Eye smoke torus must meet the dark outer edge of the portal disc"
   );
+  assert.deepEqual(getSkyEyePresentationProgress(0.31), {
+    disc: 1,
+    smoke: 0,
+    tendrils: 0,
+    eye: 0,
+  });
+  assert.deepEqual(getSkyEyePresentationProgress(0.53), {
+    disc: 1,
+    smoke: 1,
+    tendrils: 0,
+    eye: 0,
+  });
+  assert.deepEqual(getSkyEyePresentationProgress(0.73), {
+    disc: 1,
+    smoke: 1,
+    tendrils: 1,
+    eye: 0,
+  });
+  assert.deepEqual(getSkyEyePresentationProgress(1), {
+    disc: 1,
+    smoke: 1,
+    tendrils: 1,
+    eye: 1,
+  });
+  assert.equal(getSkyEyePortalDeathProgress(0, 0), 0);
+  assert.equal(getSkyEyePortalDeathProgress(1, 0), 0.28);
+  assert.equal(getSkyEyePortalDeathProgress(1, 0.5), 0.64);
+  assert.equal(getSkyEyePortalDeathProgress(1, 1), 1);
 
   const minor = createEnemy("minor", 1.5);
   await minor.initialize();

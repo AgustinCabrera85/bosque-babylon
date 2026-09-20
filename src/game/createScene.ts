@@ -818,15 +818,10 @@ scene.onBeforeRenderObservable.add(() => {
     waterfallTopY + skyEyeHoverClearance,
     terminalLandmark.caveCandleFocusPoint.z + 0.45
   );
-  const skyEyeEmergencePosition = new Vector3(
-    terminalConfig.lagoonCenterX,
-    terminalConfig.waterLevel - 6.2,
-    terminalLandmark.waterfallImpactPoint.z - 1.8
-  );
   const skyEye = await spawnSkyEye(enemyManager, {
     id: "terminal-sky-eye",
     type: SKY_EYE_TYPE,
-    position: skyEyeEmergencePosition,
+    position: skyEyeHoverPosition,
     enabled: false,
     getTargetPosition: () => player.position,
   });
@@ -837,7 +832,6 @@ scene.onBeforeRenderObservable.add(() => {
     player,
     eye: skyEye,
     waterSurface: terminalLandmark.waterSurface,
-    emergencePosition: skyEyeEmergencePosition,
     hoverPosition: skyEyeHoverPosition,
   });
   const enemyHealthHud = new EnemyHealthHud(skyEye.id);
@@ -1341,7 +1335,7 @@ scene.onBeforeRenderObservable.add(() => {
   onProgress(0.991, "Restaurando bosque...");
   await prepareTransitionState(initialPlayerPosition);
   skyEye.setEnabled(false);
-  skyEye.setPosition(skyEyeEmergencePosition);
+  skyEye.setPosition(skyEyeHoverPosition);
   onProgress(0.995, "Preparando controles...");
 
   // =========================

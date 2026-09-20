@@ -40,6 +40,20 @@ export interface ShadowGrabberPortalMaterialConfig
   iridescenceCycleSpeed: number;
 }
 
+/** Runtime-only artistic controls for the procedural portal shader. */
+export interface ShadowGrabberPortalFxConfig {
+  spawnDuration: number;
+  noiseScale: number;
+  noiseSpeed: number;
+  dissolveSoftness: number;
+  distortion: number;
+  flowSpeed: number;
+  portalIntensity: number;
+  lightIntensity: number;
+  lightRange: number;
+  lightPulseSpeed: number;
+}
+
 export interface ShadowGrabberConfig {
   modelUrl: string;
   baseScale: number;
@@ -49,6 +63,7 @@ export interface ShadowGrabberConfig {
   portalVisualScale: number;
   /** Additional compression along the arm axis so the core reads as a portal. */
   portalDepthScale: number;
+  portalFx: ShadowGrabberPortalFxConfig;
   animationSpeed: Record<ShadowGrabberAnimation, number>;
   animationLoop: Record<ShadowGrabberAnimation, boolean>;
   animationGroupNames: Record<ShadowGrabberAnimation, string>;
@@ -139,6 +154,7 @@ export type ShadowGrabberConfigOverrides = Partial<
     | "nodeNames"
     | "armMaterial"
     | "portalMaterial"
+    | "portalFx"
   >
 > & {
   animationSpeed?: Partial<Record<ShadowGrabberAnimation, number>>;
@@ -147,6 +163,7 @@ export type ShadowGrabberConfigOverrides = Partial<
   nodeNames?: Partial<ShadowGrabberConfig["nodeNames"]>;
   armMaterial?: Partial<ShadowGrabberMaterialConfig>;
   portalMaterial?: Partial<ShadowGrabberPortalMaterialConfig>;
+  portalFx?: Partial<ShadowGrabberPortalFxConfig>;
 };
 
 export const SHADOW_GRABBER_STATE_ANIMATION: Readonly<
@@ -171,6 +188,18 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   // full-size orb that dominated the character silhouette.
   portalVisualScale: 0.5,
   portalDepthScale: 0.25,
+  portalFx: {
+    spawnDuration: 1.65,
+    noiseScale: 2.35,
+    noiseSpeed: 0.22,
+    dissolveSoftness: 0.1,
+    distortion: 0.2,
+    flowSpeed: 0.32,
+    portalIntensity: 0.92,
+    lightIntensity: 0.72,
+    lightRange: 8,
+    lightPulseSpeed: 0.95,
+  },
   animationSpeed: {
     idle: 1,
     alert: 1.15,
@@ -327,6 +356,10 @@ export function createShadowGrabberConfig(
     portalMaterial: {
       ...DEFAULT_SHADOW_GRABBER_CONFIG.portalMaterial,
       ...overrides.portalMaterial,
+    },
+    portalFx: {
+      ...DEFAULT_SHADOW_GRABBER_CONFIG.portalFx,
+      ...overrides.portalFx,
     },
   };
 }

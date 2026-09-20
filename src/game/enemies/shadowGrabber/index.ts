@@ -47,6 +47,10 @@ export function registerShadowGrabber(
           ...overrides.portalMaterial,
           ...spawnOptions.configOverrides?.portalMaterial,
         },
+        portalFx: {
+          ...overrides.portalFx,
+          ...spawnOptions.configOverrides?.portalFx,
+        },
       });
       const controller = new ShadowGrabberController(
         context,
@@ -114,5 +118,6 @@ export {
   type ShadowGrabberConfigOverrides,
   type ShadowGrabberFxQuality,
   type ShadowGrabberMaterialConfig,
+  type ShadowGrabberPortalFxConfig,
   type ShadowGrabberPortalMaterialConfig,
 } from "./ShadowGrabberConfig";

@@ -66,6 +66,9 @@ export class ShadowGrabberController extends BaseEnemyController {
   private portalMaterial: PBRMaterial | null = null;
   private fxController: ShadowGrabberFxController | null = null;
   private fxState: ShadowGrabberFxState = "idle";
+  private fxEnabled = true;
+  private armSpawnVisibility = 1;
+  private portalSpawnVisibility = 0.18;
   private portalRootYOffset = 0;
   private portalIridescencePhase = 0;
 
@@ -136,14 +139,15 @@ export class ShadowGrabberController extends BaseEnemyController {
         this.root.getScene(),
         this.resolvedFxRoot,
         this.resolvedPortalMesh,
-        this.portalMaterial,
         this.config.fxQuality,
-        this.blackSmokeWrapSystem
+        this.blackSmokeWrapSystem,
+        this.config.portalFx
       );
     }
     this.measurePortalRootOffset();
     this.completeInitialization();
     this.fxController?.setOwnerEnabled(this.enabled);
+    this.playSpawn();
     this.setState(ShadowGrabberState.Idle);
   }
 
@@ -166,6 +170,9 @@ export class ShadowGrabberController extends BaseEnemyController {
         (portalConfig.iridescenceIorMax - portalConfig.iridescenceIorMin) * iorMix;
     }
     this.fxController?.update(delta);
+    this.applySpawnReveal(
+      this.fxEnabled ? (this.fxController?.spawnProgress ?? 1) : 1
+    );
   }
 
   public setState(state: ShadowGrabberState) {
@@ -225,7 +232,19 @@ export class ShadowGrabberController extends BaseEnemyController {
   }
 
   public setFxEnabled(enabled: boolean) {
+    this.fxEnabled = enabled;
     this.fxController?.setEnabled(enabled);
+    this.applySpawnReveal(enabled ? (this.fxController?.spawnProgress ?? 1) : 1);
+  }
+
+  /** Restarts the portal formation without creating a render observer. */
+  public playSpawn() {
+    if (!this.fxController || !this.fxEnabled) {
+      this.applySpawnReveal(1);
+      return;
+    }
+    this.fxController.playSpawn();
+    this.applySpawnReveal(0);
   }
 
   public setAnchorPosition(position: Vector3) {
@@ -301,6 +320,8 @@ export class ShadowGrabberController extends BaseEnemyController {
       return;
     }
 
+    this.playSpawn();
+
     if (this.currentAnimation) {
       const group = this.animations.get(this.currentAnimation);
       if (!group) return;
@@ -356,6 +377,7 @@ export class ShadowGrabberController extends BaseEnemyController {
     if (!(armMesh.material instanceof PBRMaterial)) {
       throw new Error(`ShadowGrabber ${this.id}: arm material is not a PBRMaterial`);
     }
+    this.armSpawnVisibility = armMesh.visibility;
     applyPbrConfig(armMesh.material, this.config.armMaterial);
 
     const portalMaterial = this.ownMaterial(
@@ -380,9 +402,21 @@ export class ShadowGrabberController extends BaseEnemyController {
     portalMesh.material = portalMaterial;
     portalMesh.isVisible = true;
     // The authored low-poly core remains as a faint iridescent backing. The
-    // opaque procedural void and its smooth rim are created by the FX layer.
-    portalMesh.visibility = 0.18;
+    // procedural void, dissolve and irregular rim are created by the FX layer.
+    this.portalSpawnVisibility = 0.18;
+    portalMesh.visibility = this.portalSpawnVisibility;
     this.portalMaterial = portalMaterial;
+  }
+
+  private applySpawnReveal(progress: number) {
+    const armMesh = this.resolvedArmMesh;
+    const portalMesh = this.resolvedPortalMesh;
+    if (!armMesh || !portalMesh) return;
+    const normalized = Math.max(0, Math.min(1, progress));
+    const revealLinear = Math.max(0, Math.min(1, (normalized - 0.55) / 0.35));
+    const reveal = revealLinear * revealLinear * (3 - 2 * revealLinear);
+    armMesh.visibility = this.armSpawnVisibility * reveal;
+    portalMesh.visibility = this.portalSpawnVisibility * reveal;
   }
 
   protected override onDeath() {

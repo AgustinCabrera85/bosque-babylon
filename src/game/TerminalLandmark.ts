@@ -395,7 +395,7 @@ export class TerminalLandmarkGenerator {
           emitterPosition: new Vector3(
             config.lagoonCenterX,
             waterfallMetrics.cliffTop - 0.06,
-            waterfallMetrics.sourceZ - 0.08
+            waterfallMetrics.sourceZ - 0.26
           ),
           impactPosition: safeImpactPoint,
           lakeY: config.waterLevel + 0.08,
@@ -909,7 +909,10 @@ export class TerminalLandmarkGenerator {
             widthScale: 0.75,
             xOffset: 0,
             zOffset: 0,
-            opacityScale: 0.82,
+            // FluidRenderer carries the visible mass. The ribbon remains as a
+            // deliberately subdued backing layer that closes reconstruction
+            // holes without reading as a second, flat waterfall.
+            opacityScale: 0.62,
             phase: 0.35,
           },
         ]
@@ -967,8 +970,8 @@ export class TerminalLandmarkGenerator {
     widthScale: number
   ) {
     const paths: Vector3[][] = [];
-    const columnCount = 7;
-    const rowCount = 9;
+    const columnCount = 9;
+    const rowCount = 11;
     const lipZ = metrics.sourceZ + 0.04;
     const upstreamZ = config.backCliffZ + 9;
     const lipHalfWidth = config.waterfallWidth * widthScale * 0.5;
@@ -992,7 +995,19 @@ export class TerminalLandmarkGenerator {
           metrics.cliffTop +
           lerp(0.04, 0.24, upstreamProgress) +
           Math.sin(upstreamProgress * Math.PI * 2 + horizontal) * 0.025;
-        const z = lerp(lipZ, upstreamZ, upstreamProgress);
+        // The lip itself remains welded to the fall. Just behind it, the
+        // feeder develops a shallow, irregular cross-section so the thicker
+        // FluidRenderer emitter has an authored source instead of floating in
+        // front of a perfectly flat plane.
+        const sourceDepthEnvelope = Math.sin(
+          Math.min(1, upstreamProgress / 0.72) * Math.PI
+        );
+        const crossSectionDepth =
+          (Math.cos(horizontal * Math.PI) * 0.16 +
+            Math.sin(horizontal * Math.PI * 2.4 + 0.7) * 0.07) *
+          sourceDepthEnvelope;
+        const z =
+          lerp(lipZ, upstreamZ, upstreamProgress) - crossSectionDepth;
         path.push(new Vector3(x, y, z));
       }
       paths.push(path);
@@ -1032,8 +1047,8 @@ export class TerminalLandmarkGenerator {
     phase: number
   ) {
     const paths: Vector3[][] = [];
-    const columnCount = 7;
-    const rowCount = 15;
+    const columnCount = 11;
+    const rowCount = 19;
     const widthVariation = this.visualConfig.waterfall.widthVariation;
 
     for (let column = 0; column < columnCount; column++) {
@@ -1063,13 +1078,32 @@ export class TerminalLandmarkGenerator {
         // leaving its upper section buried inside the cliff.
         const trajectory = Math.sqrt(fallingProgress);
         const baseZ = lerp(metrics.sourceZ, metrics.impactPoint.z, trajectory);
+        const depthEnvelope = Math.sin(vertical * Math.PI);
+        const centerProjection =
+          Math.pow(1 - Math.abs(horizontal), 1.45) * 0.46;
+        const sideSetback = Math.pow(Math.abs(horizontal), 1.7) * 0.2;
+        const broadDepthFold =
+          Math.sin(horizontal * Math.PI * 1.45 + vertical * 3.1 + phase * 0.43) *
+            0.3 +
+          Math.sin(horizontal * Math.PI * 3.2 - vertical * 5.4 - phase * 0.71) *
+            0.12;
+        // The last fifth separates progressively into uneven tongues, while
+        // the exact impact edge still converges on the authored point.
+        const lowerBreakupEnvelope =
+          (1 - smoothstep(0.06, 0.22, vertical)) *
+          smoothstep(0, 0.045, vertical);
+        const lowerDepthBreakup =
+          Math.sin(horizontal * Math.PI * 2.6 + vertical * 15.0 + phase) *
+          lowerBreakupEnvelope *
+          0.3;
         const z =
           baseZ +
           zOffset * vertical -
-          Math.sin(vertical * Math.PI) * (0.55 + widthScale * 0.18) +
-          Math.sin(vertical * Math.PI * 3.4 + phase) *
-            Math.sin(vertical * Math.PI) *
-            0.07;
+          depthEnvelope * (0.5 + widthScale * 0.16) -
+          centerProjection * depthEnvelope +
+          sideSetback * depthEnvelope +
+          broadDepthFold * depthEnvelope +
+          lowerDepthBreakup;
         path.push(new Vector3(x, y, z));
       }
       paths.push(path);
@@ -1110,8 +1144,21 @@ export class TerminalLandmarkGenerator {
           void main(void) {
             vec3 p = position;
             vec2 waterfallUV = vec2(uv.y, uv.x);
-            p.x += sin(waterfallUV.y * 18.0 - time * 1.15 + layerPhase) * noiseStrength * 0.045;
-            p.z += sin(waterfallUV.y * 11.0 + waterfallUV.x * 5.0 + time * 0.72) * noiseStrength * 0.035;
+            float vertical = waterfallUV.y;
+            float depthEnvelope = sin(vertical * 3.14159265);
+            float lowerBreakup = (1.0 - smoothstep(0.06, 0.22, vertical)) *
+              smoothstep(0.0, 0.045, vertical);
+            float broadFold = sin(vertical * 7.4 + waterfallUV.x * 4.8 + time * 0.48 + layerPhase);
+            float detailFold = sin(vertical * 17.0 - waterfallUV.x * 11.5 - time * 0.83 + layerPhase * 1.7);
+            p.x += sin(vertical * 18.0 - time * 1.15 + layerPhase) *
+              noiseStrength * 0.045 * depthEnvelope;
+            // Motion is intentionally deeper than it is wide. Both envelopes
+            // are zero at the source and impact so the animated folds cannot
+            // detach the ribbon from either authored endpoint.
+            p.z += broadFold * noiseStrength * 0.55 * depthEnvelope;
+            p.z += detailFold * noiseStrength * 0.22 * depthEnvelope;
+            p.z += sin(waterfallUV.x * 18.0 + time * 1.3 + layerPhase) *
+              noiseStrength * 0.62 * lowerBreakup;
             vUV = uv;
             gl_Position = worldViewProjection * vec4(p, 1.0);
           }
@@ -1144,6 +1191,10 @@ export class TerminalLandmarkGenerator {
             );
           }
 
+          float flowBand(float x, float center, float halfWidth) {
+            return 1.0 - smoothstep(halfWidth * 0.58, halfWidth, abs(x - center));
+          }
+
           void main(void) {
             vec2 waterfallUV = vec2(vUV.y, vUV.x);
             float verticalFlow = waterfallUV.y + time * scrollSpeed;
@@ -1157,7 +1208,30 @@ export class TerminalLandmarkGenerator {
             float fineFlow = noise(vec2(waterfallUV.x * 13.0 + slowWarp * 1.7, verticalFlow * 1.12 - layerPhase));
             float softStreaks = smoothstep(0.32, 0.88, broad * 0.52 + fineFlow * 0.48);
             float brokenFlow = smoothstep(0.2, 0.84, broad * 0.56 + detail * 0.29 + fineFlow * 0.15);
-            float transparency = 0.18 + softStreaks * 0.28 + brokenFlow * 0.3;
+            // Four irregular but connected broad streams replace the uniform
+            // curtain. Their low shared floor keeps the backing continuous.
+            float bandWarp = slowWarp * 0.045 + sin(verticalFlow * 0.42) * 0.012;
+            float streamA = flowBand(waterfallUV.x, 0.14 + bandWarp, 0.14);
+            float streamB = flowBand(waterfallUV.x, 0.39 - bandWarp * 0.55, 0.17);
+            float streamC = flowBand(waterfallUV.x, 0.64 + bandWarp * 0.35, 0.135);
+            float streamD = flowBand(waterfallUV.x, 0.86 - bandWarp * 0.72, 0.12);
+            float streamMass = max(max(streamA * 0.84, streamB), max(streamC * 0.9, streamD * 0.76));
+            float connectedStreams = 0.3 + streamMass * 0.7;
+
+            // Breakup grows only through the lowest fifth. It is noise-driven
+            // and progressive, leaving droplets and reconstructed fluid to own
+            // the final impact instead of ending the sheet with a hard cut.
+            float lowerZone = 1.0 - smoothstep(0.0, 0.2, waterfallUV.y);
+            float breakupNoise = smoothstep(
+              0.27,
+              0.83,
+              broad * 0.46 + detail * 0.36 + fineFlow * 0.18
+            );
+            float lowerContinuity = mix(1.0, 0.34 + breakupNoise * 0.66, lowerZone);
+            float transparency =
+              (0.18 + softStreaks * 0.28 + brokenFlow * 0.3) *
+              connectedStreams *
+              lowerContinuity;
             float startBlend = mix(1.0, smoothstep(0.0, 0.055, waterfallUV.y), fadeStart);
             float endBlend = mix(1.0, smoothstep(0.0, 0.075, 1.0 - waterfallUV.y), fadeEnd);
             float verticalBlend = startBlend * endBlend;
@@ -1215,7 +1289,7 @@ export class TerminalLandmarkGenerator {
       { radius: 1, tessellation: 48, sideOrientation: Mesh.DOUBLESIDE },
       this.scene
     );
-    foam.scaling.set(config.waterfallWidth * 0.7, 3.5, 1);
+    foam.scaling.set(config.waterfallWidth * 0.82, 4.15, 1);
     foam.rotation.x = Math.PI * 0.5;
     foam.position.copyFrom(impactPoint);
     foam.isPickable = false;
@@ -1257,6 +1331,13 @@ export class TerminalLandmarkGenerator {
             float rings = sin(distanceFromImpact * 26.0 - time * 2.25 + sin(angle * 5.0) * 0.7) * 0.5 + 0.5;
             float brokenFoam = smoothstep(0.38, 0.9, rings) * softPatch;
             float centerChurn = 1.0 - smoothstep(0.04, 0.56, distanceFromImpact);
+            float impactDepth = 1.0 - smoothstep(0.08, 0.74, abs(p.y));
+            float zoneA = 1.0 - smoothstep(0.1, 0.24, abs(p.x + 0.68));
+            float zoneB = 1.0 - smoothstep(0.12, 0.3, abs(p.x + 0.23));
+            float zoneC = 1.0 - smoothstep(0.1, 0.25, abs(p.x - 0.25));
+            float zoneD = 1.0 - smoothstep(0.08, 0.21, abs(p.x - 0.7));
+            float localizedChurn = max(max(zoneA * 0.76, zoneB), max(zoneC * 0.9, zoneD * 0.7));
+            localizedChurn *= impactDepth;
 
             // Small expanding cells continually appear and vanish across the
             // impact patch, suggesting aerated water without extra geometry.
@@ -1272,8 +1353,8 @@ export class TerminalLandmarkGenerator {
             float bubbleLife = smoothstep(0.02, 0.16, bubblePhase) * (1.0 - smoothstep(0.64, 1.0, bubblePhase));
             float bubbles = bubbleRing * bubbleLife * softPatch;
 
-            float opacity = foamAlpha * softPatch * (0.25 + brokenFoam * 0.48 + centerChurn * 0.34 + bubbles * 0.62);
-            vec3 foamColor = mix(vec3(0.18, 0.30, 0.31), vec3(0.62, 0.72, 0.73), brokenFoam * 0.5 + centerChurn * 0.3 + bubbles * 0.55);
+            float opacity = foamAlpha * softPatch * (0.2 + brokenFoam * 0.42 + centerChurn * 0.22 + localizedChurn * 0.28 + bubbles * 0.58);
+            vec3 foamColor = mix(vec3(0.18, 0.30, 0.31), vec3(0.58, 0.69, 0.70), brokenFoam * 0.44 + centerChurn * 0.22 + localizedChurn * 0.24 + bubbles * 0.5);
             gl_FragColor = vec4(foamColor * 0.78, opacity);
           }
         `,
@@ -1320,8 +1401,20 @@ export class TerminalLandmarkGenerator {
     );
     splash.particleTexture = texture;
     splash.emitter = impactPoint.add(new Vector3(0, 0.12, 0));
-    splash.minEmitBox = new Vector3(-config.waterfallWidth * 0.34, 0, -0.45);
-    splash.maxEmitBox = new Vector3(config.waterfallWidth * 0.34, 0.15, 0.45);
+    const splashStreamCenters = [-0.34, -0.115, 0.125, 0.35];
+    splash.startPositionFunction = (worldMatrix, position) => {
+      const streamIndex = Math.floor(Math.random() * splashStreamCenters.length);
+      const streamCenter = splashStreamCenters[streamIndex] * config.waterfallWidth;
+      const localX =
+        streamCenter + (Math.random() - 0.5) * config.waterfallWidth * 0.13;
+      Vector3.TransformCoordinatesFromFloatsToRef(
+        localX,
+        Math.random() * 0.15,
+        (Math.random() - 0.5) * 0.95,
+        worldMatrix,
+        position
+      );
+    };
     splash.direction1 = new Vector3(-0.9, 1.8, -0.65);
     splash.direction2 = new Vector3(0.9, 3.1, 0.35);
     splash.color1 = new Color4(0.72, 0.87, 0.88, 0.72);
@@ -1371,8 +1464,20 @@ export class TerminalLandmarkGenerator {
     );
     system.particleTexture = texture;
     system.emitter = impactPoint.add(new Vector3(0, 0.1, 0));
-    system.minEmitBox = new Vector3(-config.waterfallWidth * 0.38, 0, -0.65);
-    system.maxEmitBox = new Vector3(config.waterfallWidth * 0.38, 0.16, 0.65);
+    const dropletStreamCenters = [-0.34, -0.115, 0.125, 0.35];
+    system.startPositionFunction = (worldMatrix, position) => {
+      const streamIndex = Math.floor(Math.random() * dropletStreamCenters.length);
+      const streamCenter = dropletStreamCenters[streamIndex] * config.waterfallWidth;
+      const localX =
+        streamCenter + (Math.random() - 0.5) * config.waterfallWidth * 0.16;
+      Vector3.TransformCoordinatesFromFloatsToRef(
+        localX,
+        Math.random() * 0.16,
+        (Math.random() - 0.5) * 1.25,
+        worldMatrix,
+        position
+      );
+    };
     system.direction1 = new Vector3(-1.35, 2.1, -0.9);
     system.direction2 = new Vector3(1.35, 4.25, 0.8);
     system.color1 = new Color4(0.86, 0.96, 0.97, 0.96);
@@ -1384,12 +1489,12 @@ export class TerminalLandmarkGenerator {
     system.maxScaleX = 0.82;
     system.minScaleY = 1.1;
     system.maxScaleY = 1.85;
-    system.minLifeTime = 0.3;
-    system.maxLifeTime = 0.86;
+    system.minLifeTime = 0.34;
+    system.maxLifeTime = 0.8;
     system.minEmitPower = 0.85;
     system.maxEmitPower = 1.25;
     system.updateSpeed = 0.012;
-    system.gravity = new Vector3(0, -7.4, 0);
+    system.gravity = new Vector3(0, -8.4, 0);
     system.blendMode = ParticleSystem.BLENDMODE_STANDARD;
     system.renderingGroupId = 1;
     system.emitRate = 0;
@@ -1429,17 +1534,17 @@ export class TerminalLandmarkGenerator {
     );
     mist.particleTexture = texture;
     mist.emitter = impactPoint.add(new Vector3(0, 0.32, -0.1));
-    mist.minEmitBox = new Vector3(-config.waterfallWidth * 0.42, 0, -0.8);
-    mist.maxEmitBox = new Vector3(config.waterfallWidth * 0.42, 0.35, 0.8);
-    mist.direction1 = new Vector3(-0.35, 0.5, -0.4);
-    mist.direction2 = new Vector3(0.35, 1.25, 0.25);
-    mist.color1 = new Color4(0.5, 0.66, 0.67, 0.22);
-    mist.color2 = new Color4(0.3, 0.5, 0.52, 0.12);
+    mist.minEmitBox = new Vector3(-config.waterfallWidth * 0.36, 0, -0.52);
+    mist.maxEmitBox = new Vector3(config.waterfallWidth * 0.36, 0.26, 0.52);
+    mist.direction1 = new Vector3(-0.32, 0.42, -0.32);
+    mist.direction2 = new Vector3(0.32, 1.0, 0.22);
+    mist.color1 = new Color4(0.45, 0.61, 0.62, 0.2);
+    mist.color2 = new Color4(0.28, 0.46, 0.48, 0.1);
     mist.colorDead = new Color4(0.12, 0.2, 0.22, 0);
-    mist.minSize = 0.5;
-    mist.maxSize = 1.65;
-    mist.minLifeTime = 0.75;
-    mist.maxLifeTime = 1.65;
+    mist.minSize = 0.45;
+    mist.maxSize = 1.3;
+    mist.minLifeTime = 0.55;
+    mist.maxLifeTime = 1.18;
     mist.emitRate = 22;
     mist.minEmitPower = 0.25;
     mist.maxEmitPower = 0.85;

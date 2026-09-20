@@ -120,7 +120,7 @@ export function createFluidWaterfallConfig(
     debug: placement.debug ?? false,
     preset,
     emitterWidth: placement.emitterWidth,
-    emitterDepth: 0.72,
+    emitterDepth: 1.42,
     emitterPosition: placement.emitterPosition.clone(),
     impactPosition: placement.impactPosition.clone(),
     lakeY: placement.lakeY,
@@ -133,16 +133,16 @@ export function createFluidWaterfallConfig(
     initialForwardSpeed,
     initialDownSpeed,
     gravityStrength,
-    lateralJitter: 0.11,
+    lateralJitter: 0.14,
     convergenceStrength: 0.028,
     minLifeTime,
     maxLifeTime,
     // FluidRenderer is now a detail layer over the authored water sheet, so
     // individual reconstructed droplets stay small and translucent.
-    particleSize: preset === "low" ? 0.44 : preset === "high" ? 0.3 : 0.36,
-    density: 0.52,
-    surfaceThickness: 0.3,
-    minimumThickness: 0.025,
+    particleSize: preset === "low" ? 0.48 : preset === "high" ? 0.34 : 0.4,
+    density: 0.72,
+    surfaceThickness: 0.4,
+    minimumThickness: 0.038,
     blurSize: preset === "high" ? 6 : preset === "low" ? 4 : 5,
     blurDepthScale: 18,
     refractionStrength: 0.028,
@@ -317,16 +317,28 @@ export class FluidWaterfallController {
     );
     system.particleTexture = this.particleTexture;
     system.emitter = config.emitterPosition.clone();
-    system.createBoxEmitter(
-      Vector3.Zero(),
-      Vector3.Zero(),
-      new Vector3(-config.emitterWidth * 0.5, -0.05, -config.emitterDepth * 0.5),
-      new Vector3(config.emitterWidth * 0.5, 0.05, config.emitterDepth * 0.5)
-    );
+    const sourceStreams = [-0.34, -0.115, 0.125, 0.35];
+    system.startPositionFunction = (worldMatrix, position) => {
+      const useStream = this.random() < 0.78;
+      const streamIndex = Math.floor(this.random() * sourceStreams.length);
+      const normalizedX = useStream
+        ? sourceStreams[streamIndex] + (this.random() - 0.5) * 0.18
+        : (this.random() - 0.5) * 0.92;
+      const centerDepth = 0.78 + (1 - Math.abs(normalizedX)) * 0.22;
+      const localZ =
+        (this.random() * 2 - 1) * config.emitterDepth * 0.5 * centerDepth;
+      Vector3.TransformCoordinatesFromFloatsToRef(
+        normalizedX * config.emitterWidth,
+        (this.random() - 0.5) * 0.1,
+        localZ,
+        worldMatrix,
+        position
+      );
+    };
     system.startDirectionFunction = (_worldMatrix, direction, particle) => {
       const lateralOffset = particle.position.x - config.emitterPosition.x;
       const jitterX = (this.random() * 2 - 1) * config.lateralJitter;
-      const jitterZ = (this.random() * 2 - 1) * config.lateralJitter * 0.35;
+      const jitterZ = (this.random() * 2 - 1) * config.lateralJitter * 0.65;
       direction.set(
         -lateralOffset * config.convergenceStrength + jitterX,
         -config.initialDownSpeed,
@@ -357,7 +369,7 @@ export class FluidWaterfallController {
     renderObject.object.particleThicknessAlpha = config.surfaceThickness;
 
     const target = renderObject.targetRenderer;
-    target.fluidColor = new Color3(0.76, 0.88, 0.9);
+    target.fluidColor = new Color3(0.5, 0.65, 0.67);
     target.density = config.density;
     target.refractionStrength = config.refractionStrength;
     target.fresnelClamp = config.fresnelClamp;
@@ -368,7 +380,7 @@ export class FluidWaterfallController {
     target.blurDepthDepthScale = config.blurDepthScale;
     target.blurDepthNumIterations = 2;
     target.enableBlurThickness = true;
-    target.blurThicknessFilterSize = Math.max(3, config.blurSize - 2);
+    target.blurThicknessFilterSize = Math.max(4, config.blurSize - 1);
     target.blurThicknessNumIterations = 1;
     target.depthMapSize = config.renderTargetSize;
     target.thicknessMapSize = Math.max(192, Math.floor(config.renderTargetSize * 0.5));

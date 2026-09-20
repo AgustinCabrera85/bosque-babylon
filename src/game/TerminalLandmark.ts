@@ -35,6 +35,7 @@ import {
   TERMINAL_LAGOON_VISUAL_CONFIG,
   type TerminalLagoonVisualConfig,
 } from "./TerminalLagoonVisualConfig";
+import { applyTerminalLagoonRockMaterial } from "./TerminalLagoonRockMaterial";
 import type { WaterSurfaceInfo } from "./WaterSurface";
 
 export const DEFAULT_END_HOUSE_SEGMENT = 8;
@@ -358,6 +359,7 @@ export class TerminalLandmarkGenerator {
     const root = new TransformNode("terminalWaterfallLagoonRoot", this.scene);
     const random = mulberry32(config.seed);
 
+    applyTerminalLagoonRockMaterial(this.scene, this.terrain.mesh, config);
     this.createFadingTrail(root, config, random);
     const lagoon = this.createLagoon(root, config);
     lagoon.computeWorldMatrix(true);
@@ -534,7 +536,11 @@ export class TerminalLandmarkGenerator {
       patch.isPickable = false;
       patch.receiveShadows = true;
       patch.setParent(root);
-      setGameMaterial(patch, "soil", this.scene);
+      setGameMaterial(patch, "soil", this.scene, { applyVisual: false });
+      // These authored transition decals used to expose the untextured soil
+      // material over the new rock terrain. Reuse the terrain material so its
+      // world-space sampling remains continuous across their circular edges.
+      patch.material = this.terrain.mesh.material;
     }
   }
 

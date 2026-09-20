@@ -47,6 +47,12 @@ function applyPbrConfig(
   material.roughness = config.roughness;
   material.environmentIntensity = config.environmentIntensity;
   material.emissiveColor.setAll(0);
+  material.emissiveIntensity = 0;
+  material.sheen.isEnabled = config.sheenIntensity > 0;
+  material.sheen.color = Color3.FromArray(config.sheenColor);
+  material.sheen.intensity = Math.max(0, config.sheenIntensity);
+  material.sheen.roughness = Math.max(0, Math.min(1, config.sheenRoughness));
+  material.sheen.albedoScaling = true;
   material.alpha = 1;
   material.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
 }
@@ -63,14 +69,11 @@ export class ShadowGrabberController extends BaseEnemyController {
   private resolvedSkeleton: Skeleton | null = null;
   private resolvedAttackPointBone: Bone | null = null;
   private resolvedFxRoot: TransformNode | null = null;
-  private portalMaterial: PBRMaterial | null = null;
   private fxController: ShadowGrabberFxController | null = null;
   private fxState: ShadowGrabberFxState = "idle";
   private fxEnabled = true;
   private armSpawnVisibility = 1;
-  private portalSpawnVisibility = 0.18;
   private portalRootYOffset = 0;
-  private portalIridescencePhase = 0;
 
   public constructor(
     context: EnemyControllerContext,
@@ -132,7 +135,6 @@ export class ShadowGrabberController extends BaseEnemyController {
     if (
       this.resolvedFxRoot &&
       this.resolvedPortalMesh &&
-      this.portalMaterial &&
       this.config.fxQuality !== "off"
     ) {
       this.fxController = new ShadowGrabberFxController(
@@ -159,16 +161,6 @@ export class ShadowGrabberController extends BaseEnemyController {
       this.portalRotationSpeed * delta * (this.fxState === "hunt" ? 1.2 : 1),
       Space.LOCAL
     );
-    if (this.portalMaterial) {
-      const portalConfig = this.config.portalMaterial;
-      this.portalIridescencePhase =
-        (this.portalIridescencePhase + delta * portalConfig.iridescenceCycleSpeed) %
-        (Math.PI * 2);
-      const iorMix = (Math.sin(this.portalIridescencePhase) + 1) * 0.5;
-      this.portalMaterial.iridescence.indexOfRefraction =
-        portalConfig.iridescenceIorMin +
-        (portalConfig.iridescenceIorMax - portalConfig.iridescenceIorMin) * iorMix;
-    }
     this.fxController?.update(delta);
     this.applySpawnReveal(
       this.fxEnabled ? (this.fxController?.spawnProgress ?? 1) : 1
@@ -349,7 +341,6 @@ export class ShadowGrabberController extends BaseEnemyController {
     this.resolvedSkeleton = null;
     this.resolvedAttackPointBone = null;
     this.resolvedFxRoot = null;
-    this.portalMaterial = null;
   }
 
   private resolveAnimations() {
@@ -380,43 +371,24 @@ export class ShadowGrabberController extends BaseEnemyController {
     this.armSpawnVisibility = armMesh.visibility;
     applyPbrConfig(armMesh.material, this.config.armMaterial);
 
-    const portalMaterial = this.ownMaterial(
-      new PBRMaterial(`shadowGrabber:${this.id}:portalMaterial`, this.root.getScene())
-    );
-    applyPbrConfig(portalMaterial, this.config.portalMaterial);
-    portalMaterial.iridescence.isEnabled = true;
-    portalMaterial.iridescence.intensity =
-      this.config.portalMaterial.iridescenceIntensity;
-    portalMaterial.iridescence.indexOfRefraction =
-      (this.config.portalMaterial.iridescenceIorMin +
-        this.config.portalMaterial.iridescenceIorMax) *
-      0.5;
-    portalMaterial.iridescence.minimumThickness = 170;
-    portalMaterial.iridescence.maximumThickness = 460;
-    portalMaterial.emissiveColor = new Color3(0.004, 0.006, 0.014);
     const visualScale = Math.max(0.1, this.config.portalVisualScale);
     const depthScale = Math.max(0.04, this.config.portalDepthScale);
     portalMesh.scaling.multiplyInPlace(
       new Vector3(visualScale * depthScale, visualScale, visualScale)
     );
-    portalMesh.material = portalMaterial;
-    portalMesh.isVisible = true;
-    // The authored low-poly core remains as a faint iridescent backing. The
-    // procedural void, dissolve and irregular rim are created by the FX layer.
-    this.portalSpawnVisibility = 0.18;
-    portalMesh.visibility = this.portalSpawnVisibility;
-    this.portalMaterial = portalMaterial;
+    // ShadowOrb_Core now supplies only authored bounds, center and pivot data.
+    // Its faceted PBR geometry must never contribute to the visible portal.
+    portalMesh.isVisible = false;
+    portalMesh.visibility = 0;
   }
 
   private applySpawnReveal(progress: number) {
     const armMesh = this.resolvedArmMesh;
-    const portalMesh = this.resolvedPortalMesh;
-    if (!armMesh || !portalMesh) return;
+    if (!armMesh) return;
     const normalized = Math.max(0, Math.min(1, progress));
     const revealLinear = Math.max(0, Math.min(1, (normalized - 0.55) / 0.35));
     const reveal = revealLinear * revealLinear * (3 - 2 * revealLinear);
     armMesh.visibility = this.armSpawnVisibility * reveal;
-    portalMesh.visibility = this.portalSpawnVisibility * reveal;
   }
 
   protected override onDeath() {

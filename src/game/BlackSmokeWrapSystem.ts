@@ -54,6 +54,12 @@ export type BlackSmokeWrapOptions = {
   /** Keeps both billboard axes equal, using `particleSize` for radial volume. */
   uniformParticleScale?: boolean;
   orbitSpeed?: number;
+  /** Radial fold strength used to make the envelope breathe inward/outward. */
+  radialTurbulence?: number;
+  /** Local acceleration/deceleration applied while particles orbit. */
+  orbitTurbulence?: number;
+  /** Frequency multiplier for the layered orbital turbulence. */
+  churnSpeed?: number;
   upwardDrift?: number;
   density?: number;
   opacity?: number;
@@ -75,6 +81,9 @@ type ResolvedOptions = {
   elongation: number;
   uniformParticleScale: boolean;
   orbitSpeed: number;
+  radialTurbulence: number;
+  orbitTurbulence: number;
+  churnSpeed: number;
   upwardDrift: number;
   density: number;
   opacity: number;
@@ -118,6 +127,9 @@ function resolveOptions(
     elongation: clamp(options.elongation ?? 1, 0.5, 3),
     uniformParticleScale: options.uniformParticleScale === true,
     orbitSpeed: clamp(options.orbitSpeed ?? 0.72, -4, 4),
+    radialTurbulence: clamp(options.radialTurbulence ?? 0.11, 0, 0.45),
+    orbitTurbulence: clamp(options.orbitTurbulence ?? 0, 0, 0.75),
+    churnSpeed: clamp(options.churnSpeed ?? 1, 0.1, 4),
     upwardDrift: clamp(options.upwardDrift ?? 0.28, -2, 2),
     density: clamp(options.density ?? 1, 0.2, 2),
     opacity: clamp(options.opacity ?? 0.56, 0.02, 0.9),
@@ -365,7 +377,15 @@ export class BlackSmokeWrapEffect {
         const particle = particles[index];
         const state = particle.metadata as SmokeParticleState | null;
         if (!state) continue;
-        state.phase = (state.phase + state.angularVelocity * deltaSeconds) % TAU;
+        const orbitChurn = Math.sin(
+          state.wobblePhase * 1.37 +
+          state.phase * 2.1 +
+          particle.age * this.options.churnSpeed
+        );
+        const orbitMultiplier =
+          1 + orbitChurn * this.options.orbitTurbulence;
+        state.phase =
+          (state.phase + state.angularVelocity * orbitMultiplier * deltaSeconds) % TAU;
         this.writeParticlePosition(particle, state, worldMatrix);
       }
     };
@@ -377,15 +397,25 @@ export class BlackSmokeWrapEffect {
     worldMatrix: Matrix
   ) {
     const ageRatio = particle.lifeTime > 0 ? particle.age / particle.lifeTime : 0;
-    const wobble = Math.sin(
-      state.wobblePhase + state.phase * state.wobbleSpeed
+    const primaryFold = Math.sin(
+      state.wobblePhase +
+      state.phase * state.wobbleSpeed +
+      particle.age * this.options.churnSpeed * 0.72
     );
-    const radiusPulse = state.radiusScale * (1 + wobble * 0.11);
+    const counterFold = Math.sin(
+      state.wobblePhase * 1.71 -
+      state.phase * 2.35 +
+      particle.age * this.options.churnSpeed * 1.18
+    );
+    const radialFold =
+      primaryFold * this.options.radialTurbulence +
+      counterFold * this.options.radialTurbulence * 0.42;
+    const radiusPulse = state.radiusScale * Math.max(0.52, 1 + radialFold);
     this.localPosition.set(
       Math.cos(state.phase) * this.options.radiusX * radiusPulse,
       state.baseHeight +
         this.options.upwardDrift * ageRatio +
-        wobble * this.options.height * 0.055,
+        (primaryFold * 0.045 + counterFold * 0.035) * this.options.height,
       Math.sin(state.phase) * this.options.radiusZ * radiusPulse
     );
     Vector3.TransformCoordinatesToRef(

@@ -32,6 +32,13 @@ export interface ShadowGrabberMaterialConfig {
   environmentIntensity: number;
 }
 
+export interface ShadowGrabberArmMaterialConfig
+  extends ShadowGrabberMaterialConfig {
+  sheenColor: readonly [number, number, number];
+  sheenIntensity: number;
+  sheenRoughness: number;
+}
+
 export interface ShadowGrabberPortalMaterialConfig
   extends ShadowGrabberMaterialConfig {
   iridescenceIntensity: number;
@@ -48,10 +55,27 @@ export interface ShadowGrabberPortalFxConfig {
   dissolveSoftness: number;
   distortion: number;
   flowSpeed: number;
+  shadowMotionStrength: number;
+  vortexSpeed: number;
+  innerFlareIntensity: number;
+  originIntensity: number;
+  originRadius: number;
+  originPulseSpeed: number;
+  filamentIntensity: number;
+  filamentThickness: number;
+  filamentPulseSpeed: number;
+  filamentPulseStrength: number;
+  filamentBandInner: number;
+  filamentBandOuter: number;
+  coreDarkness: number;
   portalIntensity: number;
   lightIntensity: number;
   lightRange: number;
   lightPulseSpeed: number;
+  smokeIntensity: number;
+  smokeOpacity: number;
+  smokeRadiusScale: number;
+  smokeDensity: number;
 }
 
 export interface ShadowGrabberConfig {
@@ -74,7 +98,7 @@ export interface ShadowGrabberConfig {
     skeleton: string;
     attackPointBone: string;
   };
-  armMaterial: ShadowGrabberMaterialConfig;
+  armMaterial: ShadowGrabberArmMaterialConfig;
   portalMaterial: ShadowGrabberPortalMaterialConfig;
   runningDetectionBonus: number;
   activationRange: number;
@@ -161,7 +185,7 @@ export type ShadowGrabberConfigOverrides = Partial<
   animationLoop?: Partial<Record<ShadowGrabberAnimation, boolean>>;
   animationGroupNames?: Partial<Record<ShadowGrabberAnimation, string>>;
   nodeNames?: Partial<ShadowGrabberConfig["nodeNames"]>;
-  armMaterial?: Partial<ShadowGrabberMaterialConfig>;
+  armMaterial?: Partial<ShadowGrabberArmMaterialConfig>;
   portalMaterial?: Partial<ShadowGrabberPortalMaterialConfig>;
   portalFx?: Partial<ShadowGrabberPortalFxConfig>;
 };
@@ -191,14 +215,31 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   portalFx: {
     spawnDuration: 1.65,
     noiseScale: 2.35,
-    noiseSpeed: 0.22,
+    noiseSpeed: 0.36,
     dissolveSoftness: 0.1,
-    distortion: 0.2,
-    flowSpeed: 0.32,
+    distortion: 0.22,
+    flowSpeed: 0.52,
+    shadowMotionStrength: 0.98,
+    vortexSpeed: 0.38,
+    innerFlareIntensity: 0.34,
+    originIntensity: 0.9,
+    originRadius: 0.22,
+    originPulseSpeed: 1.6,
+    filamentIntensity: 1.05,
+    filamentThickness: 0.105,
+    filamentPulseSpeed: 2.7,
+    filamentPulseStrength: 1,
+    filamentBandInner: 0.08,
+    filamentBandOuter: 0.72,
+    coreDarkness: 0.985,
     portalIntensity: 0.92,
-    lightIntensity: 0.72,
-    lightRange: 8,
-    lightPulseSpeed: 0.95,
+    lightIntensity: 0.22,
+    lightRange: 4.5,
+    lightPulseSpeed: 0.78,
+    smokeIntensity: 1.18,
+    smokeOpacity: 0.9,
+    smokeRadiusScale: 1.12,
+    smokeDensity: 1.9,
   },
   animationSpeed: {
     idle: 1,
@@ -240,6 +281,9 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
     metallic: 0,
     roughness: 0.4,
     environmentIntensity: 0.45,
+    sheenColor: [0.014, 0.017, 0.03],
+    sheenIntensity: 0.065,
+    sheenRoughness: 0.38,
   },
   portalMaterial: {
     albedo: [0.0015, 0.002, 0.005],

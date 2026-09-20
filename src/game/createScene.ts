@@ -1153,6 +1153,33 @@ scene.onBeforeRenderObservable.add(() => {
           z
         );
       },
+      facePlayerAt: (x: number, z: number) => {
+        const directionX = x - player.position.x;
+        const directionZ = z - player.position.z;
+        if (Math.hypot(directionX, directionZ) <= 0.001) return;
+        const desiredYaw = Math.atan2(directionX, directionZ);
+        const yawDelta = Math.atan2(
+          Math.sin(desiredYaw - player.root.rotation.y),
+          Math.cos(desiredYaw - player.root.rotation.y)
+        );
+        player.addMobileLook(yawDelta / 0.0032, 0);
+      },
+      aimPlayerAt: (x: number, y: number, z: number) => {
+        player.camera.getViewMatrix(true);
+        const cameraPosition = player.camera.globalPosition;
+        const directionX = x - cameraPosition.x;
+        const directionZ = z - cameraPosition.z;
+        const planarDistance = Math.hypot(directionX, directionZ);
+        if (planarDistance <= 0.001) return;
+        const desiredYaw = Math.atan2(directionX, directionZ);
+        const yawDelta = Math.atan2(
+          Math.sin(desiredYaw - player.root.rotation.y),
+          Math.cos(desiredYaw - player.root.rotation.y)
+        );
+        const desiredPitch = Math.atan2(cameraPosition.y - y, planarDistance);
+        const pitchDelta = desiredPitch - player.camera.rotation.x;
+        player.addMobileLook(yawDelta / 0.0032, pitchDelta / 0.0027);
+      },
     };
     const debugGlobal = globalThis as typeof globalThis & {
       __bosqueShadowGrabberDebug?: typeof shadowGrabberDebug;

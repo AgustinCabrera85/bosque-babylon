@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const baseUrl = process.argv[2] ?? "http://127.0.0.1:5173/";
+const captureMode = process.argv[3] ?? "aura";
 const chromeCandidates = [
   process.env.CHROME_PATH,
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
@@ -203,9 +204,11 @@ try {
     mobile: false,
   });
   const url = new URL(baseUrl);
-  url.searchParams.set("shadowAuraDebug", "1");
-  url.searchParams.set("shadowHealth", "100");
-  url.searchParams.set("shadowSanity", "100");
+  if (captureMode !== "grabber") {
+    url.searchParams.set("shadowAuraDebug", "1");
+    url.searchParams.set("shadowHealth", "100");
+    url.searchParams.set("shadowSanity", "100");
+  }
   url.searchParams.set("shadowView", "iso");
   await client.send("Page.navigate", { url: url.toString() });
   await waitForExpression(client, "document.readyState === 'complete'", 20_000, "the document");
@@ -217,16 +220,112 @@ try {
     120_000,
     "the game scene"
   );
-  await waitForExpression(
-    client,
-    "document.querySelector('[data-shadow-metric=ready]')?.textContent.includes('sistemas') === true",
-    20_000,
-    "the NPE systems"
-  );
+  if (captureMode !== "grabber") {
+    await waitForExpression(
+      client,
+      "document.querySelector('[data-shadow-metric=ready]')?.textContent.includes('sistemas') === true",
+      20_000,
+      "the NPE systems"
+    );
+  }
   await delay(2500);
 
-  const idle = { frames: await sampleFrames(client), metrics: await readMetrics(client) };
-  const idleScreenshot = await capture(client, screenshots, "idle-iso-100-100");
+  if (captureMode === "grabber") {
+    await waitForExpression(
+      client,
+      "globalThis.__bosqueWaterContactDebug?.getPlayerState().openingSequenceActive === false",
+      30_000,
+      "the opening camera sequence"
+    );
+    await client.evaluate("globalThis.__bosqueWaterContactDebug.setViewMode('first'); true");
+    await delay(1200);
+    await waitForExpression(
+      client,
+      "!!globalThis.__bosqueShadowGrabberDebug?.getSnapshots().length",
+      20_000,
+      "the Shadow Grabber debug interface"
+    );
+    const target = await client.evaluate(`(() => {
+      const snapshots = globalThis.__bosqueShadowGrabberDebug.getSnapshots();
+      const snapshot = snapshots.reduce((best, current) =>
+        Math.abs(current.portalPosition.x) < Math.abs(best.portalPosition.x)
+          ? current
+          : best
+      );
+      const scene = globalThis.__bosqueWaterContactDebug.playerRoot.getScene();
+      const surface = scene.meshes.find((mesh) =>
+        mesh.name.includes(snapshot.id) && mesh.name.endsWith(':proceduralPortal')
+      );
+      surface.computeWorldMatrix(true);
+      const center = surface.getAbsolutePosition();
+      return {
+        id: snapshot.id,
+        x: center.x,
+        y: center.y,
+        z: center.z,
+      };
+    })()`);
+    await client.evaluate(`(() => {
+      globalThis.__bosqueShadowGrabberDebug.teleportPlayer(${target.x + 3.5}, ${target.z - 3.5});
+      globalThis.__bosqueShadowGrabberDebug.facePlayerAt(${target.x}, ${target.z});
+      globalThis.__bosqueShadowGrabberDebug.aimPlayerAt(${target.x}, ${target.y}, ${target.z});
+      return true;
+    })()`);
+    await delay(600);
+    const snapshot = await client.evaluate(`(() => {
+      const value = globalThis.__bosqueShadowGrabberDebug
+        .getSnapshots()
+        .find((entry) => entry.id === ${JSON.stringify(target.id)});
+      return {
+        id: value.id,
+        state: value.state,
+        portalPosition: {
+          x: value.portalPosition.x,
+          y: value.portalPosition.y,
+          z: value.portalPosition.z,
+        },
+        distanceToPlayer: value.distanceToPlayer,
+      };
+    })()`);
+    const recenterPlayer = async () => {
+      const current = await client.evaluate(`(() => {
+        const value = globalThis.__bosqueShadowGrabberDebug
+          .getSnapshots()
+          .find((entry) => entry.id === ${JSON.stringify(target.id)});
+        const scene = globalThis.__bosqueWaterContactDebug.playerRoot.getScene();
+        const surface = scene.meshes.find((mesh) =>
+          mesh.name.includes(value.id) && mesh.name.endsWith(':proceduralPortal')
+        );
+        surface.computeWorldMatrix(true);
+        const center = surface.getAbsolutePosition();
+        return { x: center.x, y: center.y, z: center.z };
+      })()`);
+      await client.evaluate(
+        `(() => {
+          globalThis.__bosqueShadowGrabberDebug.teleportPlayer(${current.x + 3.5}, ${current.z - 3.5});
+          globalThis.__bosqueShadowGrabberDebug.facePlayerAt(${current.x}, ${current.z});
+          globalThis.__bosqueShadowGrabberDebug.aimPlayerAt(${current.x}, ${current.y}, ${current.z});
+          return true;
+        })()`
+      );
+      await delay(120);
+    };
+    const grabberScreenshots = [];
+    await recenterPlayer();
+    grabberScreenshots.push(await capture(client, screenshots, "shadow-grabber-iso-t0"));
+    await delay(1600);
+    await recenterPlayer();
+    grabberScreenshots.push(await capture(client, screenshots, "shadow-grabber-iso-t1"));
+    await delay(1900);
+    await recenterPlayer();
+    grabberScreenshots.push(await capture(client, screenshots, "shadow-grabber-iso-t2"));
+    const performance = await client.evaluate(
+      "globalThis.__bosqueShadowGrabberDebug.getPerformance()"
+    );
+    console.log(JSON.stringify({ snapshot, performance, screenshots: grabberScreenshots, browserErrors: client.errors }, null, 2));
+  } else {
+    const idle = { frames: await sampleFrames(client), metrics: await readMetrics(client) };
+    const idleScreenshot = await capture(client, screenshots, "idle-iso-100-100");
 
   const progression = {};
   for (const [health, sanity] of [[100, 100], [50, 100], [100, 20], [25, 25], [0, 0]]) {
@@ -255,13 +354,14 @@ try {
   await delay(1200);
   const maximumFirstScreenshot = await capture(client, screenshots, "surface-only-first-0-0");
 
-  console.log(JSON.stringify({
-    idle,
-    progression,
-    maximum,
-    screenshots: [idleScreenshot, maximumIsoScreenshot, surfaceOnlyIsoScreenshot, maximumThirdScreenshot, maximumFrontScreenshot, maximumFirstScreenshot],
-    browserErrors: client.errors,
-  }, null, 2));
+    console.log(JSON.stringify({
+      idle,
+      progression,
+      maximum,
+      screenshots: [idleScreenshot, maximumIsoScreenshot, surfaceOnlyIsoScreenshot, maximumThirdScreenshot, maximumFrontScreenshot, maximumFirstScreenshot],
+      browserErrors: client.errors,
+    }, null, 2));
+  }
 } catch (error) {
   let pageState = null;
   try {

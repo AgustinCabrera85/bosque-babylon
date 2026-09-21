@@ -772,7 +772,9 @@ scene.onBeforeRenderObservable.add(() => {
   await segments.loadCandles();
   await Promise.all([
     segments.loadStartBlocker(),
-    segments.loadEndHouse(),
+    segments.loadEndHouse(
+      terminalConfig.lagoonCenterZ - terminalConfig.lagoonRadiusZ
+    ),
     enemyManager.preload(SHADOW_GRABBER_TYPE),
     enemyManager.preload(SKY_EYE_TYPE),
   ]);

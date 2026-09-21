@@ -1,5 +1,6 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Material as BabylonMaterial } from "@babylonjs/core/Materials/material";
+import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -30,6 +31,212 @@ const TRAJECTORY_POINT_COUNT = 41;
 const TRAJECTORY_STEP_SECONDS = 0.1;
 const TRAJECTORY_TARGET_COLOR = new Color3(0.42, 0.95, 1);
 const TRAJECTORY_FREE_COLOR = new Color3(0.62, 0.78, 1);
+
+// Visual-only tuning. The shell stays close to the core so it reads as a
+// membrane instead of a second, blue sphere.
+const HELD_CORE_DIAMETER = PROJECTILE_RADIUS * 1.8;
+const HELD_SHELL_DIAMETER = PROJECTILE_RADIUS * 2.28;
+const PROJECTILE_CORE_DIAMETER = PROJECTILE_RADIUS * 2;
+const PROJECTILE_SHELL_DIAMETER = PROJECTILE_RADIUS * 2.5;
+const IMPACT_DURATION_SECONDS = 0.34;
+// Group 1 preserves the opaque world's depth in createScene, so transparent
+// orb VFX are correctly occluded by the player and environment.
+const LIGHT_ORB_RENDERING_GROUP = 1;
+
+const LIGHT_ORB_VERTEX_SHADER = `
+  precision highp float;
+
+  attribute vec3 position;
+  attribute vec3 normal;
+
+  uniform mat4 world;
+  uniform mat4 worldViewProjection;
+
+  varying vec3 vLocalDirection;
+  varying vec3 vWorldPosition;
+  varying vec3 vWorldNormal;
+
+  void main(void) {
+    vec4 worldPosition = world * vec4(position, 1.0);
+    vLocalDirection = normalize(position);
+    vWorldPosition = worldPosition.xyz;
+    vWorldNormal = normalize((world * vec4(normal, 0.0)).xyz);
+    gl_Position = worldViewProjection * vec4(position, 1.0);
+  }
+`;
+
+const LIGHT_ORB_CORE_FRAGMENT_SHADER = `
+  precision highp float;
+
+  varying vec3 vLocalDirection;
+  varying vec3 vWorldPosition;
+  varying vec3 vWorldNormal;
+
+  uniform vec3 cameraPosition;
+  uniform float time;
+  uniform float charge;
+  uniform float motionBoost;
+  uniform float opacity;
+  uniform float burstProgress;
+  uniform float burstStrength;
+
+  float filament(float wave, float width) {
+    return 1.0 - smoothstep(width, width + 0.05, abs(sin(wave)));
+  }
+
+  void main(void) {
+    vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+    float facing = abs(dot(normalize(vWorldNormal), viewDirection));
+    float speed = mix(0.62, 1.42, charge) * motionBoost;
+    float t = time * speed;
+    vec3 p = normalize(vLocalDirection);
+
+    // A smooth, animated domain bend keeps the lines coherent while making
+    // junctions drift, separate and reconnect instead of reading as a texture.
+    vec3 warp = vec3(
+      sin(p.y * 5.1 + t * 0.91) + sin(p.z * 8.3 - t * 0.47),
+      sin(p.z * 5.7 - t * 0.76) + sin(p.x * 7.2 + t * 0.58),
+      sin(p.x * 6.4 + t * 0.69) + sin(p.y * 8.7 - t * 0.52)
+    ) * mix(0.085, 0.145, charge);
+    vec3 q = p + warp;
+    float width = mix(0.034, 0.072, charge);
+
+    // Three inexpensive curved wave fields provide the dense vein network.
+    // Their intersections become brighter branch points and imply depth.
+    float strandA = filament(
+      q.x * 9.2 + q.z * 3.1 + sin(q.y * 6.1 - t * 0.82) * 1.36,
+      width
+    );
+    float strandB = filament(
+      q.y * 10.4 - q.x * 2.7 + sin(q.z * 7.4 + t * 0.71) * 1.24,
+      width * 0.9
+    );
+    float strandC = filament(
+      (q.x + q.y - q.z) * 7.1 + sin((q.x - q.y) * 5.6 - t) * 1.18,
+      width * 0.78
+    );
+    float filaments = max(strandA, max(strandB * 0.92, strandC * 0.82));
+    float junctions = min(1.0, strandA * strandB + strandB * strandC + strandC * strandA);
+
+    // Front-facing fragments form the compressed center mass. Back-facing
+    // filaments still contribute through additive blending, suggesting layers
+    // suspended inside the sphere rather than paint on its surface.
+    float centerProfile = smoothstep(mix(0.12, 0.28, charge), 1.0, facing);
+    float hotCenterProfile = smoothstep(mix(0.52, 0.62, charge), 1.0, facing);
+    float centerMass = pow(centerProfile, mix(3.2, 4.6, charge));
+    float hotCenter = pow(hotCenterProfile, mix(3.8, 6.5, charge));
+    float depthFade = smoothstep(0.035, 0.72, facing);
+    filaments *= mix(0.28, 1.0, depthFade);
+
+    float fullCharge = smoothstep(0.76, 1.0, charge);
+    float surge = fullCharge * (
+      0.5 + 0.5 * sin(t * 4.9 + sin(t * 1.7) * 1.4)
+    );
+    float burstBand = 1.0 - smoothstep(
+      0.025,
+      0.15,
+      abs(facing - mix(0.98, 0.12, burstProgress))
+    );
+    float burstEnvelope = sin(burstProgress * 3.14159265) * burstStrength;
+    float impactFlash = (1.0 - smoothstep(0.0, 0.38, burstProgress)) * burstStrength;
+
+    vec3 coolWhite = vec3(0.76, 0.91, 1.0);
+    vec3 warmWhite = vec3(1.0, 0.985, 0.93);
+    vec3 color = mix(coolWhite, warmWhite, 0.48 + hotCenter * 0.52);
+    float energy = 0.1 + centerMass * mix(0.3, 0.48, charge);
+    energy += filaments * mix(1.55, 2.25, charge);
+    energy += junctions * (0.55 + charge * 0.4);
+    energy += hotCenter * (1.65 + charge * 0.7);
+    energy += surge * (filaments * 0.42 + hotCenter * 0.28);
+    energy += hotCenter * impactFlash * 1.45;
+    energy += burstBand * burstEnvelope * 1.7;
+    energy += filaments * burstEnvelope * 0.44;
+
+    // Keep clear space between structures. Brightness now comes from local
+    // filament/center intensity instead of a nearly opaque sphere-wide floor.
+    float alpha = opacity * (
+      0.026 +
+      centerMass * mix(0.08, 0.13, charge) +
+      filaments * mix(0.32, 0.44, charge) +
+      junctions * 0.16 +
+      hotCenter * 0.58 +
+      hotCenter * impactFlash * 0.16 +
+      burstBand * burstEnvelope * 0.18
+    );
+    alpha *= 1.0 - burstProgress * 0.32;
+    gl_FragColor = vec4(color * energy, clamp(alpha, 0.0, 1.0));
+  }
+`;
+
+const LIGHT_ORB_SHELL_FRAGMENT_SHADER = `
+  precision highp float;
+
+  varying vec3 vLocalDirection;
+  varying vec3 vWorldPosition;
+  varying vec3 vWorldNormal;
+
+  uniform vec3 cameraPosition;
+  uniform float time;
+  uniform float charge;
+  uniform float motionBoost;
+  uniform float opacity;
+  uniform float burstProgress;
+  uniform float burstStrength;
+  uniform float haloStrength;
+
+  void main(void) {
+    vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+    float facing = abs(dot(normalize(vWorldNormal), viewDirection));
+    float fresnel = pow(1.0 - facing, 3.2);
+    float t = time * mix(0.48, 1.12, charge) * motionBoost;
+    vec3 p = normalize(vLocalDirection);
+
+    float broadFlow = sin(p.x * 5.2 + p.y * 3.7 - p.z * 4.4 + t);
+    broadFlow += sin(p.y * 8.1 - p.x * 2.8 + t * 0.63) * 0.5;
+    float irregularity = 0.78 + broadFlow * 0.085;
+    float traceWave = abs(sin(
+      p.x * 7.4 - p.z * 5.8 + sin(p.y * 6.3 + t) * 1.15 - t * 0.72
+    ));
+    float outerTrace = 1.0 - smoothstep(0.07, 0.19, traceWave);
+
+    float fullCharge = smoothstep(0.78, 1.0, charge);
+    float surge = fullCharge * (0.5 + 0.5 * sin(t * 5.7));
+    float shell = fresnel * (0.56 + charge * 0.2);
+    shell += outerTrace * fresnel * (0.13 + charge * 0.13);
+    shell += surge * fresnel * 0.08;
+    shell *= irregularity;
+
+    // The held-orb halo reuses this same aura mesh. Its broader Fresnel makes
+    // a soft external corona, while pulse and shimmer keep it organic rather
+    // than reading as a flat HUD ring.
+    float haloFresnel = pow(1.0 - facing, 1.55);
+    float haloPulse = 0.5 + 0.5 * sin(t * (3.2 + charge * 1.8) + broadFlow * 0.72);
+    float haloShimmer = 0.5 + 0.5 * sin(
+      p.x * 8.7 + p.y * 6.2 - p.z * 7.5 - t * 1.28
+    );
+    float corona = haloFresnel * haloStrength * (
+      0.1 +
+      haloPulse * (0.08 + charge * 0.06) +
+      haloShimmer * 0.04 +
+      surge * 0.05
+    );
+
+    // During impact the same membrane becomes a clean, expanding shock shell.
+    float shock = sin(burstProgress * 3.14159265) * burstStrength;
+    shell += fresnel * shock * 0.72;
+    shell += outerTrace * fresnel * shock * 0.16;
+
+    vec3 paleCyan = vec3(0.68, 0.88, 1.0);
+    vec3 sacredWhite = vec3(1.0, 0.99, 0.96);
+    vec3 color = mix(paleCyan, sacredWhite, 0.68 + facing * 0.22);
+    float alpha = opacity * (0.008 + shell + corona);
+    if (alpha < 0.008) discard;
+    gl_FragColor = vec4(
+      color * (0.82 + shell * 1.38 + corona * 1.12),
+      clamp(alpha, 0.0, 0.82)
+    );
+  }
+`;
 
 type AttackSystemOptions = {
   canvas: HTMLCanvasElement;
@@ -72,27 +279,29 @@ type HeldLightOrb = {
   root: TransformNode;
   core: Mesh;
   aura: Mesh;
-  coreMaterial: StandardMaterial;
-  auraMaterial: StandardMaterial;
+  coreMaterial: ShaderMaterial;
+  auraMaterial: ShaderMaterial;
 };
 
 type LightProjectile = {
   root: TransformNode;
   core: Mesh;
   aura: Mesh;
-  coreMaterial: StandardMaterial;
-  auraMaterial: StandardMaterial;
+  coreMaterial: ShaderMaterial;
+  auraMaterial: ShaderMaterial;
   velocity: Vector3;
   age: number;
+  power: number;
 };
 
 type ImpactBurst = {
   root: TransformNode;
   inner: Mesh;
   outer: Mesh;
-  innerMaterial: StandardMaterial;
-  outerMaterial: StandardMaterial;
+  innerMaterial: ShaderMaterial;
+  outerMaterial: ShaderMaterial;
   elapsed: number;
+  strength: number;
 };
 
 type EnemySegmentHit = {
@@ -576,21 +785,20 @@ export class PlayerAttackSystem {
     const root = new TransformNode(`lightProjectile:${performance.now()}`, this.scene);
     root.position.copyFrom(launchOrigin);
 
-    const coreMaterial = this.createLightMaterial(
-      `${root.name}:coreMaterial`,
-      new Color3(0.82, 0.94, 1),
-      1
-    );
-    const auraMaterial = this.createLightMaterial(
-      `${root.name}:auraMaterial`,
-      new Color3(0.3, 0.68, 1),
-      0.2
-    );
-    auraMaterial.alphaMode = Engine.ALPHA_ADD;
+    const coreMaterial = this.createOrbCoreMaterial(`${root.name}:coreMaterial`, {
+      charge: aim.power,
+      motionBoost: 1.24,
+      opacity: 0.58 + aim.power * 0.09,
+    });
+    const auraMaterial = this.createOrbShellMaterial(`${root.name}:auraMaterial`, {
+      charge: aim.power,
+      motionBoost: 1.28,
+      opacity: 0.42 + aim.power * 0.18,
+    });
 
     const core = MeshBuilder.CreateSphere(
       `${root.name}:core`,
-      { diameter: PROJECTILE_RADIUS * 2, segments: 12 },
+      { diameter: PROJECTILE_CORE_DIAMETER, segments: 12 },
       this.scene
     );
     core.parent = root;
@@ -598,11 +806,12 @@ export class PlayerAttackSystem {
     core.isPickable = false;
     core.applyFog = false;
     core.alwaysSelectAsActiveMesh = true;
-    core.renderingGroupId = 2;
+    core.renderingGroupId = LIGHT_ORB_RENDERING_GROUP;
+    core.alphaIndex = 0;
 
     const aura = MeshBuilder.CreateSphere(
       `${root.name}:aura`,
-      { diameter: PROJECTILE_RADIUS * 4.2, segments: 10 },
+      { diameter: PROJECTILE_SHELL_DIAMETER, segments: 12 },
       this.scene
     );
     aura.parent = root;
@@ -610,7 +819,8 @@ export class PlayerAttackSystem {
     aura.isPickable = false;
     aura.applyFog = false;
     aura.alwaysSelectAsActiveMesh = true;
-    aura.renderingGroupId = 2;
+    aura.renderingGroupId = LIGHT_ORB_RENDERING_GROUP;
+    aura.alphaIndex = 1;
 
     this.projectiles.push({
       root,
@@ -620,6 +830,7 @@ export class PlayerAttackSystem {
       auraMaterial,
       velocity: launchDirection.scale(aim.speed),
       age: 0,
+      power: aim.power,
     });
     window.dispatchEvent(
       new CustomEvent("bosque:light-orb-thrown", {
@@ -661,9 +872,14 @@ export class PlayerAttackSystem {
 
       projectile.root.position.copyFrom(next);
       projectile.root.rotation.y += delta * 8;
-      const pulse = 1 + Math.sin(projectile.age * 24) * 0.1;
+      projectile.coreMaterial.setFloat("time", projectile.age);
+      projectile.auraMaterial.setFloat("time", projectile.age);
+      const pulse = 1 + Math.sin(projectile.age * 17) * 0.035;
       projectile.aura.scaling.setAll(pulse);
-      projectile.auraMaterial.alpha = 0.16 + Math.sin(projectile.age * 18) * 0.045;
+      projectile.auraMaterial.setFloat(
+        "opacity",
+        0.34 + projectile.power * 0.14 + Math.sin(projectile.age * 13) * 0.035
+      );
     }
   }
 
@@ -713,25 +929,28 @@ export class PlayerAttackSystem {
   private createImpactBurst(position: Vector3, hitEnemy: boolean) {
     const root = new TransformNode(`lightImpact:${performance.now()}`, this.scene);
     root.position.copyFrom(position);
-    const innerMaterial = this.createLightMaterial(
-      `${root.name}:innerMaterial`,
-      hitEnemy ? new Color3(0.62, 0.95, 1) : new Color3(0.8, 0.9, 1),
-      0.9
-    );
-    const outerMaterial = this.createLightMaterial(
-      `${root.name}:outerMaterial`,
-      new Color3(0.25, 0.58, 1),
-      0.34
-    );
-    outerMaterial.alphaMode = Engine.ALPHA_ADD;
+    const strength = hitEnemy ? 1 : 0.78;
+    const impactCharge = hitEnemy ? 1 : 0.82;
+    const innerMaterial = this.createOrbCoreMaterial(`${root.name}:innerMaterial`, {
+      charge: impactCharge,
+      motionBoost: 2.35,
+      opacity: 0.94,
+      burstStrength: strength,
+    });
+    const outerMaterial = this.createOrbShellMaterial(`${root.name}:outerMaterial`, {
+      charge: impactCharge,
+      motionBoost: 1.9,
+      opacity: 0.72,
+      burstStrength: strength,
+    });
     const inner = MeshBuilder.CreateSphere(
       `${root.name}:inner`,
-      { diameter: 0.32, segments: 10 },
+      { diameter: 0.32, segments: 12 },
       this.scene
     );
     const outer = MeshBuilder.CreateSphere(
       `${root.name}:outer`,
-      { diameter: 0.52, segments: 10 },
+      { diameter: 0.44, segments: 12 },
       this.scene
     );
     inner.parent = root;
@@ -742,8 +961,10 @@ export class PlayerAttackSystem {
     outer.isPickable = false;
     inner.applyFog = false;
     outer.applyFog = false;
-    inner.renderingGroupId = 2;
-    outer.renderingGroupId = 2;
+    inner.renderingGroupId = LIGHT_ORB_RENDERING_GROUP;
+    outer.renderingGroupId = LIGHT_ORB_RENDERING_GROUP;
+    inner.alphaIndex = 0;
+    outer.alphaIndex = 1;
     this.impactBursts.push({
       root,
       inner,
@@ -751,19 +972,38 @@ export class PlayerAttackSystem {
       innerMaterial,
       outerMaterial,
       elapsed: 0,
+      strength,
     });
   }
 
   private updateImpactBursts(delta: number) {
-    const duration = 0.36;
     for (let index = this.impactBursts.length - 1; index >= 0; index--) {
       const burst = this.impactBursts[index];
       burst.elapsed += delta;
-      const progress = clamp01(burst.elapsed / duration);
-      burst.inner.scaling.setAll(0.65 + progress * 1.8);
-      burst.outer.scaling.setAll(0.45 + progress * 4.2);
-      burst.innerMaterial.alpha = (1 - progress) * 0.9;
-      burst.outerMaterial.alpha = (1 - progress) * 0.34;
+      const progress = clamp01(burst.elapsed / IMPACT_DURATION_SECONDS);
+      const remaining = 1 - progress;
+      const expansion = 1 - Math.pow(remaining, 2.4);
+      const shockEnvelope = Math.sin(progress * Math.PI) * Math.pow(remaining, 0.58);
+      burst.root.rotation.y += delta * (7 + burst.strength * 4);
+      burst.root.rotation.x -= delta * (2.5 + burst.strength * 1.5);
+      burst.inner.scaling.setAll(
+        0.56 + expansion * (1.45 + burst.strength * 0.35)
+      );
+      burst.outer.scaling.setAll(
+        0.5 + expansion * (2.8 + burst.strength * 0.55)
+      );
+      burst.innerMaterial.setFloat("time", burst.elapsed);
+      burst.innerMaterial.setFloat("burstProgress", progress);
+      burst.innerMaterial.setFloat(
+        "opacity",
+        Math.pow(remaining, 2.05) * (0.72 + burst.strength * 0.28)
+      );
+      burst.outerMaterial.setFloat("time", burst.elapsed);
+      burst.outerMaterial.setFloat("burstProgress", progress);
+      burst.outerMaterial.setFloat(
+        "opacity",
+        shockEnvelope * (0.46 + burst.strength * 0.26)
+      );
       if (progress < 1) continue;
       this.disposeImpactBurst(burst);
       this.impactBursts.splice(index, 1);
@@ -901,26 +1141,23 @@ export class PlayerAttackSystem {
 
   private createHeldLightOrb(): HeldLightOrb {
     const root = new TransformNode("playerHeldLightOrb", this.scene);
-    const coreMaterial = this.createLightMaterial(
-      "playerHeldLightOrb:coreMaterial",
-      new Color3(0.86, 0.97, 1),
-      1
-    );
-    const auraMaterial = this.createLightMaterial(
-      "playerHeldLightOrb:auraMaterial",
-      new Color3(0.32, 0.72, 1),
-      0.24
-    );
-    auraMaterial.alphaMode = Engine.ALPHA_ADD;
+    const coreMaterial = this.createOrbCoreMaterial("playerHeldLightOrb:coreMaterial", {
+      charge: this.heldOrbPower,
+      opacity: 0.9,
+    });
+    const auraMaterial = this.createOrbShellMaterial("playerHeldLightOrb:auraMaterial", {
+      charge: this.heldOrbPower,
+      opacity: 0.4,
+    });
 
     const core = MeshBuilder.CreateSphere(
       "playerHeldLightOrb:core",
-      { diameter: PROJECTILE_RADIUS * 1.8, segments: 12 },
+      { diameter: HELD_CORE_DIAMETER, segments: 12 },
       this.scene
     );
     const aura = MeshBuilder.CreateSphere(
       "playerHeldLightOrb:aura",
-      { diameter: PROJECTILE_RADIUS * 4, segments: 10 },
+      { diameter: HELD_SHELL_DIAMETER, segments: 12 },
       this.scene
     );
     core.parent = root;
@@ -933,8 +1170,10 @@ export class PlayerAttackSystem {
     aura.applyFog = false;
     core.alwaysSelectAsActiveMesh = true;
     aura.alwaysSelectAsActiveMesh = true;
-    core.renderingGroupId = 2;
-    aura.renderingGroupId = 2;
+    core.renderingGroupId = LIGHT_ORB_RENDERING_GROUP;
+    aura.renderingGroupId = LIGHT_ORB_RENDERING_GROUP;
+    core.alphaIndex = 0;
+    aura.alphaIndex = 1;
     root.setEnabled(false);
     return { root, core, aura, coreMaterial, auraMaterial };
   }
@@ -946,10 +1185,119 @@ export class PlayerAttackSystem {
     this.heldOrb.root.setEnabled(true);
 
     const power = this.charging ? this.getChargePower() : this.heldOrbPower;
-    const pulse = Math.sin(this.heldOrbElapsed * 12) * 0.08;
-    this.heldOrb.core.scaling.setAll(0.82 + power * 0.2);
-    this.heldOrb.aura.scaling.setAll(0.84 + power * 0.38 + pulse);
-    this.heldOrb.auraMaterial.alpha = 0.16 + power * 0.12 + pulse * 0.18;
+    const pulsePhase = Math.sin(this.heldOrbElapsed * (6.8 + power * 3.8));
+    const pulse = pulsePhase * (0.008 + power * 0.02);
+    const haloStrength =
+      0.08 + power * 0.62 + Math.max(0, pulsePhase) * (0.04 + power * 0.08);
+    this.heldOrb.core.scaling.setAll(0.88 + power * 0.12);
+    this.heldOrb.aura.scaling.setAll(0.88 + power * 0.24 + pulse);
+    this.heldOrb.coreMaterial.setFloat("time", this.heldOrbElapsed);
+    this.heldOrb.coreMaterial.setFloat("charge", power);
+    this.heldOrb.coreMaterial.setFloat("opacity", 0.52 + power * 0.12);
+    this.heldOrb.auraMaterial.setFloat("time", this.heldOrbElapsed);
+    this.heldOrb.auraMaterial.setFloat("charge", power);
+    this.heldOrb.auraMaterial.setFloat("haloStrength", haloStrength);
+    this.heldOrb.auraMaterial.setFloat(
+      "opacity",
+      0.25 + power * 0.17 + pulse * 0.48
+    );
+  }
+
+  private createOrbCoreMaterial(
+    name: string,
+    options: {
+      charge?: number;
+      motionBoost?: number;
+      opacity?: number;
+      burstProgress?: number;
+      burstStrength?: number;
+    } = {}
+  ) {
+    const material = new ShaderMaterial(
+      name,
+      this.scene,
+      {
+        vertexSource: LIGHT_ORB_VERTEX_SHADER,
+        fragmentSource: LIGHT_ORB_CORE_FRAGMENT_SHADER,
+      },
+      {
+        attributes: ["position", "normal"],
+        uniforms: [
+          "world",
+          "worldViewProjection",
+          "cameraPosition",
+          "time",
+          "charge",
+          "motionBoost",
+          "opacity",
+          "burstProgress",
+          "burstStrength",
+        ],
+        needAlphaBlending: true,
+      }
+    );
+    material.setFloat("time", 0);
+    material.setFloat("charge", options.charge ?? 0.18);
+    material.setFloat("motionBoost", options.motionBoost ?? 1);
+    material.setFloat("opacity", options.opacity ?? 0.62);
+    material.setFloat("burstProgress", options.burstProgress ?? 0);
+    material.setFloat("burstStrength", options.burstStrength ?? 0);
+    this.configureOrbShader(material);
+    return material;
+  }
+
+  private createOrbShellMaterial(
+    name: string,
+    options: {
+      charge?: number;
+      motionBoost?: number;
+      opacity?: number;
+      burstProgress?: number;
+      burstStrength?: number;
+      haloStrength?: number;
+    } = {}
+  ) {
+    const material = new ShaderMaterial(
+      name,
+      this.scene,
+      {
+        vertexSource: LIGHT_ORB_VERTEX_SHADER,
+        fragmentSource: LIGHT_ORB_SHELL_FRAGMENT_SHADER,
+      },
+      {
+        attributes: ["position", "normal"],
+        uniforms: [
+          "world",
+          "worldViewProjection",
+          "cameraPosition",
+          "time",
+          "charge",
+          "motionBoost",
+          "opacity",
+          "burstProgress",
+          "burstStrength",
+          "haloStrength",
+        ],
+        needAlphaBlending: true,
+      }
+    );
+    material.setFloat("time", 0);
+    material.setFloat("charge", options.charge ?? 0.18);
+    material.setFloat("motionBoost", options.motionBoost ?? 1);
+    material.setFloat("opacity", options.opacity ?? 0.42);
+    material.setFloat("burstProgress", options.burstProgress ?? 0);
+    material.setFloat("burstStrength", options.burstStrength ?? 0);
+    material.setFloat("haloStrength", options.haloStrength ?? 0);
+    this.configureOrbShader(material);
+    return material;
+  }
+
+  private configureOrbShader(material: ShaderMaterial) {
+    material.alphaMode = Engine.ALPHA_ADD;
+    material.transparencyMode = BabylonMaterial.MATERIAL_ALPHABLEND;
+    material.backFaceCulling = false;
+    material.disableDepthWrite = true;
+    material.needDepthPrePass = false;
   }
 
   private createLightMaterial(name: string, color: Color3, alpha: number) {

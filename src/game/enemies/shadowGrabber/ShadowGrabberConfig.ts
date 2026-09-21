@@ -223,7 +223,9 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   portalDepthScale: 0.25,
   portalFx: {
     spawnDuration: 1.65,
-    coreDiscScale: 1,
+    // Let the electric plate project past more of the smoke rim so its blue
+    // origin remains legible from the gameplay camera.
+    coreDiscScale: 1.18,
     smokeTorusScale: 1,
     noiseScale: 2.35,
     noiseSpeed: 0.36,

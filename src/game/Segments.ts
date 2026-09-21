@@ -19,6 +19,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 
 import { mulberry32 } from "../utils/seed";
 import { createCandleFireMaterial, createGlowMaterial } from "./Torches";
+import { applyBrazierLogEmberMaterial } from "./BrazierLogEmberMaterial";
 import { createPhotoCard } from "./PhotoCard";
 import { createCollectibleNote } from "./CollectibleNotes";
 
@@ -44,7 +45,7 @@ type BoxCollider = {
   depth: number;
   rotation: number;
   active: boolean;
-  kind: "house" | "door" | "blocker";
+  kind: "house" | "door" | "blocker" | "prop";
 };
 
 export type NoSpawnZone = {
@@ -110,6 +111,13 @@ type CandleFlameEntry = {
   flameHeight: number;
 };
 
+type FireVisualDimensions = {
+  flameWidth?: number;
+  flameHeight?: number;
+  floorGlowSize?: number;
+  floorGlowOffsetX?: number;
+};
+
 type CandleLightPoolEntry = {
   side: -1 | 1;
   light: PointLight;
@@ -145,6 +153,7 @@ const STREAM_TREE_LOD: 0 | 1 | 2 = 1;
 const PLAYER_WORLD_COLLISION_RADIUS = 1.0;
 const PLAYER_HOUSE_COLLISION_RADIUS = 0.42;
 const PLAYER_DOOR_COLLISION_RADIUS = 0.62;
+const PLAYER_PROP_COLLISION_RADIUS = 0.38;
 const PLAYER_BLOCKER_COLLISION_RADIUS = 1.0;
 const DOOR_OPEN_ACTION_DELAY_SECONDS = 1.7;
 const DOOR_CLOSE_COLLIDER_GRACE_SECONDS = 1.0;
@@ -165,6 +174,35 @@ const ISOMETRIC_OCCLUDER_BLEND = 0.26;
 // Asset especial: no se carga en TreeLibrary para que no aparezca en la generacion normal.
 const START_BLOCKER_TREE_PATH = "/assets/models/vegetation/";
 const START_BLOCKER_TREE_FILE = "tree_08_runtime.glb";
+const END_HOUSE_BACKYARD_PROP_PATH = "/assets/models/objects/";
+const BRAZIER_LOGS_FILE = "wood_logs_brazier.glb";
+const BRAZIER_LOGS_DIAMETER_RATIO = 0.78 * 0.75;
+const BRAZIER_LOGS_RIM_RISE_RATIO = 0.16;
+const BRAZIER_FIRE_DIAMETER_RATIO = 0.92;
+const BRAZIER_FIRE_HEIGHT_RATIO = 1.08;
+const BRAZIER_FIRE_LOG_HEIGHT_RATIO = 0.3;
+const BRAZIER_FIRE_LIGHT_INTENSITY = 3.2;
+const BRAZIER_FIRE_LIGHT_RANGE = 26;
+const END_HOUSE_BACKYARD_PROPS = [
+  {
+    name: "endHousePicnicTable",
+    fileName: "Picnic_Table.glb",
+    offsetX: -3.8,
+    offsetZ: -0.6,
+    rotationY: Math.PI * 0.08,
+    scale: 2.2,
+    hasFire: false,
+  },
+  {
+    name: "endHouseIronBrazier",
+    fileName: "Iron_Brazier.glb",
+    offsetX: 3.2,
+    offsetZ: 1.25,
+    rotationY: -Math.PI * 0.12,
+    scale: 1.65,
+    hasFire: true,
+  },
+] as const;
 
 function clamp(x: number, min: number, max: number) {
   return Math.max(min, Math.min(max, x));
@@ -678,6 +716,7 @@ export class Segments {
   private boxColliderPlayerRadius(collider: BoxCollider) {
     if (collider.kind === "house") return PLAYER_HOUSE_COLLISION_RADIUS;
     if (collider.kind === "door") return PLAYER_DOOR_COLLISION_RADIUS;
+    if (collider.kind === "prop") return PLAYER_PROP_COLLISION_RADIUS;
     return PLAYER_BLOCKER_COLLISION_RADIUS;
   }
 
@@ -1243,11 +1282,12 @@ export class Segments {
     candleScale: number,
     lightIntensity: number,
     lightRange: number,
-    fadeInSeconds = SEGMENT_CANDLE_FADE_SECONDS
+    fadeInSeconds = SEGMENT_CANDLE_FADE_SECONDS,
+    visualDimensions: FireVisualDimensions = {}
   ) {
     const size = candleScale / CANDLE_MODEL_SCALE;
-    const flameWidth = CANDLE_FLAME_WIDTH * size;
-    const flameHeight = CANDLE_FLAME_HEIGHT * size;
+    const flameWidth = visualDimensions.flameWidth ?? CANDLE_FLAME_WIDTH * size;
+    const flameHeight = visualDimensions.flameHeight ?? CANDLE_FLAME_HEIGHT * size;
     const root = new TransformNode(`${name}Root`, this.scene);
     root.position.copyFrom(position);
     root.rotation.y = rotationY;
@@ -1268,15 +1308,18 @@ export class Segments {
     glow.billboardMode = Mesh.BILLBOARDMODE_ALL;
     glow.visibility = fadeInSeconds > 0 ? 0 : 0.64;
 
-    const floorGlowSize = Math.max(4.6, 5.6 * size);
+    const floorGlowSize =
+      visualDimensions.floorGlowSize ?? Math.max(4.6, 5.6 * size);
     const sideSign = position.x === 0 ? 0 : Math.sign(position.x);
+    const floorGlowOffsetX =
+      visualDimensions.floorGlowOffsetX ?? -sideSign * 1.15;
     const floorGlow = MeshBuilder.CreatePlane(
       `${name}FloorGlow`,
       { width: floorGlowSize, height: floorGlowSize },
       this.scene
     );
     floorGlow.position.set(
-      position.x - sideSign * 1.15,
+      position.x + floorGlowOffsetX,
       this.terrain.getHeightAt(position.x, position.z) + 0.045,
       position.z
     );
@@ -1481,7 +1524,7 @@ export class Segments {
     return hit?.hit ? hit.pickedMesh : null;
   }
 
-  async loadEndHouse() {
+  async loadEndHouse(lagoonFrontZ?: number) {
     const segmentLength = this.cfg.segmentLength;
     const targetFrontZ = segmentLength * (this.cfg.endHouseSegment ?? 8);
     const scale = END_HOUSE_MODEL_SCALE;
@@ -1558,7 +1601,244 @@ export class Segments {
     this.createHouseMeshColliders(res.meshes);
     this.createHouseDoor(res.meshes, finalBounds);
     const candlePosition = this.createHouseCandle(finalBounds);
-    await createPhotoCard(this.scene, finalBounds, { candlePosition });
+    await Promise.all([
+      createPhotoCard(this.scene, finalBounds, { candlePosition }),
+      this.loadEndHouseBackyardProps(finalBounds, lagoonFrontZ),
+    ]);
+  }
+
+  private async loadEndHouseBackyardProps(
+    houseBounds: { min: Vector3; max: Vector3 },
+    lagoonFrontZ?: number
+  ) {
+    const houseCenterX = (houseBounds.min.x + houseBounds.max.x) * 0.5;
+    const fallbackLagoonFrontZ = houseBounds.max.z + 36;
+    const safeLagoonFrontZ = Number.isFinite(lagoonFrontZ)
+      ? (lagoonFrontZ as number)
+      : fallbackLagoonFrontZ;
+    const usableStartZ = houseBounds.max.z + 6;
+    const usableEndZ = Math.max(usableStartZ, safeLagoonFrontZ - 7);
+    const backyardCenterZ = usableStartZ + (usableEndZ - usableStartZ) * 0.42;
+
+    await Promise.all(
+      END_HOUSE_BACKYARD_PROPS.map(async (placement) => {
+        try {
+          await this.loadEndHouseBackyardProp(
+            placement,
+            houseCenterX + placement.offsetX,
+            backyardCenterZ + placement.offsetZ
+          );
+        } catch (error) {
+          console.warn(
+            `[Segments] No se pudo cargar el objeto de patio '${placement.fileName}'.`,
+            error
+          );
+        }
+      })
+    );
+  }
+
+  private async loadEndHouseBackyardProp(
+    placement: (typeof END_HOUSE_BACKYARD_PROPS)[number],
+    targetX: number,
+    targetZ: number
+  ) {
+    const res = await SceneLoader.ImportMeshAsync(
+      null,
+      END_HOUSE_BACKYARD_PROP_PATH,
+      placement.fileName,
+      this.scene
+    );
+    const importedRoot =
+      res.meshes.find((mesh) => mesh.name === "__root__") ??
+      res.meshes.find((mesh) => mesh.parent === null);
+    const renderableMeshes = res.meshes.filter((mesh) => mesh.getTotalVertices() > 0);
+
+    if (!importedRoot || !renderableMeshes.length) {
+      console.warn(
+        `[Segments] El objeto de patio '${placement.fileName}' no contiene geometria util.`
+      );
+      return;
+    }
+
+    const placementRoot = new TransformNode(placement.name, this.scene);
+    importedRoot.parent = placementRoot;
+    placementRoot.rotation.y = placement.rotationY;
+    placementRoot.scaling.setAll(placement.scale);
+
+    for (const mesh of res.meshes) {
+      mesh.isPickable = false;
+      mesh.receiveShadows = true;
+      mesh.alwaysSelectAsActiveMesh = true;
+      mesh.computeWorldMatrix(true);
+    }
+
+    const initialBounds = this.getHierarchyBounds(renderableMeshes);
+    if (!initialBounds) return;
+
+    const initialCenterX = (initialBounds.min.x + initialBounds.max.x) * 0.5;
+    const initialCenterZ = (initialBounds.min.z + initialBounds.max.z) * 0.5;
+    const groundY = this.terrain.getHeightAt(targetX, targetZ);
+    placementRoot.position.set(
+      targetX - initialCenterX,
+      groundY - initialBounds.min.y,
+      targetZ - initialCenterZ
+    );
+    placementRoot.computeWorldMatrix(true);
+    for (const mesh of res.meshes) mesh.computeWorldMatrix(true);
+
+    const finalBounds = this.getHierarchyBounds(renderableMeshes);
+    if (!finalBounds) return;
+
+    this.endHouseMeshes.push(...renderableMeshes);
+    if (placement.hasFire) {
+      let logBounds: { min: Vector3; max: Vector3 } | null = null;
+      try {
+        logBounds = await this.loadEndHouseBrazierLogs(
+          finalBounds,
+          placement.rotationY
+        );
+      } catch (error) {
+        console.warn(
+          `[Segments] No se pudieron cargar los troncos '${BRAZIER_LOGS_FILE}'.`,
+          error
+        );
+      }
+      this.createEndHouseBrazierFire(
+        finalBounds,
+        placement.rotationY,
+        logBounds
+      );
+    }
+    this.staticBoxColliders.push({
+      x: (finalBounds.min.x + finalBounds.max.x) * 0.5,
+      z: (finalBounds.min.z + finalBounds.max.z) * 0.5,
+      width: Math.max(0.4, finalBounds.max.x - finalBounds.min.x),
+      depth: Math.max(0.4, finalBounds.max.z - finalBounds.min.z),
+      rotation: 0,
+      active: true,
+      kind: "prop",
+    });
+  }
+
+  private async loadEndHouseBrazierLogs(
+    brazierBounds: { min: Vector3; max: Vector3 },
+    rotationY: number
+  ) {
+    const res = await SceneLoader.ImportMeshAsync(
+      null,
+      END_HOUSE_BACKYARD_PROP_PATH,
+      BRAZIER_LOGS_FILE,
+      this.scene
+    );
+    const importedRoot =
+      res.meshes.find((mesh) => mesh.name === "__root__") ??
+      res.meshes.find((mesh) => mesh.parent === null);
+    const renderableMeshes = res.meshes.filter((mesh) => mesh.getTotalVertices() > 0);
+    if (!importedRoot || !renderableMeshes.length) return null;
+
+    const root = new TransformNode("endHouseIronBrazierLogs", this.scene);
+    importedRoot.parent = root;
+    root.rotation.y = rotationY + Math.PI * 0.08;
+
+    for (const mesh of res.meshes) {
+      mesh.isPickable = false;
+      mesh.receiveShadows = true;
+      mesh.alwaysSelectAsActiveMesh = true;
+      mesh.computeWorldMatrix(true);
+    }
+
+    const sourceBounds = this.getHierarchyBounds(renderableMeshes);
+    if (!sourceBounds) return null;
+
+    const brazierWidth = brazierBounds.max.x - brazierBounds.min.x;
+    const brazierDepth = brazierBounds.max.z - brazierBounds.min.z;
+    const brazierDiameter = Math.max(0.1, Math.min(brazierWidth, brazierDepth));
+    const sourceWidth = sourceBounds.max.x - sourceBounds.min.x;
+    const sourceDepth = sourceBounds.max.z - sourceBounds.min.z;
+    const sourceDiameter = Math.max(0.01, Math.max(sourceWidth, sourceDepth));
+    root.scaling.setAll(
+      (brazierDiameter * BRAZIER_LOGS_DIAMETER_RATIO) / sourceDiameter
+    );
+    root.computeWorldMatrix(true);
+    for (const mesh of res.meshes) mesh.computeWorldMatrix(true);
+
+    const scaledBounds = this.getHierarchyBounds(renderableMeshes);
+    if (!scaledBounds) return null;
+
+    const targetX = (brazierBounds.min.x + brazierBounds.max.x) * 0.5;
+    const targetZ = (brazierBounds.min.z + brazierBounds.max.z) * 0.5;
+    const targetTopY =
+      brazierBounds.max.y + brazierDiameter * BRAZIER_LOGS_RIM_RISE_RATIO;
+    root.position.set(
+      targetX - (scaledBounds.min.x + scaledBounds.max.x) * 0.5,
+      targetTopY - scaledBounds.max.y,
+      targetZ - (scaledBounds.min.z + scaledBounds.max.z) * 0.5
+    );
+    root.computeWorldMatrix(true);
+    for (const mesh of res.meshes) mesh.computeWorldMatrix(true);
+
+    const finalBounds = this.getHierarchyBounds(renderableMeshes);
+    if (!finalBounds) return null;
+
+    const logHeight = finalBounds.max.y - finalBounds.min.y;
+    applyBrazierLogEmberMaterial(this.scene, renderableMeshes, {
+      center: new Vector3(
+        (finalBounds.min.x + finalBounds.max.x) * 0.5,
+        finalBounds.max.y - logHeight * 0.18,
+        (finalBounds.min.z + finalBounds.max.z) * 0.5
+      ),
+      radius: brazierDiameter * 0.42,
+      height: logHeight * 0.72,
+      intensity: 1.15,
+    });
+    this.endHouseMeshes.push(...renderableMeshes);
+    return finalBounds;
+  }
+
+  private createEndHouseBrazierFire(
+    brazierBounds: { min: Vector3; max: Vector3 },
+    rotationY: number,
+    logBounds: { min: Vector3; max: Vector3 } | null = null
+  ) {
+    if (
+      !this.candleFireMaterial ||
+      !this.candleGlowMaterial ||
+      !this.candleFloorGlowMaterial
+    ) {
+      return;
+    }
+
+    const width = brazierBounds.max.x - brazierBounds.min.x;
+    const depth = brazierBounds.max.z - brazierBounds.min.z;
+    const diameter = Math.max(0.1, Math.min(width, depth));
+    const fireSourceBounds = logBounds ?? brazierBounds;
+    const centerX = (fireSourceBounds.min.x + fireSourceBounds.max.x) * 0.5;
+    const centerZ = (fireSourceBounds.min.z + fireSourceBounds.max.z) * 0.5;
+    const flameBaseY = logBounds
+      ? logBounds.min.y +
+        (logBounds.max.y - logBounds.min.y) * BRAZIER_FIRE_LOG_HEIGHT_RATIO
+      : brazierBounds.max.y - diameter * 0.08;
+    const fire = this.createCandleFire(
+      "endHouseIronBrazierFire",
+      new Vector3(centerX, flameBaseY, centerZ),
+      rotationY,
+      CANDLE_MODEL_SCALE,
+      BRAZIER_FIRE_LIGHT_INTENSITY,
+      BRAZIER_FIRE_LIGHT_RANGE,
+      0,
+      {
+        flameWidth: diameter * BRAZIER_FIRE_DIAMETER_RATIO,
+        flameHeight: diameter * BRAZIER_FIRE_HEIGHT_RATIO,
+        floorGlowSize: Math.max(5.6, diameter * 3.4),
+        floorGlowOffsetX: 0,
+      }
+    );
+
+    this.endHouseMeshes.push(
+      ...fire.root.getChildMeshes(false),
+      fire.floorGlow
+    );
   }
 
   private createHouseCandle(bounds: { min: Vector3; max: Vector3 }) {

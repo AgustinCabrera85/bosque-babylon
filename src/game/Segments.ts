@@ -183,6 +183,23 @@ const BRAZIER_FIRE_HEIGHT_RATIO = 1.08;
 const BRAZIER_FIRE_LOG_HEIGHT_RATIO = 0.3;
 const BRAZIER_FIRE_LIGHT_INTENSITY = 3.2;
 const BRAZIER_FIRE_LIGHT_RANGE = 26;
+const END_HOUSE_INTERIOR_COLLIDER_NAMES = [
+  "televisionretro",
+  "woodenbed",
+  "woodenchair",
+  "woodenhousebench",
+  "woodenshelf",
+  "woodenwardrobe",
+] as const;
+const ROCKING_CHAIR_WAIT_MIN_SECONDS = 7;
+const ROCKING_CHAIR_WAIT_MAX_SECONDS = 22;
+const ROCKING_CHAIR_SESSION_MIN_SECONDS = 6;
+const ROCKING_CHAIR_SESSION_MAX_SECONDS = 11;
+const ROCKING_CHAIR_AMPLITUDE_MIN = Math.PI * 0.025;
+const ROCKING_CHAIR_AMPLITUDE_MAX = Math.PI * 0.04;
+const ROCKING_CHAIR_FREQUENCY_MIN = 0.46;
+const ROCKING_CHAIR_FREQUENCY_MAX = 0.62;
+const ROCKING_CHAIR_FADE_SECONDS = 1.35;
 const END_HOUSE_BACKYARD_PROPS = [
   {
     name: "endHousePicnicTable",
@@ -1599,6 +1616,8 @@ export class Segments {
 
     this.createHouseColliders(finalBounds);
     this.createHouseMeshColliders(res.meshes);
+    this.createHouseInteriorColliders(res.meshes);
+    this.registerHouseRockingChair(res.meshes);
     this.createHouseDoor(res.meshes, finalBounds);
     const candlePosition = this.createHouseCandle(finalBounds);
     await Promise.all([
@@ -2136,6 +2155,141 @@ export class Segments {
         kind: "house",
       });
     }
+  }
+
+  private createHouseInteriorColliders(meshes: AbstractMesh[]) {
+    for (const mesh of meshes) {
+      const hierarchyName = `${mesh.name} ${mesh.parent?.name ?? ""}`.toLowerCase();
+      if (
+        !END_HOUSE_INTERIOR_COLLIDER_NAMES.some((part) =>
+          hierarchyName.includes(part)
+        )
+      ) {
+        continue;
+      }
+
+      const bounds = this.getMeshBounds(mesh);
+      if (!bounds) continue;
+
+      const width = bounds.max.x - bounds.min.x;
+      const height = bounds.max.y - bounds.min.y;
+      const depth = bounds.max.z - bounds.min.z;
+      if (height < 0.2 || width < 0.08 || depth < 0.08) continue;
+
+      this.staticBoxColliders.push({
+        x: (bounds.min.x + bounds.max.x) * 0.5,
+        z: (bounds.min.z + bounds.max.z) * 0.5,
+        width: Math.max(width, 0.3),
+        depth: Math.max(depth, 0.3),
+        rotation: 0,
+        active: true,
+        kind: "prop",
+      });
+    }
+  }
+
+  private registerHouseRockingChair(meshes: AbstractMesh[]) {
+    const chair = meshes.find((mesh) =>
+      mesh.name.toLowerCase().includes("woodenchair")
+    );
+    if (!chair) return;
+
+    const basePosition = chair.position.clone();
+    const baseRotation = chair.rotation.clone();
+    const baseRotationQuaternion = chair.rotationQuaternion?.clone() ?? null;
+    const localRockAxis = Vector3.Right();
+    const randomBetween = (min: number, max: number) =>
+      min + Math.random() * (max - min);
+
+    let waiting = true;
+    let waitRemaining = randomBetween(2.5, 7);
+    let sessionElapsed = 0;
+    let sessionDuration = 0;
+    let amplitude = 0;
+    let angularFrequency = 0;
+    let phase = Math.random() * Math.PI * 2;
+
+    const restoreBaseTransform = () => {
+      chair.position.copyFrom(basePosition);
+      if (baseRotationQuaternion) {
+        chair.rotationQuaternion = baseRotationQuaternion.clone();
+      } else {
+        chair.rotation.copyFrom(baseRotation);
+      }
+    };
+
+    this.scene.onBeforeRenderObservable.add(() => {
+      if (chair.isDisposed()) return;
+
+      const dt = Math.max(
+        0,
+        Math.min(this.scene.getEngine().getDeltaTime() * 0.001, 0.05)
+      );
+
+      if (waiting) {
+        waitRemaining -= dt;
+        if (waitRemaining > 0) return;
+
+        waiting = false;
+        sessionElapsed = 0;
+        sessionDuration = randomBetween(
+          ROCKING_CHAIR_SESSION_MIN_SECONDS,
+          ROCKING_CHAIR_SESSION_MAX_SECONDS
+        );
+        amplitude = randomBetween(
+          ROCKING_CHAIR_AMPLITUDE_MIN,
+          ROCKING_CHAIR_AMPLITUDE_MAX
+        );
+        angularFrequency =
+          randomBetween(
+            ROCKING_CHAIR_FREQUENCY_MIN,
+            ROCKING_CHAIR_FREQUENCY_MAX
+          ) *
+          Math.PI *
+          2;
+        phase = Math.random() * Math.PI * 2;
+      }
+
+      sessionElapsed += dt;
+      phase += angularFrequency * dt;
+
+      const fadeIn = smoothstep(
+        0,
+        ROCKING_CHAIR_FADE_SECONDS,
+        sessionElapsed
+      );
+      const fadeOut =
+        1 -
+        smoothstep(
+          sessionDuration - ROCKING_CHAIR_FADE_SECONDS,
+          sessionDuration,
+          sessionElapsed
+        );
+      const envelope = fadeIn * fadeOut;
+      const angle =
+        amplitude *
+        envelope *
+        (Math.sin(phase) + Math.sin(phase * 2 - 0.7) * 0.08);
+
+      chair.position.copyFrom(basePosition);
+      if (baseRotationQuaternion) {
+        chair.rotationQuaternion = baseRotationQuaternion.multiply(
+          Quaternion.RotationAxis(localRockAxis, angle)
+        );
+      } else {
+        chair.rotation.copyFrom(baseRotation);
+        chair.rotation.x += angle;
+      }
+
+      if (sessionElapsed < sessionDuration) return;
+
+      restoreBaseTransform();
+      waiting = true;
+      waitRemaining = randomBetween(
+        ROCKING_CHAIR_WAIT_MIN_SECONDS,
+        ROCKING_CHAIR_WAIT_MAX_SECONDS
+      );
+    });
   }
 
   private addHouseTriangleColliders(mesh: Mesh) {

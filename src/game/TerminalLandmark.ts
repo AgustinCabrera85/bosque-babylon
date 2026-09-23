@@ -428,6 +428,7 @@ export class TerminalLandmarkGenerator {
     const waterfallFoam = this.createWaterfallFoam(root, config, activeImpactPoint);
     waterfallFoam.setEnabled(false);
     this.waterfallOverlayMeshes.push(waterfallFoam);
+    this.createWaterfallFoamVolume(config, activeImpactPoint);
     this.createWaterfallSplash(config, activeImpactPoint);
     this.createWaterfallDropletBursts(config, activeImpactPoint);
     this.createWaterfallMist(config, activeImpactPoint);
@@ -816,7 +817,9 @@ export class TerminalLandmarkGenerator {
       config.waterLevel + 8,
       this.terrain.getHeightAt(config.lagoonCenterX, config.backCliffZ + 8) - 1.2
     );
-    const bottom = config.waterLevel + 0.25;
+    // Weld the authored curtain to the same height used by the impact VFX.
+    // Keeping separate heights left a visible dark gap from the shore view.
+    const bottom = config.waterLevel + 0.08;
     const height = cliffTop - bottom;
     // Move the visible source onto the upper terrain lip. The feeder surface
     // ends at this same edge, so the fall has a physical origin.
@@ -949,7 +952,7 @@ export class TerminalLandmarkGenerator {
         `${layer.name}Material`,
         layer.opacityScale,
         layer.phase,
-        { fadeStart: true, fadeEnd: !hybrid }
+        { fadeStart: false, fadeEnd: !hybrid }
       );
       // Keep the translucent ribbons in the main rendering group. Later groups
       // clear their depth buffer by default, which made the waterfall draw over
@@ -1227,7 +1230,7 @@ export class TerminalLandmarkGenerator {
               0.83,
               broad * 0.46 + detail * 0.36 + fineFlow * 0.18
             );
-            float lowerContinuity = mix(1.0, 0.34 + breakupNoise * 0.66, lowerZone);
+            float lowerContinuity = mix(1.0, 0.68 + breakupNoise * 0.32, lowerZone);
             float transparency =
               (0.18 + softStreaks * 0.28 + brokenFlow * 0.3) *
               connectedStreams *
@@ -1289,7 +1292,7 @@ export class TerminalLandmarkGenerator {
       { radius: 1, tessellation: 48, sideOrientation: Mesh.DOUBLESIDE },
       this.scene
     );
-    foam.scaling.set(config.waterfallWidth * 0.82, 4.15, 1);
+    foam.scaling.set(config.waterfallWidth * 0.64, 3.2, 1);
     foam.rotation.x = Math.PI * 0.5;
     foam.position.copyFrom(impactPoint);
     foam.isPickable = false;
@@ -1321,41 +1324,67 @@ export class TerminalLandmarkGenerator {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
           }
 
+          float noise(vec2 p) {
+            vec2 cell = floor(p);
+            vec2 local = fract(p);
+            local = local * local * (3.0 - 2.0 * local);
+            return mix(
+              mix(hash(cell), hash(cell + vec2(1.0, 0.0)), local.x),
+              mix(hash(cell + vec2(0.0, 1.0)), hash(cell + vec2(1.0)), local.x),
+              local.y
+            );
+          }
+
+          float foamFocus(vec2 p, vec2 center, float width) {
+            vec2 local = (p - center) * vec2(2.65, 1.15);
+            float distortion = noise(local * 4.2 + vec2(time * 0.28, -time * 0.72));
+            float radius = length(local) + (distortion - 0.5) * 0.16;
+            return 1.0 - smoothstep(width * 0.42, width, radius);
+          }
+
           void main(void) {
             vec2 p = (vUV - 0.5) * 2.0;
-            float distanceFromImpact = length(p);
-            float angle = atan(p.y, p.x);
-            float edgeNoise = sin(angle * 9.0 + time * 0.75) * 0.035;
-            edgeNoise += (hash(floor(vUV * 18.0 + time * 0.35)) - 0.5) * 0.045;
-            float softPatch = 1.0 - smoothstep(0.48 + edgeNoise, 1.0 + edgeNoise, distanceFromImpact);
-            float rings = sin(distanceFromImpact * 26.0 - time * 2.25 + sin(angle * 5.0) * 0.7) * 0.5 + 0.5;
-            float brokenFoam = smoothstep(0.38, 0.9, rings) * softPatch;
-            float centerChurn = 1.0 - smoothstep(0.04, 0.56, distanceFromImpact);
-            float impactDepth = 1.0 - smoothstep(0.08, 0.74, abs(p.y));
-            float zoneA = 1.0 - smoothstep(0.1, 0.24, abs(p.x + 0.68));
-            float zoneB = 1.0 - smoothstep(0.12, 0.3, abs(p.x + 0.23));
-            float zoneC = 1.0 - smoothstep(0.1, 0.25, abs(p.x - 0.25));
-            float zoneD = 1.0 - smoothstep(0.08, 0.21, abs(p.x - 0.7));
-            float localizedChurn = max(max(zoneA * 0.76, zoneB), max(zoneC * 0.9, zoneD * 0.7));
-            localizedChurn *= impactDepth;
+            float edgeField = length(p * vec2(0.92, 1.08));
+            float edgeNoise = noise(p * 5.3 + vec2(time * 0.17, -time * 0.31));
+            float softPatch = 1.0 - smoothstep(
+              0.64 + (edgeNoise - 0.5) * 0.08,
+              1.0 + (edgeNoise - 0.5) * 0.12,
+              edgeField
+            );
 
-            // Small expanding cells continually appear and vanish across the
-            // impact patch, suggesting aerated water without extra geometry.
-            vec2 bubbleUV = p * vec2(5.4, 3.8) + vec2(sin(time * 0.41) * 0.22, -time * 0.72);
-            vec2 bubbleCell = floor(bubbleUV);
-            vec2 bubbleLocal = fract(bubbleUV) - 0.5;
-            float bubbleSeed = hash(bubbleCell);
-            float bubblePhase = fract(time * (0.54 + bubbleSeed * 0.46) + bubbleSeed);
-            float bubbleRadius = mix(0.08, 0.34, bubblePhase);
-            float bubbleDistance = length(bubbleLocal);
-            float bubbleRing = smoothstep(bubbleRadius - 0.055, bubbleRadius, bubbleDistance);
-            bubbleRing *= 1.0 - smoothstep(bubbleRadius, bubbleRadius + 0.065, bubbleDistance);
-            float bubbleLife = smoothstep(0.02, 0.16, bubblePhase) * (1.0 - smoothstep(0.64, 1.0, bubblePhase));
-            float bubbles = bubbleRing * bubbleLife * softPatch;
+            float sources = foamFocus(p, vec2(-0.48, 0.0), 0.58);
+            sources = max(sources, foamFocus(p, vec2(-0.24, 0.025), 0.62));
+            sources = max(sources, foamFocus(p, vec2(0.0, -0.02), 0.66));
+            sources = max(sources, foamFocus(p, vec2(0.24, 0.02), 0.61));
+            sources = max(sources, foamFocus(p, vec2(0.48, -0.01), 0.57));
 
-            float opacity = foamAlpha * softPatch * (0.2 + brokenFoam * 0.42 + centerChurn * 0.22 + localizedChurn * 0.28 + bubbles * 0.58);
-            vec3 foamColor = mix(vec3(0.18, 0.30, 0.31), vec3(0.58, 0.69, 0.70), brokenFoam * 0.44 + centerChurn * 0.22 + localizedChurn * 0.24 + bubbles * 0.5);
-            gl_FragColor = vec4(foamColor * 0.78, opacity);
+            vec2 outwardFlow = vec2(
+              p.x * 4.6 + sin(p.y * 7.0) * 0.24,
+              abs(p.y) * 7.5 - time * 1.15
+            );
+            float broadTurbulence = noise(outwardFlow);
+            float detailTurbulence = noise(
+              outwardFlow * 2.13 + vec2(-time * 0.38, time * 0.74)
+            );
+            float turbulence = broadTurbulence * 0.62 + detailTurbulence * 0.38;
+            float impactBand = 1.0 - smoothstep(
+              0.08,
+              0.5,
+              abs(p.y) + (turbulence - 0.5) * 0.14
+            );
+            float brokenOutflow = smoothstep(0.43, 0.78, turbulence) *
+              (1.0 - smoothstep(0.38, 0.98, abs(p.y)));
+            float foamMass = max(sources * 0.82, impactBand * (0.58 + turbulence * 0.42));
+            foamMass = max(foamMass, brokenOutflow * 0.72);
+
+            float opacity = foamAlpha * softPatch * smoothstep(0.16, 0.78, foamMass);
+            vec3 foamColor = mix(
+              vec3(0.24, 0.38, 0.4),
+              vec3(0.7, 0.8, 0.81),
+              clamp(foamMass * 0.72 + turbulence * 0.18, 0.0, 1.0)
+            );
+            if (opacity < 0.025) discard;
+            gl_FragColor = vec4(foamColor * 0.82, opacity);
           }
         `,
       },
@@ -1374,6 +1403,131 @@ export class TerminalLandmarkGenerator {
     foam.material = material;
     setGameMaterial(foam, "water", this.scene, { applyVisual: false });
     return foam;
+  }
+
+  private createWaterfallFoamVolume(
+    config: TerminalLandmarkConfig,
+    impactPoint: Vector3
+  ) {
+    const texture = new DynamicTexture(
+      "terminalWaterfallFoamVolumeTexture",
+      { width: 64, height: 64 },
+      this.scene,
+      false
+    );
+    const context = texture.getContext();
+    context.clearRect(0, 0, 64, 64);
+
+    // Several overlapping cells make each fragment asymmetric. Kept compact
+    // and vertically compressed below so the particles read as churned foam,
+    // rather than smoke cards or another set of geometric rings.
+    const drawFoamCell = (
+      x: number,
+      y: number,
+      radius: number,
+      opacity: number
+    ) => {
+      const gradient = context.createRadialGradient(x, y, 1, x, y, radius);
+      gradient.addColorStop(0, `rgba(232, 247, 248, ${opacity})`);
+      gradient.addColorStop(0.42, `rgba(184, 222, 224, ${opacity * 0.72})`);
+      gradient.addColorStop(1, "rgba(102, 157, 162, 0)");
+      context.fillStyle = gradient;
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.fill();
+    };
+    drawFoamCell(31, 34, 23, 0.76);
+    drawFoamCell(18, 37, 13, 0.58);
+    drawFoamCell(46, 31, 14, 0.56);
+    drawFoamCell(34, 20, 11, 0.48);
+    texture.hasAlpha = true;
+    texture.update(false);
+
+    const capacity = Math.max(
+      56,
+      Math.min(112, Math.round(this.visualConfig.impact.splashCapacity * 1.2))
+    );
+    const foamVolume = new ParticleSystem(
+      "terminalWaterfallFoamVolume",
+      capacity,
+      this.scene
+    );
+    foamVolume.particleTexture = texture;
+    foamVolume.emitter = impactPoint.add(new Vector3(0, 0.035, -0.08));
+
+    // Closely spaced sources cover the full contact line while preserving one
+    // continuous turbulent mass. Depth jitter is what gives the flat base its
+    // missing parallax and low three-dimensional body.
+    const impactCenters = [-0.4, -0.2, 0, 0.2, 0.4];
+    foamVolume.startPositionFunction = (worldMatrix, position) => {
+      const source = impactCenters[Math.floor(Math.random() * impactCenters.length)];
+      Vector3.TransformCoordinatesFromFloatsToRef(
+        source * config.waterfallWidth +
+          (Math.random() - 0.5) * config.waterfallWidth * 0.13,
+        Math.random() * 0.13,
+        (Math.random() - 0.5) * 1.45,
+        worldMatrix,
+        position
+      );
+    };
+    foamVolume.startDirectionFunction = (worldMatrix, direction) => {
+      Vector3.TransformNormalFromFloatsToRef(
+        (Math.random() - 0.5) * 1.65,
+        0.72 + Math.random() * 1.18,
+        -0.82 + Math.random() * 1.08,
+        worldMatrix,
+        direction
+      );
+    };
+
+    foamVolume.minSize = 0.16;
+    foamVolume.maxSize = 0.42;
+    foamVolume.minScaleX = 0.78;
+    foamVolume.maxScaleX = 1.38;
+    foamVolume.minScaleY = 0.42;
+    foamVolume.maxScaleY = 0.82;
+    foamVolume.minInitialRotation = 0;
+    foamVolume.maxInitialRotation = Math.PI * 2;
+    foamVolume.minAngularSpeed = -1.45;
+    foamVolume.maxAngularSpeed = 1.45;
+    foamVolume.minLifeTime = 0.42;
+    foamVolume.maxLifeTime = 0.82;
+    foamVolume.emitRate = this.visualConfig.impact.splashEmitRate * 1.16;
+    foamVolume.minEmitPower = 0.52;
+    foamVolume.maxEmitPower = 1.08;
+    foamVolume.updateSpeed = 0.012;
+    foamVolume.gravity = new Vector3(0, -2.7, 0);
+    foamVolume.addSizeGradient(0, 0.42, 0.58);
+    foamVolume.addSizeGradient(0.16, 0.92, 1.08);
+    foamVolume.addSizeGradient(0.64, 0.68, 0.9);
+    foamVolume.addSizeGradient(1, 0.08, 0.2);
+    foamVolume.addVelocityGradient(0, 1, 1.12);
+    foamVolume.addVelocityGradient(0.38, 0.52, 0.72);
+    foamVolume.addVelocityGradient(0.78, 0.22, 0.38);
+    foamVolume.addVelocityGradient(1, 0.06, 0.14);
+    foamVolume.addColorGradient(
+      0,
+      new Color4(0.8, 0.93, 0.94, 0),
+      new Color4(0.68, 0.86, 0.88, 0)
+    );
+    foamVolume.addColorGradient(
+      0.14,
+      new Color4(0.82, 0.95, 0.96, 0.68),
+      new Color4(0.62, 0.82, 0.84, 0.5)
+    );
+    foamVolume.addColorGradient(
+      0.62,
+      new Color4(0.58, 0.78, 0.8, 0.38),
+      new Color4(0.42, 0.64, 0.67, 0.25)
+    );
+    foamVolume.addColorGradient(
+      1,
+      new Color4(0.22, 0.38, 0.4, 0),
+      new Color4(0.18, 0.3, 0.32, 0)
+    );
+    foamVolume.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    foamVolume.renderingGroupId = 1;
+    this.waterfallParticleSystems.push(foamVolume);
   }
 
   private createWaterfallSplash(config: TerminalLandmarkConfig, impactPoint: Vector3) {
@@ -1400,8 +1554,8 @@ export class TerminalLandmarkGenerator {
       this.scene
     );
     splash.particleTexture = texture;
-    splash.emitter = impactPoint.add(new Vector3(0, 0.12, 0));
-    const splashStreamCenters = [-0.34, -0.115, 0.125, 0.35];
+    splash.emitter = impactPoint.add(new Vector3(0, 0.06, 0));
+    const splashStreamCenters = [-0.4, -0.2, 0, 0.2, 0.4];
     splash.startPositionFunction = (worldMatrix, position) => {
       const streamIndex = Math.floor(Math.random() * splashStreamCenters.length);
       const streamCenter = splashStreamCenters[streamIndex] * config.waterfallWidth;
@@ -1410,21 +1564,21 @@ export class TerminalLandmarkGenerator {
       Vector3.TransformCoordinatesFromFloatsToRef(
         localX,
         Math.random() * 0.15,
-        (Math.random() - 0.5) * 0.95,
+        (Math.random() - 0.5) * 1.25,
         worldMatrix,
         position
       );
     };
-    splash.direction1 = new Vector3(-0.9, 1.8, -0.65);
-    splash.direction2 = new Vector3(0.9, 3.1, 0.35);
-    splash.color1 = new Color4(0.72, 0.87, 0.88, 0.72);
-    splash.color2 = new Color4(0.42, 0.66, 0.68, 0.48);
+    splash.direction1 = new Vector3(-1.05, 1.55, -0.72);
+    splash.direction2 = new Vector3(1.05, 3.25, 0.5);
+    splash.color1 = new Color4(0.78, 0.91, 0.92, 0.8);
+    splash.color2 = new Color4(0.48, 0.71, 0.73, 0.56);
     splash.colorDead = new Color4(0.12, 0.2, 0.21, 0);
-    splash.minSize = 0.065;
-    splash.maxSize = 0.21;
+    splash.minSize = 0.09;
+    splash.maxSize = 0.28;
     splash.minLifeTime = 0.35;
     splash.maxLifeTime = 0.78;
-    splash.emitRate = this.visualConfig.impact.splashEmitRate;
+    splash.emitRate = this.visualConfig.impact.splashEmitRate * 1.35;
     splash.minEmitPower = 0.55;
     splash.maxEmitPower = 1.2;
     splash.updateSpeed = 0.012;

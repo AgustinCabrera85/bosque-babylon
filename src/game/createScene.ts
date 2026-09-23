@@ -772,6 +772,7 @@ scene.onBeforeRenderObservable.add(() => {
     plantBuildCount: quality.plantBuildCount,
     plantRingCounts: quality.plantRingCounts,
     plantFarCount: quality.plantFarCount,
+    brazierFireQuality: quality.name === "mobile" ? "low" : "high",
   });
 
   onProgress(0.86, "Cargando casa...");

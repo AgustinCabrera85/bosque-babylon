@@ -20,6 +20,11 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { mulberry32 } from "../utils/seed";
 import { createCandleFireMaterial, createGlowMaterial } from "./Torches";
 import { applyBrazierLogEmberMaterial } from "./BrazierLogEmberMaterial";
+import {
+  createBrazierProceduralFire,
+  type BrazierFireQuality,
+  type BrazierProceduralFireHandle,
+} from "./BrazierProceduralFire";
 import { createPhotoCard } from "./PhotoCard";
 import { createCollectibleNote } from "./CollectibleNotes";
 
@@ -73,6 +78,7 @@ type SegmentCfg = {
   plantFarCount?: number;
   endHouseSegment?: number;
   maxGeneratedSegment?: number;
+  brazierFireQuality?: BrazierFireQuality;
 };
 
 export type StaticWorldBlocker = {
@@ -178,8 +184,9 @@ const END_HOUSE_BACKYARD_PROP_PATH = "/assets/models/objects/";
 const BRAZIER_LOGS_FILE = "wood_logs_brazier.glb";
 const BRAZIER_LOGS_DIAMETER_RATIO = 0.78 * 0.75;
 const BRAZIER_LOGS_RIM_RISE_RATIO = 0.16;
-const BRAZIER_FIRE_DIAMETER_RATIO = 0.92;
-const BRAZIER_FIRE_HEIGHT_RATIO = 1.08;
+// Keep the luminous field inside the brazier rim; the shader fills most of its plane.
+const BRAZIER_FIRE_DIAMETER_RATIO = 0.74;
+const BRAZIER_FIRE_HEIGHT_RATIO = 1.04;
 const BRAZIER_FIRE_LOG_HEIGHT_RATIO = 0.3;
 const BRAZIER_FIRE_LIGHT_INTENSITY = 3.2;
 const BRAZIER_FIRE_LIGHT_RANGE = 26;
@@ -266,6 +273,7 @@ export class Segments {
   private firstNoteCreated = false;
   private endHouseCheckpoint: Vector3 | null = null;
   private endHouseMeshes: AbstractMesh[] = [];
+  private endHouseBrazierFire: BrazierProceduralFireHandle | null = null;
   private endHouseBounds: WorldBounds | null = null;
   private worldPrewarmed = false;
 
@@ -1375,7 +1383,7 @@ export class Segments {
       flameHeight,
     });
 
-    return { root, floorGlow };
+    return { root, flame, floorGlow };
   }
 
   private registerCandleFlicker() {
@@ -1401,11 +1409,16 @@ export class Segments {
         const bend = Math.sin(t * 8.6 + entry.phase) * 0.06 + Math.sin(t * 17.5 + entry.phase * 0.4) * 0.024;
         const stretch = 1 + Math.sin(t * 11.8 + entry.phase * 0.7) * 0.085 + Math.sin(t * 24.0 + entry.phase) * 0.045;
         const width = 1 + Math.sin(t * 15.5 + entry.phase * 1.9) * 0.055;
-        entry.root.rotation.z = bend;
-        entry.flame.visibility = fade;
-        entry.flame.scaling.set(width, stretch, 1);
-        entry.flame.position.x = 0;
-        entry.flame.position.y = (entry.flameHeight * stretch) * 0.5;
+        const legacyFlameEnabled = entry.flame.isEnabled();
+        // The procedural brazier is parented to this visual root so it can reuse
+        // the existing glow/sparks, but its combustion origin must not pendulum.
+        entry.root.rotation.z = legacyFlameEnabled ? bend : 0;
+        if (legacyFlameEnabled) {
+          entry.flame.visibility = fade;
+          entry.flame.scaling.set(width, stretch, 1);
+          entry.flame.position.x = 0;
+          entry.flame.position.y = (entry.flameHeight * stretch) * 0.5;
+        }
 
         const glowPulse = 1 + flicker * 1.15;
         entry.glow.scaling.set(glowPulse, glowPulse, 1);
@@ -1854,8 +1867,32 @@ export class Segments {
       }
     );
 
+    // Keep the legacy candle entry/root for flicker, pooled light and safe-zone
+    // gameplay, but replace only its visible flame card for this brazier.
+    const existingFireMeshes = fire.root.getChildMeshes(false);
+    fire.flame.visibility = 0;
+    fire.flame.setEnabled(false);
+
+    if (this.endHouseBrazierFire) {
+      const previousMeshes = new Set<AbstractMesh>(this.endHouseBrazierFire.meshes);
+      this.endHouseMeshes = this.endHouseMeshes.filter(
+        (mesh) => !previousMeshes.has(mesh)
+      );
+      this.endHouseBrazierFire.dispose();
+    }
+    this.endHouseBrazierFire = createBrazierProceduralFire({
+      scene: this.scene,
+      parent: fire.root,
+      width: diameter * BRAZIER_FIRE_DIAMETER_RATIO,
+      height: diameter * BRAZIER_FIRE_HEIGHT_RATIO,
+      quality: this.cfg.brazierFireQuality ?? "high",
+      phase: 2.43,
+      intensity: 1,
+    });
+
     this.endHouseMeshes.push(
-      ...fire.root.getChildMeshes(false),
+      ...existingFireMeshes,
+      ...this.endHouseBrazierFire.meshes,
       fire.floorGlow
     );
   }

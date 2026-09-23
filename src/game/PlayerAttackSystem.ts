@@ -11,6 +11,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import type { PlayerController } from "./PlayerController";
 import type { PlayerStatsSystem } from "./PlayerStatsSystem";
+import { PlayerLightRechargeVFX } from "./PlayerLightRechargeVFX";
 import type { EnemyController } from "./enemies/core/EnemyTypes";
 import type { EnemyManager } from "./enemies/core/EnemyManager";
 
@@ -330,6 +331,7 @@ export class PlayerAttackSystem {
   private readonly trajectoryEnd: Mesh;
   private readonly trajectoryEndMaterial: StandardMaterial;
   private readonly heldOrb: HeldLightOrb;
+  private readonly lightRechargeVfx: PlayerLightRechargeVFX;
   private readonly abortController = new AbortController();
   private readonly hudArtworks = new Map<HTMLObjectElement, AttackHudArtwork>();
   private readonly projectiles: LightProjectile[] = [];
@@ -341,6 +343,8 @@ export class PlayerAttackSystem {
   private heldOrbPower = 0.18;
   private projectilePending = false;
   private rechargeProgress = 0;
+  private rechargeSourcePosition: Vector3 | null = null;
+  private rechargeCompletedThisFrame = false;
   private timeSinceShot = Number.POSITIVE_INFINITY;
   private desktopOrbMode = false;
   private desktopChargeMouseActive = false;
@@ -401,6 +405,10 @@ export class PlayerAttackSystem {
     this.trajectoryEnd.renderingGroupId = 2;
     this.trajectoryEnd.setEnabled(false);
     this.heldOrb = this.createHeldLightOrb();
+    this.lightRechargeVfx = new PlayerLightRechargeVFX(scene, {
+      getGroundPositionToRef: (result) => player.getGroundContactPositionToRef(result),
+      getGroundSurfaceHeightAt: options.getGroundHeight,
+    });
 
     const signal = this.abortController.signal;
     if (options.desktopInputEnabled) {
@@ -536,7 +544,13 @@ export class PlayerAttackSystem {
     }
     this.updateProjectiles(delta);
     this.updateImpactBursts(delta);
-    this.updateRecharge(delta);
+    const recharging = this.updateRecharge(delta);
+    this.lightRechargeVfx.update(delta, {
+      active: recharging,
+      progress: this.rechargeProgress / RECHARGE_SECONDS_PER_ORB,
+      sourcePosition: this.rechargeSourcePosition,
+      completed: this.rechargeCompletedThisFrame,
+    });
     this.renderHud();
   }
 
@@ -557,6 +571,7 @@ export class PlayerAttackSystem {
     this.heldOrb.root.dispose(false, false);
     this.heldOrb.coreMaterial.dispose();
     this.heldOrb.auraMaterial.dispose();
+    this.lightRechargeVfx.dispose();
   }
 
   private readonly onDesktopMouseDown = (event: MouseEvent) => {
@@ -1011,13 +1026,15 @@ export class PlayerAttackSystem {
   }
 
   private updateRecharge(delta: number) {
+    this.rechargeSourcePosition = null;
+    this.rechargeCompletedThisFrame = false;
     if (
       this.charging ||
       this.ammo >= this.options.stats.maxLightOrbs ||
       this.timeSinceShot < RECHARGE_DELAY_AFTER_SHOT
     ) {
       if (this.ammo >= this.options.stats.maxLightOrbs) this.rechargeProgress = 0;
-      return;
+      return false;
     }
 
     const playerPosition = this.player.position;
@@ -1025,26 +1042,32 @@ export class PlayerAttackSystem {
     const nearLight = this.options.getLightSourcePositions().some((position) => {
       const dx = position.x - playerPosition.x;
       const dz = position.z - playerPosition.z;
-      return dx * dx + dz * dz <= radiusSquared && Math.abs(position.y - playerPosition.y) < 5;
+      const inRange =
+        dx * dx + dz * dz <= radiusSquared &&
+        Math.abs(position.y - playerPosition.y) < 5;
+      if (inRange) this.rechargeSourcePosition = position;
+      return inRange;
     });
 
     if (!nearLight) {
       this.rechargeProgress = Math.max(0, this.rechargeProgress - delta * 1.4);
       if (this.messageTimer <= 0) this.message = "Mantene clic para apuntar";
-      return;
+      return false;
     }
 
     this.rechargeProgress += delta;
     if (this.messageTimer <= 0) this.message = "Absorbiendo luz...";
-    if (this.rechargeProgress < RECHARGE_SECONDS_PER_ORB) return;
+    if (this.rechargeProgress < RECHARGE_SECONDS_PER_ORB) return true;
     this.rechargeProgress -= RECHARGE_SECONDS_PER_ORB;
     this.options.stats.addLightOrbs(1, "light-recharge");
+    this.rechargeCompletedThisFrame = true;
     this.showMessage(
       this.ammo >= this.options.stats.maxLightOrbs
         ? "Luz completa"
         : "+1 esfera de luz",
       0.8
     );
+    return true;
   }
 
   private consumeAmmo() {

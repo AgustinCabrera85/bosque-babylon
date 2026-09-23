@@ -16,6 +16,12 @@ import { createSkyEyeConfig, SKY_EYE_TYPE } from "../src/game/enemies/skyEye/Sky
 import { SkyEyeController } from "../src/game/enemies/skyEye/SkyEyeController.ts";
 import { getSkyEyePortalDeathProgress } from "../src/game/enemies/skyEye/SkyEyeFxController.ts";
 import { getSkyEyePresentationProgress } from "../src/game/levels/TerminalSkyEyeEncounter.ts";
+import {
+  ShadowGrabberBehavior,
+  ShadowGrabberBehaviorState,
+  type ShadowGrabberGameplayEvent,
+} from "../src/game/enemies/shadowGrabber/ShadowGrabberBehavior.ts";
+import { ShadowGrabberCoordinator } from "../src/game/enemies/shadowGrabber/ShadowGrabberCoordinator.ts";
 
 // The combat controller emits browser events; EventTarget is enough here.
 Object.assign(globalThis, { window: new EventTarget() });
@@ -91,6 +97,50 @@ function hit(enemy: BaseEnemyController, damage = 1) {
 }
 
 async function verify() {
+  const interruptedCaptureEvents: ShadowGrabberGameplayEvent[] = [];
+  const interruptedCaptureBehavior = new ShadowGrabberBehavior(
+    {
+      id: "interrupted-capture",
+      config: {
+        hoverHeightMin: 1,
+        hoverHeightMax: 1,
+        roleReassignmentIntervalIdle: 1,
+        roleReassignmentIntervalActive: 1,
+        roleActivityHysteresisSeconds: 0,
+        maxConcurrentAttacks: 1,
+      },
+      setAnchorPosition: () => {},
+      setPortalCenterWorldPosition: () => {},
+      setState: () => {},
+      setFxState: () => {},
+    } as never,
+    {
+      groupId: "capture-lifecycle-test",
+      anchorPosition: Vector3.Zero(),
+      coordinator: new ShadowGrabberCoordinator(),
+      lightQuery: null as never,
+      navigation: {
+        getGroundHeight: () => 0,
+        isBlocked: () => false,
+      },
+      applySanityDrain: () => {},
+      onEvent: (_id, event) => interruptedCaptureEvents.push(event),
+    }
+  );
+  (
+    interruptedCaptureBehavior as unknown as {
+      transition: (state: ShadowGrabberBehaviorState) => void;
+    }
+  ).transition(ShadowGrabberBehaviorState.Grabbing);
+  assert.deepEqual(interruptedCaptureEvents, ["grab"]);
+  interruptedCaptureBehavior.dispose();
+  interruptedCaptureBehavior.dispose();
+  assert.deepEqual(
+    interruptedCaptureEvents,
+    ["grab", "retract"],
+    "disposing an active grab must release it exactly once"
+  );
+
   const skyEyePortal = createSkyEyeConfig();
   const coreDiameter =
     skyEyePortal.portalVisualScale *

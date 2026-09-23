@@ -33,6 +33,7 @@ import { WaterSurfaceRegistry } from "./WaterSurface";
 import type { MusicPlayerHandle } from "./MusicPlayer";
 import type { InventoryHandle } from "./Inventory";
 import { PlayerAttackSystem } from "./PlayerAttackSystem";
+import { PlayerLightAbsorptionVFX } from "./PlayerLightAbsorptionVFX";
 import { PlayerStatsSystem } from "./PlayerStatsSystem";
 import { PlayerStatusHud } from "./PlayerStatusHud";
 import {
@@ -525,10 +526,14 @@ const terrain = createTerrain(scene, {
       import.meta.env.DEV &&
       new URLSearchParams(window.location.search).get("debugSurvival") === "1",
   });
+  const playerLightAbsorptionVfx = new PlayerLightAbsorptionVFX(scene, {
+    getGroundPositionToRef: (result) => player.getGroundContactPositionToRef(result),
+  });
   const playerStatusHud = new PlayerStatusHud(playerStats);
   let auraHealth = Number.NaN;
   let auraSanity = Number.NaN;
   const unsubscribePlayerStatsAura = playerStats.onChange((event) => {
+    if (event.type === "light-orb-absorbed") playerLightAbsorptionVfx.play();
     const health = event.snapshot.health / event.snapshot.maxHealth;
     const sanity = event.snapshot.sanity / event.snapshot.maxSanity;
     if (health !== auraHealth) {
@@ -563,6 +568,7 @@ const terrain = createTerrain(scene, {
   }
   scene.onDisposeObservable.add(() => {
     unsubscribePlayerStatsAura();
+    playerLightAbsorptionVfx.dispose();
     playerStatusHud.dispose();
     playerStats.dispose();
     shadowAuraDebug.dispose();

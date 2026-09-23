@@ -71,7 +71,15 @@ const tests: Array<[string, () => void]> = [
     assert.equal(stats.beginShadowGrabberCapture("a"), false);
     assert.deepEqual(stats.snapshot, afterFirst);
   }],
-  ["7. fuentes continuas combinadas respetan 2.5/s", () => {
+  ["7. liberar un agarre vuelve a habilitar la absorcion", () => {
+    const stats = createStats({ initialSanity: 50, initialLightOrbs: 1 });
+    assert.equal(stats.beginShadowGrabberCapture("a"), true);
+    assert.equal(stats.hasActiveShadowGrabberCapture, true);
+    assert.equal(stats.endShadowGrabberCapture("a"), true);
+    assert.equal(stats.hasActiveShadowGrabberCapture, false);
+    assert.equal(stats.startLightAbsorption(), true);
+  }],
+  ["8. fuentes continuas combinadas respetan 2.5/s", () => {
     const stats = createStats();
     stats.queueContinuousSanityDrain("grab", 1);
     stats.update(0.1, {
@@ -81,7 +89,7 @@ const tests: Array<[string, () => void]> = [
     });
     close(stats.sanity, 99.75);
   }],
-  ["8. recuperacion natural respeta caps 60/75/100", () => {
+  ["9. recuperacion natural respeta caps 60/75/100", () => {
     const weak = createStats({ initialSanity: 50 });
     advance(weak, 200, { recoveryMode: "weak-light" });
     close(weak.sanity, 60);
@@ -92,7 +100,7 @@ const tests: Array<[string, () => void]> = [
     advance(sanctuary, 60, { recoveryMode: "sanctuary" });
     close(sanctuary.sanity, 100);
   }],
-  ["9. absorcion de una esfera recupera 30%", () => {
+  ["10. absorcion de una esfera recupera 30%", () => {
     const stats = createStats({ initialSanity: 50 });
     assert.equal(stats.startLightAbsorption(), true);
     advance(stats, 0.81);
@@ -100,7 +108,7 @@ const tests: Array<[string, () => void]> = [
     close(stats.sanity, 80);
     assert.equal(stats.lightOrbs, 2);
   }],
-  ["10. absorcion de dos esferas recupera 60%", () => {
+  ["11. absorcion de dos esferas recupera 60%", () => {
     const stats = createStats({ initialSanity: 20 });
     stats.startLightAbsorption();
     advance(stats, 1.61);
@@ -108,7 +116,7 @@ const tests: Array<[string, () => void]> = [
     close(stats.sanity, 80);
     assert.equal(stats.lightOrbs, 1);
   }],
-  ["11. absorcion se limita a tres esferas y 90%", () => {
+  ["12. absorcion se limita a tres esferas y 90%", () => {
     const stats = createStats({ initialSanity: 0, initialLightOrbs: 6 });
     stats.startLightAbsorption();
     advance(stats, 3);
@@ -116,7 +124,7 @@ const tests: Array<[string, () => void]> = [
     assert.equal(stats.lightOrbs, 3);
     assert.equal(stats.isAbsorbingLight, false);
   }],
-  ["12. interrupcion conserva la esfera cuyo intervalo no termino", () => {
+  ["13. interrupcion conserva la esfera cuyo intervalo no termino", () => {
     const stats = createStats({ initialSanity: 50 });
     stats.startLightAbsorption();
     advance(stats, 0.79);
@@ -124,14 +132,14 @@ const tests: Array<[string, () => void]> = [
     assert.equal(stats.lightOrbs, 3);
     close(stats.sanity, 50);
   }],
-  ["13. Cordura casi llena no consume esferas extra", () => {
+  ["14. Cordura casi llena no consume esferas extra", () => {
     const stats = createStats({ initialSanity: 95 });
     stats.startLightAbsorption();
     advance(stats, 2);
     close(stats.sanity, 100);
     assert.equal(stats.lightOrbs, 2);
   }],
-  ["14. Vida regenera solo sobre 55 y despues de 5s", () => {
+  ["15. Vida regenera solo sobre 55 y despues de 5s", () => {
     const low = createStats({ initialHealth: 50, initialSanity: 55 });
     advance(low, 10, { canRegenerateHealth: true });
     close(low.health, 50);
@@ -143,14 +151,14 @@ const tests: Array<[string, () => void]> = [
     advance(high, 0.2, { canRegenerateHealth: true });
     assert.ok(high.health > damaged);
   }],
-  ["15. recibir dano interrumpe la regeneracion", () => {
+  ["16. recibir dano interrumpe la regeneracion", () => {
     const stats = createStats({ initialHealth: 70, initialSanity: 90 });
     advance(stats, 0.2, { canRegenerateHealth: true });
     assert.equal(stats.isRegeneratingHealth, true);
     stats.takeDamage(1, { type: "scripted", ignoreSanityModifier: true });
     assert.equal(stats.isRegeneratingHealth, false);
   }],
-  ["16. multiplicadores se calculan y aplican una vez", () => {
+  ["17. multiplicadores se calculan y aplican una vez", () => {
     const high = createStats();
     close(high.getOutgoingDamageMultiplier(), 1.15);
     close(high.getIncomingDamageMultiplier(), 0.88);
@@ -161,7 +169,7 @@ const tests: Array<[string, () => void]> = [
     close(crisis.getOutgoingDamageMultiplier(), 0.75);
     close(crisis.getIncomingDamageMultiplier(), 1.4);
   }],
-  ["17. valores quedan clampeados e inputs invalidos se ignoran", () => {
+  ["18. valores quedan clampeados e inputs invalidos se ignoran", () => {
     const stats = createStats();
     stats.setSanity(-1000);
     assert.equal(stats.sanity, 0);
@@ -172,7 +180,7 @@ const tests: Array<[string, () => void]> = [
     assert.equal(stats.takeDamage(Number.NaN, { type: "physical" }), 0);
     assert.equal(stats.health, 100);
   }],
-  ["18. pausa/carga detienen drenajes, regen y progreso", () => {
+  ["19. pausa/carga detienen drenajes, regen y progreso", () => {
     const stats = createStats({ initialHealth: 70, initialSanity: 50 });
     stats.startLightAbsorption();
     const before = stats.snapshot;
@@ -184,7 +192,7 @@ const tests: Array<[string, () => void]> = [
     });
     assert.deepEqual(stats.snapshot, before);
   }],
-  ["19. dispose impide observers/timers residuales al reiniciar", () => {
+  ["20. dispose impide observers/timers residuales al reiniciar", () => {
     const stats = createStats({ initialSanity: 50 });
     let events = 0;
     stats.onChange(() => events++);

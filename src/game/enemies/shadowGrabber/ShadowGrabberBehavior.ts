@@ -157,6 +157,7 @@ export class ShadowGrabberBehavior {
   private attackReserved = false;
   private hitRegistered = false;
   private attackPointValid = false;
+  private captureActive = false;
   private elapsed = 0;
   private targetSpeed = 0;
   private lastPlayerDistance = Number.POSITIVE_INFINITY;
@@ -342,6 +343,10 @@ export class ShadowGrabberBehavior {
   }
 
   public dispose() {
+    // A dying/removed controller bypasses the normal Retracting transition.
+    // Close the gameplay capture here as well so desktop Q and the mobile
+    // absorption action cannot remain locked by an orphaned enemy id.
+    this.releasePlayerCapture("retract");
     this.releaseAttackReservation();
     this.options.coordinator.unregister(this.options.groupId, this.controller.id);
   }
@@ -1028,6 +1033,7 @@ export class ShadowGrabberBehavior {
       case ShadowGrabberBehaviorState.Grabbing:
         this.controller.setState(ShadowGrabberState.Grabbing);
         this.controller.setFxState("grab");
+        this.captureActive = true;
         this.options.onSanityHit?.(1);
         this.options.onEvent?.(this.controller.id, "grab");
         break;
@@ -1039,14 +1045,19 @@ export class ShadowGrabberBehavior {
       case ShadowGrabberBehaviorState.Retracting:
         this.controller.setState(ShadowGrabberState.Retracting);
         this.controller.setFxState("retract");
-        this.options.onEvent?.(this.controller.id, "retract");
+        if (!this.releasePlayerCapture("retract")) {
+          this.options.onEvent?.(this.controller.id, "retract");
+        }
         break;
       case ShadowGrabberBehaviorState.LightRepelled:
         this.controller.setState(ShadowGrabberState.LightRecoil);
         this.controller.setFxState("lightRecoil");
-        this.options.onEvent?.(this.controller.id, "lightRecoil");
+        if (!this.releasePlayerCapture("lightRecoil")) {
+          this.options.onEvent?.(this.controller.id, "lightRecoil");
+        }
         break;
       default:
+        this.releasePlayerCapture("retract");
         this.controller.setState(ShadowGrabberState.Idle);
         this.controller.setFxState(
           next === ShadowGrabberBehaviorState.Stalking ||
@@ -1056,6 +1067,13 @@ export class ShadowGrabberBehavior {
         );
         break;
     }
+  }
+
+  private releasePlayerCapture(event: "retract" | "lightRecoil") {
+    if (!this.captureActive) return false;
+    this.captureActive = false;
+    this.options.onEvent?.(this.controller.id, event);
+    return true;
   }
 
   private isCommittedToAttack() {

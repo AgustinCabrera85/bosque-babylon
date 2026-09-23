@@ -1,7 +1,5 @@
-import { Material } from "@babylonjs/core/Materials/material";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
-import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import { Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -11,6 +9,10 @@ import {
   WATER_CONTACT_EFFECTS_CONFIG,
   type WaterContactEffectsConfig,
 } from "./WaterContactEffectsConfig";
+import {
+  createWaterRippleShaderMaterial,
+  setWaterRippleShaderState,
+} from "./WaterRippleShader";
 
 export interface WaterRippleSpawnOptions {
   position: Vector3;
@@ -31,12 +33,14 @@ export interface WaterSplashOptions {
 
 type RippleSlot = {
   mesh: Mesh;
+  material: ReturnType<typeof createWaterRippleShaderMaterial>;
   active: boolean;
   age: number;
   duration: number;
   startRadius: number;
   endRadius: number;
   alpha: number;
+  strength: number;
 };
 
 type SplashSlot = {
@@ -57,42 +61,6 @@ export type WaterInteractionVFXDebugSnapshot = {
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
-}
-
-function createRippleTexture(scene: Scene) {
-  const texture = new DynamicTexture(
-    "waterContactRippleTexture",
-    { width: 128, height: 128 },
-    scene,
-    false
-  );
-  const context = texture.getContext();
-  context.clearRect(0, 0, 128, 128);
-  // Two incomplete rings form a wake without the artificial target-like look
-  // produced by several perfectly closed concentric circles.
-  const drawBrokenRing = (radius: number, phase: number) => {
-    const arcs = [
-      [phase + 0.08, phase + 2.62],
-      [phase + 3.08, phase + 5.72],
-    ] as const;
-    for (const [start, end] of arcs) {
-      context.beginPath();
-      context.arc(64, 64, radius, start, end);
-      context.strokeStyle = "rgba(146, 207, 211, 0.2)";
-      context.lineWidth = 7;
-      context.stroke();
-      context.beginPath();
-      context.arc(64, 64, radius, start + 0.025, end - 0.025);
-      context.strokeStyle = "rgba(218, 243, 244, 0.9)";
-      context.lineWidth = 2.4;
-      context.stroke();
-    }
-  };
-  drawBrokenRing(39, 0.18);
-  drawBrokenRing(56, -0.12);
-  texture.hasAlpha = true;
-  texture.update(false);
-  return texture;
 }
 
 function createDropletTexture(scene: Scene) {
@@ -117,8 +85,6 @@ function createDropletTexture(scene: Scene) {
 }
 
 export class WaterRippleEffectPool {
-  private readonly texture: DynamicTexture;
-  private readonly material: StandardMaterial;
   private readonly slots: RippleSlot[];
   private cursor = 0;
   private disposed = false;
@@ -128,30 +94,18 @@ export class WaterRippleEffectPool {
     private readonly scene: Scene,
     private readonly config: WaterContactEffectsConfig = WATER_CONTACT_EFFECTS_CONFIG
   ) {
-    this.texture = createRippleTexture(scene);
-    this.material = new StandardMaterial("waterContactRippleMaterial", scene);
-    this.material.diffuseTexture = this.texture;
-    this.material.useAlphaFromDiffuseTexture = true;
-    this.material.emissiveTexture = this.texture;
-    this.material.diffuseColor = new Color3(0.7, 0.86, 0.87);
-    this.material.emissiveColor = new Color3(0.3, 0.48, 0.5);
-    this.material.specularColor = Color3.Black();
-    this.material.disableLighting = true;
-    this.material.alphaMode = Material.MATERIAL_ALPHABLEND;
-    this.material.transparencyMode = Material.MATERIAL_ALPHABLEND;
-    this.material.disableDepthWrite = true;
-    this.material.backFaceCulling = false;
-    this.material.fogEnabled = true;
-    this.material.zOffset = -1;
-
     this.slots = Array.from({ length: config.ripple.poolSize }, (_, index) => {
-      const mesh = MeshBuilder.CreateDisc(
+      const material = createWaterRippleShaderMaterial(scene, index);
+      const mesh = MeshBuilder.CreateGround(
         `waterContactRipple_${index}`,
-        { radius: 1, tessellation: 40, sideOrientation: Mesh.DOUBLESIDE },
+        {
+          width: 2,
+          height: 2,
+          subdivisions: 24,
+        },
         scene
       );
-      mesh.material = this.material;
-      mesh.rotation.x = Math.PI * 0.5;
+      mesh.material = material;
       mesh.isPickable = false;
       // WaterMaterial is transparent; a later rendering group prevents its
       // surface pass from hiding contact rings and droplets.
@@ -160,12 +114,14 @@ export class WaterRippleEffectPool {
       mesh.setEnabled(false);
       return {
         mesh,
+        material,
         active: false,
         age: 0,
         duration: 1,
         startRadius: 0.1,
         endRadius: 1,
         alpha: 0,
+        strength: 0,
       };
     });
   }
@@ -184,13 +140,20 @@ export class WaterRippleEffectPool {
     );
     slot.alpha = Math.max(0, options.alpha ?? this.config.ripple.movementAlpha) *
       (0.55 + strength * 0.45);
+    slot.strength = strength;
     slot.mesh.position.set(
       options.position.x,
       options.position.y + this.config.ripple.surfaceOffset,
       options.position.z
     );
-    slot.mesh.scaling.set(slot.startRadius, slot.startRadius, 1);
-    slot.mesh.visibility = slot.alpha;
+    slot.mesh.scaling.set(slot.endRadius, 1, slot.endRadius);
+    slot.mesh.visibility = 1;
+    setWaterRippleShaderState(slot.material, {
+      progress: 0,
+      strength,
+      alpha: slot.alpha,
+      startRadiusRatio: slot.startRadius / slot.endRadius,
+    });
     slot.mesh.setEnabled(true);
     this.spawnCount += 1;
   }
@@ -204,17 +167,15 @@ export class WaterRippleEffectPool {
       const progress = clamp01(slot.age / slot.duration);
       if (progress >= 1) {
         slot.active = false;
-        slot.mesh.visibility = 0;
         slot.mesh.setEnabled(false);
         continue;
       }
-
-      const expansion = 1 - Math.pow(1 - progress, 2.2);
-      const radius = slot.startRadius + (slot.endRadius - slot.startRadius) * expansion;
-      const fadeIn = Math.min(1, progress / 0.08);
-      const fadeOut = Math.pow(1 - progress, 1.45);
-      slot.mesh.scaling.set(radius, radius, 1);
-      slot.mesh.visibility = slot.alpha * fadeIn * fadeOut;
+      setWaterRippleShaderState(slot.material, {
+        progress,
+        strength: slot.strength,
+        alpha: slot.alpha,
+        startRadiusRatio: slot.startRadius / slot.endRadius,
+      });
     }
   }
 
@@ -235,9 +196,10 @@ export class WaterRippleEffectPool {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
-    for (const slot of this.slots) slot.mesh.dispose(false, false);
-    this.material.dispose(false, false);
-    this.texture.dispose();
+    for (const slot of this.slots) {
+      slot.mesh.dispose(false, false);
+      slot.material.dispose(false, false);
+    }
   }
 
   private acquireSlot() {

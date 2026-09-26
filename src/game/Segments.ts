@@ -337,6 +337,14 @@ export class Segments {
     return this.hermanoMayor;
   }
 
+  getEndHouseBounds() {
+    if (!this.endHouseBounds) return null;
+    return {
+      min: this.endHouseBounds.min.clone(),
+      max: this.endHouseBounds.max.clone(),
+    };
+  }
+
   setWorldObjectInspectionHandler(handler: WorldObjectInspectionHandler | null) {
     this.worldObjectInspectionHandler = handler;
   }

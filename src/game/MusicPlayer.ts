@@ -41,6 +41,7 @@ export type WaterfallAudioArea = {
 export type MusicPlayerHandle = {
   configureWaterfallArea: (area: WaterfallAudioArea) => void;
   updateListenerPosition: (position: WorldPosition) => void;
+  getSfxVolume: () => number;
 };
 
 function clamp01(value: number) {
@@ -378,6 +379,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   renderAll();
 
   return {
+    getSfxVolume: () => volumes.sfx,
     configureWaterfallArea(area) {
       const fullVolumeRadius = Number.isFinite(area.fullVolumeRadius)
         ? Math.max(0, area.fullVolumeRadius)

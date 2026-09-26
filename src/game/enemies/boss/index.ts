@@ -21,3 +21,13 @@ export {
   type HermanoMayorLookTargetProvider,
 } from "./HermanoMayorLookAction";
 export { patchHermanoMayorMaterial } from "./HermanoMayorMaterials";
+export {
+  HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER,
+  HermanoMayorBehavior,
+  type HermanoMayorBehaviorOptions,
+  type HermanoMayorBehaviorState,
+} from "./HermanoMayorBehavior";
+export {
+  HermanoMayorAudio,
+  type HermanoMayorBreathingMode,
+} from "./HermanoMayorAudio";

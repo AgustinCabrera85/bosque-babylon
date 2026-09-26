@@ -5,7 +5,10 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import { LAUTARO_VISUAL_SCALE } from "../../CharacterPresentation";
-import { HermanoMayorAnimationRegistry } from "./HermanoMayorAnimations";
+import {
+  HermanoMayorAnimationRegistry,
+  type HermanoMayorPlayOptions,
+} from "./HermanoMayorAnimations";
 import {
   HERMANO_MAYOR_ORIENT_LOOK_ACTION,
   HermanoMayorLookAction,
@@ -32,6 +35,10 @@ export type HermanoMayorHandle = {
   root: TransformNode;
   meshes: readonly AbstractMesh[];
   animations: HermanoMayorAnimationRegistry;
+  playLocomotion(
+    action: "idle" | "walk",
+    options?: HermanoMayorPlayOptions
+  ): void;
   setLookTargetProvider(provider: HermanoMayorLookTargetProvider | null): void;
 };
 
@@ -70,6 +77,15 @@ export async function loadHermanoMayor(
 
   let bodyTurnWalkOwned = false;
   let playbackBeforeBodyTurn = animations.getCurrentNlaPlayback();
+  const playLocomotion = (
+    action: "idle" | "walk",
+    options: HermanoMayorPlayOptions = {}
+  ) => {
+    // A real locomotion request takes ownership away from the temporary
+    // walk-in-place used by the procedural look/body turn action.
+    bodyTurnWalkOwned = false;
+    animations.play(action, { ...options, loop: options.loop ?? true });
+  };
   const lookAction = new HermanoMayorLookAction(scene, root, meshes, {
     onStart: () => {
       const current = animations.getCurrentNlaPlayback();
@@ -102,6 +118,7 @@ export async function loadHermanoMayor(
     root,
     meshes,
     animations,
+    playLocomotion,
     setLookTargetProvider: (provider) => lookAction.setTargetProvider(provider),
   };
 }

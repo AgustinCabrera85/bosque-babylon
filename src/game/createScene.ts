@@ -80,6 +80,10 @@ import { TerminalSkyEyeEncounter } from "./levels/TerminalSkyEyeEncounter";
 import { BlackSmokeWrapSystem } from "./BlackSmokeWrapSystem";
 import { EnemyHealthHud } from "./EnemyHealthHud";
 import { createThoughtMessages } from "./ThoughtMessages";
+import {
+  HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER,
+  HermanoMayorBehavior,
+} from "./enemies/boss";
 
 
 
@@ -788,7 +792,6 @@ scene.onBeforeRenderObservable.add(() => {
     enemyManager.preload(SHADOW_GRABBER_TYPE),
     enemyManager.preload(SKY_EYE_TYPE),
   ]);
-  segments.getHermanoMayor()?.setLookTargetProvider(() => player.position);
   onProgress(0.89, "Preparando tramo final...");
   const waterfallQuery = new URLSearchParams(window.location.search);
   const fluidWaterfallEnabled = waterfallQuery.get("fluidWaterfall") === "1";
@@ -1263,6 +1266,36 @@ scene.onBeforeRenderObservable.add(() => {
     );
     return !hit?.hit || hit.distance >= distance - 0.35;
   };
+  const hermanoMayor = segments.getHermanoMayor();
+  const endHouseBounds = segments.getEndHouseBounds();
+  const hermanoMayorBehavior = hermanoMayor && endHouseBounds
+    ? new HermanoMayorBehavior({
+        actor: hermanoMayor,
+        playerPosition: () => player.position,
+        houseBounds: endHouseBounds,
+        visionRange:
+          mapLayout.segmentLength * HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER,
+        getGroundHeight: (x, z) =>
+          player.getWalkableSurfaceHeight(terrain, x, z),
+        isBlocked: (x, z) => segments.isColliding(x, z),
+        hasLineOfSight: hasGameplayLineOfSight,
+        isVisibleToPlayer: () => {
+          player.camera.computeWorldMatrix();
+          const insideFrustum = hermanoMayor.meshes.some((mesh) =>
+            player.camera.isInFrustum(mesh)
+          );
+          if (!insideFrustum) return false;
+          const target = new Vector3(
+            hermanoMayor.root.position.x,
+            hermanoMayor.root.position.y + 2.15,
+            hermanoMayor.root.position.z
+          );
+          return hasGameplayLineOfSight(player.camera.globalPosition, target);
+        },
+        getSfxVolume: () => musicPlayer?.getSfxVolume() ?? 0.8,
+      })
+    : null;
+  scene.onDisposeObservable.addOnce(() => hermanoMayorBehavior?.dispose());
   const sanctuaryLightSources = [
     ...endTorches.safeLightPositions,
     terminalLandmark.caveCandleFocusPoint,
@@ -1409,6 +1442,7 @@ scene.onBeforeRenderObservable.add(() => {
       0.78
     );
     player.update(dt, terrain, segments);
+    hermanoMayorBehavior?.update(dt);
     skyEyeEncounter.update(dt);
     shadowGrabberBehaviorSystem.update(dt);
     enemyManager.update(dt);

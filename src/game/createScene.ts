@@ -79,6 +79,7 @@ import { HouseArrivalCinematic } from "./levels/HouseArrivalCinematic";
 import { TerminalSkyEyeEncounter } from "./levels/TerminalSkyEyeEncounter";
 import { BlackSmokeWrapSystem } from "./BlackSmokeWrapSystem";
 import { EnemyHealthHud } from "./EnemyHealthHud";
+import { createThoughtMessages } from "./ThoughtMessages";
 
 
 
@@ -489,6 +490,8 @@ const terrain = createTerrain(scene, {
     jumpSpeed: 6.2,
     gravity: -18.0,
   }, selectedCharacter);
+  const thoughtMessages = createThoughtMessages();
+  scene.onDisposeObservable.addOnce(() => thoughtMessages.dispose());
   setupViewModeControls(player);
   const vintageFilm = createVintageFilmPostProcess(scene, player.camera, {
     enabled: true,
@@ -1028,6 +1031,42 @@ scene.onBeforeRenderObservable.add(() => {
     getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
     isBlocked: (x, z) => segments.isColliding(x, z),
   });
+  let worldObjectInspectionActive = false;
+  segments.setWorldObjectInspectionHandler((request) => {
+    if (worldObjectInspectionActive || player.isGameplayControlLocked) return false;
+    if (!player.beginCinematicSequence()) return false;
+
+    worldObjectInspectionActive = true;
+    attackSystem.cancelCharge();
+    hints.set(null);
+
+    const inspectionTarget = request.target.clone();
+    const inspectionCameraPosition = player.position.clone();
+    inspectionCameraPosition.y = Math.max(
+      player.position.y + 0.08,
+      inspectionTarget.y + (request.cameraHeightAboveTarget ?? 0)
+    );
+    const planarDirection = inspectionTarget.subtract(inspectionCameraPosition);
+    planarDirection.y = 0;
+    if (planarDirection.lengthSquared() > 0.0001) {
+      planarDirection.normalize();
+      inspectionCameraPosition.addInPlace(planarDirection.scale(0.48));
+    }
+    player.setCinematicCamera(
+      inspectionCameraPosition,
+      inspectionTarget,
+      0,
+      0.76
+    );
+
+    void thoughtMessages
+      .showSequence(request.messages)
+      .finally(() => {
+        player.endCinematicSequence(0.62);
+        worldObjectInspectionActive = false;
+      });
+    return true;
+  });
   const houseArrivalCinematic = new HouseArrivalCinematic({
     player,
     housePosition: segments.getEndHouseCheckpoint(),
@@ -1402,7 +1441,9 @@ scene.onBeforeRenderObservable.add(() => {
       }
     }
 
-    const looking = interactSystem.peekInteractable();
+    const looking = worldObjectInspectionActive
+      ? null
+      : interactSystem.peekInteractable();
     hints.set(looking ? "E: interactuar" : null);
   });
 

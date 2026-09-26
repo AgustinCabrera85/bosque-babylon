@@ -759,6 +759,81 @@ body.attack-aiming #reticle {
   text-align: center;
 }
 
+.thought-messages {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(88px, 13vh, 150px);
+  z-index: 18;
+  width: min(720px, calc(100vw - 48px));
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.thought-messages-panel {
+  padding: 17px 24px 19px;
+  border: 1px solid rgba(229, 213, 177, 0.2);
+  border-radius: 4px;
+  background:
+    radial-gradient(circle at 50% 0, rgba(104, 76, 50, 0.2), transparent 70%),
+    linear-gradient(90deg, rgba(5, 4, 3, 0.62), rgba(13, 9, 7, 0.92), rgba(5, 4, 3, 0.62));
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.62),
+    inset 0 0 18px rgba(0, 0, 0, 0.46);
+  color: #eadcba;
+  font-family: Georgia, "Times New Roman", serif;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 220ms ease, transform 260ms ease;
+}
+
+.thought-messages.is-visible .thought-messages-panel {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.thought-messages-label {
+  display: block;
+  margin-bottom: 7px;
+  color: rgba(214, 192, 151, 0.58);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 2.8px;
+  text-transform: uppercase;
+}
+
+.thought-messages-text {
+  margin: 0;
+  font-size: clamp(17px, 2vw, 23px);
+  font-style: italic;
+  line-height: 1.45;
+  letter-spacing: 0.2px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .thought-messages {
+    bottom: calc(env(safe-area-inset-bottom) + clamp(184px, 29vw, 300px));
+    width: min(620px, calc(100vw - 32px));
+  }
+
+  .thought-messages-panel {
+    padding: 13px 16px 15px;
+  }
+
+  .thought-messages-text {
+    font-size: clamp(15px, 4vw, 19px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thought-messages-panel {
+    transition: opacity 80ms linear;
+    transform: none;
+  }
+}
+
 #inventoryButton {
   position: fixed;
   left: 16px;

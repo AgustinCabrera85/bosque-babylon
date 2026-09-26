@@ -27,6 +27,7 @@ import {
 } from "./BrazierProceduralFire";
 import { createPhotoCard } from "./PhotoCard";
 import { createCollectibleNote } from "./CollectibleNotes";
+import { createItemLensFlare } from "./CollectibleEffects";
 import {
   loadHermanoMayor,
   type HermanoMayorHandle,
@@ -38,6 +39,7 @@ import type { TreeLibrary } from "./TreeLibrary";
 import type { GrassLibrary } from "./GrassLibrary";
 import type { PlantLibrary } from "./PlantLibrary";
 import type { RockLibrary } from "./RockLibrary";
+import type { ThoughtMessageInput } from "./ThoughtMessages";
 
 type Collider = {
   x: number;
@@ -97,6 +99,17 @@ type WorldBounds = {
   min: Vector3;
   max: Vector3;
 };
+
+export type WorldObjectInspectionRequest = {
+  id: string;
+  target: Vector3;
+  messages: readonly ThoughtMessageInput[];
+  cameraHeightAboveTarget?: number;
+};
+
+type WorldObjectInspectionHandler = (
+  request: WorldObjectInspectionRequest
+) => boolean | void;
 
 type SegTreePack = { nodes: TransformNode[]; lod: 0 | 1 | 2 };
 type SegRockPack = { nodes: TransformNode[] };
@@ -185,6 +198,13 @@ const ISOMETRIC_OCCLUDER_BLEND = 0.26;
 const START_BLOCKER_TREE_PATH = "/assets/models/vegetation/";
 const START_BLOCKER_TREE_FILE = "tree_08_runtime.glb";
 const END_HOUSE_BACKYARD_PROP_PATH = "/assets/models/objects/";
+const END_HOUSE_DETAIL_PROP_PATH = "/assets/models/props/";
+const PICNIC_TABLE_AXE_FILE = "Hacha_Sangre.glb";
+const PICNIC_TABLE_AXE_TO_TABLE_WIDTH_RATIO = 0.6;
+const PICNIC_TABLE_AXE_SURFACE_CLEARANCE = 0.012;
+const PICNIC_TABLE_AXE_LIGHT_HEIGHT = 0.9;
+const PICNIC_TABLE_AXE_LIGHT_INTENSITY = 1.35;
+const PICNIC_TABLE_AXE_LIGHT_RANGE = 2.4;
 const BRAZIER_LOGS_FILE = "wood_logs_brazier.glb";
 const BRAZIER_LOGS_DIAMETER_RATIO = 0.78 * 0.75;
 const BRAZIER_LOGS_RIM_RISE_RATIO = 0.16;
@@ -220,6 +240,7 @@ const END_HOUSE_BACKYARD_PROPS = [
     rotationY: Math.PI * 0.08,
     scale: 2.2,
     hasFire: false,
+    hasAxe: true,
   },
   {
     name: "endHouseIronBrazier",
@@ -229,6 +250,7 @@ const END_HOUSE_BACKYARD_PROPS = [
     rotationY: -Math.PI * 0.12,
     scale: 1.65,
     hasFire: true,
+    hasAxe: false,
   },
 ] as const;
 
@@ -280,6 +302,7 @@ export class Segments {
   private endHouseBrazierFire: BrazierProceduralFireHandle | null = null;
   private endHouseBounds: WorldBounds | null = null;
   private hermanoMayor: HermanoMayorHandle | null = null;
+  private worldObjectInspectionHandler: WorldObjectInspectionHandler | null = null;
   private worldPrewarmed = false;
 
   constructor(
@@ -312,6 +335,10 @@ export class Segments {
 
   getHermanoMayor() {
     return this.hermanoMayor;
+  }
+
+  setWorldObjectInspectionHandler(handler: WorldObjectInspectionHandler | null) {
+    this.worldObjectInspectionHandler = handler;
   }
 
   /** Authored candle positions for gameplay safe-zone queries; no scene-light scan. */
@@ -1769,6 +1796,16 @@ export class Segments {
     if (!finalBounds) return;
 
     this.endHouseMeshes.push(...renderableMeshes);
+    if (placement.hasAxe) {
+      try {
+        await this.loadEndHousePicnicTableAxe(placementRoot, renderableMeshes);
+      } catch (error) {
+        console.warn(
+          `[Segments] No se pudo apoyar el hacha '${PICNIC_TABLE_AXE_FILE}' sobre la mesa.`,
+          error
+        );
+      }
+    }
     if (placement.hasFire) {
       let logBounds: { min: Vector3; max: Vector3 } | null = null;
       try {
@@ -1797,6 +1834,175 @@ export class Segments {
       active: true,
       kind: "prop",
     });
+  }
+
+  private async loadEndHousePicnicTableAxe(
+    tableRoot: TransformNode,
+    tableMeshes: AbstractMesh[]
+  ) {
+    const tableBounds = this.getHierarchyBoundsRelativeTo(tableMeshes, tableRoot);
+    if (!tableBounds) return;
+
+    const res = await SceneLoader.ImportMeshAsync(
+      null,
+      END_HOUSE_DETAIL_PROP_PATH,
+      PICNIC_TABLE_AXE_FILE,
+      this.scene
+    );
+    const importedRoot =
+      res.meshes.find((mesh) => mesh.name === "__root__") ??
+      res.meshes.find((mesh) => mesh.parent === null);
+    const renderableMeshes = res.meshes.filter((mesh) => mesh.getTotalVertices() > 0);
+    if (!importedRoot || !renderableMeshes.length) {
+      console.warn(
+        `[Segments] El hacha '${PICNIC_TABLE_AXE_FILE}' no contiene geometria util.`
+      );
+      return;
+    }
+
+    const axeRoot = new TransformNode("endHousePicnicTableBloodAxe", this.scene);
+    axeRoot.parent = tableRoot;
+    importedRoot.parent = axeRoot;
+
+    for (const mesh of res.meshes) {
+      mesh.isPickable = false;
+      mesh.receiveShadows = true;
+      mesh.alwaysSelectAsActiveMesh = true;
+      mesh.computeWorldMatrix(true);
+    }
+
+    const sourceBounds = this.getHierarchyBoundsRelativeTo(renderableMeshes, axeRoot);
+    if (!sourceBounds) return;
+
+    const tableWidth = Math.min(
+      tableBounds.max.x - tableBounds.min.x,
+      tableBounds.max.z - tableBounds.min.z
+    );
+    const sourceLength = Math.max(
+      sourceBounds.max.x - sourceBounds.min.x,
+      sourceBounds.max.y - sourceBounds.min.y,
+      sourceBounds.max.z - sourceBounds.min.z
+    );
+    axeRoot.scaling.setAll(
+      (tableWidth * PICNIC_TABLE_AXE_TO_TABLE_WIDTH_RATIO) /
+        Math.max(0.001, sourceLength)
+    );
+
+    // The asset is authored upright in XY. Pitch it onto the XZ tabletop and
+    // turn it across the short side so the broad face rests fully on the table.
+    // Keep the handle direction, but flip the axe 180 degrees on the other
+    // horizontal axis so the cutting edge faces the iron brazier light.
+    axeRoot.rotation.set(Math.PI * 0.5, 0, 0);
+    axeRoot.computeWorldMatrix(true);
+    for (const mesh of res.meshes) mesh.computeWorldMatrix(true);
+
+    const orientedBounds = this.getHierarchyBoundsRelativeTo(renderableMeshes, tableRoot);
+    if (!orientedBounds) return;
+
+    const tableCenterX = (tableBounds.min.x + tableBounds.max.x) * 0.5;
+    const tableCenterZ = (tableBounds.min.z + tableBounds.max.z) * 0.5;
+    const axeCenterX = (orientedBounds.min.x + orientedBounds.max.x) * 0.5;
+    const axeCenterZ = (orientedBounds.min.z + orientedBounds.max.z) * 0.5;
+    axeRoot.position.set(
+      tableCenterX - axeCenterX,
+      tableBounds.max.y + PICNIC_TABLE_AXE_SURFACE_CLEARANCE - orientedBounds.min.y,
+      tableCenterZ - axeCenterZ
+    );
+    axeRoot.computeWorldMatrix(true);
+    for (const mesh of res.meshes) mesh.computeWorldMatrix(true);
+
+    const finalAxeBounds = this.getHierarchyBounds(renderableMeshes);
+    if (!finalAxeBounds) return;
+    const axeCenter = finalAxeBounds.min.add(finalAxeBounds.max).scale(0.5);
+    const axeSize = finalAxeBounds.max.subtract(finalAxeBounds.min);
+
+    // The fireaxe is authored along local Y, with its metal head at the upper
+    // end. Aim a tight warm spot there and restrict it to the axe meshes so
+    // the blood reads without creating an unexplained pool of light on the table.
+    const bladeLocalTarget = new Vector3(
+      (sourceBounds.min.x + sourceBounds.max.x) * 0.5,
+      sourceBounds.max.y - (sourceBounds.max.y - sourceBounds.min.y) * 0.08,
+      (sourceBounds.min.z + sourceBounds.max.z) * 0.5
+    );
+    const bladeTarget = Vector3.TransformCoordinates(
+      bladeLocalTarget,
+      axeRoot.getWorldMatrix()
+    );
+    const bladeLight = new SpotLight(
+      "endHousePicnicTableBloodAxeSpot",
+      bladeTarget.add(new Vector3(0, PICNIC_TABLE_AXE_LIGHT_HEIGHT, 0)),
+      Vector3.Down(),
+      Math.PI * 0.28,
+      12,
+      this.scene
+    );
+    bladeLight.diffuse = new Color3(1.0, 0.72, 0.54);
+    bladeLight.specular = new Color3(1.0, 0.82, 0.68);
+    bladeLight.intensity = PICNIC_TABLE_AXE_LIGHT_INTENSITY;
+    bladeLight.range = PICNIC_TABLE_AXE_LIGHT_RANGE;
+    bladeLight.falloffType = Light.FALLOFF_STANDARD;
+    bladeLight.renderPriority = 11;
+    bladeLight.includedOnlyMeshes.push(...renderableMeshes);
+
+    const flare = createItemLensFlare(
+      this.scene,
+      "endHousePicnicTableBloodAxeFlare",
+      new Vector3(axeCenter.x, finalAxeBounds.max.y, axeCenter.z),
+      {
+        size: 0.34,
+        height: 0.16,
+        intensity: 1.1,
+      }
+    );
+
+    const interaction = MeshBuilder.CreateBox(
+      "endHousePicnicTableBloodAxeInteraction",
+      {
+        width: Math.max(0.75, axeSize.x + 0.34),
+        height: Math.max(0.6, axeSize.y + 0.34),
+        depth: Math.max(0.75, axeSize.z + 0.34),
+      },
+      this.scene
+    );
+    interaction.position.copyFrom(axeCenter);
+    interaction.visibility = 0;
+    interaction.isPickable = true;
+
+    let reviewed = false;
+    interaction.metadata = {
+      interactable: true,
+      type: "inspect",
+      id: "blood-axe",
+      title: "Hacha ensangrentada",
+      onInteract: () => {
+        if (!this.worldObjectInspectionHandler) {
+          return { suppressAction: true };
+        }
+
+        const accepted = this.worldObjectInspectionHandler({
+          id: "blood-axe",
+          target: axeCenter.clone(),
+          cameraHeightAboveTarget: 1.65,
+          messages: [
+            {
+              text: "Un hacha... con sangre? Creo que es mejor no tocarla...",
+              durationSeconds: 4.4,
+            },
+            {
+              text: "...Necesito encontrar una salida de este lugar...",
+              durationSeconds: 3.6,
+            },
+          ],
+        });
+        if (accepted !== false && !reviewed) {
+          reviewed = true;
+          flare.dispose();
+        }
+        return { suppressAction: true };
+      },
+    };
+
+    this.endHouseMeshes.push(...renderableMeshes);
   }
 
   private async loadEndHouseBrazierLogs(
@@ -2083,6 +2289,40 @@ export class Segments {
       const box = mesh.getBoundingInfo().boundingBox;
       min.copyFrom(Vector3.Minimize(min, box.minimumWorld));
       max.copyFrom(Vector3.Maximize(max, box.maximumWorld));
+    }
+
+    return { min, max };
+  }
+
+  private getHierarchyBoundsRelativeTo(
+    meshes: AbstractMesh[],
+    reference: TransformNode
+  ) {
+    const renderable = meshes.filter((mesh) => mesh.getTotalVertices() > 0);
+    if (!renderable.length) return null;
+
+    reference.computeWorldMatrix(true);
+    const worldToReference = reference.getWorldMatrix().clone();
+    worldToReference.invert();
+    const min = new Vector3(
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY
+    );
+    const max = new Vector3(
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY
+    );
+
+    for (const mesh of renderable) {
+      mesh.refreshBoundingInfo({});
+      mesh.computeWorldMatrix(true);
+      for (const corner of mesh.getBoundingInfo().boundingBox.vectorsWorld) {
+        const localCorner = Vector3.TransformCoordinates(corner, worldToReference);
+        min.minimizeInPlace(localCorner);
+        max.maximizeInPlace(localCorner);
+      }
     }
 
     return { min, max };

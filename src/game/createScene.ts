@@ -785,6 +785,7 @@ scene.onBeforeRenderObservable.add(() => {
     enemyManager.preload(SHADOW_GRABBER_TYPE),
     enemyManager.preload(SKY_EYE_TYPE),
   ]);
+  segments.getHermanoMayor()?.setLookTargetProvider(() => player.position);
   onProgress(0.89, "Preparando tramo final...");
   const waterfallQuery = new URLSearchParams(window.location.search);
   const fluidWaterfallEnabled = waterfallQuery.get("fluidWaterfall") === "1";

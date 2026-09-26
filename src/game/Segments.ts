@@ -27,6 +27,10 @@ import {
 } from "./BrazierProceduralFire";
 import { createPhotoCard } from "./PhotoCard";
 import { createCollectibleNote } from "./CollectibleNotes";
+import {
+  loadHermanoMayor,
+  type HermanoMayorHandle,
+} from "./enemies/boss";
 
 import type { TerrainHandle } from "./Terrain";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
@@ -275,6 +279,7 @@ export class Segments {
   private endHouseMeshes: AbstractMesh[] = [];
   private endHouseBrazierFire: BrazierProceduralFireHandle | null = null;
   private endHouseBounds: WorldBounds | null = null;
+  private hermanoMayor: HermanoMayorHandle | null = null;
   private worldPrewarmed = false;
 
   constructor(
@@ -303,6 +308,10 @@ export class Segments {
 
   getEndHouseMeshes(): readonly AbstractMesh[] {
     return this.endHouseMeshes;
+  }
+
+  getHermanoMayor() {
+    return this.hermanoMayor;
   }
 
   /** Authored candle positions for gameplay safe-zone queries; no scene-light scan. */
@@ -1636,7 +1645,44 @@ export class Segments {
     await Promise.all([
       createPhotoCard(this.scene, finalBounds, { candlePosition }),
       this.loadEndHouseBackyardProps(finalBounds, lagoonFrontZ),
+      this.loadEndHouseHermanoMayor(res.meshes),
     ]);
+  }
+
+  private async loadEndHouseHermanoMayor(houseMeshes: AbstractMesh[]) {
+    const chair = houseMeshes.find((mesh) =>
+      mesh.name.toLowerCase().includes("woodenchair")
+    );
+    const door = houseMeshes.find((mesh) => mesh.name.toLowerCase() === "door");
+    const floor = houseMeshes.find((mesh) => mesh.name.toLowerCase().includes("floor"));
+    if (!chair || !door || !floor) {
+      console.warn(
+        "[Segments] No se pudo ubicar al Hermano Mayor: faltan referencias de silla, puerta o piso."
+      );
+      return;
+    }
+
+    chair.computeWorldMatrix(true);
+    door.computeWorldMatrix(true);
+    floor.computeWorldMatrix(true);
+    const chairCenter = chair.getBoundingInfo().boundingBox.centerWorld;
+    const doorCenter = door.getBoundingInfo().boundingBox.centerWorld;
+    const floorTop = floor.getBoundingInfo().boundingBox.maximumWorld.y;
+    const position = new Vector3(
+      (chairCenter.x + doorCenter.x) * 0.5,
+      floorTop,
+      (chairCenter.z + doorCenter.z) * 0.5
+    );
+
+    try {
+      this.hermanoMayor = await loadHermanoMayor(this.scene, {
+        position,
+        facingTarget: doorCenter,
+      });
+      this.endHouseMeshes.push(...this.hermanoMayor.meshes);
+    } catch (error) {
+      console.warn("[Segments] No se pudo cargar al Hermano Mayor.", error);
+    }
   }
 
   private async loadEndHouseBackyardProps(

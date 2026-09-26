@@ -57,6 +57,11 @@ type BoxCollider = {
   rotation: number;
   active: boolean;
   kind: "house" | "door" | "blocker" | "prop";
+  shape?: "box" | "circle";
+  minY?: number;
+  maxY?: number;
+  walkable?: boolean;
+  playerRadius?: number;
 };
 
 export type NoSpawnZone = {
@@ -178,6 +183,8 @@ const PLAYER_HOUSE_COLLISION_RADIUS = 0.42;
 const PLAYER_DOOR_COLLISION_RADIUS = 0.62;
 const PLAYER_PROP_COLLISION_RADIUS = 0.38;
 const PLAYER_BLOCKER_COLLISION_RADIUS = 1.0;
+const WALKABLE_SURFACE_EDGE_INSET = 0.035;
+const COLLIDER_TOP_CLEARANCE = 0.055;
 const DOOR_OPEN_ACTION_DELAY_SECONDS = 1.7;
 const DOOR_CLOSE_COLLIDER_GRACE_SECONDS = 1.0;
 // Higher values lower the flame plane; the fire texture has transparent padding at its base.
@@ -755,7 +762,13 @@ export class Segments {
   // =========================
   // COLLISION
   // =========================
-  isColliding(x: number, z: number, additionalClearance = 0) {
+  isColliding(
+    x: number,
+    z: number,
+    additionalClearance = 0,
+    bodyMinY?: number,
+    bodyMaxY?: number
+  ) {
     const clearance = Math.max(0, additionalClearance);
     for (const c of this.colliders) {
       if (!this.activeObjectSegments.has(c.segmentId)) continue;
@@ -768,6 +781,7 @@ export class Segments {
     }
     for (const c of this.staticBoxColliders) {
       if (!c.active) continue;
+      if (!this.overlapsColliderVertically(c, bodyMinY, bodyMaxY)) continue;
       if (
         this.isPointInsideBoxCollider(
           x,
@@ -778,6 +792,31 @@ export class Segments {
       ) return true;
     }
     return false;
+  }
+
+  getWalkableSurfaceHeight(
+    x: number,
+    z: number,
+    baseHeight: number,
+    maximumSurfaceHeight = Number.POSITIVE_INFINITY
+  ) {
+    let height = baseHeight;
+    for (const collider of this.staticBoxColliders) {
+      if (!collider.active || !collider.walkable || collider.maxY === undefined) continue;
+      if (collider.maxY > maximumSurfaceHeight || collider.maxY <= height) continue;
+      if (
+        !this.isPointInsideBoxCollider(
+          x,
+          z,
+          -WALKABLE_SURFACE_EDGE_INSET,
+          collider
+        )
+      ) {
+        continue;
+      }
+      height = collider.maxY;
+    }
+    return height;
   }
 
   addStaticWorldBlocker(blocker: StaticWorldBlocker) {
@@ -794,6 +833,7 @@ export class Segments {
   }
 
   private boxColliderPlayerRadius(collider: BoxCollider) {
+    if (collider.playerRadius !== undefined) return collider.playerRadius;
     if (collider.kind === "house") return PLAYER_HOUSE_COLLISION_RADIUS;
     if (collider.kind === "door") return PLAYER_DOOR_COLLISION_RADIUS;
     if (collider.kind === "prop") return PLAYER_PROP_COLLISION_RADIUS;
@@ -822,6 +862,13 @@ export class Segments {
   private isPointInsideBoxCollider(x: number, z: number, radius: number, collider: BoxCollider) {
     const dx = x - collider.x;
     const dz = z - collider.z;
+    if (collider.shape === "circle") {
+      const colliderRadius = Math.max(
+        0.01,
+        Math.min(collider.width, collider.depth) * 0.5 + radius
+      );
+      return dx * dx + dz * dz <= colliderRadius * colliderRadius;
+    }
     const cos = Math.cos(-collider.rotation);
     const sin = Math.sin(-collider.rotation);
     const localX = dx * cos - dz * sin;
@@ -833,12 +880,34 @@ export class Segments {
     );
   }
 
+  private overlapsColliderVertically(
+    collider: BoxCollider,
+    bodyMinY?: number,
+    bodyMaxY?: number
+  ) {
+    if (
+      bodyMinY === undefined ||
+      bodyMaxY === undefined ||
+      collider.minY === undefined ||
+      collider.maxY === undefined
+    ) {
+      return true;
+    }
+    return (
+      bodyMaxY > collider.minY + 0.015 &&
+      bodyMinY < collider.maxY - COLLIDER_TOP_CLEARANCE
+    );
+  }
+
   private raySegmentBoxHitT(
     origin: Vector3,
     desired: Vector3,
     collider: BoxCollider,
     radius: number
   ) {
+    if (collider.shape === "circle") {
+      return this.raySegmentCircleHitT(origin, desired, collider, radius);
+    }
     const cos = Math.cos(-collider.rotation);
     const sin = Math.sin(-collider.rotation);
     const toLocal = (point: Vector3) => {
@@ -846,6 +915,7 @@ export class Segments {
       const dz = point.z - collider.z;
       return {
         x: dx * cos - dz * sin,
+        y: point.y,
         z: dx * sin + dz * cos,
       };
     };
@@ -853,6 +923,7 @@ export class Segments {
     const a = toLocal(origin);
     const b = toLocal(desired);
     const dx = b.x - a.x;
+    const dy = b.y - a.y;
     const dz = b.z - a.z;
     const halfW = collider.width * 0.5 + radius;
     const halfD = collider.depth * 0.5 + radius;
@@ -872,6 +943,63 @@ export class Segments {
 
     if (!clip(a.x, dx, -halfW, halfW)) return null;
     if (!clip(a.z, dz, -halfD, halfD)) return null;
+    if (
+      collider.minY !== undefined &&
+      collider.maxY !== undefined &&
+      !clip(a.y, dy, collider.minY - radius, collider.maxY + radius)
+    ) {
+      return null;
+    }
+    return tMax >= 0 && tMin <= 1 ? Math.max(0, tMin) : null;
+  }
+
+  private raySegmentCircleHitT(
+    origin: Vector3,
+    desired: Vector3,
+    collider: BoxCollider,
+    padding: number
+  ) {
+    const dx = desired.x - origin.x;
+    const dy = desired.y - origin.y;
+    const dz = desired.z - origin.z;
+    const offsetX = origin.x - collider.x;
+    const offsetZ = origin.z - collider.z;
+    const radius = Math.min(collider.width, collider.depth) * 0.5 + padding;
+    let tMin = 0;
+    let tMax = 1;
+
+    const horizontalA = dx * dx + dz * dz;
+    const horizontalC = offsetX * offsetX + offsetZ * offsetZ - radius * radius;
+    if (horizontalA <= 0.000001) {
+      if (horizontalC > 0) return null;
+    } else {
+      const horizontalB = 2 * (offsetX * dx + offsetZ * dz);
+      const discriminant =
+        horizontalB * horizontalB - 4 * horizontalA * horizontalC;
+      if (discriminant < 0) return null;
+      const root = Math.sqrt(discriminant);
+      const enter = (-horizontalB - root) / (2 * horizontalA);
+      const exit = (-horizontalB + root) / (2 * horizontalA);
+      tMin = Math.max(tMin, enter);
+      tMax = Math.min(tMax, exit);
+      if (tMin > tMax) return null;
+    }
+
+    if (collider.minY !== undefined && collider.maxY !== undefined) {
+      if (Math.abs(dy) <= 0.00001) {
+        if (origin.y < collider.minY - padding || origin.y > collider.maxY + padding) {
+          return null;
+        }
+      } else {
+        let enterY = (collider.minY - padding - origin.y) / dy;
+        let exitY = (collider.maxY + padding - origin.y) / dy;
+        if (enterY > exitY) [enterY, exitY] = [exitY, enterY];
+        tMin = Math.max(tMin, enterY);
+        tMax = Math.min(tMax, exitY);
+        if (tMin > tMax) return null;
+      }
+    }
+
     return tMax >= 0 && tMin <= 1 ? Math.max(0, tMin) : null;
   }
 
@@ -1684,6 +1812,7 @@ export class Segments {
 
     this.createHouseColliders(finalBounds);
     this.createHouseMeshColliders(res.meshes);
+    this.createHouseFrontRailingColliders(res.meshes);
     this.createHouseInteriorColliders(res.meshes);
     this.registerHouseRockingChair(res.meshes);
     this.createHouseDoor(res.meshes, finalBounds);
@@ -1844,12 +1973,145 @@ export class Segments {
         logBounds
       );
     }
+    if (placement.hasAxe) {
+      this.registerEndHousePicnicTableColliders(placementRoot, renderableMeshes);
+    } else if (placement.hasFire) {
+      this.registerEndHouseBrazierCollider(finalBounds);
+    } else {
+      this.staticBoxColliders.push({
+        x: (finalBounds.min.x + finalBounds.max.x) * 0.5,
+        z: (finalBounds.min.z + finalBounds.max.z) * 0.5,
+        width: Math.max(0.4, finalBounds.max.x - finalBounds.min.x),
+        depth: Math.max(0.4, finalBounds.max.z - finalBounds.min.z),
+        rotation: 0,
+        active: true,
+        kind: "prop",
+      });
+    }
+  }
+
+  private registerEndHousePicnicTableColliders(
+    tableRoot: TransformNode,
+    tableMeshes: AbstractMesh[]
+  ) {
+    const bounds = this.getHierarchyBoundsRelativeTo(tableMeshes, tableRoot);
+    if (!bounds) return;
+
+    tableRoot.computeWorldMatrix(true);
+    const world = tableRoot.getWorldMatrix();
+    const localWidth = bounds.max.x - bounds.min.x;
+    const localDepth = bounds.max.z - bounds.min.z;
+    const localHeight = bounds.max.y - bounds.min.y;
+    const centerX = (bounds.min.x + bounds.max.x) * 0.5;
+    const centerZ = (bounds.min.z + bounds.max.z) * 0.5;
+    const scaleX = Vector3.TransformNormal(Vector3.Right(), world).length();
+    const scaleZ = Vector3.TransformNormal(Vector3.Forward(), world).length();
+    const axisX = Vector3.TransformNormal(Vector3.Right(), world).normalize();
+    const rotation = Math.atan2(axisX.z, axisX.x);
+    const worldY = (localY: number) =>
+      Vector3.TransformCoordinates(
+        new Vector3(centerX, localY, centerZ),
+        world
+      ).y;
+    const addBox = (
+      localX: number,
+      localZ: number,
+      width: number,
+      depth: number,
+      minY: number,
+      maxY: number,
+      walkable: boolean,
+      playerRadius: number
+    ) => {
+      const center = Vector3.TransformCoordinates(
+        new Vector3(localX, bounds.min.y, localZ),
+        world
+      );
+      this.staticBoxColliders.push({
+        x: center.x,
+        z: center.z,
+        width: width * scaleX,
+        depth: depth * scaleZ,
+        rotation,
+        minY: worldY(minY),
+        maxY: worldY(maxY),
+        walkable,
+        playerRadius,
+        active: true,
+        kind: "prop",
+      });
+    };
+
+    // The source mesh has two bench boards at roughly 54% of its height and
+    // the tabletop at its maximum Y. Keeping them separate lets the player
+    // clear each vertical face and land on the corresponding upper surface.
+    const seatTopY = bounds.min.y + localHeight * 0.5445;
+    const seatBottomY = seatTopY - localHeight * 0.105;
+    const seatCenterOffset = localWidth * 0.409;
+    const seatVisualWidth = localWidth * 0.182;
+    // Preserve the authored outer edge, but bridge the narrow slot below the
+    // tabletop so a landing cannot wedge the player between both colliders.
+    const seatInnerExtension = localWidth * 0.105;
+    const seatColliderWidth = seatVisualWidth + seatInnerExtension;
+    const seatColliderCenterOffset = seatCenterOffset - seatInnerExtension * 0.5;
+    for (const side of [-1, 1]) {
+      addBox(
+        centerX + seatColliderCenterOffset * side,
+        centerZ,
+        seatColliderWidth,
+        localDepth,
+        seatBottomY,
+        seatTopY,
+        true,
+        0.3
+      );
+    }
+
+    const tabletopTopY = bounds.max.y;
+    const tabletopBottomY = tabletopTopY - localHeight * 0.095;
+    addBox(
+      centerX,
+      centerZ,
+      localWidth * 0.44,
+      localDepth,
+      tabletopBottomY,
+      tabletopTopY,
+      true,
+      0.3
+    );
+
+    // Two narrow central trestles approximate the load-bearing frames without
+    // turning the open sides of the table into one solid rectangular blocker.
+    const trestleOffsetZ = localDepth * 0.375;
+    for (const side of [-1, 1]) {
+      addBox(
+        centerX,
+        centerZ + trestleOffsetZ * side,
+        localWidth * 0.72,
+        localDepth * 0.075,
+        bounds.min.y,
+        tabletopBottomY,
+        false,
+        0.16
+      );
+    }
+  }
+
+  private registerEndHouseBrazierCollider(bounds: WorldBounds) {
+    const width = bounds.max.x - bounds.min.x;
+    const depth = bounds.max.z - bounds.min.z;
+    const diameter = Math.min(width, depth) * 0.97;
     this.staticBoxColliders.push({
-      x: (finalBounds.min.x + finalBounds.max.x) * 0.5,
-      z: (finalBounds.min.z + finalBounds.max.z) * 0.5,
-      width: Math.max(0.4, finalBounds.max.x - finalBounds.min.x),
-      depth: Math.max(0.4, finalBounds.max.z - finalBounds.min.z),
+      x: (bounds.min.x + bounds.max.x) * 0.5,
+      z: (bounds.min.z + bounds.max.z) * 0.5,
+      width: diameter,
+      depth: diameter,
       rotation: 0,
+      shape: "circle",
+      minY: bounds.min.y,
+      maxY: bounds.max.y,
+      walkable: false,
+      playerRadius: 0.32,
       active: true,
       kind: "prop",
     });
@@ -2495,6 +2757,111 @@ export class Segments {
         rotation: 0,
         active: true,
         kind: "house",
+      });
+    }
+  }
+
+  private createHouseFrontRailingColliders(meshes: AbstractMesh[]) {
+    const front = meshes
+      .filter(
+        (mesh): mesh is Mesh =>
+          mesh instanceof Mesh &&
+          `${mesh.name} ${mesh.parent?.name ?? ""}`.toLowerCase().includes("housefront") &&
+          mesh.getTotalVertices() > 0
+      )
+      .sort((a, b) => b.getTotalVertices() - a.getTotalVertices())[0];
+    if (!front) return;
+
+    const positions = front.getVerticesData("position");
+    const indices = front.getIndices();
+    const bounds = this.getMeshBounds(front);
+    if (!positions || !indices || !bounds) return;
+
+    front.computeWorldMatrix(true);
+    const world = front.getWorldMatrix();
+    const meshDepth = bounds.max.z - bounds.min.z;
+    const frontBandDepth = Math.max(0.45, meshDepth * 0.12);
+    const intervals: Array<{
+      minX: number;
+      maxX: number;
+      minY: number;
+      maxY: number;
+      minZ: number;
+      maxZ: number;
+    }> = [];
+
+    for (let index = 0; index < indices.length; index += 3) {
+      const points = [0, 1, 2].map((offset) => {
+        const vertexIndex = indices[index + offset] * 3;
+        return Vector3.TransformCoordinates(
+          new Vector3(
+            positions[vertexIndex],
+            positions[vertexIndex + 1],
+            positions[vertexIndex + 2]
+          ),
+          world
+        );
+      });
+      const min = points.reduce(
+        (current, point) => Vector3.Minimize(current, point),
+        points[0].clone()
+      );
+      const max = points.reduce(
+        (current, point) => Vector3.Maximize(current, point),
+        points[0].clone()
+      );
+      const width = max.x - min.x;
+      const height = max.y - min.y;
+      const depth = max.z - min.z;
+
+      if (height < 0.4 || width < 0.04 || depth > 0.35) continue;
+      if (max.z > bounds.min.z + frontBandDepth) continue;
+
+      intervals.push({
+        minX: min.x,
+        maxX: max.x,
+        minY: min.y,
+        maxY: max.y,
+        minZ: min.z,
+        maxZ: max.z,
+      });
+    }
+
+    intervals.sort((a, b) => a.minX - b.minX);
+    const merged: typeof intervals = [];
+    const mergeGap = Math.min(
+      0.45,
+      Math.max(0.22, (bounds.max.x - bounds.min.x) * 0.022)
+    );
+
+    for (const interval of intervals) {
+      const current = merged[merged.length - 1];
+      if (!current || interval.minX > current.maxX + mergeGap) {
+        merged.push({ ...interval });
+        continue;
+      }
+
+      current.maxX = Math.max(current.maxX, interval.maxX);
+      current.minY = Math.min(current.minY, interval.minY);
+      current.maxY = Math.max(current.maxY, interval.maxY);
+      current.minZ = Math.min(current.minZ, interval.minZ);
+      current.maxZ = Math.max(current.maxZ, interval.maxZ);
+    }
+
+    for (const railing of merged) {
+      const width = railing.maxX - railing.minX;
+      if (width < 0.55) continue;
+
+      this.staticBoxColliders.push({
+        x: (railing.minX + railing.maxX) * 0.5,
+        z: (railing.minZ + railing.maxZ) * 0.5,
+        width,
+        depth: Math.max(0.28, railing.maxZ - railing.minZ),
+        rotation: 0,
+        active: true,
+        kind: "house",
+        minY: railing.minY - 0.05,
+        maxY: railing.maxY + 0.05,
       });
     }
   }

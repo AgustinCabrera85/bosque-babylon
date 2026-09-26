@@ -1083,6 +1083,11 @@ export class PlayerController {
       move.set(0, 0, 0);
     }
 
+    const collisionFeetY = this.root.position.y - this.settings.eyeHeight;
+    const collisionHeadY = this.root.position.y + 0.25;
+    const isMovementBlocked = (x: number, z: number) =>
+      segments.isColliding(x, z, 0, collisionFeetY, collisionHeadY);
+
     if (move.lengthSquared() > 0) {
       move.normalize().scaleInPlace(speed * dt);
 
@@ -1090,10 +1095,10 @@ export class PlayerController {
       const pz = this.root.position.z;
 
       const tryX = px + move.x;
-      if (!segments.isColliding(tryX, pz)) this.root.position.x = tryX;
+      if (!isMovementBlocked(tryX, pz)) this.root.position.x = tryX;
 
       const tryZ = pz + move.z;
-      if (!segments.isColliding(this.root.position.x, tryZ)) this.root.position.z = tryZ;
+      if (!isMovementBlocked(this.root.position.x, tryZ)) this.root.position.z = tryZ;
     }
 
     if (this.enemyGrabPressureTimer > 0 && this.enemyGrabPullSpeed > 0) {
@@ -1105,11 +1110,11 @@ export class PlayerController {
         pullX = (pullX / pullDistance) * pullStep;
         pullZ = (pullZ / pullDistance) * pullStep;
         const pullTargetX = this.root.position.x + pullX;
-        if (!segments.isColliding(pullTargetX, this.root.position.z)) {
+        if (!isMovementBlocked(pullTargetX, this.root.position.z)) {
           this.root.position.x = pullTargetX;
         }
         const pullTargetZ = this.root.position.z + pullZ;
-        if (!segments.isColliding(this.root.position.x, pullTargetZ)) {
+        if (!isMovementBlocked(this.root.position.x, pullTargetZ)) {
           this.root.position.z = pullTargetZ;
         }
       }
@@ -1122,7 +1127,16 @@ export class PlayerController {
 
     this.refreshWaterEnvironment(terrain);
     this.refreshWaterLocomotionState();
-    const groundY = this.getWalkableSurfaceHeight(terrain);
+    const terrainGroundY = this.getWalkableSurfaceHeight(terrain);
+    const currentFeetY = this.root.position.y - this.settings.eyeHeight;
+    const maximumWalkableSurfaceY =
+      currentFeetY + (this.velY > 0.01 ? -0.01 : 0.1);
+    const groundY = segments.getWalkableSurfaceHeight(
+      this.root.position.x,
+      this.root.position.z,
+      terrainGroundY,
+      maximumWalkableSurfaceY
+    );
     const targetY = groundY + this.settings.eyeHeight;
 
     if (this.waterLocomotionStateValue === "swimming" && this.activeWaterSurface) {

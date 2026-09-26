@@ -1032,7 +1032,14 @@ scene.onBeforeRenderObservable.add(() => {
     stats: playerStats,
     getLightSourcePositions: () => attackLightSources,
     getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
-    isBlocked: (x, z) => segments.isColliding(x, z),
+    isBlocked: (position, radius) =>
+      segments.isColliding(
+        position.x,
+        position.z,
+        0,
+        position.y - radius,
+        position.y + radius
+      ),
   });
   let worldObjectInspectionActive = false;
   segments.setWorldObjectInspectionHandler((request) => {

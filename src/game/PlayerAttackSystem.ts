@@ -45,7 +45,7 @@ const IMPACT_DURATION_SECONDS = 0.34;
 const IMPACT_LIGHT_DURATION_SECONDS = 0.52;
 const IMPACT_LIGHT_RANGE = 8;
 const IMPACT_LIGHT_INTENSITY = 6.4;
-const IMPACT_LIGHT_RENDER_PRIORITY = 35;
+const IMPACT_LIGHT_RENDER_PRIORITY = 28;
 // Group 1 preserves the opaque world's depth in createScene, so transparent
 // orb VFX are correctly occluded by the player and environment.
 const LIGHT_ORB_RENDERING_GROUP = 1;
@@ -251,7 +251,7 @@ type AttackSystemOptions = {
   stats: PlayerStatsSystem;
   getLightSourcePositions: () => readonly Vector3[];
   getGroundHeight: (x: number, z: number) => number;
-  isBlocked: (x: number, z: number) => boolean;
+  isBlocked: (position: Vector3, radius: number) => boolean;
 };
 
 type AttackDom = {
@@ -305,7 +305,6 @@ type ImpactBurst = {
   root: TransformNode;
   inner: Mesh;
   outer: Mesh;
-  light: PointLight;
   innerMaterial: ShaderMaterial;
   outerMaterial: ShaderMaterial;
   elapsed: number;
@@ -338,6 +337,7 @@ export class PlayerAttackSystem {
   private readonly trajectoryEnd: Mesh;
   private readonly trajectoryEndMaterial: StandardMaterial;
   private readonly heldOrb: HeldLightOrb;
+  private readonly impactLight: PointLight;
   private readonly lightRechargeVfx: PlayerLightRechargeVFX;
   private readonly abortController = new AbortController();
   private readonly hudArtworks = new Map<HTMLObjectElement, AttackHudArtwork>();
@@ -412,6 +412,7 @@ export class PlayerAttackSystem {
     this.trajectoryEnd.renderingGroupId = 2;
     this.trajectoryEnd.setEnabled(false);
     this.heldOrb = this.createHeldLightOrb();
+    this.impactLight = this.createImpactLight();
     this.lightRechargeVfx = new PlayerLightRechargeVFX(scene, {
       getGroundPositionToRef: (result) => player.getGroundContactPositionToRef(result),
       getGroundSurfaceHeightAt: options.getGroundHeight,
@@ -578,6 +579,7 @@ export class PlayerAttackSystem {
     this.heldOrb.root.dispose(false, false);
     this.heldOrb.coreMaterial.dispose();
     this.heldOrb.auraMaterial.dispose();
+    this.impactLight.dispose();
     this.lightRechargeVfx.dispose();
   }
 
@@ -941,7 +943,7 @@ export class PlayerAttackSystem {
       const point = Vector3.Lerp(from, to, fraction);
       const groundHeight = this.options.getGroundHeight(point.x, point.z);
       const hitGround = point.y <= groundHeight + PROJECTILE_RADIUS;
-      if (!hitGround && !this.options.isBlocked(point.x, point.z)) continue;
+      if (!hitGround && !this.options.isBlocked(point, PROJECTILE_RADIUS)) continue;
       if (hitGround) point.y = groundHeight + PROJECTILE_RADIUS;
       return { point, fraction };
     }
@@ -987,31 +989,10 @@ export class PlayerAttackSystem {
     outer.renderingGroupId = LIGHT_ORB_RENDERING_GROUP;
     inner.alphaIndex = 0;
     outer.alphaIndex = 1;
-    const light = new PointLight(
-      `${root.name}:flash`,
-      position.add(new Vector3(0, 0.24, 0)),
-      this.scene
-    );
-    light.diffuse = new Color3(0.68, 0.88, 1);
-    light.specular = new Color3(0.24, 0.42, 0.62);
-    light.intensity = 0;
-    light.range = IMPACT_LIGHT_RANGE;
-    light.radius = 0.32;
-    light.falloffType = Light.FALLOFF_STANDARD;
-    light.renderPriority = IMPACT_LIGHT_RENDER_PRIORITY;
-    // Restrict the short-lived light to geometry that can actually be reached
-    // by the flash. Besides lowering the per-shot light cost, this makes nearby
-    // enemies win a stable light slot even in scenes with many authored lamps.
-    light.includedOnlyMeshes.push(
-      ...this.collectImpactLightMeshes(position, IMPACT_LIGHT_RANGE),
-      inner,
-      outer
-    );
     this.impactBursts.push({
       root,
       inner,
       outer,
-      light,
       innerMaterial,
       outerMaterial,
       elapsed: 0,
@@ -1020,6 +1001,10 @@ export class PlayerAttackSystem {
   }
 
   private updateImpactBursts(delta: number) {
+    let strongestLightBurst: ImpactBurst | null = null;
+    let strongestLightIntensity = 0;
+    let strongestLightRange = IMPACT_LIGHT_RANGE;
+
     for (let index = this.impactBursts.length - 1; index >= 0; index--) {
       const burst = this.impactBursts[index];
       burst.elapsed += delta;
@@ -1032,13 +1017,18 @@ export class PlayerAttackSystem {
       const expansion = 1 - Math.pow(remaining, 2.4);
       const shockEnvelope = Math.sin(progress * Math.PI) * Math.pow(remaining, 0.58);
       const ignition = smoothstep01(Math.min(1, burst.elapsed / 0.028));
-      burst.light.intensity =
+      const lightIntensity =
         IMPACT_LIGHT_INTENSITY *
         burst.strength *
         ignition *
         Math.pow(lightRemaining, 1.55);
-      burst.light.range =
+      const lightRange =
         IMPACT_LIGHT_RANGE * (0.72 + Math.sin(lightProgress * Math.PI) * 0.28);
+      if (lightIntensity > strongestLightIntensity) {
+        strongestLightBurst = burst;
+        strongestLightIntensity = lightIntensity;
+        strongestLightRange = lightRange;
+      }
       burst.root.rotation.y += delta * (7 + burst.strength * 4);
       burst.root.rotation.x -= delta * (2.5 + burst.strength * 1.5);
       burst.inner.scaling.setAll(
@@ -1063,17 +1053,17 @@ export class PlayerAttackSystem {
       this.disposeImpactBurst(burst);
       this.impactBursts.splice(index, 1);
     }
-  }
 
-  private collectImpactLightMeshes(position: Vector3, radius: number) {
-    return this.scene.meshes.filter((mesh) => {
-      if (!mesh.isEnabled() || mesh.visibility <= 0.001) return false;
-      if (mesh.getTotalVertices() <= 0) return false;
-      mesh.computeWorldMatrix(true);
-      const sphere = mesh.getBoundingInfo().boundingSphere;
-      const reach = radius + sphere.radiusWorld;
-      return Vector3.DistanceSquared(position, sphere.centerWorld) <= reach * reach;
-    });
+    if (!strongestLightBurst) {
+      this.impactLight.intensity = 0;
+      this.impactLight.range = IMPACT_LIGHT_RANGE;
+      return;
+    }
+
+    this.impactLight.position.copyFrom(strongestLightBurst.root.position);
+    this.impactLight.position.y += 0.24;
+    this.impactLight.intensity = strongestLightIntensity;
+    this.impactLight.range = strongestLightRange;
   }
 
   private updateRecharge(delta: number) {
@@ -1252,6 +1242,25 @@ export class PlayerAttackSystem {
     return { root, core, aura, coreMaterial, auraMaterial };
   }
 
+  private createImpactLight() {
+    // Keep one zero-intensity light registered for the entire scene lifetime.
+    // The transition warmup then compiles house/lagoon materials with a stable
+    // light layout instead of rebuilding their shaders on the first impact.
+    const light = new PointLight(
+      "playerLightOrbImpactFlash",
+      Vector3.Zero(),
+      this.scene
+    );
+    light.diffuse = new Color3(0.68, 0.88, 1);
+    light.specular = new Color3(0.24, 0.42, 0.62);
+    light.intensity = 0;
+    light.range = IMPACT_LIGHT_RANGE;
+    light.radius = 0.32;
+    light.falloffType = Light.FALLOFF_STANDARD;
+    light.renderPriority = IMPACT_LIGHT_RENDER_PRIORITY;
+    return light;
+  }
+
   private updateHeldOrb(delta: number) {
     this.heldOrbElapsed += delta;
     const look = this.player.getAttackAimRay();
@@ -1393,7 +1402,6 @@ export class PlayerAttackSystem {
   }
 
   private disposeImpactBurst(burst: ImpactBurst) {
-    burst.light.dispose();
     burst.root.dispose(false, false);
     burst.innerMaterial.dispose();
     burst.outerMaterial.dispose();

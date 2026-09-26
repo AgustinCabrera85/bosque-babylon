@@ -28,3 +28,6 @@ dist-ssr
 /graphify-out/
 /.codex/
 /AGENTS.md
+
+# Local instructions for the external Android export project
+/APK_EXPORT_LOCAL.md

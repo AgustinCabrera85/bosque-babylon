@@ -1268,6 +1268,18 @@ scene.onBeforeRenderObservable.add(() => {
   };
   const hermanoMayor = segments.getHermanoMayor();
   const endHouseBounds = segments.getEndHouseBounds();
+  const hermanoMayorNavigationProbe = Vector3.Zero();
+  const isHermanoMayorNavigationBlocked = (x: number, z: number) => {
+    // His rig is wider than the playable characters, so give authored props
+    // and walls a little extra clearance. The expanded lagoon query keeps both
+    // feet visibly on dry ground instead of stopping at the water mesh center.
+    if (segments.isColliding(x, z, 0.22)) return true;
+    hermanoMayorNavigationProbe.set(x, terminalConfig.waterLevel, z);
+    return waterSurfaces.isPointInsideWaterSurface(
+      hermanoMayorNavigationProbe,
+      0.85
+    );
+  };
   const hermanoMayorBehavior = hermanoMayor && endHouseBounds
     ? new HermanoMayorBehavior({
         actor: hermanoMayor,
@@ -1277,7 +1289,7 @@ scene.onBeforeRenderObservable.add(() => {
           mapLayout.segmentLength * HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER,
         getGroundHeight: (x, z) =>
           player.getWalkableSurfaceHeight(terrain, x, z),
-        isBlocked: (x, z) => segments.isColliding(x, z),
+        isBlocked: isHermanoMayorNavigationBlocked,
         hasLineOfSight: hasGameplayLineOfSight,
         isVisibleToPlayer: () => {
           player.camera.computeWorldMatrix();

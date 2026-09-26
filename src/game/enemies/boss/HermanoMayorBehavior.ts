@@ -1,6 +1,7 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { HermanoMayorHandle } from "./HermanoMayor";
 import { HermanoMayorAudio } from "./HermanoMayorAudio";
+import { HermanoMayorNavigation } from "./HermanoMayorNavigation";
 
 export const HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER = 1.15;
 
@@ -45,6 +46,7 @@ function shortestAngle(from: number, to: number) {
 export class HermanoMayorBehavior {
   private readonly actor: HermanoMayorHandle;
   private readonly audio: HermanoMayorAudio;
+  private readonly navigation: HermanoMayorNavigation;
   private state: HermanoMayorBehaviorState = "waiting";
   private locomotion: "idle" | "walk" = "idle";
   private hasEnteredHouse = false;
@@ -64,6 +66,7 @@ export class HermanoMayorBehavior {
     this.actor = options.actor;
     this.wasPlayerInside = this.isPlayerInside(options.playerPosition());
     this.audio = new HermanoMayorAudio({ getSfxVolume: options.getSfxVolume });
+    this.navigation = new HermanoMayorNavigation({ isBlocked: options.isBlocked });
     this.audio.setBreathing("idle");
     this.actor.setLookTargetProvider(options.playerPosition);
     window.addEventListener("bosque:pause", this.onPause);
@@ -121,6 +124,7 @@ export class HermanoMayorBehavior {
     }
 
     if (!this.engaged || distance > this.options.visionRange) {
+      this.navigation.clear();
       this.enterState(this.engaged ? "watching" : "waiting");
       return;
     }
@@ -132,12 +136,22 @@ export class HermanoMayorBehavior {
       (this.state === "watching" && distance < resumeDistance);
 
     if (shouldRemainWatching) {
+      this.navigation.clear();
       this.enterState("watching");
       return;
     }
 
+    const steeringTarget = this.navigation.getSteeringTarget(
+      this.actor.root.position,
+      player,
+      dt
+    );
+    if (!steeringTarget) {
+      this.enterState("watching");
+      return;
+    }
     this.enterState("following");
-    this.moveToward(player, distance, dt, stopDistance);
+    this.moveToward(steeringTarget, distance, dt, stopDistance);
   }
 
   public dispose() {
@@ -186,15 +200,19 @@ export class HermanoMayorBehavior {
   }
 
   private moveToward(
-    player: Vector3,
-    distance: number,
+    steeringTarget: Vector3,
+    playerDistance: number,
     deltaSeconds: number,
     stopDistance: number
   ) {
-    if (distance <= 0.001) return;
     const root = this.actor.root;
-    const directionX = (player.x - root.position.x) / distance;
-    const directionZ = (player.z - root.position.z) / distance;
+    const steeringDistance = Math.hypot(
+      steeringTarget.x - root.position.x,
+      steeringTarget.z - root.position.z
+    );
+    if (steeringDistance <= 0.001) return;
+    const directionX = (steeringTarget.x - root.position.x) / steeringDistance;
+    const directionZ = (steeringTarget.z - root.position.z) / steeringDistance;
     const desiredYaw = Math.atan2(directionX, directionZ);
     const yawDelta = shortestAngle(root.rotation.y, desiredYaw);
     const maxTurn = TURN_SPEED * deltaSeconds;
@@ -203,7 +221,8 @@ export class HermanoMayorBehavior {
     const remainingYaw = Math.abs(shortestAngle(root.rotation.y, desiredYaw));
     const alignment = Math.max(0.28, Math.cos(remainingYaw));
     const step = Math.min(
-      Math.max(0, distance - stopDistance),
+      Math.max(0, playerDistance - stopDistance),
+      steeringDistance,
       WALK_SPEED * alignment * deltaSeconds
     );
     if (step <= 0) return;

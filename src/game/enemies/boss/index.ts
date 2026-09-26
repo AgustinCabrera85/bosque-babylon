@@ -31,3 +31,7 @@ export {
   HermanoMayorAudio,
   type HermanoMayorBreathingMode,
 } from "./HermanoMayorAudio";
+export {
+  HermanoMayorNavigation,
+  type HermanoMayorNavigationOptions,
+} from "./HermanoMayorNavigation";

@@ -1,4 +1,6 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
+import { Light } from "@babylonjs/core/Lights/light";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { Material as BabylonMaterial } from "@babylonjs/core/Materials/material";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -40,6 +42,10 @@ const HELD_SHELL_DIAMETER = PROJECTILE_RADIUS * 2.28;
 const PROJECTILE_CORE_DIAMETER = PROJECTILE_RADIUS * 2;
 const PROJECTILE_SHELL_DIAMETER = PROJECTILE_RADIUS * 2.5;
 const IMPACT_DURATION_SECONDS = 0.34;
+const IMPACT_LIGHT_DURATION_SECONDS = 0.52;
+const IMPACT_LIGHT_RANGE = 8;
+const IMPACT_LIGHT_INTENSITY = 6.4;
+const IMPACT_LIGHT_RENDER_PRIORITY = 35;
 // Group 1 preserves the opaque world's depth in createScene, so transparent
 // orb VFX are correctly occluded by the player and environment.
 const LIGHT_ORB_RENDERING_GROUP = 1;
@@ -299,6 +305,7 @@ type ImpactBurst = {
   root: TransformNode;
   inner: Mesh;
   outer: Mesh;
+  light: PointLight;
   innerMaterial: ShaderMaterial;
   outerMaterial: ShaderMaterial;
   elapsed: number;
@@ -980,10 +987,31 @@ export class PlayerAttackSystem {
     outer.renderingGroupId = LIGHT_ORB_RENDERING_GROUP;
     inner.alphaIndex = 0;
     outer.alphaIndex = 1;
+    const light = new PointLight(
+      `${root.name}:flash`,
+      position.add(new Vector3(0, 0.24, 0)),
+      this.scene
+    );
+    light.diffuse = new Color3(0.68, 0.88, 1);
+    light.specular = new Color3(0.24, 0.42, 0.62);
+    light.intensity = 0;
+    light.range = IMPACT_LIGHT_RANGE;
+    light.radius = 0.32;
+    light.falloffType = Light.FALLOFF_STANDARD;
+    light.renderPriority = IMPACT_LIGHT_RENDER_PRIORITY;
+    // Restrict the short-lived light to geometry that can actually be reached
+    // by the flash. Besides lowering the per-shot light cost, this makes nearby
+    // enemies win a stable light slot even in scenes with many authored lamps.
+    light.includedOnlyMeshes.push(
+      ...this.collectImpactLightMeshes(position, IMPACT_LIGHT_RANGE),
+      inner,
+      outer
+    );
     this.impactBursts.push({
       root,
       inner,
       outer,
+      light,
       innerMaterial,
       outerMaterial,
       elapsed: 0,
@@ -996,9 +1024,21 @@ export class PlayerAttackSystem {
       const burst = this.impactBursts[index];
       burst.elapsed += delta;
       const progress = clamp01(burst.elapsed / IMPACT_DURATION_SECONDS);
+      const lightProgress = clamp01(
+        burst.elapsed / IMPACT_LIGHT_DURATION_SECONDS
+      );
       const remaining = 1 - progress;
+      const lightRemaining = 1 - lightProgress;
       const expansion = 1 - Math.pow(remaining, 2.4);
       const shockEnvelope = Math.sin(progress * Math.PI) * Math.pow(remaining, 0.58);
+      const ignition = smoothstep01(Math.min(1, burst.elapsed / 0.028));
+      burst.light.intensity =
+        IMPACT_LIGHT_INTENSITY *
+        burst.strength *
+        ignition *
+        Math.pow(lightRemaining, 1.55);
+      burst.light.range =
+        IMPACT_LIGHT_RANGE * (0.72 + Math.sin(lightProgress * Math.PI) * 0.28);
       burst.root.rotation.y += delta * (7 + burst.strength * 4);
       burst.root.rotation.x -= delta * (2.5 + burst.strength * 1.5);
       burst.inner.scaling.setAll(
@@ -1019,10 +1059,21 @@ export class PlayerAttackSystem {
         "opacity",
         shockEnvelope * (0.46 + burst.strength * 0.26)
       );
-      if (progress < 1) continue;
+      if (lightProgress < 1) continue;
       this.disposeImpactBurst(burst);
       this.impactBursts.splice(index, 1);
     }
+  }
+
+  private collectImpactLightMeshes(position: Vector3, radius: number) {
+    return this.scene.meshes.filter((mesh) => {
+      if (!mesh.isEnabled() || mesh.visibility <= 0.001) return false;
+      if (mesh.getTotalVertices() <= 0) return false;
+      mesh.computeWorldMatrix(true);
+      const sphere = mesh.getBoundingInfo().boundingSphere;
+      const reach = radius + sphere.radiusWorld;
+      return Vector3.DistanceSquared(position, sphere.centerWorld) <= reach * reach;
+    });
   }
 
   private updateRecharge(delta: number) {
@@ -1342,6 +1393,7 @@ export class PlayerAttackSystem {
   }
 
   private disposeImpactBurst(burst: ImpactBurst) {
+    burst.light.dispose();
     burst.root.dispose(false, false);
     burst.innerMaterial.dispose();
     burst.outerMaterial.dispose();

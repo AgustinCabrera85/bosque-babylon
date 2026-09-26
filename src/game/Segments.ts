@@ -755,16 +755,27 @@ export class Segments {
   // =========================
   // COLLISION
   // =========================
-  isColliding(x: number, z: number) {
+  isColliding(x: number, z: number, additionalClearance = 0) {
+    const clearance = Math.max(0, additionalClearance);
     for (const c of this.colliders) {
       if (!this.activeObjectSegments.has(c.segmentId)) continue;
       const dx = x - c.x;
       const dz = z - c.z;
-      if (dx * dx + dz * dz < (PLAYER_WORLD_COLLISION_RADIUS + c.radius) ** 2) return true;
+      if (
+        dx * dx + dz * dz <
+        (PLAYER_WORLD_COLLISION_RADIUS + c.radius + clearance) ** 2
+      ) return true;
     }
     for (const c of this.staticBoxColliders) {
       if (!c.active) continue;
-      if (this.isPointInsideBoxCollider(x, z, this.boxColliderPlayerRadius(c), c)) return true;
+      if (
+        this.isPointInsideBoxCollider(
+          x,
+          z,
+          this.boxColliderPlayerRadius(c) + clearance,
+          c
+        )
+      ) return true;
     }
     return false;
   }

@@ -98,6 +98,12 @@ const CHARACTER_FOOT_CLEARANCE = 0.03;
 const THIRD_PERSON_CAMERA_DISTANCE = 5.2;
 const THIRD_PERSON_CAMERA_HEIGHT = 1.25;
 const THIRD_PERSON_CAMERA_TARGET_HEIGHT = -0.35;
+const THIRD_PERSON_CAMERA_RECOVERY_SPEED = 7.5;
+const THIRD_PERSON_CRAMPED_CAMERA_LIFT = 0.38;
+const THIRD_PERSON_AVATAR_FADE_NEAR = 0.72;
+const THIRD_PERSON_AVATAR_FADE_FAR = 1.72;
+const THIRD_PERSON_AVATAR_FADE_OUT_SPEED = 18;
+const THIRD_PERSON_AVATAR_FADE_IN_SPEED = 8;
 const THIRD_PERSON_PITCH_MIN = -1.18;
 const THIRD_PERSON_PITCH_MAX = 0.82;
 const PATH_HALF_WIDTH = 4.5;
@@ -208,6 +214,8 @@ export class PlayerController {
   private viewMode: ViewMode = "third";
   private isometricViewAllowed = true;
   private viewModeListeners = new Set<(mode: ViewMode) => void>();
+  private thirdPersonCameraArmLength: number | null = null;
+  private avatarCameraVisibility = 1;
   private isometricCameraAnchor: IsometricCameraAnchor | null = null;
   private isometricCameraAnchorEnabled = false;
   private isometricCameraAnchorBlend = 0;
@@ -1377,6 +1385,7 @@ export class PlayerController {
   ) {
     this.configureCameraProjection();
     if (this.cinematicCameraState) {
+      this.resetThirdPersonCameraCollisionState();
       this.root.computeWorldMatrix(true);
       const inverse = this.root.getWorldMatrix().clone().invert();
       this.camera.position.copyFrom(
@@ -1395,6 +1404,7 @@ export class PlayerController {
       return;
     }
     if (this.viewMode === "first") {
+      this.resetThirdPersonCameraCollisionState();
       this.positionFirstPersonCamera();
       this.applySwimmingCameraDepth();
       this.keepFirstPersonCameraAboveTerrain(terrain);
@@ -1420,12 +1430,130 @@ export class PlayerController {
           segments.resolveCameraPosition(origin, desired),
           terrain
         );
-    const terrainSafePosition = this.clampCameraAboveTerrain(adjusted, terrain);
+    let terrainSafePosition = this.clampCameraAboveTerrain(adjusted, terrain);
+    if (this.viewMode === "third" || this.viewMode === "front") {
+      terrainSafePosition = this.smoothThirdPersonCameraArm(
+        origin,
+        terrainSafePosition,
+        deltaTime,
+        segments,
+        terrain
+      );
+      terrainSafePosition = this.liftCrampedThirdPersonCamera(
+        origin,
+        terrainSafePosition,
+        segments,
+        terrain
+      );
+      this.updateThirdPersonAvatarVisibility(
+        Vector3.Distance(origin, terrainSafePosition),
+        deltaTime
+      );
+    } else {
+      this.resetThirdPersonCameraCollisionState();
+    }
     const inverse = this.root.getWorldMatrix().clone().invert();
     this.camera.position.copyFrom(
       Vector3.TransformCoordinates(terrainSafePosition, inverse)
     );
     this.orientCameraForView(target);
+  }
+
+  private smoothThirdPersonCameraArm(
+    origin: Vector3,
+    safePosition: Vector3,
+    deltaTime: number,
+    segments: Segments,
+    terrain: TerrainHandle
+  ) {
+    const safeOffset = safePosition.subtract(origin);
+    const safeLength = safeOffset.length();
+    if (safeLength <= 0.001) {
+      this.thirdPersonCameraArmLength = 0;
+      return safePosition;
+    }
+
+    const previousLength = this.thirdPersonCameraArmLength;
+    let armLength = safeLength;
+    if (previousLength !== null && safeLength > previousLength) {
+      const recovery = 1 - Math.exp(-THIRD_PERSON_CAMERA_RECOVERY_SPEED * deltaTime);
+      armLength = previousLength + (safeLength - previousLength) * recovery;
+    }
+
+    // Retraction is immediate, while extension is damped. Rechecking the
+    // shortened arm keeps quick turns from sweeping the camera through a
+    // nearby corner before it has recovered its normal distance.
+    const candidate = origin.add(safeOffset.scale(armLength / safeLength));
+    const collisionSafe = segments.resolveCameraPosition(origin, candidate);
+    const terrainSafe = this.clampCameraAboveTerrain(
+      this.resolveCameraTerrainPosition(origin, collisionSafe, terrain),
+      terrain
+    );
+    this.thirdPersonCameraArmLength = Vector3.Distance(origin, terrainSafe);
+    return terrainSafe;
+  }
+
+  private liftCrampedThirdPersonCamera(
+    origin: Vector3,
+    cameraPosition: Vector3,
+    segments: Segments,
+    terrain: TerrainHandle
+  ) {
+    const cameraDistance = Vector3.Distance(origin, cameraPosition);
+    const amount = Math.max(
+      0,
+      Math.min(
+        1,
+        (THIRD_PERSON_AVATAR_FADE_FAR - cameraDistance) /
+          (THIRD_PERSON_AVATAR_FADE_FAR - THIRD_PERSON_AVATAR_FADE_NEAR)
+      )
+    );
+    if (amount <= 0) return cameraPosition;
+
+    const smoothAmount = amount * amount * (3 - 2 * amount);
+    const lifted = cameraPosition.add(
+      Vector3.Up().scale(THIRD_PERSON_CRAMPED_CAMERA_LIFT * smoothAmount)
+    );
+    const collisionSafe = segments.resolveCameraPosition(origin, lifted);
+    return this.clampCameraAboveTerrain(
+      this.resolveCameraTerrainPosition(origin, collisionSafe, terrain),
+      terrain
+    );
+  }
+
+  private updateThirdPersonAvatarVisibility(cameraDistance: number, deltaTime: number) {
+    if (cameraDistance <= THIRD_PERSON_AVATAR_FADE_NEAR) {
+      this.avatarCameraVisibility = 0;
+      this.setAvatarVisible(true);
+      return;
+    }
+
+    const amount = Math.max(
+      0,
+      Math.min(
+        1,
+        (cameraDistance - THIRD_PERSON_AVATAR_FADE_NEAR) /
+          (THIRD_PERSON_AVATAR_FADE_FAR - THIRD_PERSON_AVATAR_FADE_NEAR)
+      )
+    );
+    const targetVisibility = amount * amount * (3 - 2 * amount);
+    const speed =
+      targetVisibility < this.avatarCameraVisibility
+        ? THIRD_PERSON_AVATAR_FADE_OUT_SPEED
+        : THIRD_PERSON_AVATAR_FADE_IN_SPEED;
+    const blend = 1 - Math.exp(-speed * deltaTime);
+    this.avatarCameraVisibility +=
+      (targetVisibility - this.avatarCameraVisibility) * blend;
+    if (this.avatarCameraVisibility < 0.01) this.avatarCameraVisibility = 0;
+    if (this.avatarCameraVisibility > 0.99) this.avatarCameraVisibility = 1;
+    this.setAvatarVisible(true);
+  }
+
+  private resetThirdPersonCameraCollisionState() {
+    this.thirdPersonCameraArmLength = null;
+    if (this.avatarCameraVisibility === 1) return;
+    this.avatarCameraVisibility = 1;
+    this.setAvatarVisible(this.viewMode !== "first");
   }
 
   private positionFirstPersonCamera() {
@@ -1925,7 +2053,7 @@ export class PlayerController {
 
   private setAvatarVisible(visible: boolean) {
     for (const mesh of this.avatarMeshes) {
-      mesh.visibility = visible ? 1 : 0;
+      mesh.visibility = visible ? this.avatarCameraVisibility : 0;
     }
   }
 

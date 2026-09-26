@@ -30,7 +30,9 @@ const FLAME_HEIGHT = 2.55;
 const FLAME_WIDTH = 0.82;
 const FLAME_BASE_OVERLAP = 0.32;
 const CANDLE_FLAME_TEXTURE_URL = "/assets/models/textures/fire/candle_flame.png";
-const END_TORCH_LIGHT_ACTIVATION_RADIUS = 80;
+const END_TORCH_LIGHT_FULL_INFLUENCE_RADIUS = 54;
+const END_TORCH_LIGHT_FADE_RADIUS = 98;
+const END_TORCH_LIGHT_INTENSITY_RESPONSE = 3.2;
 
 export type EndTorchesHandle = {
   update: (playerPosition: Vector3) => void;
@@ -415,7 +417,8 @@ export async function createEndTorches(
     light: PointLight;
     baseIntensity: number;
     phase: number;
-    active: boolean;
+    targetInfluence: number;
+    currentInfluence: number;
   }[] = [];
   const torchMeshes: AbstractMesh[] = [];
 
@@ -452,10 +455,18 @@ export async function createEndTorches(
     light.specular = new Color3(1.0, 0.54, 0.22);
     const baseIntensity = 3.75;
     light.intensity = 0;
-    light.range = 45;
+    // Meet the lagoon's cool fill at a low intensity instead of leaving a
+    // physically unlit strip between both local-light ranges.
+    light.range = 56;
     light.falloffType = Light.FALLOFF_STANDARD;
     light.renderPriority = 10;
-    lights.push({ light, baseIntensity, phase: i * 2.19, active: false });
+    lights.push({
+      light,
+      baseIntensity,
+      phase: i * 2.19,
+      targetInfluence: 0,
+      currentInfluence: 0,
+    });
   }
 
   // Restrict the receivers, then leave light membership stable for the whole
@@ -470,22 +481,29 @@ export async function createEndTorches(
 
   let t = 0;
   scene.onBeforeRenderObservable.add(() => {
-    t += scene.getEngine().getDeltaTime() * 0.001;
+    const deltaTime = Math.max(
+      0,
+      Math.min(scene.getEngine().getDeltaTime() * 0.001, 0.1)
+    );
+    const blend = 1 - Math.exp(-END_TORCH_LIGHT_INTENSITY_RESPONSE * deltaTime);
+    t += deltaTime;
 
     for (const entry of lights) {
       const { light, baseIntensity, phase } = entry;
-      if (!entry.active) {
+      entry.currentInfluence +=
+        (entry.targetInfluence - entry.currentInfluence) * blend;
+      if (entry.currentInfluence <= 0.0001) {
+        entry.currentInfluence = 0;
         light.intensity = 0;
         continue;
       }
       const flicker =
         Math.sin(t * 11.0 + phase) * 0.12 +
         Math.sin(t * 21.0 + phase * 0.7) * 0.07;
-      light.intensity = baseIntensity + flicker;
+      light.intensity = (baseIntensity + flicker) * entry.currentInfluence;
     }
   });
 
-  const activationRadiusSquared = END_TORCH_LIGHT_ACTIVATION_RADIUS ** 2;
   return {
     safeLightPositions: placements.map(({ x, z }) =>
       new Vector3(x, terrain.getHeightAt(x, z), z)
@@ -493,10 +511,20 @@ export async function createEndTorches(
     update(playerPosition) {
       for (const entry of lights) {
         const { light } = entry;
-        const distanceSquared = Vector3.DistanceSquared(playerPosition, light.position);
-        entry.active = distanceSquared <= activationRadiusSquared;
-        if (!entry.active) light.intensity = 0;
+        const distance = Vector3.Distance(playerPosition, light.position);
+        entry.targetInfluence =
+          1 -
+          smoothstep(
+            END_TORCH_LIGHT_FULL_INFLUENCE_RADIUS,
+            END_TORCH_LIGHT_FADE_RADIUS,
+            distance
+          );
       }
     },
   };
+}
+
+function smoothstep(edge0: number, edge1: number, value: number) {
+  const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
 }

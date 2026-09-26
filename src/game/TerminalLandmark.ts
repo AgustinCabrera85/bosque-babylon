@@ -40,10 +40,15 @@ import type { WaterSurfaceInfo } from "./WaterSurface";
 
 export const DEFAULT_END_HOUSE_SEGMENT = 8;
 export const DEFAULT_WORLD_SEGMENT_LENGTH = 70;
-const CAVE_LIGHT_ACTIVATION_RADIUS = 112;
-const CAVE_LIGHT_DEACTIVATION_RADIUS = 124;
-const LAGOON_LIGHT_ACTIVATION_RADIUS = 72;
-const LAGOON_LIGHT_DEACTIVATION_RADIUS = 84;
+// Local lights share the terrain's finite shader-light budget. They must only
+// enter that budget once they are close enough to contribute; enabling the
+// cave lights from more than 100 m away used to evict the brazier/base lights
+// well before their short ranges could illuminate anything.
+const CAVE_LIGHT_FULL_INFLUENCE_RADIUS = 24;
+const CAVE_LIGHT_FADE_RADIUS = 48;
+const TERMINAL_LIGHT_INTENSITY_RESPONSE = 3.4;
+const TERMINAL_LIGHT_ENABLE_INTENSITY = 0.015;
+const TERMINAL_LIGHT_DISABLE_INTENSITY = 0.006;
 const WATERFALL_PARTICLE_ACTIVATION_RADIUS = 118;
 // The visible water extends beneath the opaque shore so its mesh boundary can
 // never appear as a cut-off plate. Gameplay uses the smaller wet extent.
@@ -329,16 +334,21 @@ export class TerminalLandmarkGenerator {
   private readonly flickeringLights: {
     light: PointLight;
     baseIntensity: number;
+    currentIntensity: number;
     phase: number;
   }[] = [];
   private readonly waterfallOverlayMeshes: AbstractMesh[] = [];
   private readonly waterfallParticleSystems: ParticleSystem[] = [];
-  private readonly lagoonLights: PointLight[] = [];
+  private readonly lagoonLights: {
+    light: PointLight;
+    baseIntensity: number;
+    currentIntensity: number;
+    fullInfluenceRadius: number;
+    fadeRadius: number;
+  }[] = [];
   private waterfallDropletBurst: WaterfallDropletBurst | null = null;
   private waterfallParticleImpactPoint: Vector3 | null = null;
   private waterfallParticlesActive = false;
-  private lagoonLightActivationPoint: Vector3 | null = null;
-  private lagoonLightsActive = false;
   private animationTime = 0;
   private fluidWaterfall: FluidWaterfallController | null = null;
 
@@ -467,12 +477,24 @@ export class TerminalLandmarkGenerator {
       root,
       activeImpactPoint
     );
-    this.lagoonLightActivationPoint = new Vector3(
-      config.lagoonCenterX,
-      config.waterLevel,
-      config.lagoonCenterZ
+    this.lagoonLights.push(
+      {
+        light: underwaterLight,
+        baseIntensity: underwaterLight.intensity,
+        currentIntensity: 0,
+        fullInfluenceRadius: underwaterLight.range * 0.8,
+        fadeRadius: underwaterLight.range + 16,
+      },
+      {
+        light: waterfallImpactLight,
+        baseIntensity: waterfallImpactLight.intensity,
+        currentIntensity: 0,
+        fullInfluenceRadius: waterfallImpactLight.range * 0.8,
+        fadeRadius: waterfallImpactLight.range + 16,
+      }
     );
-    this.lagoonLights.push(underwaterLight, waterfallImpactLight);
+    underwaterLight.intensity = 0;
+    waterfallImpactLight.intensity = 0;
     underwaterLight.setEnabled(false);
     waterfallImpactLight.setEnabled(false);
     this.limitLagoonLights(
@@ -1846,7 +1868,8 @@ export class TerminalLandmarkGenerator {
       );
       light.diffuse = new Color3(1, 0.48, 0.16);
       light.specular = new Color3(0.62, 0.23, 0.06);
-      light.intensity = 4.4;
+      const baseIntensity = 4.4;
+      light.intensity = 0;
       light.range = 24;
       light.falloffType = Light.FALLOFF_STANDARD;
       light.renderPriority = 9;
@@ -1855,7 +1878,8 @@ export class TerminalLandmarkGenerator {
       lights.push(light);
       this.flickeringLights.push({
         light,
-        baseIntensity: light.intensity,
+        baseIntensity,
+        currentIntensity: 0,
         phase: index * 2.37 + 0.4,
       });
       meshes.push(flame, glow);
@@ -2007,42 +2031,87 @@ export class TerminalLandmarkGenerator {
     for (const material of this.animatedMaterials) {
       material.setFloat("time", this.animationTime);
     }
-    this.updateLagoonLightActivation(playerPosition);
+    this.updateLagoonLightActivation(deltaTime, playerPosition);
     this.fluidWaterfall?.update(deltaTime, playerPosition);
-    for (const { light, baseIntensity, phase } of this.flickeringLights) {
-      const activationRadius = light.isEnabled()
-        ? CAVE_LIGHT_DEACTIVATION_RADIUS
-        : CAVE_LIGHT_ACTIVATION_RADIUS;
-      const shouldEnable =
-        !playerPosition ||
-        Vector3.DistanceSquared(playerPosition, light.getAbsolutePosition()) <=
-          activationRadius * activationRadius;
-      if (light.isEnabled() !== shouldEnable) light.setEnabled(shouldEnable);
-      if (!shouldEnable) continue;
+    for (const entry of this.flickeringLights) {
+      const { baseIntensity, phase } = entry;
       const flicker =
         Math.sin(this.animationTime * 11.5 + phase) * 0.09 +
         Math.sin(this.animationTime * 23.0 + phase * 0.7) * 0.045;
-      light.intensity = baseIntensity + flicker;
+      this.updateProximityLight(
+        entry,
+        baseIntensity + flicker,
+        CAVE_LIGHT_FULL_INFLUENCE_RADIUS,
+        CAVE_LIGHT_FADE_RADIUS,
+        deltaTime,
+        playerPosition
+      );
     }
     if (this.updateWaterfallParticleActivation(playerPosition)) {
       this.updateWaterfallDropletBursts();
     }
   }
 
-  private updateLagoonLightActivation(playerPosition?: Vector3) {
-    const activationPoint = this.lagoonLightActivationPoint;
-    const activationRadius = this.lagoonLightsActive
-      ? LAGOON_LIGHT_DEACTIVATION_RADIUS
-      : LAGOON_LIGHT_ACTIVATION_RADIUS;
-    const shouldBeActive =
-      !playerPosition ||
-      !activationPoint ||
-      Vector3.DistanceSquared(playerPosition, activationPoint) <=
-        activationRadius * activationRadius;
-    if (shouldBeActive === this.lagoonLightsActive) return;
+  private updateLagoonLightActivation(
+    deltaTime: number,
+    playerPosition?: Vector3
+  ) {
+    for (const entry of this.lagoonLights) {
+      this.updateProximityLight(
+        entry,
+        entry.baseIntensity,
+        entry.fullInfluenceRadius,
+        entry.fadeRadius,
+        deltaTime,
+        playerPosition
+      );
+    }
+  }
 
-    this.lagoonLightsActive = shouldBeActive;
-    for (const light of this.lagoonLights) light.setEnabled(shouldBeActive);
+  private updateProximityLight(
+    entry: {
+      light: PointLight;
+      currentIntensity: number;
+    },
+    desiredIntensity: number,
+    fullInfluenceRadius: number,
+    fadeRadius: number,
+    deltaTime: number,
+    playerPosition?: Vector3
+  ) {
+    const distance = playerPosition
+      ? Vector3.Distance(playerPosition, entry.light.getAbsolutePosition())
+      : 0;
+    const influence = playerPosition
+      ? 1 - smoothstep(fullInfluenceRadius, fadeRadius, distance)
+      : 1;
+    const targetIntensity = Math.max(0, desiredIntensity * influence);
+    const dt = Math.max(0, Math.min(deltaTime, 0.1));
+    const blend = dt <= 0
+      ? 1
+      : 1 - Math.exp(-TERMINAL_LIGHT_INTENSITY_RESPONSE * dt);
+
+    entry.currentIntensity +=
+      (targetIntensity - entry.currentIntensity) * blend;
+
+    if (
+      !entry.light.isEnabled() &&
+      targetIntensity >= TERMINAL_LIGHT_ENABLE_INTENSITY
+    ) {
+      entry.light.setEnabled(true);
+    }
+
+    entry.light.intensity = entry.currentIntensity;
+
+    if (
+      entry.light.isEnabled() &&
+      targetIntensity <= TERMINAL_LIGHT_DISABLE_INTENSITY &&
+      entry.currentIntensity <= TERMINAL_LIGHT_DISABLE_INTENSITY
+    ) {
+      entry.currentIntensity = 0;
+      entry.light.intensity = 0;
+      entry.light.setEnabled(false);
+    }
   }
 
   private updateWaterfallParticleActivation(playerPosition?: Vector3) {

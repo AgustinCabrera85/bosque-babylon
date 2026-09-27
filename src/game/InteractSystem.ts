@@ -1,8 +1,8 @@
 import { Scene } from "@babylonjs/core/scene";
-import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { Ray } from "@babylonjs/core/Culling/ray";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { InputManager } from "./input/InputManager";
 
 type Hints = { set(text: string | null): void };
 type LookRay = {
@@ -35,18 +35,15 @@ const INTERACTION_PROXIMITY_VERTICAL_TOLERANCE = 2.2;
 export class InteractSystem {
   constructor(
     private scene: Scene,
+    private input: InputManager,
     private getLookRay: () => LookRay,
     private hints: Hints,
     private onAction?: (type?: string, movementLockSeconds?: number) => void
-  ) {
-    scene.onKeyboardObservable.add((kb) => {
-      if (kb.type === KeyboardEventTypes.KEYDOWN && kb.event.code === "KeyE") {
-        this.tryInteract();
-      }
-      if (kb.type === KeyboardEventTypes.KEYDOWN && kb.event.code === "Escape") {
-        this.hints.set(null);
-      }
-    });
+  ) {}
+
+  update() {
+    if (this.input.wasPressed("interact")) this.tryInteract();
+    if (this.input.wasPressed("cancel")) this.hints.set(null);
   }
 
   peekInteractable() {

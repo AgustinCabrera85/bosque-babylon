@@ -48,6 +48,8 @@ const INSPECTABLE_IMAGE_FALLBACKS: Record<string, string> = {
 export type ItemInspectorHandle = {
   inspect: (item: InspectableItem) => void;
   isOpen: () => boolean;
+  close: () => void;
+  dispose: () => void;
 };
 
 export function setupItemInspector(): ItemInspectorHandle {
@@ -55,6 +57,8 @@ export function setupItemInspector(): ItemInspectorHandle {
   let engine: Engine | null = null;
   let scene: Scene | null = null;
   let open = false;
+  const abortController = new AbortController();
+  const signal = abortController.signal;
 
   const close = () => {
     if (!open) return;
@@ -78,22 +82,23 @@ export function setupItemInspector(): ItemInspectorHandle {
     open = true;
   };
 
-  dom.closeButton.addEventListener("click", close);
-  dom.overlay.addEventListener("pointerdown", (event) => event.stopPropagation());
-  dom.overlay.addEventListener("click", (event) => event.stopPropagation());
-  window.addEventListener("resize", () => engine?.resize());
-  document.addEventListener("keydown", (event) => {
-    if (!open) return;
-    event.stopPropagation();
-    if (event.code === "Escape") close();
-  }, true);
+  dom.closeButton.addEventListener("click", close, { signal });
+  dom.overlay.addEventListener("pointerdown", (event) => event.stopPropagation(), { signal });
+  dom.overlay.addEventListener("click", (event) => event.stopPropagation(), { signal });
+  window.addEventListener("resize", () => engine?.resize(), { signal });
   window.addEventListener("bosque:inspect-item", (event) => {
     inspect((event as InspectItemEvent).detail);
-  });
+  }, { signal });
 
   return {
     inspect,
     isOpen: () => open,
+    close,
+    dispose: () => {
+      close();
+      abortController.abort();
+      dom.overlay.remove();
+    },
   };
 }
 
@@ -108,16 +113,15 @@ async function openItem(
   previous.scene?.dispose();
   previous.engine?.dispose();
 
-  if (document.pointerLockElement instanceof HTMLElement) {
-    document.exitPointerLock?.();
-  }
-
   dom.title.textContent = item.name;
   dom.type.textContent = item.typeLabel;
   dom.description.textContent = item.description;
   dom.overlay.classList.remove("hidden");
   dom.overlay.setAttribute("aria-hidden", "false");
   document.body.classList.add("inspector-open");
+  if (document.pointerLockElement instanceof HTMLElement) {
+    document.exitPointerLock?.();
+  }
   window.dispatchEvent(new CustomEvent("bosque:pause", { detail: { paused: true } }));
 
   if (item.inspectMode === "image") {

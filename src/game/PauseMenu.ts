@@ -5,6 +5,8 @@ type PauseMenuOptions = {
 export type PauseMenuHandle = {
   isPaused: () => boolean;
   setPaused: (paused: boolean) => void;
+  toggle: () => void;
+  dispose: () => void;
 };
 
 export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
@@ -18,6 +20,8 @@ export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
   let wasPointerLocked = document.pointerLockElement === canvas;
   let ignoreEscapeUntil = 0;
   let statusTimer: number | null = null;
+  const abortController = new AbortController();
+  const signal = abortController.signal;
 
   const setStatus = (text: string) => {
     if (!pauseStatus) return;
@@ -71,46 +75,50 @@ export function setupPauseMenu({ canvas }: PauseMenuOptions): PauseMenuHandle {
     event.stopPropagation();
   };
 
-  menu?.addEventListener("pointerdown", stopMenuEvent);
-  menu?.addEventListener("click", stopMenuEvent);
+  menu?.addEventListener("pointerdown", stopMenuEvent, { signal });
+  menu?.addEventListener("click", stopMenuEvent, { signal });
 
   pauseButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     setPaused(!paused);
-  });
+  }, { signal });
 
   saveButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     window.localStorage.setItem("bosque:lastManualSave", new Date().toISOString());
     window.dispatchEvent(new CustomEvent("bosque:save"));
     setStatus("Guardado");
-  });
+  }, { signal });
 
   exitButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     setPaused(false);
-  });
-
-  window.addEventListener("keydown", (event) => {
-    if (event.code !== "Escape" || event.repeat) return;
-    event.preventDefault();
-    if (paused && performance.now() < ignoreEscapeUntil) return;
-    setPaused(!paused);
-  });
+  }, { signal });
 
   document.addEventListener("pointerlockchange", () => {
     const locked = document.pointerLockElement === canvas;
-    if (wasPointerLocked && !locked && !paused) {
+    const overlayOpen =
+      document.body.classList.contains("inventory-open") ||
+      document.body.classList.contains("inspector-open");
+    if (wasPointerLocked && !locked && !paused && !overlayOpen) {
       ignoreEscapeUntil = performance.now() + 250;
       setPaused(true);
     }
     wasPointerLocked = locked;
-  });
+  }, { signal });
 
   render();
 
   return {
     isPaused: () => paused,
     setPaused,
+    toggle: () => {
+      if (paused && performance.now() < ignoreEscapeUntil) return;
+      setPaused(!paused);
+    },
+    dispose: () => {
+      abortController.abort();
+      if (statusTimer !== null) window.clearTimeout(statusTimer);
+    },
   };
 }

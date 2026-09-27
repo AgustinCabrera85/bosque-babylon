@@ -5,6 +5,7 @@ import {
   type PlayerStatsSystem,
   type SanityRecoveryMode,
 } from "./PlayerStatsSystem";
+import type { InputManager } from "./input/InputManager";
 
 export type PlayerSurvivalEnvironment = {
   onLitPath: boolean;
@@ -21,8 +22,8 @@ export type NearbyThreatSnapshot = {
 
 type PlayerSurvivalSystemOptions = {
   player: PlayerController;
+  input: InputManager;
   stats: PlayerStatsSystem;
-  desktopInputEnabled: boolean;
   isGameplayActive?: () => boolean;
   getEnvironment: () => PlayerSurvivalEnvironment;
   isSurrounded: () => boolean;
@@ -44,10 +45,6 @@ export class PlayerSurvivalSystem {
 
   public constructor(private readonly options: PlayerSurvivalSystemOptions) {
     const signal = this.abortController.signal;
-    if (options.desktopInputEnabled) {
-      window.addEventListener("keydown", this.onKeyDown, { signal });
-      window.addEventListener("keyup", this.onKeyUp, { signal });
-    }
     window.addEventListener("blur", this.onBlur, { signal });
     document.addEventListener("visibilitychange", this.onVisibilityChange, { signal });
     window.addEventListener("bosque:pause", this.onPause, { signal });
@@ -78,6 +75,10 @@ export class PlayerSurvivalSystem {
 
   public update(deltaTimeSeconds: number) {
     if (this.disposed) return;
+    if (this.options.input.wasPressed("absorbLight")) this.startLightAbsorption();
+    if (this.options.input.wasCancelled("absorbLight")) this.cancelLightAbsorption();
+    else if (this.options.input.wasReleased("absorbLight")) this.releaseLightAbsorption();
+
     const dt = Math.max(0, Math.min(deltaTimeSeconds, 0.1));
     const { player, stats } = this.options;
     if (
@@ -158,18 +159,6 @@ export class PlayerSurvivalSystem {
     this.options.stats.cancelLightAbsorption("disposed");
     this.abortController.abort();
   }
-
-  private readonly onKeyDown = (event: KeyboardEvent) => {
-    if (event.code !== "KeyQ" || event.repeat) return;
-    event.preventDefault();
-    this.startLightAbsorption();
-  };
-
-  private readonly onKeyUp = (event: KeyboardEvent) => {
-    if (event.code !== "KeyQ") return;
-    event.preventDefault();
-    this.releaseLightAbsorption();
-  };
 
   private readonly onBlur = () => {
     this.options.stats.cancelLightAbsorption("controls-locked");

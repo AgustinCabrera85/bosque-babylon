@@ -1,4 +1,5 @@
 import { getNextPrimaryViewMode, type PlayerController, type ViewMode } from "./PlayerController";
+import type { InputManager } from "./input/InputManager";
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -38,18 +39,6 @@ function releasePointer(element: HTMLElement, pointerId: number) {
   }
 }
 
-export type MobileAttackActions = {
-  start: () => boolean;
-  release: () => void;
-  cancel: () => void;
-};
-
-export type MobileAbsorptionActions = {
-  start: () => boolean;
-  release: () => void;
-  cancel: () => void;
-};
-
 type MobileActionId =
   | "light"
   | "jump"
@@ -62,9 +51,7 @@ type MobileActionState = "active" | "pressed" | "disabled";
 
 export function setupMobileControls(
   player: PlayerController,
-  onInteract: () => void,
-  attack?: MobileAttackActions,
-  absorption?: MobileAbsorptionActions
+  input: InputManager
 ) {
   if (!isMobileBrowser()) return () => {};
 
@@ -88,7 +75,7 @@ export function setupMobileControls(
     return () => abortController.abort();
   }
 
-  player.setMobileEnabled(true);
+  input.setTouchEnabled(true);
   document.body.classList.add("mobile-controls-enabled");
   root.classList.add("enabled");
   root.setAttribute("aria-hidden", "false");
@@ -198,7 +185,7 @@ export function setupMobileControls(
     const pointerId = movePointer;
     movePointer = null;
     if (pointerId !== null) releasePointer(stick, pointerId);
-    player.setMobileMove(0, 0);
+    input.setTouchMovement(0, 0);
     thumb.style.transform = "translate(-50%, -50%)";
     joystickVisualX = 0;
     joystickVisualY = 0;
@@ -240,7 +227,7 @@ export function setupMobileControls(
     joystickVisualX = normalizedX * joystickMaxDisplacement;
     joystickVisualY = normalizedY * joystickMaxDisplacement;
     renderJoystickArtwork();
-    player.setMobileMove(normalizedX, -normalizedY);
+    input.setTouchMovement(normalizedX, -normalizedY);
   };
 
   const resetLook = () => {
@@ -266,7 +253,7 @@ export function setupMobileControls(
     if (pointerId !== null) releasePointer(runButton, pointerId);
     runButton.classList.remove("active");
     setArtworkState("run", "active", false);
-    player.setMobileRun(false);
+    input.setTouchAction("run", false);
   };
 
   const stopRunFromEvent = (event: PointerEvent) => {
@@ -286,8 +273,8 @@ export function setupMobileControls(
     if (pointerId !== null) releasePointer(attackButton, pointerId);
     attackButton.classList.remove("active");
     setArtworkState("light", "active", false);
-    if (release) attack?.release();
-    else attack?.cancel();
+    if (release) input.setTouchAction("attack", false);
+    else input.cancelTouchAction("attack");
   };
 
   const releaseAttackFromEvent = (event: PointerEvent) => {
@@ -318,8 +305,8 @@ export function setupMobileControls(
     if (pointerId !== null) releasePointer(absorbLightButton, pointerId);
     absorbLightButton.classList.remove("active");
     setArtworkState("absorb", "active", false);
-    if (release) absorption?.release();
-    else absorption?.cancel();
+    if (release) input.setTouchAction("absorbLight", false);
+    else input.cancelTouchAction("absorbLight");
   };
 
   const releaseAbsorptionFromEvent = (event: PointerEvent) => {
@@ -375,7 +362,7 @@ export function setupMobileControls(
   lookPad.addEventListener("pointermove", (event) => {
     if (event.pointerId !== lookPointer) return;
     stopEvent(event);
-    player.addMobileLook(event.clientX - lastLookX, event.clientY - lastLookY);
+    input.addTouchLook(event.clientX - lastLookX, event.clientY - lastLookY);
     lastLookX = event.clientX;
     lastLookY = event.clientY;
   }, { signal });
@@ -391,7 +378,8 @@ export function setupMobileControls(
     capturePointer(runButton, event.pointerId);
     runButton.classList.add("active");
     setArtworkState("run", "active", true);
-    player.setMobileRun(true);
+    input.setTouchAction("run", true);
+    input.pulseTouchAction("waterAction");
   }, { signal });
 
   runButton.addEventListener("pointerup", stopRunFromEvent, { signal });
@@ -402,19 +390,19 @@ export function setupMobileControls(
   jumpButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     pulseArtwork("jump");
-    player.queueJump();
+    input.pulseTouchAction("jump");
   }, { signal });
 
   interactButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     pulseArtwork("interact");
-    onInteract();
+    input.pulseTouchAction("interact");
   }, { signal });
 
   attackButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     if (attackPointer !== null) stopAttack(false);
-    if (!attack?.start()) return;
+    input.setTouchAction("attack", true);
     attackPointer = event.pointerId;
     capturePointer(attackButton, event.pointerId);
     attackButton.classList.add("active");
@@ -427,7 +415,7 @@ export function setupMobileControls(
   absorbLightButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     if (absorptionPointer !== null) stopAbsorption(false);
-    if (!absorption?.start()) return;
+    input.setTouchAction("absorbLight", true);
     absorptionPointer = event.pointerId;
     capturePointer(absorbLightButton, event.pointerId);
     absorbLightButton.classList.add("active");
@@ -456,7 +444,7 @@ export function setupMobileControls(
   cameraButton.addEventListener("pointerdown", (event) => {
     stopEvent(event);
     pulseArtwork("view");
-    player.toggleViewMode();
+    input.pulseTouchAction("changeCamera");
   }, { signal });
 
   const resetMobileInput = () => {
@@ -501,6 +489,6 @@ export function setupMobileControls(
     root.classList.remove("enabled");
     root.setAttribute("aria-hidden", "true");
     document.body.classList.remove("mobile-controls-enabled");
-    player.setMobileEnabled(false);
+    input.setTouchEnabled(false);
   };
 }

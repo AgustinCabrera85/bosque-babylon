@@ -61,6 +61,10 @@ export interface ShadowGrabberPortalFxConfig {
   flowSpeed: number;
   shadowMotionStrength: number;
   vortexSpeed: number;
+  /** Cycles per second for the subtle whole-portal breathing motion. */
+  scalePulseSpeed: number;
+  /** Non-negative expansion above the authored portal size (0.06 = 6%). */
+  scalePulseAmount: number;
   innerFlareIntensity: number;
   originIntensity: number;
   originRadius: number;
@@ -216,7 +220,7 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   // Calibrated in-game Shadow Grabber scale. Do not normalize the GLB again.
   baseScale: 3.9,
   fxQuality: "low",
-  portalRotationSpeed: 0.18,
+  portalRotationSpeed: 0.72,
   // Large enough to read as a doorway, while remaining well below the original
   // full-size orb that dominated the character silhouette.
   portalVisualScale: 0.5,
@@ -225,7 +229,7 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
     spawnDuration: 1.65,
     // Let the electric plate project past more of the smoke rim so its blue
     // origin remains legible from the gameplay camera.
-    coreDiscScale: 1.58,
+    coreDiscScale: 1.78,
     smokeTorusScale: 1,
     noiseScale: 2.35,
     noiseSpeed: 0.46,
@@ -233,10 +237,12 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
     distortion: 0.22,
     flowSpeed: 0.82,
     shadowMotionStrength: 0.98,
-    vortexSpeed: 0.48,
+    vortexSpeed: 0.72,
+    scalePulseSpeed: 0.72,
+    scalePulseAmount: 0.06,
     innerFlareIntensity: 0.34,
     originIntensity: 0.9,
-    originRadius: 0.22,
+    originRadius: 0.25,
     originPulseSpeed: 1.6,
     filamentIntensity: 1.05,
     filamentThickness: 0.105,
@@ -255,7 +261,7 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
     smokeDensity: 2.28,
     smokeTubeThickness: 0.58,
     smokeTurbulence: 1.08,
-    smokeOrbitSpeed: 0.42,
+    smokeOrbitSpeed: 0.68,
     smokeDisplacement: 0.16,
     smokeAlphaThreshold: 0.43,
   },

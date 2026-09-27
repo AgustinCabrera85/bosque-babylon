@@ -16,6 +16,7 @@ import type { PlayerStatsSystem } from "./PlayerStatsSystem";
 import { PlayerLightRechargeVFX } from "./PlayerLightRechargeVFX";
 import type { EnemyController } from "./enemies/core/EnemyTypes";
 import type { EnemyManager } from "./enemies/core/EnemyManager";
+import type { InputManager } from "./input/InputManager";
 
 const MAX_CHARGE_SECONDS = 1.5;
 const MIN_LAUNCH_SPEED = 16;
@@ -246,8 +247,7 @@ const LIGHT_ORB_SHELL_FRAGMENT_SHADER = `
 `;
 
 type AttackSystemOptions = {
-  canvas: HTMLCanvasElement;
-  desktopInputEnabled: boolean;
+  input: InputManager;
   stats: PlayerStatsSystem;
   getLightSourcePositions: () => readonly Vector3[];
   getGroundHeight: (x: number, z: number) => number;
@@ -354,7 +354,6 @@ export class PlayerAttackSystem {
   private rechargeCompletedThisFrame = false;
   private timeSinceShot = Number.POSITIVE_INFINITY;
   private desktopOrbMode = false;
-  private desktopChargeMouseActive = false;
   private message = "";
   private messageTimer = 0;
   private renderedAmmo = -1;
@@ -419,20 +418,7 @@ export class PlayerAttackSystem {
     });
 
     const signal = this.abortController.signal;
-    if (options.desktopInputEnabled) {
-      // Mouse events are intentional here: unlike pointerdown, mousedown also
-      // fires for the second button in a right + left button chord.
-      options.canvas.addEventListener("mousedown", this.onDesktopMouseDown, {
-        capture: true,
-        signal,
-      });
-      options.canvas.addEventListener("contextmenu", this.onDesktopContextMenu, {
-        signal,
-      });
-      window.addEventListener("mouseup", this.onDesktopMouseUp, { signal });
-    }
     window.addEventListener("blur", this.cancelCharge, { signal });
-    document.addEventListener("pointerlockchange", this.onPointerLockChange, { signal });
     window.addEventListener("bosque:pause", this.onPause, { signal });
     for (const artwork of this.dom.artworks) {
       artwork.addEventListener("load", () => this.bindHudArtwork(artwork), { signal });
@@ -446,9 +432,8 @@ export class PlayerAttackSystem {
     this.renderHud();
   }
 
-  public startCharging = (mobile = false) => {
+  public startCharging = () => {
     if (this.disposed || this.charging) return false;
-    if (!mobile && (!this.options.desktopInputEnabled || !this.desktopOrbMode)) return false;
     if (this.ammo <= 0) {
       this.showMessage("Sin luz: acercate a una llama", 1.8);
       return false;
@@ -512,7 +497,6 @@ export class PlayerAttackSystem {
   public cancelCharge = () => {
     const hadDesktopOrbMode = this.desktopOrbMode;
     this.desktopOrbMode = false;
-    this.desktopChargeMouseActive = false;
     document.body.classList.remove("desktop-orb-mode");
     this.dom.root?.classList.remove("orb-mode");
     if (!this.charging) {
@@ -536,6 +520,13 @@ export class PlayerAttackSystem {
 
   public update(deltaTimeSeconds: number) {
     if (this.disposed) return;
+    const input = this.options.input;
+    if (input.wasPressed("aim")) this.enterAimMode();
+    if (input.wasCancelled("aim") || input.wasReleased("aim")) this.cancelCharge();
+    if (input.wasPressed("attack")) this.startCharging();
+    if (input.wasCancelled("attack")) this.cancelCharge();
+    else if (input.wasReleased("attack")) this.releaseCharge();
+
     const delta = Math.max(0, Math.min(deltaTimeSeconds, 0.05));
     this.timeSinceShot += delta;
     if (this.messageTimer > 0) {
@@ -583,65 +574,26 @@ export class PlayerAttackSystem {
     this.lightRechargeVfx.dispose();
   }
 
-  private readonly onDesktopMouseDown = (event: MouseEvent) => {
-    if (event.button === 2) {
-      event.preventDefault();
-      if (this.desktopOrbMode) return;
-
-      // Pointer lock is useful for aiming, but it must not be a prerequisite
-      // for entering orb mode because browsers grant it asynchronously.
-      if (document.pointerLockElement !== this.options.canvas) {
-        this.options.canvas.requestPointerLock?.().catch(() => {
-          // Orb mode still works; only relative mouse aiming remains unavailable.
-        });
-      }
-
-      this.desktopOrbMode = true;
-      document.body.classList.add("desktop-orb-mode");
-      this.dom.root?.classList.add("orb-mode");
-      this.showMessage(
-        this.ammo > 0 ? this.getIdleMessage() : "Sin luz: acercate a una llama",
-        0
-      );
-      this.renderHud();
-      return;
-    }
-
-    if (event.button !== 0 || !this.desktopOrbMode || this.desktopChargeMouseActive) return;
-    event.preventDefault();
-    if (!this.startCharging(false)) return;
-    this.desktopChargeMouseActive = true;
-  };
-
-  private readonly onDesktopMouseUp = (event: MouseEvent) => {
-    if (event.button === 2) {
-      if (!this.desktopOrbMode) return;
-      event.preventDefault();
-      this.cancelCharge();
-      return;
-    }
-    if (event.button !== 0 || !this.desktopChargeMouseActive) return;
-    this.desktopChargeMouseActive = false;
-    this.releaseCharge();
-  };
-
-  private readonly onDesktopContextMenu = (event: MouseEvent) => {
-    event.preventDefault();
-  };
-
-  private readonly onPointerLockChange = () => {
-    if (document.pointerLockElement !== this.options.canvas) this.cancelCharge();
-  };
+  private enterAimMode() {
+    if (this.desktopOrbMode) return;
+    this.desktopOrbMode = true;
+    document.body.classList.add("desktop-orb-mode");
+    this.dom.root?.classList.add("orb-mode");
+    this.showMessage(
+      this.ammo > 0 ? this.getIdleMessage() : "Sin luz: acercate a una llama",
+      0
+    );
+    this.renderHud();
+  }
 
   private readonly onPause = (event: Event) => {
     if ((event as CustomEvent<{ paused?: boolean }>).detail?.paused) this.cancelCharge();
   };
 
   private getIdleMessage() {
-    if (!this.options.desktopInputEnabled) return "Mantene L para apuntar";
     return this.desktopOrbMode
       ? "Mantene clic para cargar"
-      : "Clic derecho: modo orbe";
+      : "Mantene ataque para cargar";
   }
 
   private getChargePower() {

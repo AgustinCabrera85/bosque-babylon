@@ -50,7 +50,6 @@ import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"; 
 import { Light } from "@babylonjs/core/Lights/light";
-import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { ShadowAuraController } from "./ShadowAura";
 import { createShadowAuraDebugControls } from "./ShadowAuraDebug";
 import {
@@ -78,6 +77,7 @@ import { loadInitialForestEnemies } from "./levels/ForestEnemySpawns";
 import { HouseArrivalCinematic } from "./levels/HouseArrivalCinematic";
 import { TerminalSkyEyeEncounter } from "./levels/TerminalSkyEyeEncounter";
 import { BlackSmokeWrapSystem } from "./BlackSmokeWrapSystem";
+import type { InputManager } from "./input/InputManager";
 import { EnemyHealthHud } from "./EnemyHealthHud";
 import { createThoughtMessages } from "./ThoughtMessages";
 import {
@@ -337,7 +337,8 @@ export async function createScene(
   quality: QualityProfile = desktopQuality,
   selectedCharacter: CharacterId = "lautaro",
   musicPlayer: MusicPlayerHandle | null = null,
-  inventory?: InventoryHandle
+  inventory: InventoryHandle | undefined,
+  input: InputManager
 ) {
   onProgress(0.08, "Creando escena...");
   const scene = new Scene(engine);
@@ -487,7 +488,7 @@ const terrain = createTerrain(scene, {
   // =========================
   // Player
   // =========================
-  const player = new PlayerController(scene, canvas, {
+  const player = new PlayerController(scene, canvas, input, {
     eyeHeight: 1.7,
     walkSpeed: 2.8,
     runSpeed: 6.8,
@@ -683,12 +684,6 @@ flashlightButton?.addEventListener("click", (event) => {
   setFlashlightEnabled(!flashlightEnabled);
 });
 
-scene.onKeyboardObservable.add((kb) => {
-  if (kb.type !== KeyboardEventTypes.KEYDOWN) return;
-  const event = kb.event as KeyboardEvent;
-  if (event.code === "KeyF" && !event.repeat) setFlashlightEnabled(!flashlightEnabled);
-});
-
 // Sombras (opcional pero suma MUCHO)
 if (quality.shadowMapSize > 0) {
 const shadows = new ShadowGenerator(quality.shadowMapSize, flashlight);
@@ -780,12 +775,13 @@ scene.onBeforeRenderObservable.add(() => {
     plantRingCounts: quality.plantRingCounts,
     plantFarCount: quality.plantFarCount,
     brazierFireQuality: quality.name === "mobile" ? "low" : "high",
-  });
+  }, inventory);
 
   onProgress(0.86, "Cargando casa...");
   await segments.loadCandles();
   await Promise.all([
     segments.loadStartBlocker(),
+    segments.loadForestKey(),
     segments.loadEndHouse(
       terminalConfig.lagoonCenterZ - terminalConfig.lagoonRadiusZ
     ),
@@ -941,13 +937,12 @@ scene.onBeforeRenderObservable.add(() => {
         };
       },
       pressDiveControl: () => {
-        player.setMobileRun(true);
-        player.setMobileRun(false);
+        input.pulseTouchAction("waterAction");
       },
-      setMovement: (x: number, y: number) => player.setMobileMove(x, y),
+      setMovement: (x: number, y: number) => input.setTouchMovement(x, y),
       setViewMode: (mode: ViewMode) => player.setViewMode(mode),
       playThrowObject: () => player.playThrowObject(0),
-      setSimulationActive: (active: boolean) => player.setMobileEnabled(active),
+      setSimulationActive: (active: boolean) => input.setTouchEnabled(active),
       playerRoot: player.root,
     };
     scene.metadata ??= {};
@@ -1017,6 +1012,7 @@ scene.onBeforeRenderObservable.add(() => {
   };
   const interactSystem = new InteractSystem(
     scene,
+    input,
     () => player.getLookRay(),
     hints,
     (type, movementLockSeconds) => player.playInteractionAction(type, movementLockSeconds)
@@ -1026,9 +1022,7 @@ scene.onBeforeRenderObservable.add(() => {
     terminalLandmark.caveCandleFocusPoint.clone(),
   ];
   const attackSystem = new PlayerAttackSystem(scene, player, enemyManager, {
-    canvas,
-    desktopInputEnabled:
-      !window.matchMedia("(pointer: coarse)").matches && navigator.maxTouchPoints === 0,
+    input,
     stats: playerStats,
     getLightSourcePositions: () => attackLightSources,
     getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
@@ -1219,7 +1213,7 @@ scene.onBeforeRenderObservable.add(() => {
           Math.sin(desiredYaw - player.root.rotation.y),
           Math.cos(desiredYaw - player.root.rotation.y)
         );
-        player.addMobileLook(yawDelta / 0.0032, 0);
+        player.applyLookDelta(yawDelta, 0);
       },
       aimPlayerAt: (x: number, y: number, z: number) => {
         player.camera.getViewMatrix(true);
@@ -1235,7 +1229,7 @@ scene.onBeforeRenderObservable.add(() => {
         );
         const desiredPitch = Math.atan2(cameraPosition.y - y, planarDistance);
         const pitchDelta = desiredPitch - player.camera.rotation.x;
-        player.addMobileLook(yawDelta / 0.0032, pitchDelta / 0.0027);
+        player.applyLookDelta(yawDelta, pitchDelta);
       },
     };
     const debugGlobal = globalThis as typeof globalThis & {
@@ -1334,11 +1328,9 @@ scene.onBeforeRenderObservable.add(() => {
   let survivalGameplayActive = false;
   const survivalSystem = new PlayerSurvivalSystem({
     player,
+    input,
     stats: playerStats,
     isGameplayActive: () => survivalGameplayActive,
-    desktopInputEnabled:
-      !window.matchMedia("(pointer: coarse)").matches &&
-      navigator.maxTouchPoints === 0,
     getEnvironment: () => {
       const position = player.position;
       const inSanctuary = isNearPlanarLight(
@@ -1375,17 +1367,7 @@ scene.onBeforeRenderObservable.add(() => {
   });
   const disposeMobileControls = setupMobileControls(
     player,
-    () => interactSystem.tryInteract(),
-    {
-      start: () => attackSystem.startCharging(true),
-      release: () => attackSystem.releaseCharge(),
-      cancel: () => attackSystem.cancelCharge(),
-    },
-    {
-      start: survivalSystem.startLightAbsorption,
-      release: survivalSystem.releaseLightAbsorption,
-      cancel: survivalSystem.cancelLightAbsorption,
-    }
+    input
   );
   scene.metadata.playerStats = playerStats;
   scene.onDisposeObservable.addOnce(() => {
@@ -1445,6 +1427,10 @@ scene.onBeforeRenderObservable.add(() => {
   let grassWindTimer = 0;
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.max(0, Math.min(engine.getDeltaTime() / 1000, 0.05));
+    if (input.wasPressed("toggleFlashlight")) {
+      setFlashlightEnabled(!flashlightEnabled);
+    }
+    interactSystem.update();
     houseArrivalCinematic.update(dt);
     // During the reveal, upload the already-preassembled final streaming window
     // before the player crosses the boundary that used to expose the hitch.

@@ -156,11 +156,14 @@ export class ShadowGrabberController extends BaseEnemyController {
   public update(deltaTimeSeconds: number) {
     if (!this.enabled || !this.resolvedPortalMesh) return;
     const delta = Math.max(0, Math.min(deltaTimeSeconds, 0.1));
+    const rotationStep =
+      this.portalRotationSpeed * delta * (this.fxState === "hunt" ? 1.2 : 1);
     this.resolvedPortalMesh.rotate(
       Axis.X,
-      this.portalRotationSpeed * delta * (this.fxState === "hunt" ? 1.2 : 1),
+      rotationStep,
       Space.LOCAL
     );
+    this.resolvedFxRoot?.rotate(Axis.X, rotationStep, Space.LOCAL);
     this.fxController?.update(delta);
     this.applySpawnReveal(
       this.fxEnabled ? (this.fxController?.spawnProgress ?? 1) : 1

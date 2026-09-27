@@ -767,12 +767,21 @@ export class ShadowGrabberFxController {
     // Manual cinematics can explode outward from a point. Regular Shadow
     // Grabber spawns preserve their established partial-size formation.
     const deathBurst = 1 - Math.pow(1 - this.deathProgressValue, 3);
+    const pulseSpeed = Math.max(0.05, this.config.scalePulseSpeed);
+    const pulseAmount = Math.max(0, Math.min(0.18, this.config.scalePulseAmount));
+    // Starts at the authored size and only expands, avoiding a shrunken phase.
+    const portalPulse =
+      1 +
+      (0.5 - 0.5 * Math.cos(this.elapsed * pulseSpeed * Math.PI * 2)) *
+        pulseAmount;
     const smokeScale =
       (smokeStartScale + smokeFormation * (1 - smokeStartScale)) *
-      (1 + deathBurst * 0.62);
+      (1 + deathBurst * 0.62) *
+      portalPulse;
     const coreScale =
       (coreStartScale + coreFormation * (1 - coreStartScale)) *
-      (1 + deathBurst * 0.28);
+      (1 + deathBurst * 0.28) *
+      portalPulse;
     this.smokeTorus.scaling.setAll(smokeScale);
     this.coreDisc.scaling.setAll(coreScale);
 

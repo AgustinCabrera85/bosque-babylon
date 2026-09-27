@@ -6,6 +6,7 @@ import { setupPauseMenu } from "./game/PauseMenu";
 import { setupItemInspector } from "./game/ItemInspector";
 import { setupInventory } from "./game/Inventory";
 import { setupCharacterSelection } from "./game/CharacterSelection";
+import { InputManager } from "./game/input/InputManager";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement | null;
 if (!canvas) throw new Error("No se encontro #renderCanvas");
@@ -111,6 +112,7 @@ async function start() {
   const selectedCharacter = await setupCharacterSelection();
   document.body.classList.remove("character-selecting");
   showLoading();
+  const input = new InputManager(renderCanvas);
   const pauseMenu = setupPauseMenu({ canvas: renderCanvas });
   const itemInspector = setupItemInspector();
   const inventory = setupInventory({ inspectItem: itemInspector.inspect });
@@ -123,13 +125,49 @@ async function start() {
     quality,
     selectedCharacter,
     musicPlayer,
-    inventory
+    inventory,
+    input
   );
+  scene.onDisposeObservable.addOnce(() => {
+    input.dispose();
+    pauseMenu.dispose();
+    inventory.dispose();
+    itemInspector.dispose();
+  });
 
   const firstFrameReady = new Promise<void>((resolve) => {
     scene.onAfterRenderObservable.addOnce(() => resolve());
   });
   engine.runRenderLoop(() => {
+    input.update(engine.getDeltaTime() / 1000);
+
+    let modalActionHandled = false;
+    if (input.wasPressed("cancel")) {
+      if (itemInspector.isOpen()) {
+        itemInspector.close();
+        modalActionHandled = true;
+      } else if (inventory.isOpen()) {
+        inventory.close();
+        modalActionHandled = true;
+      } else if (pauseMenu.isPaused()) {
+        pauseMenu.toggle();
+        modalActionHandled = true;
+      }
+    }
+    if (!modalActionHandled && input.wasPressed("pause")) {
+      if (inventory.isOpen()) inventory.close();
+      if (!itemInspector.isOpen()) pauseMenu.toggle();
+      modalActionHandled = true;
+    }
+    if (
+      !modalActionHandled &&
+      input.wasPressed("inventory") &&
+      !pauseMenu.isPaused() &&
+      !itemInspector.isOpen()
+    ) {
+      inventory.toggle();
+    }
+
     if (pauseMenu.isPaused() || itemInspector.isOpen() || inventory.isOpen()) return;
     scene.render();
   });

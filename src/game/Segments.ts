@@ -27,6 +27,11 @@ import {
 } from "./BrazierProceduralFire";
 import { createPhotoCard } from "./PhotoCard";
 import { createCollectibleNote } from "./CollectibleNotes";
+import { createCollectibleMatchbox } from "./CollectibleMatches";
+import {
+  createCollectibleForestKey,
+  FOREST_KEY_ITEM_ID,
+} from "./CollectibleForestKey";
 import { createItemLensFlare } from "./CollectibleEffects";
 import {
   loadHermanoMayor,
@@ -40,6 +45,7 @@ import type { GrassLibrary } from "./GrassLibrary";
 import type { PlantLibrary } from "./PlantLibrary";
 import type { RockLibrary } from "./RockLibrary";
 import type { ThoughtMessageInput } from "./ThoughtMessages";
+import type { InventoryHandle } from "./Inventory";
 
 type Collider = {
   x: number;
@@ -196,6 +202,7 @@ const END_HOUSE_RESERVE_WIDTH = 122;
 const END_HOUSE_RESERVE_DEPTH = 150;
 const INTERACTION_RAY_LENGTH = 4.25;
 const FIRST_NOTE_SEGMENT_ID = 1;
+const FIRST_MATCHBOX_SEGMENT_ID = FIRST_NOTE_SEGMENT_ID;
 const ISOMETRIC_OCCLUDER_INNER_RADIUS = 0.35;
 const ISOMETRIC_OCCLUDER_OUTER_RADIUS = 2.25;
 const ISOMETRIC_OCCLUDER_MIN_VISIBILITY = 0.28;
@@ -303,6 +310,7 @@ export class Segments {
   private isometricOccluderBaseVisibility = new Map<AbstractMesh, number>();
   private candleFlickerRegistered = false;
   private startBlockerLoaded = false;
+  private firstMatchboxCreated = false;
   private firstNoteCreated = false;
   private endHouseCheckpoint: Vector3 | null = null;
   private endHouseMeshes: AbstractMesh[] = [];
@@ -319,7 +327,8 @@ export class Segments {
     private grassLibrary: GrassLibrary,
     private plantLibrary: PlantLibrary,
     private rockLibrary: RockLibrary,
-    private cfg: SegmentCfg
+    private cfg: SegmentCfg,
+    private inventory?: Pick<InventoryHandle, "getItemCount">
   ) {
     this.noSpawnZones.push({
       x: 0,
@@ -635,6 +644,11 @@ export class Segments {
     // ---------- TREES + ROCKS ----------
     for (const id of objectNeeded) {
       const centerZ = (id + 0.5) * segLen;
+
+      if (id === FIRST_MATCHBOX_SEGMENT_ID && !this.firstMatchboxCreated) {
+        this.createFirstPathMatchbox();
+        this.firstMatchboxCreated = true;
+      }
 
       if (id === FIRST_NOTE_SEGMENT_ID && !this.firstNoteCreated) {
         this.createFirstPathNote();
@@ -1045,6 +1059,19 @@ export class Segments {
   // =========================
   // INTERACTION
   // =========================
+  private createFirstPathMatchbox() {
+    const segLen = this.cfg.segmentLength;
+    // The player advances along +Z, so this is encountered before the note at 0.43.
+    const z = FIRST_MATCHBOX_SEGMENT_ID * segLen + segLen * 0.18;
+    const x = 0.85;
+    const y = this.terrain.getHeightAt(x, z) + 0.045;
+
+    createCollectibleMatchbox(this.scene, {
+      position: new Vector3(x, y, z),
+      rotationY: Math.PI * 0.08,
+    });
+  }
+
   private createFirstPathNote() {
     const segLen = this.cfg.segmentLength;
     const z = FIRST_NOTE_SEGMENT_ID * segLen + segLen * 0.43;
@@ -1988,6 +2015,20 @@ export class Segments {
         kind: "prop",
       });
     }
+  }
+
+  async loadForestKey() {
+    const segmentLength = this.cfg.segmentLength;
+    const houseSegment = this.cfg.endHouseSegment ?? 8;
+    const keySegment = Math.max(FIRST_NOTE_SEGMENT_ID + 1, houseSegment - 2);
+    const z = keySegment * segmentLength + segmentLength * 0.68;
+    const x = -0.85;
+    const y = this.terrain.getHeightAt(x, z) + 0.04;
+
+    await createCollectibleForestKey(this.scene, {
+      position: new Vector3(x, y, z),
+      rotationY: Math.PI * -0.16,
+    });
   }
 
   private registerEndHousePicnicTableColliders(
@@ -3092,6 +3133,7 @@ export class Segments {
     const closedRotation = doorMesh?.rotation.clone();
     const closedRotationQuaternion = doorMesh?.rotationQuaternion?.clone();
     let open = false;
+    let locked = true;
     let amount = 0;
     let target = 0;
     let openDelayTimer: number | null = null;
@@ -3129,6 +3171,7 @@ export class Segments {
     picker.metadata = {
       interactable: true,
       type: "door",
+      locked: true,
       onInteract: () => {
         if (openDelayTimer !== null) {
           return {
@@ -3138,6 +3181,22 @@ export class Segments {
         }
 
         if (!open) {
+          let unlockedNow = false;
+          if (locked) {
+            const hasForestKey =
+              (this.inventory?.getItemCount(FOREST_KEY_ITEM_ID) ?? 0) > 0;
+            if (!hasForestKey) {
+              return {
+                message: "No puedo abrir... Parece estar cerrado con llave.",
+                suppressAction: true,
+              };
+            }
+
+            locked = false;
+            unlockedNow = true;
+            picker.metadata.locked = false;
+          }
+
           clearDoorTimers();
           openDelayTimer = window.setTimeout(() => {
             open = true;
@@ -3150,7 +3209,9 @@ export class Segments {
           }, DOOR_OPEN_ACTION_DELAY_SECONDS * 1000);
 
           return {
-            message: "Abris la puerta.",
+            message: unlockedNow
+              ? "Has usado la Llave del Bosque"
+              : "Abrís la puerta.",
             actionType: "door",
             movementLockSeconds: DOOR_OPEN_ACTION_DELAY_SECONDS,
           };

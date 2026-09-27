@@ -4,7 +4,6 @@ import { Camera } from "@babylonjs/core/Cameras/camera";
 import { UniversalCamera } from "@babylonjs/core/Cameras/universalCamera";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
@@ -21,6 +20,7 @@ import {
   type WaterSurfaceRegistry,
 } from "./WaterSurface";
 import { LAUTARO_VISUAL_SCALE } from "./CharacterPresentation";
+import type { InputManager } from "./input/InputManager";
 
 type Settings = {
   eyeHeight: number;
@@ -198,13 +198,8 @@ export class PlayerController {
   public readonly root: TransformNode;
   public readonly camera: UniversalCamera;
 
-  private keys = new Set<string>();
   private velY = 0;
   private grounded = false;
-  private mobileEnabled = false;
-  private mobileMoveX = 0;
-  private mobileMoveY = 0;
-  private mobileRun = false;
   private jumpQueued = false;
   private waterActionQueued = false;
   private pitch = 0;
@@ -285,6 +280,7 @@ export class PlayerController {
   constructor(
     private scene: Scene,
     private canvas: HTMLCanvasElement,
+    private input: InputManager,
     private settings: Settings,
     private character: CharacterId = "lautaro"
   ) {
@@ -301,52 +297,12 @@ export class PlayerController {
     this.pitch = this.camera.rotation.x;
     this.applyCameraRig();
 
-    document.addEventListener("click", (event) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("#mobileControls")) return;
-      if (target?.closest("#musicControls")) return;
-      if (target?.closest("#viewControls")) return;
-      if (target?.closest("#pauseMenu")) return;
-      if (target?.closest("#itemInspector")) return;
-      if (target?.closest("#inventoryOverlay")) return;
-      if (target?.closest("#inventoryButton")) return;
-      if (target?.closest("#shadowAuraDebug")) return;
-      if (target?.closest("#openingSequence")) return;
-      if (this.controlsLocked) return;
-      if (this.mobileEnabled) return;
-      canvas.requestPointerLock?.();
-    });
-
-    window.addEventListener("mousemove", (event) => {
-      if (document.pointerLockElement !== this.canvas) return;
-      if (this.controlsLocked) return;
-      this.applyLook(event.movementX * 0.0012, event.movementY * 0.001);
-    });
-
-    const updatePointerLockHelp = () => {
-      const help = document.getElementById("help");
-      const locked = document.pointerLockElement === canvas;
-      if (help) help.style.display = locked || this.mobileEnabled ? "none" : "block";
-    };
-    document.addEventListener("pointerlockchange", updatePointerLockHelp);
-    updatePointerLockHelp();
-
-    scene.onKeyboardObservable.add((kb) => {
-      if (kb.type === KeyboardEventTypes.KEYDOWN) {
-        if (this.controlsLocked) return;
-        const event = kb.event as KeyboardEvent;
-        if (event.code === "KeyV" && !event.repeat) this.toggleViewMode();
-        if (event.code === "Space" && !event.repeat) {
-          this.jumpQueued = true;
-          this.waterActionQueued = true;
-        }
-        this.keys.add(kb.event.code);
-      }
-      if (kb.type === KeyboardEventTypes.KEYUP) this.keys.delete(kb.event.code);
-    });
-
-    window.addEventListener("bosque:pause", () => {
+    const onPause = () => {
       this.updateMovementSfx("idle");
+    };
+    window.addEventListener("bosque:pause", onPause);
+    scene.onDisposeObservable.addOnce(() => {
+      window.removeEventListener("bosque:pause", onPause);
     });
   }
 
@@ -394,20 +350,8 @@ export class PlayerController {
   }
 
   get isRunning() {
-    const hasMovementInput =
-      this.keys.has("KeyW") ||
-      this.keys.has("KeyS") ||
-      this.keys.has("KeyA") ||
-      this.keys.has("KeyD") ||
-      this.keys.has("ArrowUp") ||
-      this.keys.has("ArrowDown") ||
-      this.keys.has("ArrowLeft") ||
-      this.keys.has("ArrowRight") ||
-      Math.hypot(this.mobileMoveX, this.mobileMoveY) > 0.12;
-    return (
-      hasMovementInput &&
-      (this.mobileRun || this.keys.has("ShiftLeft") || this.keys.has("ShiftRight"))
-    );
+    const movement = this.input.getMovement();
+    return Math.hypot(movement.x, movement.y) > 0.12 && this.input.isDown("run");
   }
 
   get isUnderEnemyGrabPressure() {
@@ -883,42 +827,16 @@ export class PlayerController {
     return direction;
   }
 
-  setMobileEnabled(enabled: boolean) {
-    this.mobileEnabled = enabled;
-    const help = document.getElementById("help");
-    if (help) help.style.display = enabled ? "none" : "block";
-  }
-
-  setMobileMove(x: number, y: number) {
+  applyLookDelta(deltaYaw: number, deltaPitch: number) {
     if (this.controlsLocked) return;
-    this.mobileMoveX = Math.max(-1, Math.min(1, x));
-    this.mobileMoveY = Math.max(-1, Math.min(1, y));
+    this.applyLook(deltaYaw, deltaPitch);
   }
 
-  setMobileRun(running: boolean) {
-    if (this.controlsLocked) {
-      this.mobileRun = false;
-      return;
-    }
-    if (running && !this.mobileRun) this.waterActionQueued = true;
-    this.mobileRun = running;
-  }
-
-  queueJump() {
-    if (this.controlsLocked) return;
-    this.jumpQueued = true;
-  }
-
-  addMobileLook(deltaX: number, deltaY: number) {
-    if (this.controlsLocked) return;
-    this.applyLook(deltaX * 0.0032, deltaY * 0.0027);
-  }
-
-  private getIsometricMobileMovementDirection(moveX: number, moveY: number) {
+  private getIsometricScreenMovementDirection(moveX: number, moveY: number) {
     return this.getIsometricWorldDirectionFromScreenAim(moveX, -moveY);
   }
 
-  private faceMobileMovement(direction: Vector3) {
+  private faceScreenMovement(direction: Vector3) {
     if (direction.lengthSquared() <= 0) return;
 
     this.yaw = Math.atan2(direction.x, direction.z);
@@ -993,6 +911,19 @@ export class PlayerController {
     // Streaming and shader compilation can occasionally stall a frame. Never
     // convert that wall-clock pause into several metres of player movement.
     dt = Math.max(0, Math.min(dt, MAX_SIMULATION_DELTA_SECONDS));
+    const inputActive = this.input.isGameplayInputEnabled();
+    if (!this.controlsLocked) {
+      if (inputActive) {
+        const look = this.input.getLook();
+        if (look.x !== 0 || look.y !== 0) this.applyLook(look.x, look.y);
+      }
+      if (this.input.wasPressed("changeCamera")) this.toggleViewMode();
+      if (inputActive && this.input.wasPressed("jump")) {
+        this.jumpQueued = true;
+        this.waterActionQueued = true;
+      }
+      if (inputActive && this.input.wasPressed("waterAction")) this.waterActionQueued = true;
+    }
     this.updateChargedThrowAction();
     this.updateIsometricCameraAnchorBlend(dt);
 
@@ -1021,8 +952,7 @@ export class PlayerController {
     this.consumeWaterAction(movementLocked);
     this.updateSwimmingCameraBlend(dt);
 
-    const active = this.mobileEnabled || document.pointerLockElement === this.canvas;
-    if (!active) {
+    if (!inputActive) {
       if (!this.actionPlaying) this.resumeIdleOrWaterAnimation();
       this.jumpQueued = false;
       this.updateMovementSfx("idle");
@@ -1046,33 +976,22 @@ export class PlayerController {
         : forward;
 
     const move = new Vector3(0, 0, 0);
-    let moveX = 0;
-    let moveY = 0;
-    if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) moveY += 1;
-    if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) moveY -= 1;
-    if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) moveX += 1;
-    if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) moveX -= 1;
-
-    if (this.mobileEnabled && this.viewMode !== "iso") {
-      moveY += this.mobileMoveY;
-      moveX += this.mobileMoveX;
-    }
-
-    moveX = Math.max(-1, Math.min(1, moveX));
-    moveY = Math.max(-1, Math.min(1, moveY));
-    move.addInPlace(movementForward.scale(moveY));
-    move.addInPlace(right.scale(moveX));
-
-    const mobileInputStrength = Math.min(1, Math.hypot(this.mobileMoveX, this.mobileMoveY));
-    if (this.mobileEnabled && this.viewMode === "iso" && mobileInputStrength > 0.12) {
-      const mobileDirection = this.getIsometricMobileMovementDirection(this.mobileMoveX, this.mobileMoveY);
-      this.faceMobileMovement(mobileDirection);
-      move.addInPlace(mobileDirection.scale(mobileInputStrength));
+    const movement = this.input.getMovement();
+    let moveX = Math.max(-1, Math.min(1, movement.x));
+    let moveY = Math.max(-1, Math.min(1, movement.y));
+    const inputStrength = Math.min(1, Math.hypot(moveX, moveY));
+    if (this.viewMode === "iso" && movement.reference === "screen" && inputStrength > 0.12) {
+      const screenDirection = this.getIsometricScreenMovementDirection(moveX, moveY);
+      this.faceScreenMovement(screenDirection);
+      move.addInPlace(screenDirection.scale(inputStrength));
       moveX = 0;
-      moveY = mobileInputStrength;
+      moveY = inputStrength;
+    } else {
+      move.addInPlace(movementForward.scale(moveY));
+      move.addInPlace(right.scale(moveX));
     }
 
-    const running = this.mobileRun || this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
+    const running = this.input.isDown("run");
     const baseSpeed =
       this.waterLocomotionStateValue === "swimming"
         ? SWIMMING_SPEED
@@ -1097,7 +1016,7 @@ export class PlayerController {
       segments.isColliding(x, z, 0, collisionFeetY, collisionHeadY);
 
     if (move.lengthSquared() > 0) {
-      move.normalize().scaleInPlace(speed * dt);
+      move.normalize().scaleInPlace(speed * dt * inputStrength);
 
       const px = this.root.position.x;
       const pz = this.root.position.z;
@@ -1846,10 +1765,7 @@ export class PlayerController {
   }
 
   private resetInputState() {
-    this.keys.clear();
-    this.mobileMoveX = 0;
-    this.mobileMoveY = 0;
-    this.mobileRun = false;
+    this.input.reset();
     this.jumpQueued = false;
     this.waterActionQueued = false;
     this.updateMovementSfx("idle");

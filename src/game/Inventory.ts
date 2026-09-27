@@ -24,6 +24,10 @@ type InventoryDom = {
 };
 
 type AddInventoryItemEvent = CustomEvent<InspectableItem>;
+type SetInventoryItemCountEvent = CustomEvent<{
+  item: InspectableItem;
+  count: number;
+}>;
 
 export type InventoryHandle = {
   addItem: (item: InspectableItem) => void;
@@ -32,6 +36,9 @@ export type InventoryHandle = {
   getItemCount: (id: string) => number;
   consumeItem: (id: string, amount?: number) => boolean;
   isOpen: () => boolean;
+  toggle: () => void;
+  close: () => void;
+  dispose: () => void;
 };
 
 export function setupInventory({ inspectItem }: InventoryOptions): InventoryHandle {
@@ -40,6 +47,8 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
   let selectedId: string | null = null;
   let currentFilter = "all";
   let open = false;
+  const abortController = new AbortController();
+  const signal = abortController.signal;
 
   const render = () => {
     renderFilters(dom, items, currentFilter, (filter) => {
@@ -66,13 +75,12 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
   const openInventory = () => {
     if (open) return;
     if (document.body.classList.contains("sky-eye-cinematic-active")) return;
-    if (document.pointerLockElement instanceof HTMLElement) document.exitPointerLock?.();
-
     open = true;
     dom.overlay.classList.remove("hidden");
     dom.overlay.setAttribute("aria-hidden", "false");
     dom.button.setAttribute("aria-pressed", "true");
     document.body.classList.add("inventory-open");
+    if (document.pointerLockElement instanceof HTMLElement) document.exitPointerLock?.();
     window.dispatchEvent(new CustomEvent("bosque:pause", { detail: { paused: true } }));
     render();
   };
@@ -116,8 +124,8 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
     return true;
   };
 
-  dom.button.addEventListener("click", toggle);
-  dom.closeButton.addEventListener("click", close);
+  dom.button.addEventListener("click", toggle, { signal });
+  dom.closeButton.addEventListener("click", close, { signal });
   dom.inspectButton.addEventListener("click", () => {
     if (!selectedId) return;
     const item = items.get(selectedId);
@@ -125,28 +133,16 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
 
     close();
     inspectItem(item);
-  });
-  dom.overlay.addEventListener("pointerdown", (event) => event.stopPropagation());
-  dom.overlay.addEventListener("click", (event) => event.stopPropagation());
-  document.addEventListener("keydown", (event) => {
-    if (document.body.classList.contains("inspector-open")) return;
-
-    if (event.code === "KeyI" && !event.repeat) {
-      event.preventDefault();
-      event.stopPropagation();
-      toggle();
-      return;
-    }
-
-    if (open && event.code === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      close();
-    }
-  }, true);
+  }, { signal });
+  dom.overlay.addEventListener("pointerdown", (event) => event.stopPropagation(), { signal });
+  dom.overlay.addEventListener("click", (event) => event.stopPropagation(), { signal });
   window.addEventListener("bosque:inventory:add-item", (event) => {
     addItem((event as AddInventoryItemEvent).detail);
-  });
+  }, { signal });
+  window.addEventListener("bosque:inventory:set-item-count", (event) => {
+    const { item, count } = (event as SetInventoryItemCountEvent).detail;
+    setItemCount(item, count);
+  }, { signal });
 
   render();
 
@@ -157,6 +153,14 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
     getItemCount: (id) => items.get(id)?.count ?? 0,
     consumeItem,
     isOpen: () => open,
+    toggle,
+    close,
+    dispose: () => {
+      close();
+      abortController.abort();
+      dom.button.remove();
+      dom.overlay.remove();
+    },
   };
 }
 
@@ -330,6 +334,8 @@ function renderDetail(dom: InventoryDom, item: InventoryItem | null) {
   dom.detailStatus.textContent = item
     ? item.typeLabel === "Municion"
       ? "Equipado"
+      : item.typeLabel === "Consumible"
+        ? "Consumible"
       : "Guardado"
     : "-";
   dom.inspectButton.disabled = !item || !canInspectItem(item);

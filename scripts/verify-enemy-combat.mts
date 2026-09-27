@@ -22,6 +22,8 @@ import {
   type ShadowGrabberGameplayEvent,
 } from "../src/game/enemies/shadowGrabber/ShadowGrabberBehavior.ts";
 import { ShadowGrabberCoordinator } from "../src/game/enemies/shadowGrabber/ShadowGrabberCoordinator.ts";
+import { DEFAULT_SHADOW_GRABBER_CONFIG } from "../src/game/enemies/shadowGrabber/ShadowGrabberConfig.ts";
+import { ShadowGrabberLightQuery } from "../src/game/enemies/shadowGrabber/ShadowGrabberLightQuery.ts";
 
 // The combat controller emits browser events; EventTarget is enough here.
 Object.assign(globalThis, { window: new EventTarget() });
@@ -97,6 +99,98 @@ function hit(enemy: BaseEnemyController, damage = 1) {
 }
 
 async function verify() {
+  const candleLights = [
+    {
+      id: "test-candle",
+      position: new Vector3(3, 0, 0),
+      lit: true,
+      extinguishable: true,
+    },
+  ];
+  let extinguishedCandleId: string | null = null;
+  const candleLightQuery = new ShadowGrabberLightQuery(
+    [],
+    () => candleLights,
+    (id) => {
+      const candle = candleLights.find((light) => light.id === id && light.lit);
+      if (!candle) return false;
+      candle.lit = false;
+      extinguishedCandleId = id;
+      return true;
+    },
+    () => ({
+      enabled: false,
+      origin: Vector3.Zero(),
+      direction: Vector3.Forward(),
+    })
+  );
+  candleLightQuery.updateCandleLightState();
+  candleLightQuery.updateFlashlightState();
+  assert.equal(candleLightQuery.sampleFixed(new Vector3(3, 0, 0), 7, 13).hardAvoidance, true);
+
+  const candleHuntEvents: ShadowGrabberGameplayEvent[] = [];
+  const candleHunterRoot = {
+    position: Vector3.Zero(),
+    rotation: Vector3.Zero(),
+    scaling: Vector3.One(),
+  };
+  const candleHunter = new ShadowGrabberBehavior(
+    {
+      id: "candle-hunter",
+      config: DEFAULT_SHADOW_GRABBER_CONFIG,
+      enabled: true,
+      root: candleHunterRoot,
+      getAnchorPosition: () => Vector3.Zero(),
+      setAnchorPosition: () => {},
+      setPortalCenterWorldPosition: () => {},
+      getPortalCenterWorldPositionToRef: (result: Vector3) => {
+        result.copyFrom(candleHunterRoot.position);
+        return true;
+      },
+      setState: () => {},
+      setFxState: () => {},
+      turnToward: () => {},
+      getCurrentAnimation: () => "idle",
+    } as never,
+    {
+      groupId: "candle-hunt-test",
+      anchorPosition: Vector3.Zero(),
+      coordinator: new ShadowGrabberCoordinator(),
+      lightQuery: candleLightQuery,
+      navigation: {
+        getGroundHeight: () => 0,
+        isBlocked: () => false,
+      },
+      applySanityDrain: () => {},
+      onEvent: (_id, event) => candleHuntEvents.push(event),
+    }
+  );
+  const candleHuntTarget = {
+    position: new Vector3(15, 0, 0),
+    groundPosition: new Vector3(15, 0, 0),
+    horizontalVelocity: Vector3.Zero(),
+    collisionHeight: 1.7,
+    sanity: 1,
+  };
+  for (let step = 0; step < 80 && candleLights[0].lit; step++) {
+    candleHunter.update(0.05, candleHuntTarget);
+  }
+  assert.equal(extinguishedCandleId, "test-candle");
+  assert.equal(candleLights[0].lit, false);
+  assert.ok(candleHuntEvents.includes("extinguishLight"));
+  assert.equal(
+    candleLightQuery.sampleFixed(new Vector3(3, 0, 0), 7, 13).hardAvoidance,
+    false,
+    "an extinguished candle must stop protecting the player"
+  );
+  candleLights[0].lit = true;
+  assert.equal(
+    candleLightQuery.sampleFixed(new Vector3(3, 0, 0), 7, 13).hardAvoidance,
+    true,
+    "relighting a candle must restore its safe-light field"
+  );
+  candleHunter.dispose();
+
   const interruptedCaptureEvents: ShadowGrabberGameplayEvent[] = [];
   const interruptedCaptureBehavior = new ShadowGrabberBehavior(
     {
@@ -414,7 +508,7 @@ async function verify() {
   }
   lateHud.dispose();
 
-  console.log("Enemy combat: 2/18 hits, gray-to-ash boss death and SVG HUD OK");
+  console.log("Enemy combat: candle hunting, 2/18 hits, gray-to-ash death and SVG HUD OK");
 }
 
 await verify();

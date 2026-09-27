@@ -1021,10 +1021,17 @@ scene.onBeforeRenderObservable.add(() => {
     ...endTorches.safeLightPositions.map((position) => position.clone()),
     terminalLandmark.caveCandleFocusPoint.clone(),
   ];
+  const getAttackLightSources = () => [
+    ...attackLightSources,
+    ...segments.getLitSafeLightPositions(),
+  ];
   const attackSystem = new PlayerAttackSystem(scene, player, enemyManager, {
     input,
     stats: playerStats,
-    getLightSourcePositions: () => attackLightSources,
+    getLightSourcePositions: getAttackLightSources,
+    findUnlitCandleSegmentHit: (from, to, projectileRadius) =>
+      segments.findUnlitCandleSegmentHit(from, to, projectileRadius),
+    relightCandle: (id) => segments.relightCandle(id),
     getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
     isBlocked: (position, radius) =>
       segments.isColliding(
@@ -1098,8 +1105,6 @@ scene.onBeforeRenderObservable.add(() => {
     const ratio = total > 0 ? completed / total : 1;
     onProgress(0.91 + ratio * 0.05, `Precargando bosque (${completed}/${total})...`);
   });
-  attackLightSources.push(...segments.getFixedSafeLightPositions());
-
   const shadowGrabberBehaviorSystem = new ShadowGrabberBehaviorSystem({
     player: {
       getPosition: () => player.position,
@@ -1124,10 +1129,9 @@ scene.onBeforeRenderObservable.add(() => {
       getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
       isBlocked: (x, z) => segments.isColliding(x, z),
     },
-    fixedSafeLightPositions: [
-      ...segments.getFixedSafeLightPositions(),
-      ...endTorches.safeLightPositions,
-    ],
+    fixedSafeLightPositions: endTorches.safeLightPositions,
+    getCandleLights: () => segments.getActiveCandleGameplayLights(),
+    extinguishCandle: (id) => segments.extinguishCandle(id),
     getFlashlight: () => {
       const ray = player.getFlashlightRay();
       return {
@@ -1338,7 +1342,7 @@ scene.onBeforeRenderObservable.add(() => {
         sanctuaryLightSources,
         6
       );
-      const inWeakFixedLight = isNearPlanarLight(position, attackLightSources, 12);
+      const inWeakFixedLight = isNearPlanarLight(position, getAttackLightSources(), 12);
       return {
         onLitPath:
           Math.abs(position.x) <= 4.5 &&

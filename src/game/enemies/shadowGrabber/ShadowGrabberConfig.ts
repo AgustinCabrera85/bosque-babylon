@@ -146,6 +146,10 @@ export interface ShadowGrabberConfig {
   separationStrength: number;
   returnToAnchorDelay: number;
   anchorArrivalRadius: number;
+  candleSearchRange: number;
+  candleApproachSpeed: number;
+  candleExtinguishRadius: number;
+  candleRetargetCooldown: number;
   hardLightAvoidanceRadius: number;
   softLightAvoidanceRadius: number;
   flashlightRange: number;
@@ -355,6 +359,12 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   separationStrength: 1.15,
   returnToAnchorDelay: 5,
   anchorArrivalRadius: 0.45,
+  // An alerted grabber may temporarily break pursuit to remove a nearby safe light.
+  candleSearchRange: 34,
+  candleApproachSpeed: 5.6,
+  // Candle colliders keep enemies about 1.55 units from the wick.
+  candleExtinguishRadius: 1.9,
+  candleRetargetCooldown: 4.5,
   hardLightAvoidanceRadius: 7,
   softLightAvoidanceRadius: 13,
   flashlightRange: 48,

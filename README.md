@@ -1,4 +1,8 @@
-# Bosque Babylon (starter)
+# Bosque Babylon
+
+## Documentación
+
+- [Manual de usuario](MANUAL_USUARIO.md)
 
 Starter minimal para un juego 3D de exploración con Babylon.js:
 - Vite + TypeScript

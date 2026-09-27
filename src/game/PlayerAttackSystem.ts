@@ -250,6 +250,12 @@ type AttackSystemOptions = {
   input: InputManager;
   stats: PlayerStatsSystem;
   getLightSourcePositions: () => readonly Vector3[];
+  findUnlitCandleSegmentHit: (
+    from: Vector3,
+    to: Vector3,
+    projectileRadius: number
+  ) => CandleSegmentHit | null;
+  relightCandle: (id: string) => boolean;
   getGroundHeight: (x: number, z: number) => number;
   isBlocked: (position: Vector3, radius: number) => boolean;
 };
@@ -313,6 +319,12 @@ type ImpactBurst = {
 
 type EnemySegmentHit = {
   enemy: EnemyController;
+  point: Vector3;
+  fraction: number;
+};
+
+type CandleSegmentHit = {
+  id: string;
   point: Vector3;
   fraction: number;
 };
@@ -823,9 +835,18 @@ export class PlayerAttackSystem {
       projectile.velocity.y -= PROJECTILE_GRAVITY * delta;
       const next = previous.add(projectile.velocity.scale(delta));
       const enemyHit = this.findEnemySegmentHit(previous, next);
+      const candleHit = this.options.findUnlitCandleSegmentHit(
+        previous,
+        next,
+        PROJECTILE_RADIUS
+      );
       const worldHit = this.findWorldSegmentHit(previous, next);
 
-      if (enemyHit && (!worldHit || enemyHit.fraction <= worldHit.fraction)) {
+      if (
+        enemyHit &&
+        (!candleHit || enemyHit.fraction <= candleHit.fraction) &&
+        (!worldHit || enemyHit.fraction <= worldHit.fraction)
+      ) {
         const direction = projectile.velocity.normalizeToNew();
         enemyHit.enemy.receiveAttack({
           // Durability is measured in whole light orbs, independent of sanity.
@@ -834,6 +855,24 @@ export class PlayerAttackSystem {
           direction,
         });
         this.createImpactBurst(enemyHit.point, true);
+        this.disposeProjectile(projectile);
+        this.projectiles.splice(index, 1);
+        continue;
+      }
+
+      if (
+        candleHit &&
+        (!enemyHit || candleHit.fraction < enemyHit.fraction) &&
+        (!worldHit || candleHit.fraction <= worldHit.fraction) &&
+        this.options.relightCandle(candleHit.id)
+      ) {
+        this.createImpactBurst(candleHit.point, true);
+        this.showMessage("Vela encendida", 1.1);
+        window.dispatchEvent(
+          new CustomEvent("bosque:candle-relit", {
+            detail: { id: candleHit.id },
+          })
+        );
         this.disposeProjectile(projectile);
         this.projectiles.splice(index, 1);
         continue;

@@ -133,6 +133,7 @@ type CandleTemplate = {
 
 type CandleFlameEntry = {
   root: TransformNode;
+  gameplayLight: CandleGameplayLight;
   baseIntensity: number;
   lightRange: number;
   phase: number;
@@ -150,6 +151,20 @@ type FireVisualDimensions = {
   flameHeight?: number;
   floorGlowSize?: number;
   floorGlowOffsetX?: number;
+  extinguishable?: boolean;
+};
+
+export type CandleGameplayLight = {
+  id: string;
+  position: Vector3;
+  lit: boolean;
+  extinguishable: boolean;
+};
+
+export type CandleLightSegmentHit = {
+  id: string;
+  point: Vector3;
+  fraction: number;
 };
 
 type CandleLightPoolEntry = {
@@ -171,6 +186,8 @@ const HOUSE_CANDLE_DIAMETER_SCALE = 0.10;
 const CANDLE_GROUND_SINK = 0.015;
 const CANDLE_RESERVE_RADIUS = 1.35;
 const CANDLE_COLLISION_RADIUS = 0.55;
+// Match the candle's world-collision envelope so a light orb can reach the wick.
+const CANDLE_RELIGHT_HIT_RADIUS = 1.55;
 const CANDLE_FLAME_WIDTH = 0.34;
 const CANDLE_FLAME_HEIGHT = 0.68;
 const SEGMENT_CANDLE_FADE_SECONDS = 0.85;
@@ -304,6 +321,7 @@ export class Segments {
   private candleGlowMaterial: ReturnType<typeof createGlowMaterial> | null = null;
   private candleFloorGlowMaterial: StandardMaterial | null = null;
   private candleLights: CandleFlameEntry[] = [];
+  private candleLightsById = new Map<string, CandleFlameEntry>();
   private candleLightPool: CandleLightPoolEntry[] = [];
   private activeObjectSegments = new Set<number>();
   private isometricOccluderRoots = new Set<TransformNode>();
@@ -365,11 +383,12 @@ export class Segments {
     this.worldObjectInspectionHandler = handler;
   }
 
-  /** Authored candle positions for gameplay safe-zone queries; no scene-light scan. */
+  /** Lit authored candle positions for gameplay safe-zone queries; no scene-light scan. */
   getFixedSafeLightPositions() {
     const result: Vector3[] = [];
     const seen = new Set<string>();
     for (const entry of this.candleLights) {
+      if (!entry.gameplayLight.lit) continue;
       const position = entry.root.getAbsolutePosition();
       const key = `${position.x.toFixed(2)}:${position.z.toFixed(2)}`;
       if (seen.has(key)) continue;
@@ -377,6 +396,72 @@ export class Segments {
       result.push(position.clone());
     }
     return result;
+  }
+
+  /** Stable gameplay records for active candle flames. Consumers must treat them as read-only. */
+  getActiveCandleGameplayLights(): readonly CandleGameplayLight[] {
+    const result: CandleGameplayLight[] = [];
+    for (const entry of this.candleLights) {
+      if (entry.root.isEnabled(true)) result.push(entry.gameplayLight);
+    }
+    return result;
+  }
+
+  getLitSafeLightPositions(): readonly Vector3[] {
+    const result: Vector3[] = [];
+    for (const entry of this.candleLights) {
+      if (!entry.gameplayLight.lit || !entry.root.isEnabled(true)) continue;
+      result.push(entry.gameplayLight.position);
+    }
+    return result;
+  }
+
+  extinguishCandle(id: string) {
+    return this.setCandleLitState(id, false);
+  }
+
+  relightCandle(id: string) {
+    return this.setCandleLitState(id, true);
+  }
+
+  findUnlitCandleSegmentHit(
+    from: Vector3,
+    to: Vector3,
+    projectileRadius = 0
+  ): CandleLightSegmentHit | null {
+    const segment = to.subtract(from);
+    const lengthSquared = segment.lengthSquared();
+    let best: CandleLightSegmentHit | null = null;
+
+    for (const entry of this.candleLights) {
+      const light = entry.gameplayLight;
+      if (
+        light.lit ||
+        !light.extinguishable ||
+        !entry.root.isEnabled(true)
+      ) {
+        continue;
+      }
+      const target = light.position.add(new Vector3(0, entry.flameHeight * 0.45, 0));
+      const hitRadius = CANDLE_RELIGHT_HIT_RADIUS + Math.max(0, projectileRadius);
+      const fromTarget = from.subtract(target);
+      const radiusDelta = fromTarget.lengthSquared() - hitRadius * hitRadius;
+      let fraction = 0;
+      if (radiusDelta > 0) {
+        if (lengthSquared <= 0.000001) continue;
+        const projection = Vector3.Dot(fromTarget, segment);
+        const discriminant =
+          projection * projection - lengthSquared * radiusDelta;
+        if (discriminant < 0) continue;
+        fraction = (-projection - Math.sqrt(discriminant)) / lengthSquared;
+        if (fraction < 0 || fraction > 1) continue;
+      }
+      if (best && fraction >= best.fraction) continue;
+      const closest = from.add(segment.scale(fraction));
+      best = { id: light.id, point: closest, fraction };
+    }
+
+    return best;
   }
 
   prepareLightingForPosition(playerPosition: Vector3) {
@@ -1579,8 +1664,15 @@ export class Segments {
       return spark;
     });
 
-    this.candleLights.push({
+    const gameplayLight: CandleGameplayLight = {
+      id: name,
+      position: position.clone(),
+      lit: true,
+      extinguishable: visualDimensions.extinguishable ?? true,
+    };
+    const entry: CandleFlameEntry = {
       root,
+      gameplayLight,
       baseIntensity: lightIntensity,
       lightRange,
       phase: (this.candleLights.length % 17) * 1.37,
@@ -1591,7 +1683,9 @@ export class Segments {
       floorGlow,
       sparks,
       flameHeight,
-    });
+    };
+    this.candleLights.push(entry);
+    this.candleLightsById.set(gameplayLight.id, entry);
 
     return { root, flame, floorGlow };
   }
@@ -1607,6 +1701,14 @@ export class Segments {
       for (const entry of this.candleLights) {
         entry.age += dt;
         if (!entry.root.isEnabled(true)) continue;
+        if (!entry.gameplayLight.lit) {
+          entry.root.rotation.z = 0;
+          entry.flame.visibility = 0;
+          entry.glow.visibility = 0;
+          entry.floorGlow.visibility = 0;
+          for (const spark of entry.sparks) spark.visibility = 0;
+          continue;
+        }
         const fade =
           entry.fadeInSeconds > 0
             ? Math.min(1, entry.age / entry.fadeInSeconds)
@@ -1704,7 +1806,7 @@ export class Segments {
       let weightedZ = 0;
 
       for (const entry of this.candleLights) {
-        if (!entry.root.isEnabled(true)) continue;
+        if (!entry.gameplayLight.lit || !entry.root.isEnabled(true)) continue;
         const position = entry.root.getAbsolutePosition();
         const entrySide = position.x < 0 ? -1 : 1;
         if (entrySide !== pool.side) continue;
@@ -1752,6 +1854,30 @@ export class Segments {
         pool.light.setEnabled(true);
       }
     }
+  }
+
+  private setCandleLitState(id: string, lit: boolean) {
+    const entry = this.candleLightsById.get(id);
+    if (
+      !entry ||
+      !entry.gameplayLight.extinguishable ||
+      entry.gameplayLight.lit === lit
+    ) {
+      return false;
+    }
+
+    entry.gameplayLight.lit = lit;
+    if (lit) {
+      entry.age = 0;
+      entry.flame.setEnabled(true);
+    } else {
+      entry.flame.visibility = 0;
+      entry.flame.setEnabled(false);
+      entry.glow.visibility = 0;
+      entry.floorGlow.visibility = 0;
+      for (const spark of entry.sparks) spark.visibility = 0;
+    }
+    return true;
   }
 
   peekInteractable(cameraOrLook: Camera | { origin: Vector3; direction: Vector3 }) {
@@ -2438,6 +2564,7 @@ export class Segments {
         flameHeight: diameter * BRAZIER_FIRE_HEIGHT_RATIO,
         floorGlowSize: Math.max(5.6, diameter * 3.4),
         floorGlowOffsetX: 0,
+        extinguishable: false,
       }
     );
 

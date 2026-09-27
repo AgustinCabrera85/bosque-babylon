@@ -13,9 +13,17 @@ export type FixedLightSample = {
   softInfluence: number;
 };
 
+export type ShadowGrabberCandleLight = {
+  id: string;
+  position: Vector3;
+  lit: boolean;
+  extinguishable: boolean;
+};
+
 /** Gameplay-only light field; it never scans or modifies Babylon scene lights. */
 export class ShadowGrabberLightQuery {
   private readonly fixedSafeLights: Vector3[];
+  private candleLights: readonly ShadowGrabberCandleLight[] = [];
   private readonly flashlightState: FlashlightGameplayState = {
     enabled: false,
     origin: Vector3.Zero(),
@@ -24,9 +32,15 @@ export class ShadowGrabberLightQuery {
 
   public constructor(
     safeLightPositions: readonly Vector3[],
+    private readonly getCandleLights: () => readonly ShadowGrabberCandleLight[],
+    private readonly extinguishCandleSource: (id: string) => boolean,
     private readonly getFlashlight: () => FlashlightGameplayState
   ) {
     this.fixedSafeLights = safeLightPositions.map((position) => position.clone());
+  }
+
+  public updateCandleLightState() {
+    this.candleLights = this.getCandleLights();
   }
 
   public updateFlashlightState() {
@@ -46,6 +60,15 @@ export class ShadowGrabberLightQuery {
       if (distanceSquared >= nearestDistanceSquared) continue;
       nearestDistanceSquared = distanceSquared;
       nearestPosition = light;
+    }
+    for (const light of this.candleLights) {
+      if (!light.lit) continue;
+      const dx = position.x - light.position.x;
+      const dz = position.z - light.position.z;
+      const distanceSquared = dx * dx + dz * dz;
+      if (distanceSquared >= nearestDistanceSquared) continue;
+      nearestDistanceSquared = distanceSquared;
+      nearestPosition = light.position;
     }
 
     if (!nearestPosition) {
@@ -106,7 +129,46 @@ export class ShadowGrabberLightQuery {
       nearestDistanceSquared = distanceSquared;
       nearest = light;
     }
+    for (const light of this.candleLights) {
+      if (!light.lit) continue;
+      const dx = position.x - light.position.x;
+      const dz = position.z - light.position.z;
+      const distanceSquared = dx * dx + dz * dz;
+      if (distanceSquared >= nearestDistanceSquared) continue;
+      nearestDistanceSquared = distanceSquared;
+      nearest = light.position;
+    }
     return nearest;
+  }
+
+  public getNearestExtinguishableLight(position: Vector3, maxDistance: number) {
+    let nearest: ShadowGrabberCandleLight | null = null;
+    let nearestDistanceSquared = Math.max(0, maxDistance) ** 2;
+    for (const light of this.candleLights) {
+      if (!light.lit || !light.extinguishable) continue;
+      const dx = position.x - light.position.x;
+      const dz = position.z - light.position.z;
+      const distanceSquared = dx * dx + dz * dz;
+      if (distanceSquared > nearestDistanceSquared) continue;
+      nearestDistanceSquared = distanceSquared;
+      nearest = light;
+    }
+    return nearest;
+  }
+
+  public getExtinguishableLight(id: string) {
+    return (
+      this.candleLights.find(
+        (light) => light.id === id && light.lit && light.extinguishable
+      ) ?? null
+    );
+  }
+
+  public extinguishCandle(id: string) {
+    const light = this.getExtinguishableLight(id);
+    if (!light || !this.extinguishCandleSource(id)) return false;
+    light.lit = false;
+    return true;
   }
 
   private static readonly scratchToEnemy = Vector3.Zero();

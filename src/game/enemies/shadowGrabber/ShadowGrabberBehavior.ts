@@ -11,6 +11,7 @@ export enum ShadowGrabberBehaviorState {
   Idle = "idle",
   Stalking = "stalking",
   Encircling = "encircling",
+  SeekingLight = "seeking-light",
   Telegraphing = "telegraphing",
   Attacking = "attacking",
   Grabbing = "grabbing",
@@ -59,6 +60,7 @@ export type ShadowGrabberBehaviorDebug = {
   lightExposure: number;
   fixedLightDistance: number;
   nearestFixedLight: Vector3 | null;
+  targetLightId: string | null;
   attackSlotOwner: string | null;
   lastAttackResult: "none" | "hit" | "miss" | "repelled";
 };
@@ -70,6 +72,7 @@ export type ShadowGrabberGameplayEvent =
   | "grab"
   | "hold"
   | "retract"
+  | "extinguishLight"
   | "lightRecoil";
 
 export type ShadowGrabberBehaviorOptions = {
@@ -137,6 +140,7 @@ export class ShadowGrabberBehavior {
   private readonly previousAttackPoint = Vector3.Zero();
   private readonly currentAttackPoint = Vector3.Zero();
   private readonly portalPosition = Vector3.Zero();
+  private readonly targetLightPosition = Vector3.Zero();
   private readonly firstCandidate = Vector3.Zero();
   private readonly secondCandidate = Vector3.Zero();
   private readonly bobPhase: number;
@@ -150,6 +154,8 @@ export class ShadowGrabberBehavior {
   private tacticalElapsed = 0;
   private attackCooldownRemaining = 0;
   private recoilCooldownRemaining = 0;
+  private candleRetargetCooldownRemaining = 0;
+  private targetLightId: string | null = null;
   private lightExposure = 0;
   private darknessExposureTime = 0;
   private playerInHardLight = false;
@@ -206,11 +212,16 @@ export class ShadowGrabberBehavior {
     this.tacticalElapsed += dt;
     this.attackCooldownRemaining = Math.max(0, this.attackCooldownRemaining - dt);
     this.recoilCooldownRemaining = Math.max(0, this.recoilCooldownRemaining - dt);
+    this.candleRetargetCooldownRemaining = Math.max(
+      0,
+      this.candleRetargetCooldownRemaining - dt
+    );
     this.lastPlayerDistance = planarDistance(this.controller.root.position, target.position);
 
     this.updateDarknessPressure(dt, target);
     this.updateActivation(dt, target);
     this.updateLightResponse(dt, target);
+    this.tryBeginCandleHunt(target);
 
     switch (this.stateValue) {
       case ShadowGrabberBehaviorState.Idle:
@@ -225,6 +236,9 @@ export class ShadowGrabberBehavior {
         this.updateTacticalMovement(dt, target);
         this.controller.turnToward(target.groundPosition, config.turnSpeed * dt);
         this.tryBeginAttack(target);
+        break;
+      case ShadowGrabberBehaviorState.SeekingLight:
+        this.updateCandleHunt(dt, target);
         break;
       case ShadowGrabberBehaviorState.Telegraphing:
         this.decelerate(dt);
@@ -337,6 +351,7 @@ export class ShadowGrabberBehavior {
       nearestFixedLight: this.hasFixedLightPosition
         ? this.lastFixedLightPosition.clone()
         : null,
+      targetLightId: this.targetLightId,
       attackSlotOwner: this.options.coordinator.getAttackOwner(this.options.groupId),
       lastAttackResult: this.lastAttackResult,
     };
@@ -440,6 +455,77 @@ export class ShadowGrabberBehavior {
       );
       this.transition(ShadowGrabberBehaviorState.LightRepelled);
     }
+  }
+
+  private tryBeginCandleHunt(target: ShadowGrabberTargetSnapshot) {
+    const config = this.controller.config;
+    if (
+      !this.active ||
+      this.targetLightId ||
+      this.candleRetargetCooldownRemaining > 0 ||
+      this.isCommittedToAttack() ||
+      this.stateValue === ShadowGrabberBehaviorState.LightRepelled ||
+      (this.lastPlayerDistance <= config.attackRange && !this.playerInHardLight)
+    ) {
+      return;
+    }
+
+    const light = this.options.lightQuery.getNearestExtinguishableLight(
+      this.controller.root.position,
+      config.candleSearchRange
+    );
+    if (!light) return;
+    if (planarDistance(light.position, this.anchor) > config.maxDistanceFromAnchor) return;
+
+    this.targetLightId = light.id;
+    this.targetLightPosition.copyFrom(light.position);
+    this.tacticalTarget.copyFrom(light.position);
+    this.transition(ShadowGrabberBehaviorState.SeekingLight);
+  }
+
+  private updateCandleHunt(dt: number, target: ShadowGrabberTargetSnapshot) {
+    const light = this.targetLightId
+      ? this.options.lightQuery.getExtinguishableLight(this.targetLightId)
+      : null;
+    if (!light) {
+      this.finishCandleHunt(0.65);
+      return;
+    }
+
+    const config = this.controller.config;
+    this.targetLightPosition.copyFrom(light.position);
+    this.tacticalTarget.copyFrom(light.position);
+    this.controller.turnToward(this.targetLightPosition, config.turnSpeed * dt);
+
+    if (
+      planarDistance(this.controller.root.position, this.targetLightPosition) <=
+      config.candleExtinguishRadius
+    ) {
+      this.decelerate(dt);
+      const extinguished = this.options.lightQuery.extinguishCandle(light.id);
+      if (extinguished) this.options.onEvent?.(this.controller.id, "extinguishLight");
+      this.finishCandleHunt(config.candleRetargetCooldown);
+      return;
+    }
+
+    this.moveToward(
+      this.targetLightPosition,
+      config.candleApproachSpeed,
+      dt,
+      target.sanity,
+      true,
+      true
+    );
+  }
+
+  private finishCandleHunt(cooldown: number) {
+    this.targetLightId = null;
+    this.candleRetargetCooldownRemaining = Math.max(
+      this.candleRetargetCooldownRemaining,
+      cooldown
+    );
+    if (this.active) this.transitionToRoleMovement();
+    else this.transition(ShadowGrabberBehaviorState.ReturningToAnchor);
   }
 
   private updateTacticalMovement(
@@ -834,7 +920,8 @@ export class ShadowGrabberBehavior {
     speed: number,
     dt: number,
     sanity: number,
-    applyFlashlightSlow = true
+    applyFlashlightSlow = true,
+    ignoreFixedLight = false
   ) {
     const config = this.controller.config;
     let dx = target.x - this.controller.root.position.x;
@@ -855,7 +942,7 @@ export class ShadowGrabberBehavior {
     );
     this.lastFixedLightDistance = fixedLight.distance;
     this.rememberFixedLight(fixedLight.nearestPosition);
-    speedFactor *= 1 - fixedLight.softInfluence * 0.42;
+    if (!ignoreFixedLight) speedFactor *= 1 - fixedLight.softInfluence * 0.42;
     if (applyFlashlightSlow) {
       const flashlight = this.options.lightQuery.sampleFlashlight(
         this.controller.root.position,
@@ -921,7 +1008,7 @@ export class ShadowGrabberBehavior {
       config.hardLightAvoidanceRadius,
       config.softLightAvoidanceRadius
     );
-    if (nextLight.hardAvoidance && nextLight.nearestPosition) {
+    if (!ignoreFixedLight && nextLight.hardAvoidance && nextLight.nearestPosition) {
       const light = nextLight.nearestPosition;
       let normalX = this.controller.root.position.x - light.x;
       let normalZ = this.controller.root.position.z - light.z;
@@ -1017,6 +1104,12 @@ export class ShadowGrabberBehavior {
 
   private transition(next: ShadowGrabberBehaviorState) {
     if (this.stateValue === next) return;
+    if (
+      this.stateValue === ShadowGrabberBehaviorState.SeekingLight &&
+      next !== ShadowGrabberBehaviorState.SeekingLight
+    ) {
+      this.targetLightId = null;
+    }
     this.stateValue = next;
     this.stateElapsed = 0;
     switch (next) {
@@ -1061,7 +1154,8 @@ export class ShadowGrabberBehavior {
         this.controller.setState(ShadowGrabberState.Idle);
         this.controller.setFxState(
           next === ShadowGrabberBehaviorState.Stalking ||
-            next === ShadowGrabberBehaviorState.Encircling
+            next === ShadowGrabberBehaviorState.Encircling ||
+            next === ShadowGrabberBehaviorState.SeekingLight
             ? "hunt"
             : "idle"
         );

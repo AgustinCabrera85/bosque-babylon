@@ -11,7 +11,10 @@ import {
 import { ShadowGrabberCoordinator } from "./ShadowGrabberCoordinator";
 import type { ShadowGrabberController } from "./ShadowGrabberController";
 import { ShadowGrabberLightQuery } from "./ShadowGrabberLightQuery";
-import type { FlashlightGameplayState } from "./ShadowGrabberLightQuery";
+import type {
+  FlashlightGameplayState,
+  ShadowGrabberCandleLight,
+} from "./ShadowGrabberLightQuery";
 import { ShadowGrabberDebugView } from "./ShadowGrabberDebugView";
 
 export type ShadowGrabberPlayerSource = {
@@ -33,6 +36,8 @@ export type ShadowGrabberBehaviorSystemOptions = {
   player: ShadowGrabberPlayerSource;
   navigation: ShadowGrabberNavigation;
   fixedSafeLightPositions: readonly Vector3[];
+  getCandleLights: () => readonly ShadowGrabberCandleLight[];
+  extinguishCandle: (id: string) => boolean;
   getFlashlight: () => FlashlightGameplayState;
   onEvent?: (id: string, event: ShadowGrabberGameplayEvent) => void;
   debug?: {
@@ -65,6 +70,8 @@ export class ShadowGrabberBehaviorSystem {
     this.coordinator = new ShadowGrabberCoordinator();
     this.lightQuery = new ShadowGrabberLightQuery(
       options.fixedSafeLightPositions,
+      options.getCandleLights,
+      options.extinguishCandle,
       options.getFlashlight
     );
   }
@@ -105,6 +112,7 @@ export class ShadowGrabberBehaviorSystem {
     const dt = Math.max(0, Math.min(deltaTimeSeconds, 0.1));
     if (dt <= 0) return;
     this.updatePlayerSnapshot(dt);
+    this.lightQuery.updateCandleLightState();
     this.lightQuery.updateFlashlightState();
     this.coordinator.update(dt);
     for (const [id, behavior] of this.behaviors) {

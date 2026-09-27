@@ -31,8 +31,11 @@ type InteractableMetadata = {
 
 const INTERACTION_RAY_LENGTH = 4.25;
 const INTERACTION_PROXIMITY_VERTICAL_TOLERANCE = 2.2;
+const INTERACTION_MESSAGE_DURATION_SECONDS = 2.4;
 
 export class InteractSystem {
+  private messageSecondsRemaining = 0;
+
   constructor(
     private scene: Scene,
     private input: InputManager,
@@ -41,9 +44,22 @@ export class InteractSystem {
     private onAction?: (type?: string, movementLockSeconds?: number) => void
   ) {}
 
-  update() {
+  update(deltaSeconds: number) {
+    this.messageSecondsRemaining = Math.max(
+      0,
+      this.messageSecondsRemaining - Math.max(0, deltaSeconds)
+    );
     if (this.input.wasPressed("interact")) this.tryInteract();
-    if (this.input.wasPressed("cancel")) this.hints.set(null);
+    if (this.input.wasPressed("cancel")) this.clearMessage();
+  }
+
+  isMessageActive() {
+    return this.messageSecondsRemaining > 0;
+  }
+
+  clearMessage() {
+    this.messageSecondsRemaining = 0;
+    this.hints.set(null);
   }
 
   peekInteractable() {
@@ -69,26 +85,31 @@ export class InteractSystem {
     if (!suppressAction) this.onAction?.(actionType, movementLockSeconds);
 
     if (customMessage) {
-      this.hints.set(customMessage);
+      this.showMessage(customMessage);
       return;
     }
 
     if (data?.type === "clue") {
-      this.hints.set(`Pista: ${data.title ?? data.id}`);
+      this.showMessage(`Pista: ${data.title ?? data.id}`);
       return;
     }
 
     if (data?.type === "door") {
       const locked = !!data.locked;
       if (locked) {
-        this.hints.set("La puerta esta cerrada. Falta una llave...");
+        this.showMessage("La puerta esta cerrada. Falta una llave...");
       } else {
-        this.hints.set("Abris la puerta (demo).");
+        this.showMessage("Abris la puerta (demo).");
       }
       return;
     }
 
-    this.hints.set(`Interaccion: ${data?.type ?? "objeto"}`);
+    this.showMessage(`Interaccion: ${data?.type ?? "objeto"}`);
+  }
+
+  private showMessage(message: string) {
+    this.messageSecondsRemaining = INTERACTION_MESSAGE_DURATION_SECONDS;
+    this.hints.set(message);
   }
 
   private findInteractable(look: LookRay) {

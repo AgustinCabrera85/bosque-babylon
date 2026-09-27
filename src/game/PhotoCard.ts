@@ -15,6 +15,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 
 import { asset } from "../utils/asset";
 import { createItemLensFlare } from "./CollectibleEffects";
+import { getInventoryPickupMessage } from "./InventoryMessages";
 
 export type PhotoCardBounds = {
   min: Vector3;
@@ -32,7 +33,6 @@ export type PhotoCardConfig = {
   fallbackHouseFraction: { x: number; z: number };
   rotationY: number;
   interactionSize: { width: number; height: number; depth: number };
-  pickupMessage: string;
   movementLockSeconds: number;
   inspectionDelaySeconds: number;
   pulseSize: number;
@@ -57,7 +57,6 @@ const DEFAULT_PHOTO_CARD_CONFIG: PhotoCardConfig = {
   fallbackHouseFraction: { x: 0.43, z: 0.5 },
   rotationY: Math.PI * -0.14,
   interactionSize: { width: 1.85, height: 0.85, depth: 1.85 },
-  pickupMessage: "Recogiste la foto.",
   movementLockSeconds: 1.05,
   inspectionDelaySeconds: 0.85,
   pulseSize: 1.28,
@@ -164,7 +163,7 @@ export async function createPhotoCard(
       }, config.inspectionDelaySeconds * 1000);
 
       return {
-        message: config.pickupMessage,
+        message: getInventoryPickupMessage(inventoryItem),
         actionType: "photo",
         movementLockSeconds: config.movementLockSeconds,
       };

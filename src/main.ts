@@ -3,6 +3,7 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import { createScene, desktopQuality, mobileQuality } from "./game/createScene";
 import { setupMusicPlayer } from "./game/MusicPlayer";
 import { setupPauseMenu } from "./game/PauseMenu";
+import { readStoredResolutionMode, resolveHardwareScalingLevel } from "./game/PauseVideo";
 import { setupItemInspector } from "./game/ItemInspector";
 import { setupInventory } from "./game/Inventory";
 import { setupCharacterSelection } from "./game/CharacterSelection";
@@ -94,10 +95,14 @@ function shouldUseMobileQuality() {
 }
 
 const quality = shouldUseMobileQuality() ? mobileQuality : desktopQuality;
-const hardwareScaling = quality.name === "mobile"
+const automaticHardwareScaling = quality.name === "mobile"
   ? ((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8) <= 4 ? 2.25 : 1.8
   // 80% per axis retains the vintage image while cutting full-screen work by 36%.
   : 1.25;
+const hardwareScaling = resolveHardwareScalingLevel(
+  readStoredResolutionMode(),
+  automaticHardwareScaling
+);
 
 const engine = new Engine(renderCanvas, quality.name === "desktop", {
   preserveDrawingBuffer: false,
@@ -113,7 +118,12 @@ async function start() {
   document.body.classList.remove("character-selecting");
   showLoading();
   const input = new InputManager(renderCanvas);
-  const pauseMenu = setupPauseMenu({ canvas: renderCanvas, input });
+  const pauseMenu = setupPauseMenu({
+    canvas: renderCanvas,
+    engine,
+    automaticHardwareScaling,
+    input,
+  });
   const itemInspector = setupItemInspector();
   const inventory = setupInventory({ inspectItem: itemInspector.inspect });
 

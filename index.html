@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>Bosque Babylon</title>
   </head>
   <body class="character-selecting">
@@ -184,14 +184,24 @@
             <p class="pause-sidebar-title">Opciones</p>
             <div class="pause-tabs" role="tablist" aria-label="Secciones del menú de pausa">
               <button
-                id="pauseSettingsTab"
+                id="pauseAudioTab"
                 class="pause-tab selected"
                 type="button"
                 role="tab"
                 aria-selected="true"
-                aria-controls="pauseSettingsPanel"
-                data-pause-tab="settings"
-              >Ajustes</button>
+                aria-controls="pauseAudioPanel"
+                data-pause-tab="audio"
+              >Audio</button>
+              <button
+                id="pauseVideoTab"
+                class="pause-tab"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="pauseVideoPanel"
+                data-pause-tab="video"
+                tabindex="-1"
+              >Video</button>
               <button
                 id="pauseControlsTab"
                 class="pause-tab"
@@ -206,7 +216,7 @@
 
             <div class="menu-actions">
               <button class="menu-button" id="saveButton" type="button">Guardar</button>
-              <button class="menu-button secondary" id="exitButton" type="button">Salir</button>
+              <button class="menu-button secondary" id="exitButton" type="button">Continuar</button>
             </div>
 
             <div id="pauseStatus" class="pause-status" aria-live="polite"></div>
@@ -214,8 +224,8 @@
 
           <main class="pause-content">
 
-        <div id="pauseSettingsPanel" class="pause-tab-panel" role="tabpanel" aria-labelledby="pauseSettingsTab">
-          <div class="settings-grid">
+        <div id="pauseAudioPanel" class="pause-tab-panel audio-panel" role="tabpanel" aria-labelledby="pauseAudioTab">
+          <div class="settings-grid settings-grid-single">
             <section class="settings-section" aria-labelledby="audioSettingsTitle">
               <h2 id="audioSettingsTitle" class="section-title">Audio</h2>
               <div class="settings">
@@ -238,9 +248,60 @@
                 </div>
               </div>
             </section>
+          </div>
+        </div>
 
-            <section class="settings-section" aria-labelledby="videoSettingsTitle">
-              <h2 id="videoSettingsTitle" class="section-title">Video</h2>
+        <div id="pauseVideoPanel" class="pause-tab-panel video-panel" role="tabpanel" aria-labelledby="pauseVideoTab" hidden>
+          <section class="video-settings-card" aria-labelledby="videoSettingsTitle">
+            <header class="video-settings-header">
+              <div>
+                <h2 id="videoSettingsTitle" class="section-title">Video</h2>
+                <p class="video-settings-copy">Ajusta la nitidez y el modo de visualización.</p>
+              </div>
+              <span id="resolutionValue" class="video-resolution-value">Automática</span>
+            </header>
+
+            <div class="video-setting-block">
+              <div class="video-setting-heading">
+                <strong>Resolución interna</strong>
+                <small>Una resolución menor mejora el rendimiento sin cambiar el tamaño de la interfaz.</small>
+              </div>
+              <div class="resolution-options" role="radiogroup" aria-label="Resolución interna">
+                <button class="resolution-option selected" type="button" role="radio" aria-checked="true" data-resolution-mode="auto">
+                  <strong>Auto</strong>
+                  <small>Recomendada</small>
+                </button>
+                <button class="resolution-option" type="button" role="radio" aria-checked="false" data-resolution-mode="100" tabindex="-1">
+                  <strong>100%</strong>
+                  <small>Nítida</small>
+                </button>
+                <button class="resolution-option" type="button" role="radio" aria-checked="false" data-resolution-mode="80" tabindex="-1">
+                  <strong>80%</strong>
+                  <small>Equilibrada</small>
+                </button>
+                <button class="resolution-option" type="button" role="radio" aria-checked="false" data-resolution-mode="67" tabindex="-1">
+                  <strong>67%</strong>
+                  <small>Rendimiento</small>
+                </button>
+                <button class="resolution-option" type="button" role="radio" aria-checked="false" data-resolution-mode="50" tabindex="-1">
+                  <strong>50%</strong>
+                  <small>Máximo rendimiento</small>
+                </button>
+              </div>
+            </div>
+
+            <div class="video-toggle-list">
+              <label class="toggle-row video-toggle-row" for="fullscreenToggle">
+                <span class="video-toggle-copy">
+                  <span class="setting-label">Pantalla completa</span>
+                  <small id="fullscreenHint">El HUD y el menú permanecen visibles. Pulsa Esc para salir.</small>
+                </span>
+                <input id="fullscreenToggle" type="checkbox" />
+                <span class="toggle-track" aria-hidden="true">
+                  <span class="toggle-thumb"></span>
+                </span>
+              </label>
+
               <label class="toggle-row" for="postProcessingToggle">
                 <span class="setting-label">Filtro VHS</span>
                 <input id="postProcessingToggle" type="checkbox" checked />
@@ -248,8 +309,8 @@
                   <span class="toggle-thumb"></span>
                 </span>
               </label>
-            </section>
-          </div>
+            </div>
+          </section>
         </div>
 
         <div id="pauseControlsPanel" class="pause-tab-panel controls-panel" role="tabpanel" aria-labelledby="pauseControlsTab" hidden>

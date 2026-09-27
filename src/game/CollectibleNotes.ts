@@ -10,6 +10,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 
 import { asset } from "../utils/asset";
 import { createItemLensFlare } from "./CollectibleEffects";
+import { getInventoryPickupMessage } from "./InventoryMessages";
 
 export type CollectibleNoteConfig = {
   id: string;
@@ -23,7 +24,6 @@ export type CollectibleNoteConfig = {
   height?: number;
   floatHeight?: number;
   faceCamera?: boolean;
-  pickupMessage?: string;
   inspectionDelaySeconds?: number;
 };
 
@@ -110,7 +110,7 @@ export function createCollectibleNote(scene: Scene, config: CollectibleNoteConfi
       }, (config.inspectionDelaySeconds ?? 0.75) * 1000);
 
       return {
-        message: config.pickupMessage ?? "Recogiste una nota.",
+        message: getInventoryPickupMessage(inventoryItem),
         actionType: "note",
         movementLockSeconds: 1.05,
       };

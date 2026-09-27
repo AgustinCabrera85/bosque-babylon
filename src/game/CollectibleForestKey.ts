@@ -8,6 +8,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { asset } from "../utils/asset";
 import type { InspectableItem } from "./ItemInspector";
 import { createItemLensFlare } from "./CollectibleEffects";
+import { getInventoryPickupMessage } from "./InventoryMessages";
 
 export const FOREST_KEY_ITEM_ID = "forest-key";
 export const FOREST_KEY_MODEL_ROOT = "assets/models/props/";
@@ -120,7 +121,7 @@ export async function createCollectibleForestKey(
       );
 
       return {
-        message: "Recogiste la Llave del bosque.",
+        message: getInventoryPickupMessage(FOREST_KEY_INVENTORY_ITEM),
         actionType: "key",
         movementLockSeconds: 0.65,
       };

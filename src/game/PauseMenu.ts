@@ -1,8 +1,12 @@
 import { setupPauseControls } from "./PauseControls";
+import { setupPauseVideo } from "./PauseVideo";
+import type { Engine } from "@babylonjs/core/Engines/engine";
 import type { InputManager } from "./input/InputManager";
 
 type PauseMenuOptions = {
   canvas: HTMLCanvasElement;
+  engine: Engine;
+  automaticHardwareScaling: number;
   input: InputManager;
 };
 
@@ -13,19 +17,30 @@ export type PauseMenuHandle = {
   dispose: () => void;
 };
 
-type PauseTab = "settings" | "controls";
+type PauseTab = "audio" | "video" | "controls";
 
-export function setupPauseMenu({ canvas, input }: PauseMenuOptions): PauseMenuHandle {
+function isPauseTab(value: string | undefined): value is PauseTab {
+  return value === "audio" || value === "video" || value === "controls";
+}
+
+export function setupPauseMenu({
+  canvas,
+  engine,
+  automaticHardwareScaling,
+  input,
+}: PauseMenuOptions): PauseMenuHandle {
   const menu = document.getElementById("pauseMenu");
   const pauseButton = document.getElementById("pauseButton") as HTMLButtonElement | null;
   const saveButton = document.getElementById("saveButton") as HTMLButtonElement | null;
   const exitButton = document.getElementById("exitButton") as HTMLButtonElement | null;
   const pauseStatus = document.getElementById("pauseStatus");
+  const pauseContent = menu?.querySelector<HTMLElement>(".pause-content");
   const tabButtons = Array.from(
     document.querySelectorAll<HTMLButtonElement>("[data-pause-tab]")
   );
   const tabPanels: Record<PauseTab, HTMLElement | null> = {
-    settings: document.getElementById("pauseSettingsPanel"),
+    audio: document.getElementById("pauseAudioPanel"),
+    video: document.getElementById("pauseVideoPanel"),
     controls: document.getElementById("pauseControlsPanel"),
   };
 
@@ -54,6 +69,12 @@ export function setupPauseMenu({ canvas, input }: PauseMenuOptions): PauseMenuHa
     signal,
     onModeChanged: setStatus,
   });
+  const video = setupPauseVideo({
+    engine,
+    automaticHardwareScaling,
+    signal,
+    onChanged: setStatus,
+  });
 
   const setActiveTab = (tab: PauseTab, focus = false) => {
     for (const button of tabButtons) {
@@ -63,8 +84,11 @@ export function setupPauseMenu({ canvas, input }: PauseMenuOptions): PauseMenuHa
       button.tabIndex = selected ? 0 : -1;
       if (selected && focus) button.focus();
     }
-    tabPanels.settings?.toggleAttribute("hidden", tab !== "settings");
-    tabPanels.controls?.toggleAttribute("hidden", tab !== "controls");
+    for (const [panelTab, panel] of Object.entries(tabPanels) as [PauseTab, HTMLElement | null][]) {
+      panel?.toggleAttribute("hidden", panelTab !== tab);
+    }
+    pauseContent?.scrollTo({ top: 0 });
+    if (tab === "video") video.refresh();
     if (tab === "controls") controls.refresh();
   };
 
@@ -73,7 +97,11 @@ export function setupPauseMenu({ canvas, input }: PauseMenuOptions): PauseMenuHa
     menu?.setAttribute("aria-hidden", String(!paused));
     pauseButton?.classList.toggle("paused", paused);
     pauseButton?.setAttribute("aria-pressed", String(paused));
-    if (paused) controls.refresh();
+    if (paused) {
+      pauseContent?.scrollTo({ top: 0 });
+      controls.refresh();
+      video.refresh();
+    }
   };
 
   const setPaused = (next: boolean) => {
@@ -114,15 +142,22 @@ export function setupPauseMenu({ canvas, input }: PauseMenuOptions): PauseMenuHa
   for (const button of tabButtons) {
     button.addEventListener("click", () => {
       const tab = button.dataset.pauseTab;
-      if (tab === "settings" || tab === "controls") setActiveTab(tab);
+      if (isPauseTab(tab)) setActiveTab(tab);
     }, { signal });
     button.addEventListener("keydown", (event) => {
-      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
-      const nextTab: PauseTab = event.key === "ArrowLeft" || event.key === "Home"
-        ? "settings"
-        : "controls";
-      setActiveTab(nextTab, true);
+      const currentIndex = tabButtons.indexOf(button);
+      const lastIndex = tabButtons.length - 1;
+      const nextIndex = event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? lastIndex
+          : event.key === "ArrowLeft" || event.key === "ArrowUp"
+            ? (currentIndex - 1 + tabButtons.length) % tabButtons.length
+            : (currentIndex + 1) % tabButtons.length;
+      const nextTab = tabButtons[nextIndex]?.dataset.pauseTab;
+      if (isPauseTab(nextTab)) setActiveTab(nextTab, true);
     }, { signal });
   }
 
@@ -155,7 +190,7 @@ export function setupPauseMenu({ canvas, input }: PauseMenuOptions): PauseMenuHa
     wasPointerLocked = locked;
   }, { signal });
 
-  setActiveTab("settings");
+  setActiveTab("audio");
   render();
 
   return {

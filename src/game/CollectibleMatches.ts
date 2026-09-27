@@ -11,6 +11,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { asset } from "../utils/asset";
 import type { InspectableItem } from "./ItemInspector";
 import { createItemLensFlare } from "./CollectibleEffects";
+import { getInventoryPickupMessage } from "./InventoryMessages";
 
 export const MATCHES_ITEM_ID = "matches";
 export const MATCHBOX_MATCH_COUNT = 25;
@@ -126,7 +127,7 @@ export function createCollectibleMatchbox(
       );
 
       return {
-        message: `Recogiste una caja con ${MATCHBOX_MATCH_COUNT} fósforos.`,
+        message: getInventoryPickupMessage(MATCHES_INVENTORY_ITEM),
         actionType: "matches",
         movementLockSeconds: 0.65,
       };

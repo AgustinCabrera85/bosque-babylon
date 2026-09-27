@@ -1042,7 +1042,7 @@ scene.onBeforeRenderObservable.add(() => {
 
     worldObjectInspectionActive = true;
     attackSystem.cancelCharge();
-    hints.set(null);
+    interactSystem.clearMessage();
 
     const inspectionTarget = request.target.clone();
     const inspectionCameraPosition = player.position.clone();
@@ -1430,7 +1430,7 @@ scene.onBeforeRenderObservable.add(() => {
     if (input.wasPressed("toggleFlashlight")) {
       setFlashlightEnabled(!flashlightEnabled);
     }
-    interactSystem.update();
+    interactSystem.update(dt);
     houseArrivalCinematic.update(dt);
     // During the reveal, upload the already-preassembled final streaming window
     // before the player crosses the boundary that used to expose the hitch.
@@ -1480,10 +1480,12 @@ scene.onBeforeRenderObservable.add(() => {
       }
     }
 
-    const looking = worldObjectInspectionActive
-      ? null
-      : interactSystem.peekInteractable();
-    hints.set(looking ? "E: interactuar" : null);
+    if (!interactSystem.isMessageActive()) {
+      const looking = worldObjectInspectionActive
+        ? null
+        : interactSystem.peekInteractable();
+      hints.set(looking ? "E: interactuar" : null);
+    }
   });
 
   // Hold the player and the elevated opening camera before the first frame that

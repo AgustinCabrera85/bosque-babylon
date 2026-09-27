@@ -113,7 +113,7 @@ async function start() {
   document.body.classList.remove("character-selecting");
   showLoading();
   const input = new InputManager(renderCanvas);
-  const pauseMenu = setupPauseMenu({ canvas: renderCanvas });
+  const pauseMenu = setupPauseMenu({ canvas: renderCanvas, input });
   const itemInspector = setupItemInspector();
   const inventory = setupInventory({ inspectItem: itemInspector.inspect });
 

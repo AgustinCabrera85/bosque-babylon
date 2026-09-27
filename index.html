@@ -179,48 +179,129 @@
           <h1 id="pauseTitle" class="menu-title">Pausa</h1>
         </header>
 
-        <div class="settings-grid">
-          <section class="settings-section" aria-labelledby="audioSettingsTitle">
-            <h2 id="audioSettingsTitle" class="section-title">Audio</h2>
-            <div class="settings">
-              <div class="setting-row">
-                <label class="setting-label" for="musicVolume">Musica</label>
-                <input id="musicVolume" type="range" min="0" max="100" step="1" value="70" />
-                <span class="value" id="musicValue">70%</span>
-              </div>
+        <div class="pause-menu-layout">
+          <aside class="pause-sidebar" aria-label="Opciones de pausa">
+            <p class="pause-sidebar-title">Opciones</p>
+            <div class="pause-tabs" role="tablist" aria-label="Secciones del menú de pausa">
+              <button
+                id="pauseSettingsTab"
+                class="pause-tab selected"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="pauseSettingsPanel"
+                data-pause-tab="settings"
+              >Ajustes</button>
+              <button
+                id="pauseControlsTab"
+                class="pause-tab"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="pauseControlsPanel"
+                data-pause-tab="controls"
+                tabindex="-1"
+              >Controles</button>
+            </div>
 
-              <div class="setting-row">
-                <label class="setting-label" for="ambientVolume">Ambiente</label>
-                <input id="ambientVolume" type="range" min="0" max="100" step="1" value="85" />
-                <span class="value" id="ambientValue">85%</span>
-              </div>
+            <div class="menu-actions">
+              <button class="menu-button" id="saveButton" type="button">Guardar</button>
+              <button class="menu-button secondary" id="exitButton" type="button">Salir</button>
+            </div>
 
-              <div class="setting-row">
-                <label class="setting-label" for="sfxVolume">SFX</label>
-                <input id="sfxVolume" type="range" min="0" max="100" step="1" value="80" />
-                <span class="value" id="sfxValue">80%</span>
+            <div id="pauseStatus" class="pause-status" aria-live="polite"></div>
+          </aside>
+
+          <main class="pause-content">
+
+        <div id="pauseSettingsPanel" class="pause-tab-panel" role="tabpanel" aria-labelledby="pauseSettingsTab">
+          <div class="settings-grid">
+            <section class="settings-section" aria-labelledby="audioSettingsTitle">
+              <h2 id="audioSettingsTitle" class="section-title">Audio</h2>
+              <div class="settings">
+                <div class="setting-row">
+                  <label class="setting-label" for="musicVolume">Musica</label>
+                  <input id="musicVolume" type="range" min="0" max="100" step="1" value="70" />
+                  <span class="value" id="musicValue">70%</span>
+                </div>
+
+                <div class="setting-row">
+                  <label class="setting-label" for="ambientVolume">Ambiente</label>
+                  <input id="ambientVolume" type="range" min="0" max="100" step="1" value="85" />
+                  <span class="value" id="ambientValue">85%</span>
+                </div>
+
+                <div class="setting-row">
+                  <label class="setting-label" for="sfxVolume">SFX</label>
+                  <input id="sfxVolume" type="range" min="0" max="100" step="1" value="80" />
+                  <span class="value" id="sfxValue">80%</span>
+                </div>
               </div>
+            </section>
+
+            <section class="settings-section" aria-labelledby="videoSettingsTitle">
+              <h2 id="videoSettingsTitle" class="section-title">Video</h2>
+              <label class="toggle-row" for="postProcessingToggle">
+                <span class="setting-label">Filtro VHS</span>
+                <input id="postProcessingToggle" type="checkbox" checked />
+                <span class="toggle-track" aria-hidden="true">
+                  <span class="toggle-thumb"></span>
+                </span>
+              </label>
+            </section>
+          </div>
+        </div>
+
+        <div id="pauseControlsPanel" class="pause-tab-panel controls-panel" role="tabpanel" aria-labelledby="pauseControlsTab" hidden>
+          <section class="control-selection" aria-labelledby="controlSelectionTitle">
+            <div class="control-section-heading">
+              <div>
+                <h2 id="controlSelectionTitle" class="section-title">Tipo de control</h2>
+                <p id="controlSelectionHint" class="control-section-copy">Elige el dispositivo que controlará el juego.</p>
+              </div>
+              <span id="controlModeState" class="control-mode-state">Selección automática</span>
+            </div>
+
+            <div class="control-device-options" role="group" aria-label="Tipo de control">
+              <button class="control-device-card" type="button" data-control-mode="keyboardMouse" aria-pressed="false">
+                <span class="control-device-glyph keyboard-glyph" aria-hidden="true">WASD</span>
+                <span class="control-device-copy">
+                  <strong>Teclado y ratón</strong>
+                  <small>Movimiento digital y cámara con el ratón.</small>
+                </span>
+                <span class="control-device-marker" aria-hidden="true"></span>
+              </button>
+
+              <button class="control-device-card" type="button" data-control-mode="gamepad" aria-pressed="false">
+                <span class="control-device-glyph gamepad-glyph" aria-hidden="true">ABXY</span>
+                <span class="control-device-copy">
+                  <strong>Gamepad</strong>
+                  <small>Sticks analógicos y distribución detectada.</small>
+                </span>
+                <span class="control-device-marker" aria-hidden="true"></span>
+              </button>
             </div>
           </section>
 
-          <section class="settings-section" aria-labelledby="videoSettingsTitle">
-            <h2 id="videoSettingsTitle" class="section-title">Video</h2>
-            <label class="toggle-row" for="postProcessingToggle">
-              <span class="setting-label">Filtro VHS</span>
-              <input id="postProcessingToggle" type="checkbox" checked />
-              <span class="toggle-track" aria-hidden="true">
-                <span class="toggle-thumb"></span>
-              </span>
-            </label>
+          <section id="gamepadConnection" class="gamepad-connection" aria-live="polite">
+            <span id="gamepadConnectionDot" class="gamepad-connection-dot" aria-hidden="true"></span>
+            <span class="gamepad-connection-copy">
+              <strong id="gamepadName">Buscando gamepad...</strong>
+              <small id="gamepadDetails">Conecta un mando y pulsa cualquier botón.</small>
+            </span>
+          </section>
+
+          <section class="control-mapping-card" aria-labelledby="controlMappingTitle">
+            <header class="control-mapping-header">
+              <h2 id="controlMappingTitle" class="section-title">Distribución</h2>
+              <span id="controlMappingDevice" class="control-mapping-device"></span>
+            </header>
+            <div id="controlMappingList" class="control-mapping-list"></div>
           </section>
         </div>
 
-        <div class="menu-actions">
-          <button class="menu-button" id="saveButton" type="button">Guardar</button>
-          <button class="menu-button secondary" id="exitButton" type="button">Salir</button>
+          </main>
         </div>
-
-        <div id="pauseStatus" class="pause-status" aria-live="polite"></div>
       </section>
     </div>
 

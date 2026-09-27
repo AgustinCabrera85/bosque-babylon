@@ -33,8 +33,8 @@ export type CollectibleMatchboxConfig = {
   rotationY?: number;
 };
 
-const MATCHBOX_WORLD_SIZE = 0.82;
-const MATCHBOX_FLOAT_HEIGHT = 0.43;
+const MATCHBOX_WORLD_SIZE = 0.28;
+const MATCHBOX_FLOAT_HEIGHT = 0.24;
 const MATCHBOX_PICKER_SIZE = { width: 1.55, height: 1.1, depth: 1.55 };
 
 export function createCollectibleMatchbox(
@@ -83,9 +83,9 @@ export function createCollectibleMatchbox(
     "matchboxCollectibleFlare",
     config.position,
     {
-      size: 0.34,
-      height: 0.44,
-      intensity: 0.95,
+      size: 0.27,
+      height: 0.28,
+      intensity: 0.82,
     }
   );
 

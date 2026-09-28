@@ -18,6 +18,7 @@ import {
   HERMANO_MAYOR_NECK_GRAB_ACTION,
   HermanoMayorNeckGrabAction,
   type HermanoMayorNeckGrabPoseState,
+  type HermanoMayorNeckTargetProvider,
 } from "./HermanoMayorNeckGrabAction";
 import { patchHermanoMayorMaterial } from "./HermanoMayorMaterials";
 
@@ -45,6 +46,7 @@ export type HermanoMayorHandle = {
     options?: HermanoMayorPlayOptions
   ): void;
   setLookTargetProvider(provider: HermanoMayorLookTargetProvider | null): void;
+  setNeckGrabTargetProvider(provider: HermanoMayorNeckTargetProvider | null): void;
   setNeckGrabPose(state: HermanoMayorNeckGrabPoseState | null): void;
   getNeckGrabDebugSnapshot(): ReturnType<
     HermanoMayorNeckGrabAction["getDebugSnapshot"]
@@ -136,6 +138,8 @@ export async function loadHermanoMayor(
     animations,
     playLocomotion,
     setLookTargetProvider: (provider) => lookAction.setTargetProvider(provider),
+    setNeckGrabTargetProvider: (provider) =>
+      neckGrabAction.setTargetProvider(provider),
     setNeckGrabPose: (state) => {
       if (state) {
         lookAction.setEnabled(false);

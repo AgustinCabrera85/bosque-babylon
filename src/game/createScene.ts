@@ -1338,6 +1338,9 @@ scene.onBeforeRenderObservable.add(() => {
   const endHouseBounds = segments.getEndHouseBounds();
   const hermanoMayorNavigationProbe = Vector3.Zero();
   const hermanoMayorNeckTarget = Vector3.Zero();
+  hermanoMayor?.setNeckGrabTargetProvider((result) =>
+    player.getNeckWorldPositionToRef(result)
+  );
   const isHermanoMayorNavigationBlocked = (x: number, z: number) => {
     // His rig is wider than the playable characters, so give authored props
     // and walls a little extra clearance. The expanded lagoon query keeps both

@@ -20,6 +20,41 @@ export type HermanoMayorNeckGrabPoseState = {
   targetPosition: Vector3;
 };
 
+export type HermanoMayorNeckTargetProvider = (result: Vector3) => Vector3;
+
+const GRIP_FINGER_JOINTS = [
+  "leftHandThumb1",
+  "leftHandThumb2",
+  "leftHandThumb3",
+  "leftHandIndex1",
+  "leftHandIndex2",
+  "leftHandIndex3",
+  "leftHandMiddle1",
+  "leftHandMiddle2",
+  "leftHandMiddle3",
+  "leftHandRing1",
+  "leftHandRing2",
+  "leftHandRing3",
+  "leftHandPinky1",
+  "leftHandPinky2",
+  "leftHandPinky3",
+  "rightHandThumb1",
+  "rightHandThumb2",
+  "rightHandThumb3",
+  "rightHandIndex1",
+  "rightHandIndex2",
+  "rightHandIndex3",
+  "rightHandMiddle1",
+  "rightHandMiddle2",
+  "rightHandMiddle3",
+  "rightHandRing1",
+  "rightHandRing2",
+  "rightHandRing3",
+  "rightHandPinky1",
+  "rightHandPinky2",
+  "rightHandPinky3",
+] as const satisfies readonly MixamoJointName[];
+
 const REQUIRED_JOINTS = [
   "hips",
   "spine",
@@ -33,7 +68,65 @@ const REQUIRED_JOINTS = [
   "rightForeArm",
   "leftHand",
   "rightHand",
+  ...GRIP_FINGER_JOINTS,
 ] as const;
+
+type GripJointAxisProfile = {
+  joint: MixamoJointName;
+  axis: Vector3;
+  axisName: "localX" | "localY";
+  sign: -1 | 1;
+};
+
+// The GLB's forearm-to-hand and hand-to-finger translations run along local
+// +Y on both sides. Local X spans the palm, so it is the wrist-flexion axis.
+const GRIP_AXIS_PROFILE = {
+  leftHandFlex: {
+    joint: "leftHand",
+    axis: Axis.X,
+    axisName: "localX",
+    sign: -1,
+  },
+  rightHandFlex: {
+    joint: "rightHand",
+    axis: Axis.X,
+    axisName: "localX",
+    sign: 1,
+  },
+} as const satisfies Record<string, GripJointAxisProfile>;
+
+const HAND_FLEX_DEGREES = 3;
+const MAX_FOREARM_PRONATION_DEGREES = 80;
+const MAX_HAND_ROLL_DEGREES = 45;
+const FOREARM_TWIST_SHARE = 0.8;
+const GRIP_WRIST_BACK_METERS = 0.07;
+const GRIP_HALF_WIDTH_METERS = 0.165;
+const LEFT_GRIP_WRIST_VERTICAL_METERS = -0.04;
+const RIGHT_GRIP_WRIST_VERTICAL_METERS = 0.048;
+
+const GRIP_FINGER_CHAINS = [
+  ["leftHandIndex1", "leftHandIndex2", "leftHandIndex3"],
+  ["leftHandMiddle1", "leftHandMiddle2", "leftHandMiddle3"],
+  ["leftHandRing1", "leftHandRing2", "leftHandRing3"],
+  ["leftHandPinky1", "leftHandPinky2", "leftHandPinky3"],
+  ["rightHandIndex1", "rightHandIndex2", "rightHandIndex3"],
+  ["rightHandMiddle1", "rightHandMiddle2", "rightHandMiddle3"],
+  ["rightHandRing1", "rightHandRing2", "rightHandRing3"],
+  ["rightHandPinky1", "rightHandPinky2", "rightHandPinky3"],
+] as const satisfies readonly (readonly [
+  MixamoJointName,
+  MixamoJointName,
+  MixamoJointName,
+])[];
+
+const FINGER_CURL_DEGREES = [24, 38, 26] as const;
+// This asset mirrors the finger placement, but both phalanx chains retain the
+// same local-X flexion sign. Negating the right side hyperextends it across the
+// victim's neck instead of wrapping the fingers back toward the palm.
+const FINGER_CURL_SIGN = {
+  left: 1,
+  right: 1,
+} as const;
 
 /** Procedural Mixamo overlay for reaching, closing the grip and lifting. */
 export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction {
@@ -48,6 +141,15 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
   private readonly rightHandPosition = Vector3.Zero();
   private readonly leftElbowPosition = Vector3.Zero();
   private readonly rightElbowPosition = Vector3.Zero();
+  private readonly leftPalmDirection = Vector3.Zero();
+  private readonly rightPalmDirection = Vector3.Zero();
+  private readonly leftGripDirection = Vector3.Zero();
+  private readonly rightGripDirection = Vector3.Zero();
+  private readonly rightPalmLocalDirection = new Vector3(0, 0, -1);
+  private readonly twistAxis = Vector3.Zero();
+  private readonly projectedPalmDirection = Vector3.Zero();
+  private readonly projectedGripDirection = Vector3.Zero();
+  private readonly twistCross = Vector3.Zero();
   private readonly jointPosition = Vector3.Zero();
   private readonly currentDirection = Vector3.Zero();
   private readonly targetDirection = Vector3.Zero();
@@ -64,6 +166,13 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
   private victimStruggle = 0;
   private elapsed = 0;
   private poseApplied = false;
+  private targetProvider: HermanoMayorNeckTargetProvider | null = null;
+  private leftForeArmPronationDegrees = 0;
+  private rightForeArmPronationDegrees = 0;
+  private leftHandRollDegrees = 0;
+  private rightHandRollDegrees = 0;
+  private leftPalmProjectedFacingScore = 0;
+  private rightPalmProjectedFacingScore = 0;
 
   public constructor(
     private readonly scene: Scene,
@@ -117,15 +226,70 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
     return {
       available: this.rig.available,
       enabled: this.requestedEnabled,
+      liveTargetTracking: this.targetProvider !== null,
       blend: this.blend,
       reach: this.reach,
       lift: this.lift,
       victimStruggle: this.victimStruggle,
       targetPosition: vectorSnapshot(this.target),
+      leftHandTarget: vectorSnapshot(this.leftHandTarget),
+      rightHandTarget: vectorSnapshot(this.rightHandTarget),
       leftHandPosition: vectorSnapshot(this.leftHandPosition),
       rightHandPosition: vectorSnapshot(this.rightHandPosition),
       leftElbowPosition: vectorSnapshot(this.leftElbowPosition),
       rightElbowPosition: vectorSnapshot(this.rightElbowPosition),
+      leftPalmDirection: vectorSnapshot(this.leftPalmDirection),
+      rightPalmDirection: vectorSnapshot(this.rightPalmDirection),
+      leftPalmFacingScore: Vector3.Dot(
+        this.leftPalmDirection,
+        this.leftGripDirection
+      ),
+      rightPalmFacingScore: Vector3.Dot(
+        this.rightPalmDirection,
+        this.rightGripDirection
+      ),
+      leftPalmProjectedFacingScore: this.leftPalmProjectedFacingScore,
+      rightPalmProjectedFacingScore: this.rightPalmProjectedFacingScore,
+      gripLandmarks: {
+        leftThumbTip: this.getJointPositionSnapshot("leftHandThumb3"),
+        leftIndexTip: this.getJointPositionSnapshot("leftHandIndex3"),
+        leftMiddleKnuckle: this.getJointPositionSnapshot("leftHandMiddle1"),
+        leftMiddleTip: this.getJointPositionSnapshot("leftHandMiddle3"),
+        leftPinkyKnuckle: this.getJointPositionSnapshot("leftHandPinky1"),
+        rightThumbTip: this.getJointPositionSnapshot("rightHandThumb3"),
+        rightIndexTip: this.getJointPositionSnapshot("rightHandIndex3"),
+        rightMiddleKnuckle: this.getJointPositionSnapshot("rightHandMiddle1"),
+        rightMiddleTip: this.getJointPositionSnapshot("rightHandMiddle3"),
+        rightPinkyKnuckle: this.getJointPositionSnapshot("rightHandPinky1"),
+      },
+      gripOrientation: {
+        leftForeArmPronationDegrees: this.leftForeArmPronationDegrees,
+        rightForeArmPronationDegrees: this.rightForeArmPronationDegrees,
+        leftHandRollDegrees: this.leftHandRollDegrees,
+        rightHandRollDegrees: this.rightHandRollDegrees,
+        leftHandFlexDegrees:
+          HAND_FLEX_DEGREES * this.reach * GRIP_AXIS_PROFILE.leftHandFlex.sign,
+        rightHandFlexDegrees:
+          HAND_FLEX_DEGREES * this.reach * GRIP_AXIS_PROFILE.rightHandFlex.sign,
+        fingerCurlDegrees: {
+          left: FINGER_CURL_DEGREES.map(
+            (degrees) => degrees * this.reach * FINGER_CURL_SIGN.left
+          ),
+          right: FINGER_CURL_DEGREES.map(
+            (degrees) => degrees * this.reach * FINGER_CURL_SIGN.right
+          ),
+        },
+        gripHalfWidthMeters: GRIP_HALF_WIDTH_METERS,
+        wristBackMeters: GRIP_WRIST_BACK_METERS,
+        localAxisMapping: {
+          leftForeArmPronation: { axis: "localY", dynamicPalmAlignment: true },
+          rightForeArmPronation: { axis: "localY", dynamicPalmAlignment: true },
+          leftHandRoll: { axis: "localY", dynamicPalmAlignment: true },
+          rightHandRoll: { axis: "localY", dynamicPalmAlignment: true },
+          leftHandFlex: profileSnapshot(GRIP_AXIS_PROFILE.leftHandFlex),
+          rightHandFlex: profileSnapshot(GRIP_AXIS_PROFILE.rightHandFlex),
+        },
+      },
       resolvedBones: this.rig.getResolvedBones(),
     };
   }
@@ -142,6 +306,16 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
     }
   }
 
+  public setTargetProvider(provider: HermanoMayorNeckTargetProvider | null) {
+    this.targetProvider = provider;
+  }
+
+  private getJointPositionSnapshot(name: MixamoJointName) {
+    return this.rig.getJointWorldPositionToRef(name, this.jointPosition)
+      ? vectorSnapshot(this.jointPosition)
+      : null;
+  }
+
   private update(dt: number) {
     if (!this.rig.available || dt <= 0) return;
     this.elapsed += dt;
@@ -154,7 +328,17 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
       9,
       dt
     );
-    dampVectorToRef(this.target, this.requestedTarget, 14, dt, this.target);
+    if (this.requestedEnabled && this.targetProvider) {
+      const providedTarget = this.targetProvider(this.requestedTarget);
+      if (providedTarget !== this.requestedTarget) {
+        this.requestedTarget.copyFrom(providedTarget);
+      }
+      // The player procedural pose has already run in this after-animation
+      // phase. An additional damp here makes the wrists trail the neck.
+      this.target.copyFrom(this.requestedTarget);
+    } else {
+      dampVectorToRef(this.target, this.requestedTarget, 14, dt, this.target);
+    }
     if (this.blend <= 0.0001) return;
 
     this.rig.captureBasePose();
@@ -233,21 +417,21 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
       this.forwardAxis.set(Math.sin(this.root.rotation.y), 0, Math.cos(this.root.rotation.y));
     }
 
-    const wristBack = 0.1;
-    const sideSpacing = 0.105;
     this.leftHandTarget.copyFrom(this.target);
-    this.leftHandTarget.x -= this.forwardAxis.x * wristBack;
-    this.leftHandTarget.z -= this.forwardAxis.z * wristBack;
-    this.leftHandTarget.x -= this.rightAxis.x * sideSpacing;
-    this.leftHandTarget.z -= this.rightAxis.z * sideSpacing;
-    this.leftHandTarget.y += 0.055 + effortWave * 0.012;
+    this.leftHandTarget.x -= this.forwardAxis.x * GRIP_WRIST_BACK_METERS;
+    this.leftHandTarget.z -= this.forwardAxis.z * GRIP_WRIST_BACK_METERS;
+    this.leftHandTarget.x -= this.rightAxis.x * GRIP_HALF_WIDTH_METERS;
+    this.leftHandTarget.z -= this.rightAxis.z * GRIP_HALF_WIDTH_METERS;
+    this.leftHandTarget.y +=
+      LEFT_GRIP_WRIST_VERTICAL_METERS + effortWave * 0.008;
 
     this.rightHandTarget.copyFrom(this.target);
-    this.rightHandTarget.x -= this.forwardAxis.x * wristBack;
-    this.rightHandTarget.z -= this.forwardAxis.z * wristBack;
-    this.rightHandTarget.x += this.rightAxis.x * sideSpacing;
-    this.rightHandTarget.z += this.rightAxis.z * sideSpacing;
-    this.rightHandTarget.y -= 0.055 + counterWave * 0.01;
+    this.rightHandTarget.x -= this.forwardAxis.x * GRIP_WRIST_BACK_METERS;
+    this.rightHandTarget.z -= this.forwardAxis.z * GRIP_WRIST_BACK_METERS;
+    this.rightHandTarget.x += this.rightAxis.x * GRIP_HALF_WIDTH_METERS;
+    this.rightHandTarget.z += this.rightAxis.z * GRIP_HALF_WIDTH_METERS;
+    this.rightHandTarget.y +=
+      RIGHT_GRIP_WRIST_VERTICAL_METERS - counterWave * 0.008;
 
     this.rig.getJointWorldPositionToRef("leftHand", this.leftHandPosition);
     this.rig.getJointWorldPositionToRef("rightHand", this.rightHandPosition);
@@ -278,29 +462,209 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
       this.rightHandTarget
     );
 
-    // Roll the wrists in opposite directions so both palms oppose one another
-    // around the victim's vertical neck instead of hanging flat and horizontal.
-    const gripRoll = radians(68) * reach;
-    const gripFlex = radians(8) * reach;
-    this.rig.applyLocalOffset(
-      "leftHand",
-      Axis.Y,
-      gripRoll,
-      Axis.Z,
-      -gripFlex
-    );
-    this.rig.applyLocalOffset(
-      "rightHand",
-      Axis.Y,
-      -gripRoll,
-      Axis.Z,
-      gripFlex
-    );
-    this.rig.prepare();
+    this.applyGripOrientation(reach);
     this.rig.getJointWorldPositionToRef("leftHand", this.leftHandPosition);
     this.rig.getJointWorldPositionToRef("rightHand", this.rightHandPosition);
     this.rig.getJointWorldPositionToRef("leftForeArm", this.leftElbowPosition);
     this.rig.getJointWorldPositionToRef("rightForeArm", this.rightElbowPosition);
+    this.updateGripOrientationDebug();
+  }
+
+  private updateGripOrientationDebug() {
+    this.rig.getJointWorldDirectionToRef(
+      "leftHand",
+      Axis.Z,
+      this.leftPalmDirection
+    );
+    this.rig.getJointWorldDirectionToRef(
+      "rightHand",
+      Axis.Z,
+      this.rightPalmDirection
+    );
+    // The mirrored right-hand hierarchy exposes its palmar normal as local -Z.
+    this.rightPalmDirection.scaleInPlace(-1);
+    this.target.subtractToRef(this.leftHandPosition, this.leftGripDirection);
+    this.target.subtractToRef(this.rightHandPosition, this.rightGripDirection);
+    if (this.leftGripDirection.lengthSquared() > 0.000001) {
+      this.leftGripDirection.normalize();
+    }
+    if (this.rightGripDirection.lengthSquared() > 0.000001) {
+      this.rightGripDirection.normalize();
+    }
+    this.leftPalmProjectedFacingScore = Math.cos(
+      this.measurePalmTwist("leftHand", "leftHand", Axis.Z, this.target)
+    );
+    this.rightPalmProjectedFacingScore = Math.cos(
+      this.measurePalmTwist(
+        "rightHand",
+        "rightHand",
+        this.rightPalmLocalDirection,
+        this.target
+      )
+    );
+  }
+
+  private applyGripOrientation(reach: number) {
+    const handFlex = radians(HAND_FLEX_DEGREES) * reach;
+    this.alignPalmToGrip(
+      "left",
+      "leftForeArm",
+      "leftHand",
+      Axis.Z,
+      this.target,
+      reach
+    );
+    this.alignPalmToGrip(
+      "right",
+      "rightForeArm",
+      "rightHand",
+      this.rightPalmLocalDirection,
+      this.target,
+      reach
+    );
+    this.appendProfileOffset(GRIP_AXIS_PROFILE.leftHandFlex, handFlex);
+    this.appendProfileOffset(GRIP_AXIS_PROFILE.rightHandFlex, handFlex);
+    this.applyFingerCurl(reach);
+    this.rig.prepare();
+  }
+
+  private alignPalmToGrip(
+    side: "left" | "right",
+    foreArm: MixamoJointName,
+    hand: MixamoJointName,
+    palmLocalDirection: Vector3,
+    target: Vector3,
+    reach: number
+  ) {
+    const blend = smoothStep(reach);
+    const fullCorrection = this.measurePalmTwist(
+      foreArm,
+      hand,
+      palmLocalDirection,
+      target
+    );
+    const foreArmCorrection = clamp(
+      -fullCorrection * FOREARM_TWIST_SHARE,
+      -radians(MAX_FOREARM_PRONATION_DEGREES),
+      radians(MAX_FOREARM_PRONATION_DEGREES)
+    ) * blend;
+    this.rig.appendLocalOffset(foreArm, Axis.Y, foreArmCorrection);
+    this.rig.prepare();
+
+    const remainingCorrection = this.measurePalmTwist(
+      hand,
+      hand,
+      palmLocalDirection,
+      target
+    );
+    const handCorrection = clamp(
+      -remainingCorrection,
+      -radians(MAX_HAND_ROLL_DEGREES),
+      radians(MAX_HAND_ROLL_DEGREES)
+    ) * blend;
+    this.rig.appendLocalOffset(hand, Axis.Y, handCorrection);
+    this.rig.prepare();
+
+    if (side === "left") {
+      this.leftForeArmPronationDegrees = degrees(foreArmCorrection);
+      this.leftHandRollDegrees = degrees(handCorrection);
+    } else {
+      this.rightForeArmPronationDegrees = degrees(foreArmCorrection);
+      this.rightHandRollDegrees = degrees(handCorrection);
+    }
+  }
+
+  private measurePalmTwist(
+    twistJoint: MixamoJointName,
+    hand: MixamoJointName,
+    palmLocalDirection: Vector3,
+    target: Vector3
+  ) {
+    if (
+      !this.rig.getJointWorldDirectionToRef(
+        twistJoint,
+        Axis.Y,
+        this.twistAxis
+      ) ||
+      !this.rig.getJointWorldDirectionToRef(
+        hand,
+        palmLocalDirection,
+        this.projectedPalmDirection
+      ) ||
+      !this.rig.getJointWorldPositionToRef(hand, this.jointPosition)
+    ) {
+      return 0;
+    }
+
+    target.subtractToRef(this.jointPosition, this.projectedGripDirection);
+    const palmAlongAxis = Vector3.Dot(
+      this.projectedPalmDirection,
+      this.twistAxis
+    );
+    const gripAlongAxis = Vector3.Dot(
+      this.projectedGripDirection,
+      this.twistAxis
+    );
+    this.projectedPalmDirection.set(
+      this.projectedPalmDirection.x - this.twistAxis.x * palmAlongAxis,
+      this.projectedPalmDirection.y - this.twistAxis.y * palmAlongAxis,
+      this.projectedPalmDirection.z - this.twistAxis.z * palmAlongAxis
+    );
+    this.projectedGripDirection.set(
+      this.projectedGripDirection.x - this.twistAxis.x * gripAlongAxis,
+      this.projectedGripDirection.y - this.twistAxis.y * gripAlongAxis,
+      this.projectedGripDirection.z - this.twistAxis.z * gripAlongAxis
+    );
+    const palmLength = this.projectedPalmDirection.length();
+    const gripLength = this.projectedGripDirection.length();
+    if (palmLength <= 0.0001 || gripLength <= 0.0001) return 0;
+    this.projectedPalmDirection.scaleInPlace(1 / palmLength);
+    this.projectedGripDirection.scaleInPlace(1 / gripLength);
+    Vector3.CrossToRef(
+      this.projectedPalmDirection,
+      this.projectedGripDirection,
+      this.twistCross
+    );
+    return Math.atan2(
+      Vector3.Dot(this.twistAxis, this.twistCross),
+      Vector3.Dot(this.projectedPalmDirection, this.projectedGripDirection)
+    );
+  }
+
+  private applyFingerCurl(reach: number) {
+    for (const chain of GRIP_FINGER_CHAINS) {
+      const curlSign = chain[0].startsWith("right")
+        ? FINGER_CURL_SIGN.right
+        : FINGER_CURL_SIGN.left;
+      for (let index = 0; index < chain.length; index += 1) {
+        this.rig.appendLocalOffset(
+          chain[index],
+          Axis.X,
+          radians(FINGER_CURL_DEGREES[index]) * reach * curlSign
+        );
+      }
+    }
+
+    const thumbBase = radians(18) * reach;
+    const thumbMiddle = radians(22) * reach;
+    const thumbTip = radians(14) * reach;
+    this.rig.appendLocalOffset("leftHandThumb1", Axis.Z, thumbBase);
+    this.rig.appendLocalOffset("rightHandThumb1", Axis.Z, -thumbBase);
+    this.rig.appendLocalOffset("leftHandThumb2", Axis.Z, -thumbMiddle);
+    this.rig.appendLocalOffset("rightHandThumb2", Axis.Z, thumbMiddle);
+    this.rig.appendLocalOffset("leftHandThumb3", Axis.X, thumbTip);
+    this.rig.appendLocalOffset("rightHandThumb3", Axis.X, thumbTip);
+  }
+
+  private appendProfileOffset(
+    profile: GripJointAxisProfile,
+    amount: number
+  ) {
+    this.rig.appendLocalOffset(
+      profile.joint,
+      profile.axis,
+      amount * profile.sign
+    );
   }
 
   private solveArmToTarget(
@@ -311,9 +675,9 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
   ) {
     // Distal-to-proximal CCD is independent of Mixamo bone pre-rotations and
     // imported root scaling. Small bounded steps preserve the low-elbow seed.
-    for (let iteration = 0; iteration < 7; iteration += 1) {
-      this.rotateJointTowardTarget(foreArm, hand, target, radians(14));
-      this.rotateJointTowardTarget(upperArm, hand, target, radians(12));
+    for (let iteration = 0; iteration < 11; iteration += 1) {
+      this.rotateJointTowardTarget(foreArm, hand, target, radians(16));
+      this.rotateJointTowardTarget(upperArm, hand, target, radians(14));
     }
   }
 
@@ -359,6 +723,14 @@ function radians(degrees: number) {
   return (degrees * Math.PI) / 180;
 }
 
+function degrees(radiansValue: number) {
+  return (radiansValue * 180) / Math.PI;
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
@@ -389,4 +761,8 @@ function smoothStep(value: number) {
 
 function vectorSnapshot(vector: Vector3) {
   return { x: vector.x, y: vector.y, z: vector.z };
+}
+
+function profileSnapshot(profile: GripJointAxisProfile) {
+  return { axis: profile.axisName, sign: profile.sign };
 }

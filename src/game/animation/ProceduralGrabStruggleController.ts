@@ -1,6 +1,6 @@
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import { Axis } from "@babylonjs/core/Maths/math.axis";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Observer } from "@babylonjs/core/Misc/observable";
@@ -115,6 +115,13 @@ export type ProceduralGrabStruggleDebugSnapshot = {
   neckGrabWeight: number;
   neckGrabLift: number;
   neckGrabEscapeProgress: number;
+  neckGrabAnchorCaptured: boolean;
+  neckGrabLegPoseDegrees: {
+    leftThigh: number;
+    rightThigh: number;
+    leftKnee: number;
+    rightKnee: number;
+  };
   localAxisMapping: typeof LIMB_LOCAL_AXIS_MAPPING;
   resolvedBones: Record<JointName, string | null>;
   animatedBones: JointName[];
@@ -334,6 +341,7 @@ const HIT_ZONE_PROFILES: Record<ProceduralHitReactionZone, HitZoneProfile> = {
 const REQUIRED_JOINTS: readonly JointName[] = [
   "hips",
   "spine",
+  "neck",
   "leftUpLeg",
   "leftLeg",
   "rightUpLeg",
@@ -356,6 +364,12 @@ export class ProceduralGrabStruggleController {
   private readonly desiredLookDirection = Vector3.Zero();
   private readonly smoothedLookDirection = Vector3.Zero();
   private readonly visualRootBasePosition = Vector3.Zero();
+  private readonly neckGrabAnchorWorld = Vector3.Zero();
+  private readonly neckGrabCurrentWorld = Vector3.Zero();
+  private readonly neckGrabDesiredWorld = Vector3.Zero();
+  private readonly neckGrabCorrectionWorld = Vector3.Zero();
+  private readonly neckGrabCorrectionLocal = Vector3.Zero();
+  private readonly neckGrabRootInverse = Matrix.Identity();
   private readonly config: ProceduralGrabStruggleConfig;
   private readonly poseMask: ProceduralGrabStruggleDebugPoseMask = {
     ...DEFAULT_DEBUG_POSE_MASK,
@@ -400,6 +414,7 @@ export class ProceduralGrabStruggleController {
   private neckGrabLift = 0;
   private neckGrabEscapeProgress = 0;
   private neckGrabElapsed = 0;
+  private neckGrabAnchorCaptured = false;
   private readonly neckGrabAttackerPosition = Vector3.Zero();
   private readonly neckGrabPose: NeckGrabPose = createEmptyNeckGrabPose();
 
@@ -552,7 +567,10 @@ export class ProceduralGrabStruggleController {
 
   public setNeckGrabState(state: ProceduralNeckGrabState) {
     if (!this.available || this.disposed) return;
-    if (state.active && !this.neckGrabRequested) this.neckGrabElapsed = 0;
+    if (state.active && !this.neckGrabRequested) {
+      this.neckGrabElapsed = 0;
+      this.neckGrabAnchorCaptured = false;
+    }
     this.neckGrabRequested = state.active;
     this.neckGrabTargetLift = state.active ? clamp(state.lift ?? 0, 0, 1) : 0;
     this.neckGrabEscapeProgress = clamp(state.escapeProgress ?? 0, 0, 1);
@@ -610,8 +628,10 @@ export class ProceduralGrabStruggleController {
       return;
     }
     this.captureBasePose();
+    this.captureNeckGrabAnchorIfNeeded();
     this.applyPose(smoothStep(this.blend) * this.intensity);
     this.rig.prepare();
+    this.stabilizeNeckGrabAnchor();
     this.poseApplied = true;
   }
 
@@ -663,6 +683,13 @@ export class ProceduralGrabStruggleController {
       neckGrabWeight: this.neckGrabWeight,
       neckGrabLift: this.neckGrabLift,
       neckGrabEscapeProgress: this.neckGrabEscapeProgress,
+      neckGrabAnchorCaptured: this.neckGrabAnchorCaptured,
+      neckGrabLegPoseDegrees: {
+        leftThigh: degrees(this.neckGrabPose.leftThighPitch),
+        rightThigh: degrees(this.neckGrabPose.rightThighPitch),
+        leftKnee: degrees(this.neckGrabPose.leftKneeFlex),
+        rightKnee: degrees(this.neckGrabPose.rightKneeFlex),
+      },
       localAxisMapping: LIMB_LOCAL_AXIS_MAPPING,
       resolvedBones: this.rig.getResolvedBones(),
       animatedBones: this.rig.getAnimatedBones(),
@@ -677,6 +704,7 @@ export class ProceduralGrabStruggleController {
     this.neckGrabRequested = false;
     this.neckGrabWeight = 0;
     this.neckGrabLift = 0;
+    this.neckGrabAnchorCaptured = false;
     this.disposed = true;
     if (this.beforeAnimationsObserver) {
       this.scene.onBeforeAnimationsObservable.remove(this.beforeAnimationsObserver);
@@ -695,6 +723,60 @@ export class ProceduralGrabStruggleController {
   private captureBasePose() {
     this.visualRootBasePosition.copyFrom(this.visualRoot.position);
     this.rig.captureBasePose();
+  }
+
+  private captureNeckGrabAnchorIfNeeded() {
+    if (!this.neckGrabRequested || this.neckGrabAnchorCaptured) return;
+    if (
+      this.rig.getJointWorldPositionToRef("neck", this.neckGrabAnchorWorld)
+    ) {
+      this.neckGrabAnchorCaptured = true;
+    }
+  }
+
+  private stabilizeNeckGrabAnchor() {
+    if (!this.neckGrabAnchorCaptured || this.neckGrabWeight <= 0.0001) return;
+    if (
+      !this.rig.getJointWorldPositionToRef("neck", this.neckGrabCurrentWorld)
+    ) {
+      return;
+    }
+
+    const weight = smoothStep(this.neckGrabWeight);
+    const effort = 0.55 + this.neckGrabEscapeProgress * 0.45;
+    const lateralSway =
+      Math.sin(this.neckGrabElapsed * Math.PI * 2 * 1.27 + this.motionPhase) *
+      0.006 *
+      effort;
+    const forwardSway =
+      Math.sin(this.neckGrabElapsed * Math.PI * 2 * 0.91 + 1.1) *
+      0.004 *
+      effort;
+    const verticalSway =
+      Math.sin(this.neckGrabElapsed * Math.PI * 2 * 1.73 + 0.45) *
+      0.003 *
+      effort;
+    this.neckGrabDesiredWorld.copyFrom(this.neckGrabAnchorWorld);
+    this.neckGrabDesiredWorld.x +=
+      this.rightAxis.x * lateralSway + this.forwardAxis.x * forwardSway;
+    this.neckGrabDesiredWorld.y +=
+      this.neckGrabPose.visualLift + verticalSway;
+    this.neckGrabDesiredWorld.z +=
+      this.rightAxis.z * lateralSway + this.forwardAxis.z * forwardSway;
+    this.neckGrabDesiredWorld.subtractToRef(
+      this.neckGrabCurrentWorld,
+      this.neckGrabCorrectionWorld
+    );
+    this.root.computeWorldMatrix(true).invertToRef(this.neckGrabRootInverse);
+    Vector3.TransformNormalToRef(
+      this.neckGrabCorrectionWorld,
+      this.neckGrabRootInverse,
+      this.neckGrabCorrectionLocal
+    );
+    this.neckGrabCorrectionLocal.scaleInPlace(weight);
+    this.visualRoot.position.addInPlace(this.neckGrabCorrectionLocal);
+    this.visualRoot.computeWorldMatrix(true);
+    this.rig.prepare();
   }
 
   private restoreBasePose() {
@@ -879,8 +961,7 @@ export class ProceduralGrabStruggleController {
         clamp(
           kneeBase * 0.46 +
             legKick +
-            this.hitPose.leftThighPitch +
-            this.neckGrabPose.leftThighPitch,
+            this.hitPose.leftThighPitch,
           -COMBINED_POSE_LIMITS.upperLegPitch,
           COMBINED_POSE_LIMITS.upperLegPitch
         )
@@ -891,8 +972,7 @@ export class ProceduralGrabStruggleController {
         clamp(
           kneeBase * 0.46 -
             legKick * 0.82 +
-            this.hitPose.rightThighPitch +
-            this.neckGrabPose.rightThighPitch,
+            this.hitPose.rightThighPitch,
           -COMBINED_POSE_LIMITS.upperLegPitch,
           COMBINED_POSE_LIMITS.upperLegPitch
         )
@@ -914,8 +994,7 @@ export class ProceduralGrabStruggleController {
         this.rightAxis,
         clamp(
           -kneeBase * (0.94 + legNoise * 0.1) -
-            this.hitPose.leftKneeFlex -
-            this.neckGrabPose.leftKneeFlex,
+            this.hitPose.leftKneeFlex,
           -COMBINED_POSE_LIMITS.kneeFlex,
           COMBINED_POSE_LIMITS.kneeFlex
         )
@@ -925,8 +1004,7 @@ export class ProceduralGrabStruggleController {
         this.rightAxis,
         clamp(
           -kneeBase * (0.9 - legNoise * 0.08) -
-            this.hitPose.rightKneeFlex -
-            this.neckGrabPose.rightKneeFlex,
+            this.hitPose.rightKneeFlex,
           -COMBINED_POSE_LIMITS.kneeFlex,
           COMBINED_POSE_LIMITS.kneeFlex
         )
@@ -953,6 +1031,30 @@ export class ProceduralGrabStruggleController {
       );
       this.rotate("leftFoot", this.forwardAxis, stanceWidth * 0.16);
       this.rotate("rightFoot", this.forwardAxis, -stanceWidth * 0.16);
+
+      // Both player GLBs expose the sagittal leg hinge as local X even though
+      // their bind-pose longitudinal axes differ. Appending in joint space
+      // preserves the authored pose and avoids Sofia's former sideways knees.
+      this.appendLocalOffset(
+        "leftUpLeg",
+        Axis.X,
+        this.neckGrabPose.leftThighPitch
+      );
+      this.appendLocalOffset(
+        "rightUpLeg",
+        Axis.X,
+        this.neckGrabPose.rightThighPitch
+      );
+      this.appendLocalOffset(
+        "leftLeg",
+        Axis.X,
+        -this.neckGrabPose.leftKneeFlex
+      );
+      this.appendLocalOffset(
+        "rightLeg",
+        Axis.X,
+        -this.neckGrabPose.rightKneeFlex
+      );
     }
 
     if (this.poseMask.torso) {
@@ -1254,6 +1356,7 @@ export class ProceduralGrabStruggleController {
     if (!this.neckGrabRequested && this.neckGrabWeight < 0.0001) {
       this.neckGrabWeight = 0;
       this.neckGrabLift = 0;
+      this.neckGrabAnchorCaptured = false;
       resetNeckGrabPose(this.neckGrabPose);
     }
   }
@@ -1293,26 +1396,41 @@ export class ProceduralGrabStruggleController {
 
     this.neckGrabPose.hipsPitch = radians(-4) * weight;
     this.neckGrabPose.torsoPitch =
-      radians(-7.5) * weight + radians(1.8) * effortWave * weight;
+      radians(-7.5) * weight + radians(0.65) * effortWave * weight;
     this.neckGrabPose.torsoYaw =
-      (lookYaw * 0.34 + radians(5.5) * effortWave) * weight;
+      (lookYaw * 0.22 + radians(1.4) * effortWave) * weight;
     this.neckGrabPose.torsoSideBend =
-      radians(5.5) * counter * escapeEffort * weight;
+      radians(1.6) * counter * escapeEffort * weight;
     this.neckGrabPose.neckPitch =
-      (radians(-7) + radians(2) * Math.max(0, primary)) * weight;
+      (radians(-7) + radians(0.7) * Math.max(0, primary)) * weight;
     this.neckGrabPose.headPitch =
-      (radians(-9) + radians(2.5) * tremor * escapeEffort) * weight;
-    this.neckGrabPose.neckYaw = lookYaw * 0.32 * weight;
+      (radians(-9) + radians(0.9) * tremor * escapeEffort) * weight;
+    this.neckGrabPose.neckYaw = lookYaw * 0.2 * weight;
     this.neckGrabPose.headYaw =
-      (lookYaw * 0.5 - radians(3.5) * effortWave) * weight;
+      (lookYaw * 0.34 - radians(1) * effortWave) * weight;
 
-    // Keep the lower body inherited from the authored idle pose. World-space
-    // knee rotations look acceptable on Lautaro but twist Sofia's differently
-    // oriented bind pose sideways while airborne.
-    this.neckGrabPose.leftThighPitch = 0;
-    this.neckGrabPose.rightThighPitch = 0;
-    this.neckGrabPose.leftKneeFlex = 0;
-    this.neckGrabPose.rightKneeFlex = 0;
+    // A reciprocal run cadence sells the suspended kicking motion. Two faster,
+    // mismatched waves keep it from looking like a clean locomotion loop.
+    const runCycle = Math.sin(
+      this.neckGrabElapsed * Math.PI * 2 * 2.35 + this.motionPhase * 0.17
+    );
+    const leftChaos = Math.sin(
+      this.neckGrabElapsed * Math.PI * 2 * 3.61 + this.motionPhase * 0.73
+    );
+    const rightChaos = Math.sin(
+      this.neckGrabElapsed * Math.PI * 2 * 3.17 + 1.2 + this.motionPhase * 0.39
+    );
+    const legEffort = (0.58 + this.neckGrabEscapeProgress * 0.42) * weight;
+    this.neckGrabPose.leftThighPitch =
+      radians(24) * (runCycle * 0.82 + leftChaos * 0.18) * legEffort;
+    this.neckGrabPose.rightThighPitch =
+      radians(24) * (-runCycle * 0.78 + rightChaos * 0.22) * legEffort;
+    this.neckGrabPose.leftKneeFlex =
+      radians(8 + Math.max(0, -runCycle) * 32 + Math.max(0, leftChaos) * 5) *
+      legEffort;
+    this.neckGrabPose.rightKneeFlex =
+      radians(8 + Math.max(0, runCycle) * 32 + Math.max(0, rightChaos) * 5) *
+      legEffort;
 
     this.neckGrabPose.shoulderProtraction = radians(5.5) * weight;
     const armStruggle = radians(7) * effortWave * weight;
@@ -1562,6 +1680,22 @@ export class ProceduralGrabStruggleController {
     );
   }
 
+  private appendLocalOffset(
+    name: JointName,
+    firstAxis: Vector3,
+    firstAmount: number,
+    secondAxis?: Vector3,
+    secondAmount = 0
+  ) {
+    this.rig.appendLocalOffset(
+      name,
+      firstAxis,
+      firstAmount,
+      secondAxis,
+      secondAmount
+    );
+  }
+
   private updateJerk() {
     if (!this.requestedActive) return;
     if (this.elapsed < this.nextJerkAt) return;
@@ -1754,6 +1888,10 @@ function intensityForGrabberCount(count: number) {
 
 function radians(degrees: number) {
   return (degrees * Math.PI) / 180;
+}
+
+function degrees(radiansValue: number) {
+  return (radiansValue * 180) / Math.PI;
 }
 
 function clamp(value: number, minimum: number, maximum: number) {

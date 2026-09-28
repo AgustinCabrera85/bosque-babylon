@@ -36,6 +36,7 @@ import { PlayerAttackSystem } from "./PlayerAttackSystem";
 import { PlayerLightAbsorptionVFX } from "./PlayerLightAbsorptionVFX";
 import { PlayerStatsSystem } from "./PlayerStatsSystem";
 import { PlayerStatusHud } from "./PlayerStatusHud";
+import type { ProceduralHitReactionZone } from "./animation/ProceduralGrabStruggleController";
 import {
   PlayerSurvivalSystem,
   isPlayerPhysicallySurrounded,
@@ -84,6 +85,7 @@ import {
   HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER,
   HermanoMayorBehavior,
 } from "./enemies/boss";
+import { HermanoMayorGrabHud } from "./enemies/boss/HermanoMayorGrabHud";
 
 
 
@@ -540,8 +542,12 @@ const terrain = createTerrain(scene, {
   const playerStatusHud = new PlayerStatusHud(playerStats);
   let auraHealth = Number.NaN;
   let auraSanity = Number.NaN;
+  let animatedHealth = playerStats.snapshot.health;
   const unsubscribePlayerStatsAura = playerStats.onChange((event) => {
     if (event.type === "light-orb-absorbed") playerLightAbsorptionVfx.play();
+    if (event.snapshot.health < animatedHealth) player.playHitReaction();
+    animatedHealth = event.snapshot.health;
+    if (event.snapshot.health <= 0) player.clearEnemyGrabStruggles();
     const health = event.snapshot.health / event.snapshot.maxHealth;
     const sanity = event.snapshot.sanity / event.snapshot.maxSanity;
     if (health !== auraHealth) {
@@ -575,6 +581,7 @@ const terrain = createTerrain(scene, {
     player.setViewMode(requestedShadowView);
   }
   scene.onDisposeObservable.add(() => {
+    player.clearEnemyGrabStruggles();
     unsubscribePlayerStatsAura();
     playerLightAbsorptionVfx.dispose();
     playerStatusHud.dispose();
@@ -1015,7 +1022,8 @@ scene.onBeforeRenderObservable.add(() => {
     input,
     () => player.getLookRay(),
     hints,
-    (type, movementLockSeconds) => player.playInteractionAction(type, movementLockSeconds)
+    (type, movementLockSeconds) => player.playInteractionAction(type, movementLockSeconds),
+    () => !player.isNeckGrabbed
   );
   const attackLightSources = [
     ...endTorches.safeLightPositions.map((position) => position.clone()),
@@ -1116,8 +1124,15 @@ scene.onBeforeRenderObservable.add(() => {
           `shadow-grabber:${sourceId}:hold`,
           amount
         ),
-      applyGrabPressure: (source, duration, movementMultiplier, pullSpeed) =>
+      applyGrabPressure: (
+        sourceId,
+        source,
+        duration,
+        movementMultiplier,
+        pullSpeed
+      ) =>
         player.applyEnemyGrabPressure(
+          sourceId,
           source,
           duration,
           movementMultiplier,
@@ -1143,9 +1158,13 @@ scene.onBeforeRenderObservable.add(() => {
     onEvent: (id, event) => {
       if (event === "detect") playerStats.noteEnemyAwareness("detected");
       if (event === "alert") playerStats.noteEnemyAwareness("chase-started");
-      if (event === "grab") playerStats.beginShadowGrabberCapture(id);
+      if (event === "grab") {
+        const captureAccepted = playerStats.beginShadowGrabberCapture(id);
+        if (captureAccepted && !playerStats.isDead) player.beginEnemyGrabStruggle(id);
+      }
       if (event === "retract" || event === "lightRecoil") {
         playerStats.endShadowGrabberCapture(id);
+        player.endEnemyGrabStruggle(id);
       }
       window.dispatchEvent(
         new CustomEvent("bosque:shadow-grabber", {
@@ -1165,8 +1184,28 @@ scene.onBeforeRenderObservable.add(() => {
   });
   scene.metadata.shadowGrabberBehaviorSystem = shadowGrabberBehaviorSystem;
   if (import.meta.env.DEV) {
+    const debugGrabIds = new Set<string>();
     const shadowGrabberDebug = {
       getSnapshots: () => shadowGrabberBehaviorSystem.getDebugSnapshots(),
+      getPlayerGrabStruggle: () => player.getGrabStruggleDebugSnapshot(),
+      setPlayerGrabPoseMask: (
+        mask: Parameters<typeof player.setGrabStruggleDebugPoseMask>[0]
+      ) => player.setGrabStruggleDebugPoseMask(mask),
+      triggerPlayerHitReaction: (
+        strength = 1,
+        hitZone: ProceduralHitReactionZone = "chest",
+        localRight = 0,
+        localForward = -1
+      ) => {
+        const yaw = player.root.rotation.y;
+        const direction = new Vector3(
+          localRight * Math.cos(yaw) + localForward * Math.sin(yaw),
+          0,
+          -localRight * Math.sin(yaw) + localForward * Math.cos(yaw)
+        );
+        player.playHitReaction({ direction, strength, hitZone });
+        return player.getGrabStruggleDebugSnapshot();
+      },
       getPlayerPosition: () => player.position.clone(),
       getSanity: () => playerStats.normalizedSanity,
       getPerformance: () => ({
@@ -1178,6 +1217,29 @@ scene.onBeforeRenderObservable.add(() => {
       }),
       setFxEnabled: (enabled: boolean) =>
         shadowGrabberBehaviorSystem.setFxEnabled(enabled),
+      simulatePlayerGrabStruggle: (requestedCount: number) => {
+        for (const id of debugGrabIds) player.endEnemyGrabStruggle(id);
+        debugGrabIds.clear();
+        const count = Math.max(0, Math.min(4, Math.floor(requestedCount)));
+        for (let index = 0; index < count; index++) {
+          const id = `debug-player-grab-${index + 1}`;
+          const angle = (index - (count - 1) * 0.5) * 0.65;
+          const source = new Vector3(
+            player.position.x + Math.sin(angle) * 3,
+            player.position.y,
+            player.position.z + Math.cos(angle) * 3
+          );
+          debugGrabIds.add(id);
+          player.beginEnemyGrabStruggle(id);
+          player.applyEnemyGrabPressure(id, source, 0, 1, 0);
+        }
+        return player.getGrabStruggleDebugSnapshot();
+      },
+      stopPlayerGrabStruggleSimulation: () => {
+        for (const id of debugGrabIds) player.endEnemyGrabStruggle(id);
+        debugGrabIds.clear();
+        return player.getGrabStruggleDebugSnapshot();
+      },
       simulateShadowGrabbers: (seconds: number, stepSeconds = 1 / 60) => {
         const committedStates = new Set([
           "telegraphing",
@@ -1272,8 +1334,10 @@ scene.onBeforeRenderObservable.add(() => {
     return !hit?.hit || hit.distance >= distance - 0.35;
   };
   const hermanoMayor = segments.getHermanoMayor();
+  const hermanoMayorGrabHud = new HermanoMayorGrabHud();
   const endHouseBounds = segments.getEndHouseBounds();
   const hermanoMayorNavigationProbe = Vector3.Zero();
+  const hermanoMayorNeckTarget = Vector3.Zero();
   const isHermanoMayorNavigationBlocked = (x: number, z: number) => {
     // His rig is wider than the playable characters, so give authored props
     // and walls a little extra clearance. The expanded lagoon query keeps both
@@ -1289,6 +1353,8 @@ scene.onBeforeRenderObservable.add(() => {
     ? new HermanoMayorBehavior({
         actor: hermanoMayor,
         playerPosition: () => player.position,
+        playerNeckPosition: () =>
+          player.getNeckWorldPositionToRef(hermanoMayorNeckTarget),
         houseBounds: endHouseBounds,
         visionRange:
           mapLayout.segmentLength * HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER,
@@ -1310,9 +1376,98 @@ scene.onBeforeRenderObservable.add(() => {
           return hasGameplayLineOfSight(player.camera.globalPosition, target);
         },
         getSfxVolume: () => musicPlayer?.getSfxVolume() ?? 0.8,
+        canGrabPlayer: () =>
+          !playerStats.isDead &&
+          !player.isGameplayControlLocked &&
+          player.waterLocomotionState === "grounded",
+        wasGrabEscapePressed: () => input.wasPressed("interact"),
+        setGrabVictimPose: (
+          active,
+          attackerPosition,
+          lift,
+          escapeProgress
+        ) =>
+          player.setNeckGrabState({
+            active,
+            attackerPosition,
+            lift,
+            escapeProgress,
+          }),
+        setGrabEscapeHud: (active, progress, presses, requiredPresses) =>
+          hermanoMayorGrabHud.setState(
+            active,
+            progress,
+            presses,
+            requiredPresses
+          ),
+        onGrabStarted: () => {
+          attackSystem.cancelCharge();
+          playerStats.cancelLightAbsorption("grab");
+        },
+        onGrabDamage: (kind) => {
+          const initial = kind === "initial";
+          playerStats.takeDamage(initial ? 6 : 2, {
+            type: "physical",
+            source: `hermano-mayor:neck-grab:${kind}`,
+          });
+          playerStats.modifySanity(
+            initial ? -7 : -2.5,
+            `hermano-mayor:neck-grab:${kind}:sanity`
+          );
+        },
       })
     : null;
-  scene.onDisposeObservable.addOnce(() => hermanoMayorBehavior?.dispose());
+  scene.onDisposeObservable.addOnce(() => {
+    hermanoMayorBehavior?.dispose();
+    hermanoMayorGrabHud.dispose();
+    player.setNeckGrabState({ active: false });
+  });
+  if (import.meta.env.DEV && hermanoMayor && hermanoMayorBehavior) {
+    const hermanoMayorDebug = {
+      getGrab: () => hermanoMayorBehavior.getGrabDebugSnapshot(),
+      forceGrab: (positionPlayer = true) => {
+        if (positionPlayer) {
+          const yaw = hermanoMayor.root.rotation.y;
+          const x = hermanoMayor.root.position.x + Math.sin(yaw) * 2.08;
+          const z = hermanoMayor.root.position.z + Math.cos(yaw) * 2.08;
+          player.root.position.set(
+            x,
+            player.getWalkableSurfaceHeight(terrain, x, z) +
+              player.getCollisionHeight(),
+            z
+          );
+          const desiredYaw = Math.atan2(
+            hermanoMayor.root.position.x - x,
+            hermanoMayor.root.position.z - z
+          );
+          const yawDelta = Math.atan2(
+            Math.sin(desiredYaw - player.root.rotation.y),
+            Math.cos(desiredYaw - player.root.rotation.y)
+          );
+          player.applyLookDelta(yawDelta, 0);
+        }
+        return hermanoMayorBehavior.forceGrab();
+      },
+      pressEscape: () => hermanoMayorBehavior.simulateGrabEscapePress(),
+      getPlayerPose: () => player.getGrabStruggleDebugSnapshot(),
+      getCamera: () => player.getNeckGrabCameraDebugSnapshot(),
+      setViewMode: (mode: ViewMode) => player.setViewMode(mode),
+      getPlayerStats: () => playerStats.snapshot,
+      isPlayerAvailable: () =>
+        !playerStats.isDead &&
+        !player.isGameplayControlLocked &&
+        player.waterLocomotionState === "grounded",
+    };
+    const debugGlobal = globalThis as typeof globalThis & {
+      __bosqueHermanoMayorDebug?: typeof hermanoMayorDebug;
+    };
+    debugGlobal.__bosqueHermanoMayorDebug = hermanoMayorDebug;
+    scene.onDisposeObservable.addOnce(() => {
+      if (debugGlobal.__bosqueHermanoMayorDebug === hermanoMayorDebug) {
+        delete debugGlobal.__bosqueHermanoMayorDebug;
+      }
+    });
+  }
   const sanctuaryLightSources = [
     ...endTorches.safeLightPositions,
     terminalLandmark.caveCandleFocusPoint,

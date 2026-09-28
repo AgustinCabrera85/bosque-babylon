@@ -41,7 +41,8 @@ export class InteractSystem {
     private input: InputManager,
     private getLookRay: () => LookRay,
     private hints: Hints,
-    private onAction?: (type?: string, movementLockSeconds?: number) => void
+    private onAction?: (type?: string, movementLockSeconds?: number) => void,
+    private canInteract: () => boolean = () => true
   ) {}
 
   update(deltaSeconds: number) {
@@ -49,7 +50,7 @@ export class InteractSystem {
       0,
       this.messageSecondsRemaining - Math.max(0, deltaSeconds)
     );
-    if (this.input.wasPressed("interact")) this.tryInteract();
+    if (this.input.wasPressed("interact") && this.canInteract()) this.tryInteract();
     if (this.input.wasPressed("cancel")) this.clearMessage();
   }
 

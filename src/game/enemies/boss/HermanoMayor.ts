@@ -14,6 +14,11 @@ import {
   HermanoMayorLookAction,
   type HermanoMayorLookTargetProvider,
 } from "./HermanoMayorLookAction";
+import {
+  HERMANO_MAYOR_NECK_GRAB_ACTION,
+  HermanoMayorNeckGrabAction,
+  type HermanoMayorNeckGrabPoseState,
+} from "./HermanoMayorNeckGrabAction";
 import { patchHermanoMayorMaterial } from "./HermanoMayorMaterials";
 
 export const HERMANO_MAYOR_MODEL_ROOT_URL = "/assets/models/enemies/boss/";
@@ -40,6 +45,10 @@ export type HermanoMayorHandle = {
     options?: HermanoMayorPlayOptions
   ): void;
   setLookTargetProvider(provider: HermanoMayorLookTargetProvider | null): void;
+  setNeckGrabPose(state: HermanoMayorNeckGrabPoseState | null): void;
+  getNeckGrabDebugSnapshot(): ReturnType<
+    HermanoMayorNeckGrabAction["getDebugSnapshot"]
+  >;
 };
 
 export async function loadHermanoMayor(
@@ -113,6 +122,13 @@ export async function loadHermanoMayor(
   });
   animations.registerProcedural(HERMANO_MAYOR_ORIENT_LOOK_ACTION, lookAction);
   animations.play(HERMANO_MAYOR_ORIENT_LOOK_ACTION);
+  const neckGrabAction = new HermanoMayorNeckGrabAction(
+    scene,
+    root,
+    meshes,
+    result.animationGroups
+  );
+  animations.registerProcedural(HERMANO_MAYOR_NECK_GRAB_ACTION, neckGrabAction);
 
   return {
     root,
@@ -120,6 +136,17 @@ export async function loadHermanoMayor(
     animations,
     playLocomotion,
     setLookTargetProvider: (provider) => lookAction.setTargetProvider(provider),
+    setNeckGrabPose: (state) => {
+      if (state) {
+        lookAction.setEnabled(false);
+        neckGrabAction.setPoseState(state);
+        neckGrabAction.setEnabled(true);
+        return;
+      }
+      neckGrabAction.setEnabled(false);
+      lookAction.setEnabled(true);
+    },
+    getNeckGrabDebugSnapshot: () => neckGrabAction.getDebugSnapshot(),
   };
 }
 

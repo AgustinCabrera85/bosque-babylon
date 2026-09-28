@@ -24,6 +24,7 @@ export type ShadowGrabberPlayerSource = {
   getSanity: () => number;
   applySanityDrain: (amount: number, sourceId: string) => void;
   applyGrabPressure?: (
+    sourceId: string,
     source: Vector3,
     duration: number,
     movementMultiplier: number,
@@ -93,7 +94,14 @@ export class ShadowGrabberBehaviorSystem {
       navigation: this.options.navigation,
       applySanityDrain: (amount) =>
         this.options.player.applySanityDrain(amount, controller.id),
-      applyGrabPressure: this.options.player.applyGrabPressure,
+      applyGrabPressure: (source, duration, movementMultiplier, pullSpeed) =>
+        this.options.player.applyGrabPressure?.(
+          controller.id,
+          source,
+          duration,
+          movementMultiplier,
+          pullSpeed
+        ),
       onSanityHit: this.options.player.onSanityHit,
       onEvent: this.options.onEvent,
     });

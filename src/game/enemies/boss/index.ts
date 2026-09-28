@@ -35,3 +35,14 @@ export {
   HermanoMayorNavigation,
   type HermanoMayorNavigationOptions,
 } from "./HermanoMayorNavigation";
+export {
+  HERMANO_MAYOR_NECK_GRAB_ACTION,
+  HermanoMayorNeckGrabAction,
+  type HermanoMayorNeckGrabPoseState,
+} from "./HermanoMayorNeckGrabAction";
+export {
+  HermanoMayorGrabAttack,
+  type HermanoMayorGrabAttackOptions,
+  type HermanoMayorGrabReleaseReason,
+  type HermanoMayorGrabState,
+} from "./HermanoMayorGrabAttack";

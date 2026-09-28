@@ -21,6 +21,13 @@ import {
 } from "./WaterSurface";
 import { LAUTARO_VISUAL_SCALE } from "./CharacterPresentation";
 import type { InputManager } from "./input/InputManager";
+import {
+  ProceduralGrabStruggleController,
+  type ProceduralGrabStruggleDebugPoseMask,
+  type ProceduralGrabStruggleDebugSnapshot,
+  type ProceduralHitReactionEvent,
+  type ProceduralNeckGrabState,
+} from "./animation/ProceduralGrabStruggleController";
 
 type Settings = {
   eyeHeight: number;
@@ -114,6 +121,8 @@ const MAX_SIMULATION_DELTA_SECONDS = 0.05;
 const ANIMATION_BLEND_TIME = 0.16;
 const ACTION_BLEND_TIME = 0.08;
 const STANDING_UP_BLEND_TIME = 0.18;
+const GRAB_LOOK_HALF_FOV_COSINE = Math.cos((65 * Math.PI) / 180);
+const GRAB_LOOK_TARGET_HYSTERESIS = 0.12;
 const THROW_ACTION_MOVEMENT_LOCK_SECONDS = 1.15;
 const THROW_CHARGE_REFERENCE_FRAMES: Record<
   CharacterId,
@@ -136,6 +145,12 @@ const THIRD_PERSON_FLASHLIGHT_PITCH_MIN = -0.58;
 const THIRD_PERSON_FLASHLIGHT_PITCH_MAX = 0.68;
 const FIRST_PERSON_CAMERA_HEIGHT_MULTIPLIER = 2;
 const PLAYER_CAMERA_FOV = 0.9;
+const NECK_GRAB_CAMERA_DISTANCE = 5.35;
+const NECK_GRAB_CAMERA_HEIGHT = 0.18;
+const NECK_GRAB_CAMERA_TARGET_DROP = 0.28;
+const NECK_GRAB_CAMERA_FOV = 0.82;
+const NECK_GRAB_CAMERA_ENTER_SECONDS = 0.48;
+const NECK_GRAB_CAMERA_EXIT_SECONDS = 0.72;
 const PRIMARY_VIEW_MODE_SEQUENCE: ViewMode[] = ["third", "first", "iso"];
 const ISOMETRIC_CAMERA_SIDE_OFFSET = 6.8;
 const ISOMETRIC_CAMERA_DISTANCE = 8.8;
@@ -231,6 +246,26 @@ export class PlayerController {
   private fadeToAnimation: AnimationGroup | null = null;
   private fadeElapsed = 0;
   private fadeDuration = ANIMATION_BLEND_TIME;
+  private grabStruggleController: ProceduralGrabStruggleController | null = null;
+  private readonly enemyGrabSources = new Map<string, Vector3 | null>();
+  private readonly enemyGrabDirection = Vector3.Zero();
+  private readonly enemyGrabLookDirection = Vector3.Zero();
+  private enemyGrabLookTargetId: string | null = null;
+  private neckGrabRestrained = false;
+  private neckGrabCameraActive = false;
+  private neckGrabCameraSideResolved = false;
+  private neckGrabCameraElapsed = 0;
+  private neckGrabCameraEntryFov = PLAYER_CAMERA_FOV;
+  private readonly neckGrabCameraAttackerPosition = Vector3.Zero();
+  private readonly neckGrabCameraSide = Vector3.Right();
+  private readonly neckGrabCameraEntryPosition = Vector3.Zero();
+  private readonly neckGrabCameraEntryTarget = Vector3.Zero();
+  private readonly neckGrabCameraTarget = Vector3.Zero();
+  private readonly neckGrabCameraDesiredPosition = Vector3.Zero();
+  private readonly neckGrabCameraResolvedPosition = Vector3.Zero();
+  private readonly neckGrabCameraAlternativePosition = Vector3.Zero();
+  private readonly neckGrabCameraBlendedPosition = Vector3.Zero();
+  private readonly neckGrabCameraBlendedTarget = Vector3.Zero();
   private actionPlaying = false;
   private chargedThrowAction: {
     group: AnimationGroup;
@@ -317,6 +352,16 @@ export class PlayerController {
     return result;
   }
 
+  /** Writes the animated Mixamo neck position used by external grab IK. */
+  getNeckWorldPositionToRef(result: Vector3) {
+    if (this.grabStruggleController?.getJointWorldPositionToRef("neck", result)) {
+      return result;
+    }
+    result.copyFrom(this.root.position);
+    result.y -= 0.2;
+    return result;
+  }
+
   getCollisionHeight() {
     return this.settings.eyeHeight;
   }
@@ -347,6 +392,10 @@ export class PlayerController {
 
   get isGameplayControlLocked() {
     return this.controlsLocked;
+  }
+
+  get isNeckGrabbed() {
+    return this.neckGrabRestrained;
   }
 
   get isRunning() {
@@ -477,6 +526,17 @@ export class PlayerController {
       if (!REGISTERED_CHARACTER_ANIMATIONS.has(group.name)) continue;
       this.animations.set(group.name, group);
     }
+    this.grabStruggleController?.dispose();
+    this.grabStruggleController = new ProceduralGrabStruggleController(
+      this.scene,
+      this.root,
+      avatarRoot,
+      this.avatarMeshes,
+      res.animationGroups,
+      this.character,
+      {},
+      import.meta.env.DEV
+    );
 
     this.normalizeAvatar();
     this.setAvatarVisible(this.viewMode !== "first");
@@ -635,6 +695,7 @@ export class PlayerController {
   beginChargedThrow() {
     if (
       this.controlsLocked ||
+      this.neckGrabRestrained ||
       this.actionPlaying ||
       this.waterLocomotionStateValue !== "grounded"
     ) {
@@ -691,6 +752,7 @@ export class PlayerController {
 
   /** Keeps input responsive while a grab briefly slows and tugs the character. */
   applyEnemyGrabPressure(
+    sourceId: string,
     source: Vector3,
     duration: number,
     movementMultiplier: number,
@@ -703,6 +765,101 @@ export class PlayerController {
       Math.max(0.35, Math.min(1, movementMultiplier))
     );
     this.enemyGrabPullSpeed = Math.max(this.enemyGrabPullSpeed, Math.max(0, pullSpeed));
+    const id = sourceId.trim();
+    if (id && this.enemyGrabSources.has(id)) {
+      const storedSource = this.enemyGrabSources.get(id);
+      if (storedSource) storedSource.copyFrom(source);
+      else this.enemyGrabSources.set(id, source.clone());
+      this.updateEnemyGrabDirection();
+    }
+  }
+
+  /** Plays a short bounded procedural impact over the current locomotion clip. */
+  playHitReaction(event?: ProceduralHitReactionEvent) {
+    if (this.controlsLocked) return false;
+    const direction =
+      event?.direction ??
+      new Vector3(-Math.sin(this.root.rotation.y), 0, -Math.cos(this.root.rotation.y));
+    return (
+      this.grabStruggleController?.triggerHitReaction({
+        ...event,
+        direction,
+      }) ?? false
+    );
+  }
+
+  setNeckGrabState(state: ProceduralNeckGrabState) {
+    if (state.active && !this.neckGrabRestrained) {
+      this.cancelChargedThrow();
+      this.jumpQueued = false;
+      this.waterActionQueued = false;
+    } else if (!state.active && this.neckGrabRestrained) {
+      this.endNeckGrabSideCamera();
+    }
+    this.neckGrabRestrained = state.active;
+    if (state.active && state.attackerPosition) {
+      if (this.neckGrabCameraActive) {
+        this.neckGrabCameraAttackerPosition.copyFrom(state.attackerPosition);
+      } else {
+        this.beginNeckGrabSideCamera(state.attackerPosition);
+      }
+    }
+    this.grabStruggleController?.setNeckGrabState(state);
+  }
+
+  getNeckGrabCameraDebugSnapshot() {
+    this.camera.computeWorldMatrix();
+    return {
+      active: this.neckGrabCameraActive,
+      elapsed: this.neckGrabCameraElapsed,
+      viewMode: this.viewMode,
+      avatarVisible: this.avatarMeshes.some((mesh) => mesh.visibility > 0.01),
+      side: vectorSnapshot(this.neckGrabCameraSide),
+      playerPosition: vectorSnapshot(this.root.position),
+      attackerPosition: vectorSnapshot(this.neckGrabCameraAttackerPosition),
+      target: vectorSnapshot(this.neckGrabCameraTarget),
+      worldPosition: vectorSnapshot(this.camera.globalPosition),
+      mode: this.camera.mode,
+      fieldOfView: this.camera.fov,
+    };
+  }
+
+  /** Starts the procedural struggle for one grabber without duplicating ownership. */
+  beginEnemyGrabStruggle(sourceId: string) {
+    const id = sourceId.trim();
+    if (!id || this.enemyGrabSources.has(id)) return;
+    this.enemyGrabSources.set(id, null);
+    this.grabStruggleController?.setActiveGrabberCount(this.enemyGrabSources.size);
+  }
+
+  /** Releases one grabber without cancelling a struggle owned by another. */
+  endEnemyGrabStruggle(sourceId: string) {
+    if (!this.enemyGrabSources.delete(sourceId.trim())) return;
+    this.grabStruggleController?.setActiveGrabberCount(this.enemyGrabSources.size);
+    this.updateEnemyGrabDirection();
+  }
+
+  /** Clears visual grab ownership on death, respawn, or scene teardown. */
+  clearEnemyGrabStruggles() {
+    if (this.enemyGrabSources.size === 0) return;
+    this.enemyGrabSources.clear();
+    this.enemyGrabDirection.setAll(0);
+    this.enemyGrabLookDirection.setAll(0);
+    this.enemyGrabLookTargetId = null;
+    this.grabStruggleController?.setGrabDirection(this.enemyGrabDirection);
+    this.grabStruggleController?.setLookDirection(this.enemyGrabLookDirection);
+    this.grabStruggleController?.setActiveGrabberCount(0);
+  }
+
+  getGrabStruggleDebugSnapshot(): ProceduralGrabStruggleDebugSnapshot | null {
+    return this.grabStruggleController?.getDebugSnapshot() ?? null;
+  }
+
+  setGrabStruggleDebugPoseMask(
+    mask: Partial<ProceduralGrabStruggleDebugPoseMask>
+  ) {
+    this.grabStruggleController?.setDebugPoseMask(mask);
+    return this.getGrabStruggleDebugSnapshot();
   }
 
   private lockMovement(seconds: number) {
@@ -912,7 +1069,7 @@ export class PlayerController {
     // convert that wall-clock pause into several metres of player movement.
     dt = Math.max(0, Math.min(dt, MAX_SIMULATION_DELTA_SECONDS));
     const inputActive = this.input.isGameplayInputEnabled();
-    if (!this.controlsLocked) {
+    if (!this.controlsLocked && !this.neckGrabRestrained) {
       if (inputActive) {
         const look = this.input.getLook();
         if (look.x !== 0 || look.y !== 0) this.applyLook(look.x, look.y);
@@ -948,7 +1105,10 @@ export class PlayerController {
     this.refreshWaterEnvironment(terrain);
     this.refreshWaterLocomotionState();
     const movementLocked =
-      this.controlsLocked || this.movementLockTimer > 0 || this.actionPlaying;
+      this.controlsLocked ||
+      this.neckGrabRestrained ||
+      this.movementLockTimer > 0 ||
+      this.actionPlaying;
     this.consumeWaterAction(movementLocked);
     this.updateSwimmingCameraBlend(dt);
 
@@ -1322,6 +1482,10 @@ export class PlayerController {
       this.camera.fov = this.cinematicCameraState.fieldOfView;
       return;
     }
+    if (this.neckGrabCameraActive) {
+      this.updateNeckGrabSideCamera(deltaTime, segments, terrain);
+      return;
+    }
     if (this.viewMode === "first") {
       this.resetThirdPersonCameraCollisionState();
       this.positionFirstPersonCamera();
@@ -1376,6 +1540,192 @@ export class PlayerController {
       Vector3.TransformCoordinates(terrainSafePosition, inverse)
     );
     this.orientCameraForView(target);
+  }
+
+  private beginNeckGrabSideCamera(attackerPosition: Vector3) {
+    this.neckGrabCameraAttackerPosition.copyFrom(attackerPosition);
+    this.root.computeWorldMatrix(true);
+    this.camera.computeWorldMatrix();
+    this.neckGrabCameraEntryPosition.copyFrom(this.camera.globalPosition);
+    this.neckGrabCameraEntryFov = this.camera.fov;
+    this.updateNeckGrabCameraTarget();
+
+    const encounterX = this.root.position.x - attackerPosition.x;
+    const encounterZ = this.root.position.z - attackerPosition.z;
+    const encounterLength = Math.hypot(encounterX, encounterZ);
+    if (encounterLength > 0.001) {
+      this.neckGrabCameraSide.set(
+        encounterZ / encounterLength,
+        0,
+        -encounterX / encounterLength
+      );
+    } else {
+      this.neckGrabCameraSide.set(
+        Math.cos(this.root.rotation.y),
+        0,
+        -Math.sin(this.root.rotation.y)
+      );
+    }
+
+    const currentOffsetX =
+      this.neckGrabCameraEntryPosition.x - this.neckGrabCameraTarget.x;
+    const currentOffsetZ =
+      this.neckGrabCameraEntryPosition.z - this.neckGrabCameraTarget.z;
+    if (
+      currentOffsetX * this.neckGrabCameraSide.x +
+        currentOffsetZ * this.neckGrabCameraSide.z <
+      0
+    ) {
+      this.neckGrabCameraSide.scaleInPlace(-1);
+    }
+
+    const currentForward = this.camera.getDirection(Vector3.Forward());
+    const targetDistance = Math.max(
+      2,
+      Vector3.Distance(
+        this.neckGrabCameraEntryPosition,
+        this.neckGrabCameraTarget
+      )
+    );
+    this.neckGrabCameraEntryTarget
+      .copyFrom(this.neckGrabCameraEntryPosition)
+      .addInPlace(currentForward.scale(targetDistance));
+
+    this.neckGrabCameraElapsed = 0;
+    this.neckGrabCameraSideResolved = false;
+    this.neckGrabCameraActive = true;
+    this.cameraViewTransition = null;
+    this.thirdPersonCameraArmLength = null;
+    this.avatarCameraVisibility = 1;
+    this.setAvatarVisible(true);
+  }
+
+  private endNeckGrabSideCamera() {
+    if (!this.neckGrabCameraActive) return;
+    this.root.computeWorldMatrix(true);
+    this.camera.computeWorldMatrix();
+    const transitionOrigin = this.camera.globalPosition.clone();
+    this.neckGrabCameraActive = false;
+    this.neckGrabCameraElapsed = 0;
+    this.camera.rotation.z = 0;
+    this.camera.fov = PLAYER_CAMERA_FOV;
+    this.cameraViewTransition = {
+      fromWorldPosition: transitionOrigin,
+      elapsed: 0,
+      duration: NECK_GRAB_CAMERA_EXIT_SECONDS,
+    };
+    this.setAvatarVisible(this.viewMode !== "first");
+  }
+
+  private updateNeckGrabSideCamera(
+    deltaTime: number,
+    segments: Segments,
+    terrain: TerrainHandle
+  ) {
+    this.camera.mode = Camera.PERSPECTIVE_CAMERA;
+    this.resetThirdPersonCameraCollisionState();
+    this.avatarCameraVisibility = 1;
+    this.setAvatarVisible(true);
+    this.updateNeckGrabCameraTarget();
+
+    this.resolveNeckGrabCameraPosition(
+      this.neckGrabCameraSide.x,
+      this.neckGrabCameraSide.z,
+      segments,
+      terrain,
+      this.neckGrabCameraResolvedPosition
+    );
+    if (!this.neckGrabCameraSideResolved) {
+      this.resolveNeckGrabCameraPosition(
+        -this.neckGrabCameraSide.x,
+        -this.neckGrabCameraSide.z,
+        segments,
+        terrain,
+        this.neckGrabCameraAlternativePosition
+      );
+      const preferredDistance = Vector3.Distance(
+        this.neckGrabCameraTarget,
+        this.neckGrabCameraResolvedPosition
+      );
+      const alternativeDistance = Vector3.Distance(
+        this.neckGrabCameraTarget,
+        this.neckGrabCameraAlternativePosition
+      );
+      if (alternativeDistance > preferredDistance + 0.35) {
+        this.neckGrabCameraSide.scaleInPlace(-1);
+        this.neckGrabCameraResolvedPosition.copyFrom(
+          this.neckGrabCameraAlternativePosition
+        );
+      }
+      this.neckGrabCameraSideResolved = true;
+    }
+    this.neckGrabCameraElapsed = Math.min(
+      NECK_GRAB_CAMERA_ENTER_SECONDS,
+      this.neckGrabCameraElapsed + Math.max(0, deltaTime)
+    );
+    const progress =
+      this.neckGrabCameraElapsed / NECK_GRAB_CAMERA_ENTER_SECONDS;
+    const smooth = progress * progress * (3 - 2 * progress);
+    Vector3.LerpToRef(
+      this.neckGrabCameraEntryPosition,
+      this.neckGrabCameraResolvedPosition,
+      smooth,
+      this.neckGrabCameraBlendedPosition
+    );
+    Vector3.LerpToRef(
+      this.neckGrabCameraEntryTarget,
+      this.neckGrabCameraTarget,
+      smooth,
+      this.neckGrabCameraBlendedTarget
+    );
+
+    this.root.computeWorldMatrix(true);
+    const inverse = this.root.getWorldMatrix().clone().invert();
+    this.camera.position.copyFrom(
+      Vector3.TransformCoordinates(this.neckGrabCameraBlendedPosition, inverse)
+    );
+    const localTarget = Vector3.TransformCoordinates(
+      this.neckGrabCameraBlendedTarget,
+      inverse
+    );
+    this.lookAtLocal(localTarget);
+    this.camera.fov =
+      this.neckGrabCameraEntryFov +
+      (NECK_GRAB_CAMERA_FOV - this.neckGrabCameraEntryFov) * smooth;
+  }
+
+  private updateNeckGrabCameraTarget() {
+    this.neckGrabCameraTarget.set(
+      (this.root.position.x + this.neckGrabCameraAttackerPosition.x) * 0.5,
+      this.root.position.y - NECK_GRAB_CAMERA_TARGET_DROP,
+      (this.root.position.z + this.neckGrabCameraAttackerPosition.z) * 0.5
+    );
+  }
+
+  private resolveNeckGrabCameraPosition(
+    sideX: number,
+    sideZ: number,
+    segments: Segments,
+    terrain: TerrainHandle,
+    result: Vector3
+  ) {
+    this.neckGrabCameraDesiredPosition.copyFrom(this.neckGrabCameraTarget);
+    this.neckGrabCameraDesiredPosition.x += sideX * NECK_GRAB_CAMERA_DISTANCE;
+    this.neckGrabCameraDesiredPosition.y += NECK_GRAB_CAMERA_HEIGHT;
+    this.neckGrabCameraDesiredPosition.z += sideZ * NECK_GRAB_CAMERA_DISTANCE;
+    result.copyFrom(
+      this.clampCameraAboveTerrain(
+        this.resolveCameraTerrainPosition(
+          this.neckGrabCameraTarget,
+          segments.resolveCameraPosition(
+            this.neckGrabCameraTarget,
+            this.neckGrabCameraDesiredPosition
+          ),
+          terrain
+        ),
+        terrain
+      )
+    );
   }
 
   private smoothThirdPersonCameraArm(
@@ -1973,6 +2323,68 @@ export class PlayerController {
     }
   }
 
+  private updateEnemyGrabDirection() {
+    let directionX = 0;
+    let directionZ = 0;
+    let positionedSources = 0;
+    let bestLookTargetId: string | null = null;
+    let bestLookScore = Number.NEGATIVE_INFINITY;
+    let currentLookScore = Number.NEGATIVE_INFINITY;
+    const forwardX = Math.sin(this.root.rotation.y);
+    const forwardZ = Math.cos(this.root.rotation.y);
+    for (const [id, source] of this.enemyGrabSources) {
+      if (!source) continue;
+      const offsetX = source.x - this.root.position.x;
+      const offsetZ = source.z - this.root.position.z;
+      const length = Math.hypot(offsetX, offsetZ);
+      if (length <= 0.001) continue;
+      const normalizedX = offsetX / length;
+      const normalizedZ = offsetZ / length;
+      directionX += normalizedX;
+      directionZ += normalizedZ;
+      positionedSources++;
+      const lookScore = normalizedX * forwardX + normalizedZ * forwardZ;
+      if (lookScore < GRAB_LOOK_HALF_FOV_COSINE) continue;
+      if (id === this.enemyGrabLookTargetId) currentLookScore = lookScore;
+      if (lookScore > bestLookScore) {
+        bestLookScore = lookScore;
+        bestLookTargetId = id;
+      }
+    }
+    if (positionedSources > 0) {
+      this.enemyGrabDirection.set(
+        directionX / positionedSources,
+        0,
+        directionZ / positionedSources
+      );
+      if (this.enemyGrabDirection.lengthSquared() > 0.000001) {
+        this.enemyGrabDirection.normalize();
+      }
+    } else {
+      this.enemyGrabDirection.setAll(0);
+    }
+    if (
+      this.enemyGrabLookTargetId &&
+      currentLookScore >= bestLookScore - GRAB_LOOK_TARGET_HYSTERESIS
+    ) {
+      bestLookTargetId = this.enemyGrabLookTargetId;
+    }
+    this.enemyGrabLookTargetId = bestLookTargetId;
+    const lookSource = bestLookTargetId
+      ? this.enemyGrabSources.get(bestLookTargetId)
+      : null;
+    if (lookSource) {
+      this.enemyGrabLookDirection.copyFrom(lookSource).subtractInPlace(this.root.position);
+      if (this.enemyGrabLookDirection.lengthSquared() > 0.000001) {
+        this.enemyGrabLookDirection.normalize();
+      }
+    } else {
+      this.enemyGrabLookDirection.setAll(0);
+    }
+    this.grabStruggleController?.setGrabDirection(this.enemyGrabDirection);
+    this.grabStruggleController?.setLookDirection(this.enemyGrabLookDirection);
+  }
+
   private updateAvatarAnimation(moveX: number, moveY: number, running: boolean) {
     if (!this.animations.size || this.actionPlaying) return;
 
@@ -2160,4 +2572,8 @@ export class PlayerController {
     group.weight = weight;
     group.setWeightForAllAnimatables(weight);
   }
+}
+
+function vectorSnapshot(vector: Vector3) {
+  return { x: vector.x, y: vector.y, z: vector.z };
 }

@@ -73,6 +73,25 @@
       <div id="hint" class="hidden"></div>
       <div id="reticle" aria-hidden="true"></div>
 
+      <div id="hermanoMayorGrabHud" aria-hidden="true">
+        <div class="hermano-grab-title">¡TE TIENE DEL CUELLO!</div>
+        <div
+          id="hermanoMayorGrabProgress"
+          class="hermano-grab-track"
+          role="progressbar"
+          aria-label="Progreso para liberarse del agarre"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <div id="hermanoMayorGrabFill" class="hermano-grab-fill"></div>
+        </div>
+        <div class="hermano-grab-prompt">
+          PULSA <strong>INTERACTUAR</strong> REPETIDAMENTE
+          <span id="hermanoMayorGrabCount">0 / 10</span>
+        </div>
+      </div>
+
       <div id="minorEnemyHealthHud" class="enemy-health-hud minor-enemy-health-hud" aria-hidden="true">
         <span class="enemy-health-label">ATRAPASOMBRAS</span>
         <div id="minorEnemyHealthTrack" class="enemy-health-track" role="progressbar" aria-label="Vida de Atrapasombras" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">

@@ -705,6 +705,102 @@ body.attack-aiming #reticle {
     drop-shadow(0 9px 12px rgba(0, 0, 0, 0.48));
 }
 
+#hermanoMayorGrabHud {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(148px, 20vh, 232px);
+  width: min(520px, calc(100vw - 40px));
+  z-index: 48;
+  box-sizing: border-box;
+  padding: 14px 18px 13px;
+  color: #f4e8ce;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 18px) scale(.96);
+  transition: opacity .16s ease, transform .2s cubic-bezier(.2,.8,.2,1);
+  border: 1px solid rgba(190, 142, 86, .72);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(32, 18, 15, .94), rgba(9, 8, 10, .96)),
+    radial-gradient(circle at 50% 0%, rgba(126, 55, 37, .38), transparent 70%);
+  box-shadow:
+    0 0 0 2px rgba(15, 9, 8, .78),
+    0 10px 36px rgba(0, 0, 0, .68),
+    inset 0 0 20px rgba(122, 46, 32, .2);
+}
+
+#hermanoMayorGrabHud.active {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  animation: hermanoGrabPressure .72s ease-in-out infinite alternate;
+}
+
+.hermano-grab-title {
+  margin-bottom: 9px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(15px, 2.2vw, 21px);
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-shadow: 0 2px 5px #000, 0 0 12px rgba(157, 51, 34, .7);
+}
+
+.hermano-grab-track {
+  position: relative;
+  height: 15px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 190, 124, .58);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .72);
+  box-shadow: inset 0 2px 7px rgba(0, 0, 0, .85);
+}
+
+.hermano-grab-fill {
+  --grab-progress: 0;
+  width: calc(var(--grab-progress) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7b2721, #c86c3f 56%, #f0c777);
+  box-shadow: 0 0 13px rgba(231, 117, 67, .72);
+  transition: width .09s cubic-bezier(.2,.9,.25,1);
+}
+
+.hermano-grab-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: clamp(10px, 1.5vw, 13px);
+  letter-spacing: .08em;
+  color: rgba(242, 226, 198, .9);
+}
+
+.hermano-grab-prompt strong {
+  color: #ffd796;
+}
+
+#hermanoMayorGrabCount {
+  min-width: 48px;
+  margin-left: 5px;
+  color: #df9b73;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes hermanoGrabPressure {
+  from { box-shadow: 0 0 0 2px rgba(15, 9, 8, .78), 0 10px 36px rgba(0,0,0,.68), inset 0 0 20px rgba(122,46,32,.2); }
+  to { box-shadow: 0 0 0 2px rgba(15, 9, 8, .78), 0 10px 42px rgba(0,0,0,.74), inset 0 0 27px rgba(151,48,32,.36); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #hermanoMayorGrabHud,
+  #hermanoMayorGrabHud.active,
+  .hermano-grab-fill {
+    animation: none;
+    transition: none;
+  }
+}
+
 .player-status-hud-art {
   display: block;
   width: 100%;

@@ -1,13 +1,17 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { HermanoMayorHandle } from "./HermanoMayor";
 import { HermanoMayorAudio } from "./HermanoMayorAudio";
+import {
+  HermanoMayorGrabAttack,
+  type HermanoMayorGrabReleaseReason,
+} from "./HermanoMayorGrabAttack";
 import { HermanoMayorNavigation } from "./HermanoMayorNavigation";
 
 export const HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER = 1.15;
 
 const VISION_HALF_ANGLE = (78 * Math.PI) / 180;
-const UNARMED_STOP_DISTANCE = 3.4;
-const UNARMED_RESUME_DISTANCE = 4.6;
+const UNARMED_STOP_DISTANCE = 2.05;
+const UNARMED_RESUME_DISTANCE = 2.75;
 const WALK_SPEED = 1.72;
 const TURN_SPEED = (125 * Math.PI) / 180;
 const WALK_SPEED_RATIO = 0.88;
@@ -15,11 +19,16 @@ const ANIMATION_BLEND_SPEED = 0.09;
 const NEARBY_UNSEEN_DISTANCE = 13;
 const NEARBY_UNSEEN_COOLDOWN = 18;
 
-export type HermanoMayorBehaviorState = "waiting" | "following" | "watching";
+export type HermanoMayorBehaviorState =
+  | "waiting"
+  | "following"
+  | "watching"
+  | "grabbing";
 
 export type HermanoMayorBehaviorOptions = {
   actor: HermanoMayorHandle;
   playerPosition: () => Vector3;
+  playerNeckPosition: () => Vector3;
   houseBounds: { min: Vector3; max: Vector3 };
   visionRange: number;
   getGroundHeight: (x: number, z: number) => number;
@@ -27,6 +36,23 @@ export type HermanoMayorBehaviorOptions = {
   hasLineOfSight: (origin: Vector3, target: Vector3) => boolean;
   isVisibleToPlayer: () => boolean;
   getSfxVolume?: () => number;
+  canGrabPlayer: () => boolean;
+  wasGrabEscapePressed: () => boolean;
+  setGrabVictimPose: (
+    active: boolean,
+    attackerPosition: Vector3,
+    lift: number,
+    escapeProgress: number
+  ) => void;
+  setGrabEscapeHud: (
+    active: boolean,
+    progress: number,
+    presses: number,
+    requiredPresses: number
+  ) => void;
+  onGrabStarted: () => void;
+  onGrabDamage: (kind: "initial" | "squeeze") => void;
+  onGrabEnded?: (reason: HermanoMayorGrabReleaseReason) => void;
 };
 
 function clamp01(value: number) {
@@ -47,6 +73,7 @@ export class HermanoMayorBehavior {
   private readonly actor: HermanoMayorHandle;
   private readonly audio: HermanoMayorAudio;
   private readonly navigation: HermanoMayorNavigation;
+  private readonly grabAttack: HermanoMayorGrabAttack;
   private state: HermanoMayorBehaviorState = "waiting";
   private locomotion: "idle" | "walk" = "idle";
   private hasEnteredHouse = false;
@@ -67,6 +94,18 @@ export class HermanoMayorBehavior {
     this.wasPlayerInside = this.isPlayerInside(options.playerPosition());
     this.audio = new HermanoMayorAudio({ getSfxVolume: options.getSfxVolume });
     this.navigation = new HermanoMayorNavigation({ isBlocked: options.isBlocked });
+    this.grabAttack = new HermanoMayorGrabAttack({
+      actor: options.actor,
+      playerPosition: options.playerPosition,
+      playerNeckPosition: options.playerNeckPosition,
+      canCapturePlayer: options.canGrabPlayer,
+      wasEscapePressed: options.wasGrabEscapePressed,
+      setVictimPose: options.setGrabVictimPose,
+      setEscapeHud: options.setGrabEscapeHud,
+      onGrabStarted: options.onGrabStarted,
+      onGrabDamage: options.onGrabDamage,
+      onGrabEnded: options.onGrabEnded,
+    });
     this.audio.setBreathing("idle");
     this.actor.setLookTargetProvider(options.playerPosition);
     window.addEventListener("bosque:pause", this.onPause);
@@ -123,6 +162,17 @@ export class HermanoMayorBehavior {
       this.nearbyUnseenCooldown = NEARBY_UNSEEN_COOLDOWN;
     }
 
+    const grabOwnsMovement = this.grabAttack.update(
+      dt,
+      this.engaged && this.canSeePlayer(player, distance),
+      distance
+    );
+    if (grabOwnsMovement) {
+      this.navigation.clear();
+      this.enterState("grabbing");
+      return;
+    }
+
     if (!this.engaged || distance > this.options.visionRange) {
       this.navigation.clear();
       this.enterState(this.engaged ? "watching" : "waiting");
@@ -156,7 +206,20 @@ export class HermanoMayorBehavior {
 
   public dispose() {
     window.removeEventListener("bosque:pause", this.onPause);
+    this.grabAttack.dispose();
     this.audio.dispose();
+  }
+
+  public forceGrab() {
+    return this.grabAttack.forceGrab();
+  }
+
+  public simulateGrabEscapePress() {
+    return this.grabAttack.simulateEscapePress();
+  }
+
+  public getGrabDebugSnapshot() {
+    return this.grabAttack.getDebugSnapshot();
   }
 
   private enterState(next: HermanoMayorBehaviorState) {
@@ -168,7 +231,7 @@ export class HermanoMayorBehavior {
       return;
     }
     this.setLocomotion("idle");
-    this.audio.setBreathing("idle");
+    this.audio.setBreathing(next === "grabbing" ? "chase" : "idle");
   }
 
   private setLocomotion(next: "idle" | "walk") {

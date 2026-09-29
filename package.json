@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@babylonjs/core": "^9.23.0",
+    "@babylonjs/inspector": "^9.23.0",
     "@babylonjs/loaders": "^9.23.0",
     "@babylonjs/materials": "^9.23.0",
     "graphify": "^1.0.0"

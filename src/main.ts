@@ -110,10 +110,23 @@ const engine = new Engine(renderCanvas, quality.name === "desktop", {
   antialias: quality.name === "desktop",
 });
 engine.setHardwareScalingLevel(hardwareScaling);
-const musicPlayer = setupMusicPlayer();
 
 async function start() {
+  let debugBootstrap: typeof import("./debug/DebugBootstrap") | null = null;
+  if (import.meta.env.DEV) {
+    debugBootstrap = await import("./debug/DebugBootstrap");
+    if (
+      await debugBootstrap.tryStartStandaloneDebugMode({
+        engine,
+        canvas: renderCanvas,
+      })
+    ) {
+      return;
+    }
+  }
+
   armDesktopControlFromStartGesture();
+  const musicPlayer = setupMusicPlayer();
   const selectedCharacter = await setupCharacterSelection();
   document.body.classList.remove("character-selecting");
   showLoading();
@@ -138,6 +151,7 @@ async function start() {
     inventory,
     input
   );
+  debugBootstrap?.bootstrapDebug(scene);
   scene.onDisposeObservable.addOnce(() => {
     input.dispose();
     pauseMenu.dispose();

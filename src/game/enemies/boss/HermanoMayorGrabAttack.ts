@@ -39,10 +39,11 @@ export type HermanoMayorGrabAttackOptions = {
   onGrabEnded?: (reason: HermanoMayorGrabReleaseReason) => void;
 };
 
-const GRAB_START_DISTANCE = 2.35;
-const GRAB_BREAK_DISTANCE = 3.15;
-const GRAB_HOLD_DISTANCE = 1.12;
-const GRAB_LUNGE_SPEED = 2.7;
+const GRAB_START_DISTANCE = 1.55;
+const GRAB_BREAK_DISTANCE = 2.15;
+const GRAB_HOLD_DISTANCE = 0.92;
+const GRAB_CAPTURE_DISTANCE = 1.02;
+const GRAB_LUNGE_SPEED = 3.1;
 const WINDUP_SECONDS = 0.48;
 const LIFT_SECONDS = 0.58;
 const RELEASE_SECONDS = 0.44;
@@ -67,6 +68,7 @@ export class HermanoMayorGrabAttack {
     reach: 0,
     lift: 0,
     victimStruggle: 0,
+    shake: 0,
     targetPosition: Vector3.Zero(),
   };
 
@@ -113,10 +115,12 @@ export class HermanoMayorGrabAttack {
       if (playerDistance > GRAB_BREAK_DISTANCE) {
         this.beginRelease("missed");
       } else {
-        this.moveIntoGrabRange(dt);
+        const reachedGrabRange = this.moveIntoGrabRange(dt);
         const progress = smoothStep(this.stateElapsed / WINDUP_SECONDS);
-        this.setActorPose(progress, 0, 0);
-        if (this.stateElapsed >= WINDUP_SECONDS) this.capturePlayer();
+        this.setActorPose(progress, 0, 0, 0);
+        if (this.stateElapsed >= WINDUP_SECONDS && reachedGrabRange) {
+          this.capturePlayer();
+        }
       }
       return true;
     }
@@ -128,7 +132,7 @@ export class HermanoMayorGrabAttack {
         return true;
       }
       const lift = smoothStep(this.stateElapsed / LIFT_SECONDS);
-      this.setActorPose(1, lift, this.escapeProgress);
+      this.setActorPose(1, lift, this.escapeProgress, lift);
       this.updateVictim(lift);
       if (this.stateElapsed >= LIFT_SECONDS) {
         this.squeezeTimer = 0;
@@ -148,13 +152,18 @@ export class HermanoMayorGrabAttack {
         this.squeezeTimer -= SQUEEZE_INTERVAL_SECONDS;
         this.options.onGrabDamage("squeeze");
       }
-      this.setActorPose(1, 1, this.escapeProgress);
+      this.setActorPose(1, 1, this.escapeProgress, 1);
       this.updateVictim(1);
       return true;
     }
 
     const releaseProgress = smoothStep(this.stateElapsed / RELEASE_SECONDS);
-    this.setActorPose(1 - releaseProgress, 1 - releaseProgress, 0);
+    this.setActorPose(
+      1 - releaseProgress,
+      1 - releaseProgress,
+      0,
+      1 - releaseProgress
+    );
     if (this.stateElapsed >= RELEASE_SECONDS) this.finishRelease();
     return true;
   }
@@ -185,6 +194,7 @@ export class HermanoMayorGrabAttack {
         reach: this.actorPose.reach,
         lift: this.actorPose.lift,
         victimStruggle: this.actorPose.victimStruggle,
+        shake: this.actorPose.shake,
         targetPosition: {
           x: this.actorPose.targetPosition.x,
           y: this.actorPose.targetPosition.y,
@@ -210,7 +220,7 @@ export class HermanoMayorGrabAttack {
     this.squeezeTimer = 0;
     this.options.setEscapeHud(false, 0, 0, REQUIRED_ESCAPE_PRESSES);
     this.enterState("windup");
-    this.setActorPose(0, 0, 0);
+    this.setActorPose(0, 0, 0, 0);
   }
 
   private capturePlayer() {
@@ -276,10 +286,16 @@ export class HermanoMayorGrabAttack {
     this.enterState("cooldown");
   }
 
-  private setActorPose(reach: number, lift: number, victimStruggle: number) {
+  private setActorPose(
+    reach: number,
+    lift: number,
+    victimStruggle: number,
+    shake: number
+  ) {
     this.actorPose.reach = clamp01(reach);
     this.actorPose.lift = clamp01(lift);
     this.actorPose.victimStruggle = clamp01(victimStruggle);
+    this.actorPose.shake = clamp01(shake);
     this.actorPose.targetPosition.copyFrom(this.options.playerNeckPosition());
     this.options.actor.setNeckGrabPose(this.actorPose);
   }
@@ -302,13 +318,16 @@ export class HermanoMayorGrabAttack {
     const dx = player.x - root.position.x;
     const dz = player.z - root.position.z;
     const distance = Math.hypot(dx, dz);
-    if (distance <= GRAB_HOLD_DISTANCE || distance <= 0.001) return;
+    if (distance <= GRAB_HOLD_DISTANCE || distance <= 0.001) {
+      return distance <= GRAB_CAPTURE_DISTANCE;
+    }
     const step = Math.min(
       distance - GRAB_HOLD_DISTANCE,
       GRAB_LUNGE_SPEED * dt
     );
     root.position.x += (dx / distance) * step;
     root.position.z += (dz / distance) * step;
+    return distance - step <= GRAB_CAPTURE_DISTANCE;
   }
 
   private enterState(next: HermanoMayorGrabState) {

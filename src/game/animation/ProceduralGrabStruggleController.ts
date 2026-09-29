@@ -219,6 +219,9 @@ const COMBINED_POSE_LIMITS = {
 const NECK_GRAB_UPPER_ARM_LIMIT = radians(68);
 const NECK_GRAB_FOREARM_LIMIT = radians(78);
 const NECK_GRAB_VISUAL_LIFT_METERS = 0.7;
+const NECK_GRAB_SHAKE_LATERAL_METERS = 0.075;
+const NECK_GRAB_SHAKE_FORWARD_METERS = 0.105;
+const NECK_GRAB_SHAKE_VERTICAL_METERS = 0.018;
 
 type HitReactionWeights = {
   impact: number;
@@ -744,25 +747,46 @@ export class ProceduralGrabStruggleController {
 
     const weight = smoothStep(this.neckGrabWeight);
     const effort = 0.55 + this.neckGrabEscapeProgress * 0.45;
+    const shakeEnvelope =
+      smoothStep(this.neckGrabLift) *
+      (0.72 + this.neckGrabEscapeProgress * 0.28);
+    const shakePulse = Math.tanh(
+      Math.sin(this.neckGrabElapsed * Math.PI * 2 * 2.45) * 2.2
+    );
+    const shakeCounter = Math.sin(
+      this.neckGrabElapsed * Math.PI * 2 * 4.9 + 0.8
+    );
     const lateralSway =
-      Math.sin(this.neckGrabElapsed * Math.PI * 2 * 1.27 + this.motionPhase) *
-      0.006 *
-      effort;
+      shakeCounter * NECK_GRAB_SHAKE_LATERAL_METERS * shakeEnvelope;
     const forwardSway =
-      Math.sin(this.neckGrabElapsed * Math.PI * 2 * 0.91 + 1.1) *
-      0.004 *
-      effort;
+      shakePulse *
+      NECK_GRAB_SHAKE_FORWARD_METERS *
+      effort *
+      shakeEnvelope;
     const verticalSway =
-      Math.sin(this.neckGrabElapsed * Math.PI * 2 * 1.73 + 0.45) *
-      0.003 *
-      effort;
+      shakeCounter *
+      NECK_GRAB_SHAKE_VERTICAL_METERS *
+      shakeEnvelope;
+    const attackerOffsetX =
+      this.neckGrabAttackerPosition.x - this.root.position.x;
+    const attackerOffsetZ =
+      this.neckGrabAttackerPosition.z - this.root.position.z;
+    const attackerDistance = Math.hypot(attackerOffsetX, attackerOffsetZ);
+    const pullX = attackerDistance > 0.001
+      ? attackerOffsetX / attackerDistance
+      : this.forwardAxis.x;
+    const pullZ = attackerDistance > 0.001
+      ? attackerOffsetZ / attackerDistance
+      : this.forwardAxis.z;
+    const sideX = pullZ;
+    const sideZ = -pullX;
     this.neckGrabDesiredWorld.copyFrom(this.neckGrabAnchorWorld);
     this.neckGrabDesiredWorld.x +=
-      this.rightAxis.x * lateralSway + this.forwardAxis.x * forwardSway;
+      sideX * lateralSway + pullX * forwardSway;
     this.neckGrabDesiredWorld.y +=
       this.neckGrabPose.visualLift + verticalSway;
     this.neckGrabDesiredWorld.z +=
-      this.rightAxis.z * lateralSway + this.forwardAxis.z * forwardSway;
+      sideZ * lateralSway + pullZ * forwardSway;
     this.neckGrabDesiredWorld.subtractToRef(
       this.neckGrabCurrentWorld,
       this.neckGrabCorrectionWorld

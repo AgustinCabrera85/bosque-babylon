@@ -10,8 +10,10 @@ import { HermanoMayorNavigation } from "./HermanoMayorNavigation";
 export const HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER = 1.15;
 
 const VISION_HALF_ANGLE = (78 * Math.PI) / 180;
-const UNARMED_STOP_DISTANCE = 2.05;
-const UNARMED_RESUME_DISTANCE = 2.75;
+const UNARMED_STOP_DISTANCE = 1.35;
+const UNARMED_RESUME_DISTANCE = 1.85;
+const ARMED_STOP_DISTANCE = 1.28;
+const ARMED_RESUME_DISTANCE = 1.78;
 const WALK_SPEED = 1.72;
 const TURN_SPEED = (125 * Math.PI) / 180;
 const WALK_SPEED_RATIO = 0.88;
@@ -179,8 +181,12 @@ export class HermanoMayorBehavior {
       return;
     }
 
-    const stopDistance = this.armed ? 1.8 : UNARMED_STOP_DISTANCE;
-    const resumeDistance = this.armed ? 2.5 : UNARMED_RESUME_DISTANCE;
+    const stopDistance = this.armed
+      ? ARMED_STOP_DISTANCE
+      : UNARMED_STOP_DISTANCE;
+    const resumeDistance = this.armed
+      ? ARMED_RESUME_DISTANCE
+      : UNARMED_RESUME_DISTANCE;
     const shouldRemainWatching =
       distance <= stopDistance ||
       (this.state === "watching" && distance < resumeDistance);

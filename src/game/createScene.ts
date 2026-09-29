@@ -1431,8 +1431,8 @@ scene.onBeforeRenderObservable.add(() => {
       forceGrab: (positionPlayer = true) => {
         if (positionPlayer) {
           const yaw = hermanoMayor.root.rotation.y;
-          const x = hermanoMayor.root.position.x + Math.sin(yaw) * 2.08;
-          const z = hermanoMayor.root.position.z + Math.cos(yaw) * 2.08;
+          const x = hermanoMayor.root.position.x + Math.sin(yaw) * 1.45;
+          const z = hermanoMayor.root.position.z + Math.cos(yaw) * 1.45;
           player.root.position.set(
             x,
             player.getWalkableSurfaceHeight(terrain, x, z) +

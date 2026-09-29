@@ -17,6 +17,7 @@ export type HermanoMayorNeckGrabPoseState = {
   reach: number;
   lift: number;
   victimStruggle: number;
+  shake: number;
   targetPosition: Vector3;
 };
 
@@ -95,14 +96,14 @@ const GRIP_AXIS_PROFILE = {
   },
 } as const satisfies Record<string, GripJointAxisProfile>;
 
-const HAND_FLEX_DEGREES = 3;
+const HAND_FLEX_DEGREES = 5;
 const MAX_FOREARM_PRONATION_DEGREES = 80;
 const MAX_HAND_ROLL_DEGREES = 45;
 const FOREARM_TWIST_SHARE = 0.8;
-const GRIP_WRIST_BACK_METERS = 0.07;
-const GRIP_HALF_WIDTH_METERS = 0.165;
-const LEFT_GRIP_WRIST_VERTICAL_METERS = -0.04;
-const RIGHT_GRIP_WRIST_VERTICAL_METERS = 0.048;
+const GRIP_WRIST_BACK_METERS = 0.025;
+const GRIP_HALF_WIDTH_METERS = 0.105;
+const LEFT_GRIP_WRIST_VERTICAL_METERS = 0.035;
+const RIGHT_GRIP_WRIST_VERTICAL_METERS = 0.055;
 
 const GRIP_FINGER_CHAINS = [
   ["leftHandIndex1", "leftHandIndex2", "leftHandIndex3"],
@@ -145,7 +146,7 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
   private readonly rightPalmDirection = Vector3.Zero();
   private readonly leftGripDirection = Vector3.Zero();
   private readonly rightGripDirection = Vector3.Zero();
-  private readonly rightPalmLocalDirection = new Vector3(0, 0, -1);
+  private readonly rightPalmLocalDirection = new Vector3(0, 0, 1);
   private readonly twistAxis = Vector3.Zero();
   private readonly projectedPalmDirection = Vector3.Zero();
   private readonly projectedGripDirection = Vector3.Zero();
@@ -161,9 +162,11 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
   private requestedReach = 0;
   private requestedLift = 0;
   private requestedVictimStruggle = 0;
+  private requestedShake = 0;
   private reach = 0;
   private lift = 0;
   private victimStruggle = 0;
+  private shake = 0;
   private elapsed = 0;
   private poseApplied = false;
   private targetProvider: HermanoMayorNeckTargetProvider | null = null;
@@ -212,6 +215,7 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
       this.requestedReach = 0;
       this.requestedLift = 0;
       this.requestedVictimStruggle = 0;
+      this.requestedShake = 0;
     }
   }
 
@@ -219,6 +223,7 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
     this.requestedReach = clamp01(state.reach);
     this.requestedLift = clamp01(state.lift);
     this.requestedVictimStruggle = clamp01(state.victimStruggle);
+    this.requestedShake = clamp01(state.shake);
     this.requestedTarget.copyFrom(state.targetPosition);
   }
 
@@ -231,6 +236,7 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
       reach: this.reach,
       lift: this.lift,
       victimStruggle: this.victimStruggle,
+      shake: this.shake,
       targetPosition: vectorSnapshot(this.target),
       leftHandTarget: vectorSnapshot(this.leftHandTarget),
       rightHandTarget: vectorSnapshot(this.rightHandTarget),
@@ -328,6 +334,7 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
       9,
       dt
     );
+    this.shake = damp(this.shake, this.requestedShake, 13, dt);
     if (this.requestedEnabled && this.targetProvider) {
       const providedTarget = this.targetProvider(this.requestedTarget);
       if (providedTarget !== this.requestedTarget) {
@@ -357,9 +364,16 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
     const reach = this.reach * weight;
     const lift = this.lift * weight;
     const struggle = this.victimStruggle * weight;
+    const shake = this.shake * weight;
     const effortWave = Math.sin(this.elapsed * Math.PI * 2 * 1.7) * struggle;
     const counterWave =
       Math.sin(this.elapsed * Math.PI * 2 * 1.13 + 1.4) * struggle;
+    const shakeWave =
+      (Math.tanh(
+        Math.sin(this.elapsed * Math.PI * 2 * 2.45) * 2.2
+      ) * 0.78 +
+        Math.sin(this.elapsed * Math.PI * 2 * 4.9 + 0.8) * 0.22) *
+      shake;
     const yaw = this.root.rotation.y;
     this.rightAxis.set(Math.cos(yaw), 0, -Math.sin(yaw));
 
@@ -371,24 +385,24 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
     this.rig.rotateWorld(
       "spine1",
       Axis.Y,
-      radians(2.4) * effortWave
+      radians(2.4) * effortWave + radians(4.8) * shakeWave
     );
     this.rig.rotateWorld(
       "spine2",
       Axis.Y,
-      radians(3.2) * effortWave
+      radians(3.2) * effortWave + radians(7.5) * shakeWave
     );
 
-    const shoulderForward = radians(2.5) * reach;
+    const shoulderForward = radians(4.5 + shakeWave * 2.6) * reach;
     this.rig.applyLocalOffset("leftShoulder", Axis.Z, shoulderForward);
     this.rig.applyLocalOffset("rightShoulder", Axis.Z, -shoulderForward);
 
     // Start from a broad, low-elbow choke silhouette. The short CCD pass below
     // then corrects the wrists against the victim's *animated* neck without the
     // coordinate-space assumptions made by Babylon's BoneIKController.
-    const armLift = -radians(48 + lift * 5) * reach;
-    const armSweep = radians(18) * reach;
-    const elbowFlex = radians(48 + lift * 5) * reach;
+    const armLift = -radians(50 + lift * 4) * reach;
+    const armSweep = radians(24 + shakeWave * 7) * reach;
+    const elbowFlex = radians(43 + lift * 4 - shakeWave * 10) * reach;
     this.rig.applyLocalOffset("leftArm", Axis.X, armLift, Axis.Z, armSweep);
     this.rig.applyLocalOffset("rightArm", Axis.X, armLift, Axis.Z, -armSweep);
     this.rig.applyLocalOffset("leftForeArm", Axis.Z, elbowFlex);
@@ -481,8 +495,6 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
       Axis.Z,
       this.rightPalmDirection
     );
-    // The mirrored right-hand hierarchy exposes its palmar normal as local -Z.
-    this.rightPalmDirection.scaleInPlace(-1);
     this.target.subtractToRef(this.leftHandPosition, this.leftGripDirection);
     this.target.subtractToRef(this.rightHandPosition, this.rightGripDirection);
     if (this.leftGripDirection.lengthSquared() > 0.000001) {
@@ -675,9 +687,9 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
   ) {
     // Distal-to-proximal CCD is independent of Mixamo bone pre-rotations and
     // imported root scaling. Small bounded steps preserve the low-elbow seed.
-    for (let iteration = 0; iteration < 11; iteration += 1) {
-      this.rotateJointTowardTarget(foreArm, hand, target, radians(16));
-      this.rotateJointTowardTarget(upperArm, hand, target, radians(14));
+    for (let iteration = 0; iteration < 14; iteration += 1) {
+      this.rotateJointTowardTarget(foreArm, hand, target, radians(18));
+      this.rotateJointTowardTarget(upperArm, hand, target, radians(16));
     }
   }
 

@@ -8,6 +8,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { EnemyHealthHud } from "../src/game/EnemyHealthHud.ts";
 import { BaseEnemyController } from "../src/game/enemies/core/EnemyController.ts";
 import { getDeferredSceneDisposalStats } from "../src/game/enemies/core/DeferredSceneDisposal.ts";
+import { HermanoMayorGrabAttack } from "../src/game/enemies/boss/HermanoMayorGrabAttack.ts";
 import {
   EnemyLifecycleState,
   type EnemyControllerContext,
@@ -99,6 +100,70 @@ function hit(enemy: BaseEnemyController, damage = 1) {
 }
 
 async function verify() {
+  const grabberRoot = {
+    position: Vector3.Zero(),
+    rotation: Vector3.Zero(),
+  };
+  const grabTarget = new Vector3(0, 0, 1.7);
+  const grabTargetNeck = new Vector3(0, 1.62, 1.7);
+  let latestGrabPose: { shake: number } | null = null;
+  let victimRestrained = false;
+  const neckGrab = new HermanoMayorGrabAttack({
+    actor: {
+      root: grabberRoot,
+      setNeckGrabPose: (pose: { shake: number } | null) => {
+        latestGrabPose = pose ? { shake: pose.shake } : null;
+      },
+      getNeckGrabDebugSnapshot: () => null,
+    } as never,
+    playerPosition: () => grabTarget,
+    playerNeckPosition: () => grabTargetNeck,
+    canCapturePlayer: () => true,
+    wasEscapePressed: () => false,
+    setVictimPose: (active) => {
+      victimRestrained = active;
+    },
+    setEscapeHud: () => {},
+    onGrabStarted: () => {},
+    onGrabDamage: () => {},
+  });
+  for (let step = 0; step < 25; step++) neckGrab.update(0.05, true, 1.7);
+  assert.equal(
+    neckGrab.currentState,
+    "idle",
+    "the neck grab must not start from the old oversized range"
+  );
+  grabTarget.z = 1.55;
+  grabTargetNeck.z = 1.55;
+  neckGrab.update(0.05, true, 1.55);
+  assert.equal(neckGrab.currentState, "windup");
+  for (let step = 0; step < 10; step++) {
+    grabTarget.z = grabberRoot.position.z + 2;
+    grabTargetNeck.z = grabTarget.z;
+    neckGrab.update(0.05, true, 2);
+  }
+  assert.equal(
+    neckGrab.currentState,
+    "windup",
+    "the attack must not capture while the neck remains outside contact range"
+  );
+  assert.equal(victimRestrained, false);
+  grabTarget.z = grabberRoot.position.z + 1;
+  grabTargetNeck.z = grabTarget.z;
+  neckGrab.update(0.05, true, 1);
+  assert.equal(neckGrab.currentState, "lifting");
+  assert.ok(
+    Math.abs(grabTarget.z - grabberRoot.position.z) <= 1.03,
+    "the attacker must close to neck-grab distance before restraining the player"
+  );
+  assert.equal(victimRestrained, true);
+  neckGrab.update(0.05, true, 1.55);
+  assert.ok(
+    (latestGrabPose?.shake ?? 0) > 0,
+    "the attacker shake must begin during the lift"
+  );
+  neckGrab.dispose();
+
   const candleLights = [
     {
       id: "test-candle",

@@ -145,10 +145,11 @@ const THIRD_PERSON_FLASHLIGHT_PITCH_MIN = -0.58;
 const THIRD_PERSON_FLASHLIGHT_PITCH_MAX = 0.68;
 const FIRST_PERSON_CAMERA_HEIGHT_MULTIPLIER = 2;
 const PLAYER_CAMERA_FOV = 0.9;
-const NECK_GRAB_CAMERA_DISTANCE = 5.35;
-const NECK_GRAB_CAMERA_HEIGHT = 0.18;
-const NECK_GRAB_CAMERA_TARGET_DROP = 0.28;
-const NECK_GRAB_CAMERA_FOV = 0.82;
+const NECK_GRAB_CAMERA_DISTANCE = 3.45;
+const NECK_GRAB_CAMERA_HEIGHT = 0.38;
+const NECK_GRAB_CAMERA_TARGET_HEIGHT_OFFSET = 0.12;
+const NECK_GRAB_CAMERA_LIFT_METERS = 1.1;
+const NECK_GRAB_CAMERA_FOV = 0.66;
 const NECK_GRAB_CAMERA_ENTER_SECONDS = 0.48;
 const NECK_GRAB_CAMERA_EXIT_SECONDS = 0.72;
 const PRIMARY_VIEW_MODE_SEQUENCE: ViewMode[] = ["third", "first", "iso"];
@@ -255,6 +256,7 @@ export class PlayerController {
   private neckGrabCameraActive = false;
   private neckGrabCameraSideResolved = false;
   private neckGrabCameraElapsed = 0;
+  private neckGrabCameraLift = 0;
   private neckGrabCameraEntryFov = PLAYER_CAMERA_FOV;
   private readonly neckGrabCameraAttackerPosition = Vector3.Zero();
   private readonly neckGrabCameraSide = Vector3.Right();
@@ -789,6 +791,9 @@ export class PlayerController {
   }
 
   setNeckGrabState(state: ProceduralNeckGrabState) {
+    this.neckGrabCameraLift = state.active
+      ? Math.max(0, Math.min(1, state.lift ?? 0))
+      : 0;
     if (state.active && !this.neckGrabRestrained) {
       this.cancelChargedThrow();
       this.jumpQueued = false;
@@ -812,6 +817,7 @@ export class PlayerController {
     return {
       active: this.neckGrabCameraActive,
       elapsed: this.neckGrabCameraElapsed,
+      lift: this.neckGrabCameraLift,
       viewMode: this.viewMode,
       avatarVisible: this.avatarMeshes.some((mesh) => mesh.visibility > 0.01),
       side: vectorSnapshot(this.neckGrabCameraSide),
@@ -1697,7 +1703,9 @@ export class PlayerController {
   private updateNeckGrabCameraTarget() {
     this.neckGrabCameraTarget.set(
       (this.root.position.x + this.neckGrabCameraAttackerPosition.x) * 0.5,
-      this.root.position.y - NECK_GRAB_CAMERA_TARGET_DROP,
+      this.root.position.y +
+        NECK_GRAB_CAMERA_TARGET_HEIGHT_OFFSET +
+        this.neckGrabCameraLift * NECK_GRAB_CAMERA_LIFT_METERS,
       (this.root.position.z + this.neckGrabCameraAttackerPosition.z) * 0.5
     );
   }

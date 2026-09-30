@@ -12,8 +12,13 @@ import { Material as BabylonMaterial } from "@babylonjs/core/Materials/material"
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
-import type { TerrainHandle } from "./Terrain";
-import type { Segments } from "./Segments";
+import type { PlayerWorldQuery } from "./PlayerWorldQuery";
+import {
+  dampStairPresentation,
+  INACTIVE_STAIR_LOCOMOTION,
+  resolveStairLocomotion,
+  shouldKeepStairGrounded,
+} from "./animation/StairLocomotion";
 import {
   getWaterLevelAt,
   type WaterSurfaceInfo,
@@ -35,7 +40,23 @@ type Settings = {
   runSpeed: number;
   jumpSpeed: number;
   gravity: number;
+  runningEnabled?: boolean;
+  jumpingEnabled?: boolean;
 };
+
+export function resolveRunningRequest(
+  runRequested: boolean,
+  runningEnabled = true
+) {
+  return runningEnabled && runRequested;
+}
+
+export function resolveJumpRequest(
+  jumpRequested: boolean,
+  jumpingEnabled = true
+) {
+  return jumpingEnabled && jumpRequested;
+}
 
 export type ViewMode = "first" | "third" | "front" | "iso";
 export type IsometricCameraAnchor = {
@@ -113,10 +134,6 @@ const THIRD_PERSON_AVATAR_FADE_OUT_SPEED = 18;
 const THIRD_PERSON_AVATAR_FADE_IN_SPEED = 8;
 const THIRD_PERSON_PITCH_MIN = -1.18;
 const THIRD_PERSON_PITCH_MAX = 0.82;
-const PATH_HALF_WIDTH = 4.5;
-const PATH_START_Z = -800;
-const PATH_END_Z = 70 * 8 - 8;
-const PATH_SURFACE_OFFSET = 0.1;
 const MAX_SIMULATION_DELTA_SECONDS = 0.05;
 const ANIMATION_BLEND_TIME = 0.16;
 const ACTION_BLEND_TIME = 0.08;
@@ -313,6 +330,10 @@ export class PlayerController {
   private swimmingCameraBlend = 0;
   private shallowWaterTransitionTimer = 0;
   private waterLocomotionStateValue: PlayerWaterLocomotionState = "grounded";
+  private stairBodyPresentationY: number | null = null;
+  private stairCameraPresentationY: number | null = null;
+  private stairBodyOffsetY = 0;
+  private stairCameraOffsetY = 0;
 
   constructor(
     private scene: Scene,
@@ -402,7 +423,13 @@ export class PlayerController {
 
   get isRunning() {
     const movement = this.input.getMovement();
-    return Math.hypot(movement.x, movement.y) > 0.12 && this.input.isDown("run");
+    return (
+      Math.hypot(movement.x, movement.y) > 0.12 &&
+      resolveRunningRequest(
+        this.input.isDown("run"),
+        this.settings.runningEnabled
+      )
+    );
   }
 
   get isUnderEnemyGrabPressure() {
@@ -1046,10 +1073,7 @@ export class PlayerController {
     this.configureCameraProjection();
     this.root.rotation.y = this.yaw;
     if (this.viewMode === "first") {
-      this.camera.position.set(0, this.settings.eyeHeight * (FIRST_PERSON_CAMERA_HEIGHT_MULTIPLIER - 1), 0);
-      this.camera.rotation.x = this.pitch;
-      this.camera.rotation.y = 0;
-      this.camera.rotation.z = 0;
+      this.positionFirstPersonCamera();
     } else if (this.viewMode === "iso") {
       this.positionIsometricCamera();
     } else {
@@ -1070,10 +1094,13 @@ export class PlayerController {
     if (this.pitch > maxPitch) this.pitch = maxPitch;
   }
 
-  update(dt: number, terrain: TerrainHandle, segments: Segments) {
+  update(dt: number, world: PlayerWorldQuery) {
     // Streaming and shader compilation can occasionally stall a frame. Never
     // convert that wall-clock pause into several metres of player movement.
     dt = Math.max(0, Math.min(dt, MAX_SIMULATION_DELTA_SECONDS));
+    const previousX = this.root.position.x;
+    const previousZ = this.root.position.z;
+    const wasGrounded = this.grounded;
     const inputActive = this.input.isGameplayInputEnabled();
     if (!this.controlsLocked && !this.neckGrabRestrained) {
       if (inputActive) {
@@ -1081,7 +1108,12 @@ export class PlayerController {
         if (look.x !== 0 || look.y !== 0) this.applyLook(look.x, look.y);
       }
       if (this.input.wasPressed("changeCamera")) this.toggleViewMode();
-      if (inputActive && this.input.wasPressed("jump")) {
+      if (
+        resolveJumpRequest(
+          inputActive && this.input.wasPressed("jump"),
+          this.settings.jumpingEnabled
+        )
+      ) {
         this.jumpQueued = true;
         this.waterActionQueued = true;
       }
@@ -1108,7 +1140,7 @@ export class PlayerController {
       );
     }
 
-    this.refreshWaterEnvironment(terrain);
+    this.refreshWaterEnvironment(world);
     this.refreshWaterLocomotionState();
     const movementLocked =
       this.controlsLocked ||
@@ -1123,7 +1155,8 @@ export class PlayerController {
       this.jumpQueued = false;
       this.updateMovementSfx("idle");
       this.updateAnimationFade(dt);
-      this.updateThirdPersonCameraCollision(dt, segments, terrain);
+      this.updateStairPresentation(dt, world, previousX, previousZ, false);
+      this.updateThirdPersonCameraCollision(dt, world);
       return;
     }
 
@@ -1157,7 +1190,10 @@ export class PlayerController {
       move.addInPlace(right.scale(moveX));
     }
 
-    const running = this.input.isDown("run");
+    const running = resolveRunningRequest(
+      this.input.isDown("run"),
+      this.settings.runningEnabled
+    );
     const baseSpeed =
       this.waterLocomotionStateValue === "swimming"
         ? SWIMMING_SPEED
@@ -1179,7 +1215,7 @@ export class PlayerController {
     const collisionFeetY = this.root.position.y - this.settings.eyeHeight;
     const collisionHeadY = this.root.position.y + 0.25;
     const isMovementBlocked = (x: number, z: number) =>
-      segments.isColliding(x, z, 0, collisionFeetY, collisionHeadY);
+      world.isColliding(x, z, 0, collisionFeetY, collisionHeadY);
 
     if (move.lengthSquared() > 0) {
       move.normalize().scaleInPlace(speed * dt * inputStrength);
@@ -1218,25 +1254,39 @@ export class PlayerController {
     if (this.root.position.x > maxX - margin) this.root.position.x = maxX - margin;
     if (this.root.position.x < -maxX + margin) this.root.position.x = -maxX + margin;
 
-    this.refreshWaterEnvironment(terrain);
+    this.refreshWaterEnvironment(world);
     this.refreshWaterLocomotionState();
-    const terrainGroundY = this.getWalkableSurfaceHeight(terrain);
     const currentFeetY = this.root.position.y - this.settings.eyeHeight;
     const maximumWalkableSurfaceY =
       currentFeetY + (this.velY > 0.01 ? -0.01 : 0.1);
-    const groundY = segments.getWalkableSurfaceHeight(
+    const groundY = world.getWalkableSurfaceHeight(
       this.root.position.x,
       this.root.position.z,
-      terrainGroundY,
+      currentFeetY,
       maximumWalkableSurfaceY
     );
     const targetY = groundY + this.settings.eyeHeight;
+    const horizontalTravel = Math.hypot(
+      this.root.position.x - previousX,
+      this.root.position.z - previousZ
+    );
+    const hasStairSurface = Boolean(
+      world.getStairSurfaceInfo?.(this.root.position.x, this.root.position.z) ??
+      world.getStairSurfaceInfo?.(previousX, previousZ)
+    );
+    const keepGroundedOnStepDown = shouldKeepStairGrounded(
+      wasGrounded,
+      this.velY,
+      this.root.position.y - targetY,
+      horizontalTravel,
+      hasStairSurface
+    );
 
     if (this.waterLocomotionStateValue === "swimming" && this.activeWaterSurface) {
       this.updateSwimmingVerticalMotion(
         dt,
         move.y,
-        this.getSwimmingFloorHeight(terrain)
+        this.getSwimmingFloorHeight(world)
       );
       this.jumpQueued = false;
     } else if (
@@ -1250,11 +1300,23 @@ export class PlayerController {
         this.root.position.y = targetY;
         this.velY = 0;
         this.grounded = true;
+      } else if (keepGroundedOnStepDown) {
+        // Theatre stairs remain physically discrete, but descending one riser
+        // is still supported locomotion. The visual root and camera perform
+        // the downward interpolation; gameplay must not enter the jump state.
+        this.root.position.y = targetY;
+        this.velY = 0;
+        this.grounded = true;
       } else {
         this.grounded = false;
       }
 
-      if (!movementLocked && this.jumpQueued && this.grounded) {
+      if (
+        this.settings.jumpingEnabled !== false &&
+        !movementLocked &&
+        this.jumpQueued &&
+        this.grounded
+      ) {
         this.velY = this.settings.jumpSpeed;
         this.grounded = false;
         this.playSfx("jump");
@@ -1271,7 +1333,14 @@ export class PlayerController {
     }
     this.jumpQueued = false;
 
-    this.updateThirdPersonCameraCollision(dt, segments, terrain);
+    this.updateStairPresentation(
+      dt,
+      world,
+      previousX,
+      previousZ,
+      !movementLocked && this.grounded
+    );
+    this.updateThirdPersonCameraCollision(dt, world);
     this.updateAvatarAnimation(moveX, moveY, running);
     const moving = Math.abs(moveX) > 0.12 || Math.abs(moveY) > 0.12;
     this.updateMovementSfx(
@@ -1284,7 +1353,92 @@ export class PlayerController {
     this.updateAnimationFade(dt);
   }
 
-  private refreshWaterEnvironment(terrain: TerrainHandle) {
+  private updateStairPresentation(
+    dt: number,
+    world: PlayerWorldQuery,
+    previousX: number,
+    previousZ: number,
+    movementAllowed: boolean
+  ) {
+    if (!world.getStairSurfaceInfo) {
+      this.stairBodyPresentationY = null;
+      this.stairCameraPresentationY = null;
+      this.stairBodyOffsetY = 0;
+      this.stairCameraOffsetY = 0;
+      return;
+    }
+
+    const previousSurface = world.getStairSurfaceInfo(previousX, previousZ);
+    const currentSurface = world.getStairSurfaceInfo(
+      this.root.position.x,
+      this.root.position.z
+    );
+    const surface = currentSurface ?? previousSurface;
+    const physicalRootY = this.root.position.y;
+    const canUseStairs =
+      this.grounded &&
+      this.waterLocomotionStateValue === "grounded" &&
+      !this.neckGrabRestrained &&
+      !this.controlsLocked;
+
+    if (!canUseStairs) {
+      this.stairBodyPresentationY = physicalRootY;
+      this.stairCameraPresentationY = physicalRootY;
+      this.stairBodyOffsetY = 0;
+      this.stairCameraOffsetY = 0;
+      this.grabStruggleController?.setStairLocomotionState(
+        INACTIVE_STAIR_LOCOMOTION
+      );
+      return;
+    }
+
+    this.stairBodyPresentationY ??= physicalRootY;
+    this.stairCameraPresentationY ??= physicalRootY;
+    const deltaX = this.root.position.x - previousX;
+    const deltaZ = this.root.position.z - previousZ;
+    const ascentTravel = surface
+      ? deltaX * surface.ascentDirectionX + deltaZ * surface.ascentDirectionZ
+      : 0;
+    const traversalActive =
+      movementAllowed && surface !== null && Math.abs(ascentTravel) > 0.00001;
+    const targetPresentationY = traversalActive
+      ? physicalRootY + surface.presentationHeight - surface.surfaceHeight
+      : physicalRootY;
+
+    this.stairBodyPresentationY = dampStairPresentation(
+      this.stairBodyPresentationY,
+      targetPresentationY,
+      14,
+      dt
+    );
+    this.stairCameraPresentationY = dampStairPresentation(
+      this.stairCameraPresentationY,
+      targetPresentationY,
+      6.5,
+      dt
+    );
+    this.stairBodyOffsetY = Math.max(
+      -0.6,
+      Math.min(0.6, this.stairBodyPresentationY - physicalRootY)
+    );
+    this.stairCameraOffsetY = Math.max(
+      -0.9,
+      Math.min(0.9, this.stairCameraPresentationY - physicalRootY)
+    );
+    this.stairBodyPresentationY = physicalRootY + this.stairBodyOffsetY;
+    this.stairCameraPresentationY = physicalRootY + this.stairCameraOffsetY;
+
+    this.grabStruggleController?.setStairLocomotionState(
+      resolveStairLocomotion(
+        surface,
+        traversalActive ? ascentTravel : 0,
+        dt,
+        this.stairBodyOffsetY
+      )
+    );
+  }
+
+  private refreshWaterEnvironment(world: PlayerWorldQuery) {
     this.activeWaterSurface = this.waterSurfaces?.getWaterSurfaceAt(this.root.position) ?? null;
     if (!this.activeWaterSurface) {
       this.waterLevel = Number.NEGATIVE_INFINITY;
@@ -1293,7 +1447,7 @@ export class PlayerController {
     }
 
     this.waterLevel = getWaterLevelAt(this.activeWaterSurface, this.root.position);
-    const groundY = this.getWalkableSurfaceHeight(terrain);
+    const groundY = this.getWalkableSurfaceHeight(world);
     this.waterDepthAtGround = Math.max(0, this.waterLevel - groundY);
   }
 
@@ -1406,7 +1560,7 @@ export class PlayerController {
     this.grounded = false;
   }
 
-  private getSwimmingFloorHeight(terrain: TerrainHandle) {
+  private getSwimmingFloorHeight(world: PlayerWorldQuery) {
     const forwardX = Math.sin(this.yaw);
     const forwardZ = Math.cos(this.yaw);
     const rightX = forwardZ;
@@ -1415,20 +1569,20 @@ export class PlayerController {
     const z = this.root.position.z;
 
     return Math.max(
-      terrain.getHeightAt(x, z),
-      terrain.getHeightAt(
+      world.getTerrainHeight(x, z),
+      world.getTerrainHeight(
         x + forwardX * SWIMMING_BODY_HALF_LENGTH,
         z + forwardZ * SWIMMING_BODY_HALF_LENGTH
       ),
-      terrain.getHeightAt(
+      world.getTerrainHeight(
         x - forwardX * SWIMMING_BODY_HALF_LENGTH,
         z - forwardZ * SWIMMING_BODY_HALF_LENGTH
       ),
-      terrain.getHeightAt(
+      world.getTerrainHeight(
         x + rightX * SWIMMING_BODY_HALF_WIDTH,
         z + rightZ * SWIMMING_BODY_HALF_WIDTH
       ),
-      terrain.getHeightAt(
+      world.getTerrainHeight(
         x - rightX * SWIMMING_BODY_HALF_WIDTH,
         z - rightZ * SWIMMING_BODY_HALF_WIDTH
       )
@@ -1465,8 +1619,7 @@ export class PlayerController {
 
   private updateThirdPersonCameraCollision(
     deltaTime: number,
-    segments: Segments,
-    terrain: TerrainHandle
+    world: PlayerWorldQuery
   ) {
     this.configureCameraProjection();
     if (this.cinematicCameraState) {
@@ -1489,14 +1642,14 @@ export class PlayerController {
       return;
     }
     if (this.neckGrabCameraActive) {
-      this.updateNeckGrabSideCamera(deltaTime, segments, terrain);
+      this.updateNeckGrabSideCamera(deltaTime, world);
       return;
     }
     if (this.viewMode === "first") {
       this.resetThirdPersonCameraCollisionState();
       this.positionFirstPersonCamera();
       this.applySwimmingCameraDepth();
-      this.keepFirstPersonCameraAboveTerrain(terrain);
+      this.keepFirstPersonCameraAboveTerrain(world);
       return;
     }
 
@@ -1513,26 +1666,24 @@ export class PlayerController {
     const adjusted = this.isUsingIsometricCameraAnchor
       ? desired
       : this.openingCameraState
-        ? this.resolveCameraTerrainPosition(origin, desired, terrain)
+        ? this.resolveCameraTerrainPosition(origin, desired, world)
       : this.resolveCameraTerrainPosition(
           origin,
-          segments.resolveCameraPosition(origin, desired),
-          terrain
+          world.resolveCameraPosition(origin, desired),
+          world
         );
-    let terrainSafePosition = this.clampCameraAboveTerrain(adjusted, terrain);
+    let terrainSafePosition = this.clampCameraAboveTerrain(adjusted, world);
     if (this.viewMode === "third" || this.viewMode === "front") {
       terrainSafePosition = this.smoothThirdPersonCameraArm(
         origin,
         terrainSafePosition,
         deltaTime,
-        segments,
-        terrain
+        world
       );
       terrainSafePosition = this.liftCrampedThirdPersonCamera(
         origin,
         terrainSafePosition,
-        segments,
-        terrain
+        world
       );
       this.updateThirdPersonAvatarVisibility(
         Vector3.Distance(origin, terrainSafePosition),
@@ -1625,8 +1776,7 @@ export class PlayerController {
 
   private updateNeckGrabSideCamera(
     deltaTime: number,
-    segments: Segments,
-    terrain: TerrainHandle
+    world: PlayerWorldQuery
   ) {
     this.camera.mode = Camera.PERSPECTIVE_CAMERA;
     this.resetThirdPersonCameraCollisionState();
@@ -1637,16 +1787,14 @@ export class PlayerController {
     this.resolveNeckGrabCameraPosition(
       this.neckGrabCameraSide.x,
       this.neckGrabCameraSide.z,
-      segments,
-      terrain,
+      world,
       this.neckGrabCameraResolvedPosition
     );
     if (!this.neckGrabCameraSideResolved) {
       this.resolveNeckGrabCameraPosition(
         -this.neckGrabCameraSide.x,
         -this.neckGrabCameraSide.z,
-        segments,
-        terrain,
+        world,
         this.neckGrabCameraAlternativePosition
       );
       const preferredDistance = Vector3.Distance(
@@ -1713,8 +1861,7 @@ export class PlayerController {
   private resolveNeckGrabCameraPosition(
     sideX: number,
     sideZ: number,
-    segments: Segments,
-    terrain: TerrainHandle,
+    world: PlayerWorldQuery,
     result: Vector3
   ) {
     this.neckGrabCameraDesiredPosition.copyFrom(this.neckGrabCameraTarget);
@@ -1725,13 +1872,13 @@ export class PlayerController {
       this.clampCameraAboveTerrain(
         this.resolveCameraTerrainPosition(
           this.neckGrabCameraTarget,
-          segments.resolveCameraPosition(
+          world.resolveCameraPosition(
             this.neckGrabCameraTarget,
             this.neckGrabCameraDesiredPosition
           ),
-          terrain
+          world
         ),
-        terrain
+        world
       )
     );
   }
@@ -1740,8 +1887,7 @@ export class PlayerController {
     origin: Vector3,
     safePosition: Vector3,
     deltaTime: number,
-    segments: Segments,
-    terrain: TerrainHandle
+    world: PlayerWorldQuery
   ) {
     const safeOffset = safePosition.subtract(origin);
     const safeLength = safeOffset.length();
@@ -1761,10 +1907,10 @@ export class PlayerController {
     // shortened arm keeps quick turns from sweeping the camera through a
     // nearby corner before it has recovered its normal distance.
     const candidate = origin.add(safeOffset.scale(armLength / safeLength));
-    const collisionSafe = segments.resolveCameraPosition(origin, candidate);
+    const collisionSafe = world.resolveCameraPosition(origin, candidate);
     const terrainSafe = this.clampCameraAboveTerrain(
-      this.resolveCameraTerrainPosition(origin, collisionSafe, terrain),
-      terrain
+      this.resolveCameraTerrainPosition(origin, collisionSafe, world),
+      world
     );
     this.thirdPersonCameraArmLength = Vector3.Distance(origin, terrainSafe);
     return terrainSafe;
@@ -1773,8 +1919,7 @@ export class PlayerController {
   private liftCrampedThirdPersonCamera(
     origin: Vector3,
     cameraPosition: Vector3,
-    segments: Segments,
-    terrain: TerrainHandle
+    world: PlayerWorldQuery
   ) {
     const cameraDistance = Vector3.Distance(origin, cameraPosition);
     const amount = Math.max(
@@ -1791,10 +1936,10 @@ export class PlayerController {
     const lifted = cameraPosition.add(
       Vector3.Up().scale(THIRD_PERSON_CRAMPED_CAMERA_LIFT * smoothAmount)
     );
-    const collisionSafe = segments.resolveCameraPosition(origin, lifted);
+    const collisionSafe = world.resolveCameraPosition(origin, lifted);
     return this.clampCameraAboveTerrain(
-      this.resolveCameraTerrainPosition(origin, collisionSafe, terrain),
-      terrain
+      this.resolveCameraTerrainPosition(origin, collisionSafe, world),
+      world
     );
   }
 
@@ -1834,7 +1979,12 @@ export class PlayerController {
   }
 
   private positionFirstPersonCamera() {
-    this.camera.position.set(0, this.settings.eyeHeight * (FIRST_PERSON_CAMERA_HEIGHT_MULTIPLIER - 1), 0);
+    this.camera.position.set(
+      0,
+      this.settings.eyeHeight * (FIRST_PERSON_CAMERA_HEIGHT_MULTIPLIER - 1) +
+        this.stairCameraOffsetY,
+      0
+    );
     this.camera.rotation.x = this.pitch;
     this.camera.rotation.y = 0;
     this.camera.rotation.z = 0;
@@ -1858,20 +2008,20 @@ export class PlayerController {
       (underwaterWorldY - currentWorldY) * this.swimmingCameraBlend;
   }
 
-  private keepFirstPersonCameraAboveTerrain(terrain: TerrainHandle) {
+  private keepFirstPersonCameraAboveTerrain(world: PlayerWorldQuery) {
     this.root.computeWorldMatrix(true);
     this.camera.computeWorldMatrix();
     const cameraWorld = this.camera.globalPosition;
     const minimumWorldY =
-      terrain.getHeightAt(cameraWorld.x, cameraWorld.z) + CAMERA_TERRAIN_CLEARANCE;
+      world.getTerrainHeight(cameraWorld.x, cameraWorld.z) + CAMERA_TERRAIN_CLEARANCE;
     if (cameraWorld.y < minimumWorldY) {
       this.camera.position.y += minimumWorldY - cameraWorld.y;
     }
   }
 
-  private clampCameraAboveTerrain(position: Vector3, terrain: TerrainHandle) {
+  private clampCameraAboveTerrain(position: Vector3, world: PlayerWorldQuery) {
     const minimumY =
-      terrain.getHeightAt(position.x, position.z) + CAMERA_TERRAIN_CLEARANCE;
+      world.getTerrainHeight(position.x, position.z) + CAMERA_TERRAIN_CLEARANCE;
     if (position.y >= minimumY) return position;
     return new Vector3(position.x, minimumY, position.z);
   }
@@ -1879,7 +2029,7 @@ export class PlayerController {
   private resolveCameraTerrainPosition(
     origin: Vector3,
     desired: Vector3,
-    terrain: TerrainHandle
+    world: PlayerWorldQuery
   ) {
     const dx = desired.x - origin.x;
     const dy = desired.y - origin.y;
@@ -1901,7 +2051,7 @@ export class PlayerController {
       const x = origin.x + dx * t;
       const y = origin.y + dy * t;
       const z = origin.z + dz * t;
-      const minimumY = terrain.getHeightAt(x, z) + CAMERA_TERRAIN_CLEARANCE;
+      const minimumY = world.getTerrainHeight(x, z) + CAMERA_TERRAIN_CLEARANCE;
       if (y >= minimumY) {
         previousSafeT = t;
         continue;
@@ -1917,7 +2067,7 @@ export class PlayerController {
         const middleY = origin.y + dy * middle;
         const middleZ = origin.z + dz * middle;
         const middleMinimumY =
-          terrain.getHeightAt(middleX, middleZ) + CAMERA_TERRAIN_CLEARANCE;
+          world.getTerrainHeight(middleX, middleZ) + CAMERA_TERRAIN_CLEARANCE;
         if (middleY >= middleMinimumY) low = middle;
         else high = middle;
       }
@@ -2018,7 +2168,11 @@ export class PlayerController {
 
   private getCameraTargetLocal() {
     if (this.viewMode === "iso") {
-      const localTarget = new Vector3(0, ISOMETRIC_CAMERA_TARGET_HEIGHT, 0);
+      const localTarget = new Vector3(
+        0,
+        ISOMETRIC_CAMERA_TARGET_HEIGHT + this.stairCameraOffsetY,
+        0
+      );
       const anchor = this.isometricCameraAnchor;
       if (!anchor || this.isometricCameraAnchorBlend <= 0) return localTarget;
 
@@ -2130,7 +2284,11 @@ export class PlayerController {
   }
 
   private getThirdPersonTargetLocal() {
-    return new Vector3(0, THIRD_PERSON_CAMERA_TARGET_HEIGHT, 0);
+    return new Vector3(
+      0,
+      THIRD_PERSON_CAMERA_TARGET_HEIGHT + this.stairCameraOffsetY,
+      0
+    );
   }
 
   private getPlanarForward() {
@@ -2251,15 +2409,11 @@ export class PlayerController {
   }
 
   getWalkableSurfaceHeight(
-    terrain: TerrainHandle,
+    world: PlayerWorldQuery,
     x = this.root.position.x,
     z = this.root.position.z
   ) {
-    const baseHeight = terrain.getHeightAt(x, z);
-    const onPath =
-      Math.abs(x) <= PATH_HALF_WIDTH && z >= PATH_START_Z && z <= PATH_END_Z;
-
-    return baseHeight + (onPath ? PATH_SURFACE_OFFSET : 0);
+    return world.getWalkableSurfaceHeight(x, z);
   }
 
   private patchAvatarMaterial(material: BabylonMaterial | null) {

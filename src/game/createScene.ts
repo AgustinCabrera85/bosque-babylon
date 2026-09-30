@@ -8,11 +8,11 @@ import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { RockLibrary } from "./RockLibrary";
 import { createTerrain } from "./Terrain";
 import {
-  getNextPrimaryViewMode,
   PlayerController,
   type CharacterId,
   type ViewMode,
 } from "./PlayerController";
+import { setupPlayerViewControls } from "./PlayerViewControls";
 import { Segments } from "./Segments";
 import { TreeLibrary } from "./TreeLibrary";
 import { GrassLibrary } from "./GrassLibrary";
@@ -35,7 +35,6 @@ import type { InventoryHandle } from "./Inventory";
 import { PlayerAttackSystem } from "./PlayerAttackSystem";
 import { PlayerLightAbsorptionVFX } from "./PlayerLightAbsorptionVFX";
 import { PlayerStatsSystem } from "./PlayerStatsSystem";
-import { PlayerStatusHud } from "./PlayerStatusHud";
 import type { ProceduralHitReactionZone } from "./animation/ProceduralGrabStruggleController";
 import {
   PlayerSurvivalSystem,
@@ -86,6 +85,7 @@ import {
   HermanoMayorBehavior,
 } from "./enemies/boss";
 import { HermanoMayorGrabHud } from "./enemies/boss/HermanoMayorGrabHud";
+import { ForestPlayerWorld } from "./levels/forest/ForestPlayerWorld";
 
 
 
@@ -199,83 +199,6 @@ export const mobileQuality: QualityProfile = {
   fireflyCount: 5,
 };
 
-function getViewModeShortLabel(mode: ViewMode) {
-  if (mode === "first") return "1P";
-  if (mode === "iso") return "ISO";
-  if (mode === "front") return "FR";
-  return "3P";
-}
-
-function getViewModeName(mode: ViewMode) {
-  if (mode === "first") return "primera persona";
-  if (mode === "iso") return "isometrica";
-  if (mode === "front") return "frontal";
-  return "tercera persona";
-}
-
-function setupViewModeControls(player: PlayerController) {
-  const cameraButton = document.getElementById("cameraModeButton") as HTMLButtonElement | null;
-  const frontButton = document.getElementById("frontCameraButton") as HTMLButtonElement | null;
-  const isometricButton = document.getElementById("isometricCameraButton") as HTMLButtonElement | null;
-  const reticle = document.getElementById("reticle");
-  if (!cameraButton) return;
-
-  const setMode = (mode: ViewMode) => {
-    const isFirstPerson = mode === "first";
-    const isFrontView = mode === "front";
-    const isIsometricView = mode === "iso";
-    const aimViewport = player.getAttackAimViewportPosition();
-    reticle?.style.setProperty("--reticle-x", `${aimViewport.x * 100}%`);
-    reticle?.style.setProperty("--reticle-y", `${aimViewport.y * 100}%`);
-    const nextMode = getNextPrimaryViewMode(
-      mode,
-      player.isIsometricViewAllowed
-    );
-    cameraButton.classList.toggle("active", isFirstPerson);
-    cameraButton.textContent = getViewModeShortLabel(nextMode);
-    cameraButton.setAttribute("aria-pressed", String(isFirstPerson));
-    cameraButton.setAttribute(
-      "aria-label",
-      `Cambiar a vista ${getViewModeName(nextMode)}`
-    );
-    frontButton?.classList.toggle("active", isFrontView);
-    frontButton?.setAttribute("aria-pressed", String(isFrontView));
-    frontButton?.setAttribute(
-      "aria-label",
-      isFrontView ? "Volver a tercera persona" : "Activar camara frontal"
-    );
-    isometricButton?.classList.toggle("active", isIsometricView);
-    if (isometricButton) isometricButton.disabled = !player.isIsometricViewAllowed;
-    isometricButton?.setAttribute("aria-pressed", String(isIsometricView));
-    isometricButton?.setAttribute(
-      "aria-label",
-      !player.isIsometricViewAllowed
-        ? "Vista isometrica no disponible desde la casa"
-        : isIsometricView
-          ? "Volver a tercera persona"
-          : "Activar vista isometrica"
-    );
-    reticle?.classList.toggle("hidden", isFrontView || isIsometricView);
-  };
-
-  cameraButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    player.toggleViewMode();
-  });
-
-  frontButton?.addEventListener("click", (event) => {
-    event.stopPropagation();
-    player.setViewMode(player.currentViewMode === "front" ? "third" : "front");
-  });
-
-  isometricButton?.addEventListener("click", (event) => {
-    event.stopPropagation();
-    player.setViewMode(player.currentViewMode === "iso" ? "third" : "iso");
-  });
-
-  player.onViewModeChange(setMode);
-}
-
 function createPathMesh(
   scene: Scene,
   terrain: ReturnType<typeof createTerrain>,
@@ -340,7 +263,9 @@ export async function createScene(
   selectedCharacter: CharacterId = "lautaro",
   musicPlayer: MusicPlayerHandle | null = null,
   inventory: InventoryHandle | undefined,
-  input: InputManager
+  input: InputManager,
+  sharedPlayerStats?: PlayerStatsSystem,
+  prepareOpeningSequence = true
 ) {
   onProgress(0.08, "Creando escena...");
   const scene = new Scene(engine);
@@ -421,6 +346,12 @@ const terrain = createTerrain(scene, {
   playableHalfWidth: 52, // antes de montaña
   heightModifiers: [createTerminalTerrainModifier(terminalConfig)],
 });
+const playerWorld = new ForestPlayerWorld(terrain, {
+  pathHalfWidth: 4.5,
+  pathStartZ: -terrain.size / 2,
+  pathEndZ: mapLayout.segmentLength * mapLayout.endHouseSegment - 8,
+  pathSurfaceOffset: 0.1,
+});
 
 
   // =========================
@@ -499,7 +430,8 @@ const terrain = createTerrain(scene, {
   }, selectedCharacter);
   const thoughtMessages = createThoughtMessages();
   scene.onDisposeObservable.addOnce(() => thoughtMessages.dispose());
-  setupViewModeControls(player);
+  const disposeViewModeControls = setupPlayerViewControls(player);
+  scene.onDisposeObservable.addOnce(disposeViewModeControls);
   const vintageFilm = createVintageFilmPostProcess(scene, player.camera, {
     enabled: true,
     intensity: 0,
@@ -521,7 +453,7 @@ const terrain = createTerrain(scene, {
     {
       root: player.root,
       avatarMeshes: player.getAvatarMeshes(),
-      getGroundSurfaceHeightAt: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
+      getGroundSurfaceHeightAt: (x, z) => player.getWalkableSurfaceHeight(playerWorld, x, z),
     },
     {
       performance: {
@@ -530,16 +462,16 @@ const terrain = createTerrain(scene, {
       },
     }
   );
-  const playerStats = new PlayerStatsSystem({
-    inventory,
-    debug:
-      import.meta.env.DEV &&
-      new URLSearchParams(window.location.search).get("debugSurvival") === "1",
-  });
+  const ownsPlayerStats = !sharedPlayerStats;
+  const playerStats = sharedPlayerStats ?? new PlayerStatsSystem({
+      inventory,
+      debug:
+        import.meta.env.DEV &&
+        new URLSearchParams(window.location.search).get("debugSurvival") === "1",
+    });
   const playerLightAbsorptionVfx = new PlayerLightAbsorptionVFX(scene, {
     getGroundPositionToRef: (result) => player.getGroundContactPositionToRef(result),
   });
-  const playerStatusHud = new PlayerStatusHud(playerStats);
   let auraHealth = Number.NaN;
   let auraSanity = Number.NaN;
   let animatedHealth = playerStats.snapshot.health;
@@ -584,8 +516,8 @@ const terrain = createTerrain(scene, {
     player.clearEnemyGrabStruggles();
     unsubscribePlayerStatsAura();
     playerLightAbsorptionVfx.dispose();
-    playerStatusHud.dispose();
-    playerStats.dispose();
+    if (ownsPlayerStats) playerStats.dispose();
+    else playerStats.resetTransientLevelState();
     shadowAuraDebug.dispose();
   });
 
@@ -686,9 +618,13 @@ const setFlashlightEnabled = (enabled: boolean) => {
   flashlightButton?.setAttribute("aria-pressed", String(enabled));
 };
 
-flashlightButton?.addEventListener("click", (event) => {
+const onFlashlightButtonClick = (event: Event) => {
   event.stopPropagation();
   setFlashlightEnabled(!flashlightEnabled);
+};
+flashlightButton?.addEventListener("click", onFlashlightButtonClick);
+scene.onDisposeObservable.addOnce(() => {
+  flashlightButton?.removeEventListener("click", onFlashlightButtonClick);
 });
 
 // Sombras (opcional pero suma MUCHO)
@@ -783,6 +719,7 @@ scene.onBeforeRenderObservable.add(() => {
     plantFarCount: quality.plantFarCount,
     brazierFireQuality: quality.name === "mobile" ? "low" : "high",
   }, inventory);
+  playerWorld.setSegments(segments);
 
   onProgress(0.86, "Cargando casa...");
   await segments.loadCandles();
@@ -1040,7 +977,7 @@ scene.onBeforeRenderObservable.add(() => {
     findUnlitCandleSegmentHit: (from, to, projectileRadius) =>
       segments.findUnlitCandleSegmentHit(from, to, projectileRadius),
     relightCandle: (id) => segments.relightCandle(id),
-    getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
+    getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(playerWorld, x, z),
     isBlocked: (position, radius) =>
       segments.isColliding(
         position.x,
@@ -1091,7 +1028,7 @@ scene.onBeforeRenderObservable.add(() => {
     housePosition: segments.getEndHouseCheckpoint(),
     triggerZ: terminalConfig.houseFrontZ - DEFAULT_WORLD_SEGMENT_LENGTH,
     segmentBoundaryZ: terminalConfig.houseFrontZ,
-    getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
+    getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(playerWorld, x, z),
     compactFraming: quality.name === "mobile",
     onStart: () => {
       attackSystem.cancelCharge();
@@ -1141,7 +1078,7 @@ scene.onBeforeRenderObservable.add(() => {
       onSanityHit: (intensity) => shadowAura.pulseSanityHit(intensity),
     },
     navigation: {
-      getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
+      getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(playerWorld, x, z),
       isBlocked: (x, z) => segments.isColliding(x, z),
     },
     fixedSafeLightPositions: endTorches.safeLightPositions,
@@ -1180,7 +1117,7 @@ scene.onBeforeRenderObservable.add(() => {
     },
   });
   await loadInitialForestEnemies(enemyManager, shadowGrabberBehaviorSystem, {
-    getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(terrain, x, z),
+    getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(playerWorld, x, z),
   });
   scene.metadata.shadowGrabberBehaviorSystem = shadowGrabberBehaviorSystem;
   if (import.meta.env.DEV) {
@@ -1266,7 +1203,7 @@ scene.onBeforeRenderObservable.add(() => {
       teleportPlayer: (x: number, z: number) => {
         player.root.position.set(
           x,
-          player.getWalkableSurfaceHeight(terrain, x, z) + player.getCollisionHeight(),
+          player.getWalkableSurfaceHeight(playerWorld, x, z) + player.getCollisionHeight(),
           z
         );
       },
@@ -1362,7 +1299,7 @@ scene.onBeforeRenderObservable.add(() => {
         visionRange:
           mapLayout.segmentLength * HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER,
         getGroundHeight: (x, z) =>
-          player.getWalkableSurfaceHeight(terrain, x, z),
+          player.getWalkableSurfaceHeight(playerWorld, x, z),
         isBlocked: isHermanoMayorNavigationBlocked,
         hasLineOfSight: hasGameplayLineOfSight,
         isVisibleToPlayer: () => {
@@ -1435,7 +1372,7 @@ scene.onBeforeRenderObservable.add(() => {
           const z = hermanoMayor.root.position.z + Math.cos(yaw) * 1.45;
           player.root.position.set(
             x,
-            player.getWalkableSurfaceHeight(terrain, x, z) +
+            player.getWalkableSurfaceHeight(playerWorld, x, z) +
               player.getCollisionHeight(),
             z
           );
@@ -1608,7 +1545,7 @@ scene.onBeforeRenderObservable.add(() => {
       player.position.z < terminalConfig.houseFrontZ - 7,
       0.78
     );
-    player.update(dt, terrain, segments);
+    player.update(dt, playerWorld);
     hermanoMayorBehavior?.update(dt);
     skyEyeEncounter.update(dt);
     shadowGrabberBehaviorSystem.update(dt);
@@ -1652,7 +1589,7 @@ scene.onBeforeRenderObservable.add(() => {
 
   // Hold the player and the elevated opening camera before the first frame that
   // can become visible. The UI presentation decides when both begin moving.
-  player.prepareOpeningSequence();
+  if (prepareOpeningSequence) player.prepareOpeningSequence();
   survivalGameplayActive = true;
   onProgress(1, "Listo");
   return {

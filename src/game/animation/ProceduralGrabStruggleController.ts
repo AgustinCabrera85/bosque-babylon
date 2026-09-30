@@ -9,6 +9,12 @@ import {
   MixamoProceduralRig,
   type MixamoJointName,
 } from "./MixamoProceduralRig";
+import {
+  computeStairLegPose,
+  INACTIVE_STAIR_LOCOMOTION,
+  shouldUseProceduralStairPose,
+  type StairLocomotionState,
+} from "./StairLocomotion";
 
 type JointName = MixamoJointName;
 
@@ -411,6 +417,10 @@ export class ProceduralGrabStruggleController {
   private readonly hitWeights: HitReactionWeights = createEmptyHitReactionWeights();
   private readonly hitPose: HitReactionPose = createEmptyHitReactionPose();
   private readonly visualRootHitOffset = Vector3.Zero();
+  private stairLocomotion: StairLocomotionState = {
+    ...INACTIVE_STAIR_LOCOMOTION,
+  };
+  private stairLocomotionBlend = 0;
   private neckGrabRequested = false;
   private neckGrabWeight = 0;
   private neckGrabTargetLift = 0;
@@ -582,6 +592,22 @@ export class ProceduralGrabStruggleController {
     }
   }
 
+  public setStairLocomotionState(state: StairLocomotionState) {
+    if (this.disposed) return;
+    this.stairLocomotion = state.active
+      ? {
+          ...state,
+          // Descending keeps the authored walking clip untouched. Grounding and
+          // vertical presentation remain active through PlayerController.
+          active: shouldUseProceduralStairPose(state),
+        }
+      : {
+          ...this.stairLocomotion,
+          active: false,
+          visualOffsetY: state.visualOffsetY,
+        };
+  }
+
   public getJointWorldPositionToRef(name: JointName, result: Vector3) {
     return this.rig.getJointWorldPositionToRef(name, result);
   }
@@ -621,18 +647,38 @@ export class ProceduralGrabStruggleController {
     this.updateJerk();
     this.updateHitReaction(dt);
     this.updateNeckGrab(dt);
+    this.stairLocomotionBlend = damp(
+      this.stairLocomotionBlend,
+      this.stairLocomotion.active ? 1 : 0,
+      this.stairLocomotion.active ? 13 : 9,
+      dt
+    );
 
+    const hasGrabOrHitPose =
+      this.blend > 0.0001 ||
+      this.isHitActive() ||
+      this.neckGrabWeight > 0.0001;
+    const hasStairPose =
+      this.stairLocomotionBlend > 0.0001 ||
+      Math.abs(this.stairLocomotion.visualOffsetY) > 0.0001;
     if (
       this.blend <= 0.0001 &&
       !this.isHitActive() &&
-      this.neckGrabWeight <= 0.0001
+      this.neckGrabWeight <= 0.0001 &&
+      !hasStairPose
     ) {
       this.visualRootHitOffset.setAll(0);
       return;
     }
     this.captureBasePose();
     this.captureNeckGrabAnchorIfNeeded();
-    this.applyPose(smoothStep(this.blend) * this.intensity);
+    if (hasGrabOrHitPose) {
+      this.applyPose(smoothStep(this.blend) * this.intensity);
+    } else {
+      this.visualRootHitOffset.setAll(0);
+    }
+    this.applyStairLocomotionPose();
+    this.visualRoot.position.y += this.stairLocomotion.visualOffsetY;
     this.rig.prepare();
     this.stabilizeNeckGrabAnchor();
     this.poseApplied = true;
@@ -1358,6 +1404,26 @@ export class ProceduralGrabStruggleController {
         )
       );
     }
+  }
+
+  private applyStairLocomotionPose() {
+    const pose = computeStairLegPose(
+      this.stairLocomotion,
+      this.stairLocomotionBlend
+    );
+    if (this.poseMask.torso && pose.torsoForwardLean > 0.0001) {
+      // Spread the slight uphill lean across the torso so it reads as a
+      // balanced weight shift rather than a sharp bend at one vertebra.
+      this.rotate("spine", this.rightAxis, pose.torsoForwardLean * 0.3);
+      this.rotate("spine1", this.rightAxis, pose.torsoForwardLean * 0.35);
+      this.rotate("spine2", this.rightAxis, pose.torsoForwardLean * 0.35);
+    }
+    this.appendLocalOffset("leftUpLeg", Axis.X, pose.leftThighPitch);
+    this.appendLocalOffset("rightUpLeg", Axis.X, pose.rightThighPitch);
+    this.appendLocalOffset("leftLeg", Axis.X, -pose.leftKneeFlex);
+    this.appendLocalOffset("rightLeg", Axis.X, -pose.rightKneeFlex);
+    this.appendLocalOffset("leftFoot", Axis.X, pose.leftFootPitch);
+    this.appendLocalOffset("rightFoot", Axis.X, pose.rightFootPitch);
   }
 
   private updateNeckGrab(dt: number) {

@@ -1,6 +1,5 @@
 import "./style.css";
 import { Engine } from "@babylonjs/core/Engines/engine";
-import { createScene, desktopQuality, mobileQuality } from "./game/createScene";
 import { setupMusicPlayer } from "./game/MusicPlayer";
 import { setupPauseMenu } from "./game/PauseMenu";
 import { readStoredResolutionMode, resolveHardwareScalingLevel } from "./game/PauseVideo";
@@ -8,6 +7,10 @@ import { setupItemInspector } from "./game/ItemInspector";
 import { setupInventory } from "./game/Inventory";
 import { setupCharacterSelection } from "./game/CharacterSelection";
 import { InputManager } from "./game/input/InputManager";
+import { LevelManager } from "./game/runtime/LevelManager";
+import { LevelRegistry } from "./game/runtime/LevelRegistry";
+import type { LevelId, PerformanceTier } from "./game/runtime/LevelTypes";
+import { GameSession } from "./game/runtime/GameSession";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement | null;
 if (!canvas) throw new Error("No se encontro #renderCanvas");
@@ -94,8 +97,8 @@ function shouldUseMobileQuality() {
   return coarsePointer || navigator.maxTouchPoints > 0 || smallScreen || memory <= 4;
 }
 
-const quality = shouldUseMobileQuality() ? mobileQuality : desktopQuality;
-const automaticHardwareScaling = quality.name === "mobile"
+const performanceTier: PerformanceTier = shouldUseMobileQuality() ? "mobile" : "desktop";
+const automaticHardwareScaling = performanceTier === "mobile"
   ? ((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8) <= 4 ? 2.25 : 1.8
   // 80% per axis retains the vintage image while cutting full-screen work by 36%.
   : 1.25;
@@ -104,10 +107,10 @@ const hardwareScaling = resolveHardwareScalingLevel(
   automaticHardwareScaling
 );
 
-const engine = new Engine(renderCanvas, quality.name === "desktop", {
+const engine = new Engine(renderCanvas, performanceTier === "desktop", {
   preserveDrawingBuffer: false,
   stencil: false,
-  antialias: quality.name === "desktop",
+  antialias: performanceTier === "desktop",
 });
 engine.setHardwareScalingLevel(hardwareScaling);
 
@@ -139,25 +142,109 @@ async function start() {
   });
   const itemInspector = setupItemInspector();
   const inventory = setupInventory({ inspectItem: itemInspector.inspect });
-
-  setLoading(0.02, `Iniciando motor (${quality.name})...`);
-  const { scene, playOpeningSequence } = await createScene(
-    engine,
-    renderCanvas,
-    setLoading,
-    quality,
+  const session = new GameSession({
     selectedCharacter,
-    musicPlayer,
     inventory,
-    input
+    musicPlayer,
+    debugPlayerStats:
+      import.meta.env.DEV &&
+      new URLSearchParams(window.location.search).get("debugSurvival") === "1",
+  });
+
+  const registry = new LevelRegistry().register("forest", async () => {
+    const module = await import("./game/levels/forest/createForestLevel");
+    return module.createForestLevel;
+  }).register("theatre", async () => {
+    const module = await import("./game/levels/theatre/createTheatreLevel");
+    return module.createTheatreLevel;
+  });
+  let activeDebug: { dispose(): void } | null = null;
+  const levelManager = new LevelManager({
+    registry,
+    context: {
+      engine,
+      canvas: renderCanvas,
+      input,
+      selectedCharacter: session.selectedCharacter,
+      inventory: session.inventory,
+      playerStats: session.playerStats,
+      musicPlayer: session.musicPlayer,
+      performanceTier,
+      onProgress: setLoading,
+    },
+    input,
+    playerStats: session.playerStats,
+    musicPlayer: session.musicPlayer,
+    onActiveSceneChanged: (scene) => {
+      activeDebug?.dispose();
+      activeDebug = scene ? debugBootstrap?.bootstrapDebug(scene) ?? null : null;
+    },
+    onTransitionError: (error) => {
+      console.error("No se pudo cambiar de nivel", error);
+      setLoading(1, "No se pudo cambiar de nivel");
+    },
+  });
+
+  const requestedLevel = import.meta.env.DEV
+    ? new URLSearchParams(window.location.search).get("level")
+    : null;
+  const initialLevelId: LevelId = requestedLevel === "theatre" ? "theatre" : "forest";
+  if (import.meta.env.DEV) {
+    const debugWindow = window as Window & {
+      __bosqueLevelDebug?: {
+        load(level: LevelId, entryPoint?: string): Promise<void>;
+        current(): LevelId | null;
+        snapshot(): {
+          current: LevelId | null;
+          transitioning: boolean;
+          liveScenes: number;
+          thoughtMessageRoots: number;
+          playerStatusHuds: number;
+        };
+      };
+    };
+    debugWindow.__bosqueLevelDebug = {
+      async load(level, entryPoint = "dev") {
+        pauseMenu.setPaused(false);
+        inventory.close();
+        itemInspector.close();
+        showLoading();
+        setLoading(0.02, `Cargando ${level}...`);
+        try {
+          const loaded = await levelManager.loadLevel(level, entryPoint);
+          await new Promise<void>((resolve) => {
+            loaded.scene.onAfterRenderObservable.addOnce(() => resolve());
+          });
+        } finally {
+          hideLoading();
+        }
+      },
+      current: () => levelManager.currentLevelId,
+      snapshot: () => ({
+        current: levelManager.currentLevelId,
+        transitioning: levelManager.isTransitioning,
+        liveScenes: engine.scenes.filter((scene) => !scene.isDisposed).length,
+        thoughtMessageRoots: document.querySelectorAll("#thoughtMessages").length,
+        playerStatusHuds: document.querySelectorAll("#playerStatusHud").length,
+      }),
+    };
+  }
+
+  setLoading(0.02, `Iniciando motor (${performanceTier})...`);
+  const initialLevel = await levelManager.loadLevel(
+    initialLevelId,
+    initialLevelId === "forest" ? "initial" : "dev"
   );
-  debugBootstrap?.bootstrapDebug(scene);
-  scene.onDisposeObservable.addOnce(() => {
+  const scene = initialLevel.scene;
+  window.addEventListener("pagehide", () => {
+    levelManager.dispose();
     input.dispose();
     pauseMenu.dispose();
+    session.dispose();
+    musicPlayer?.dispose();
     inventory.dispose();
     itemInspector.dispose();
-  });
+  }, { once: true });
 
   const firstFrameReady = new Promise<void>((resolve) => {
     scene.onAfterRenderObservable.addOnce(() => resolve());
@@ -193,11 +280,16 @@ async function start() {
     }
 
     if (pauseMenu.isPaused() || itemInspector.isOpen() || inventory.isOpen()) return;
-    scene.render();
+    levelManager.update(engine.getDeltaTime() / 1000);
+    levelManager.render();
   });
 
   await firstFrameReady;
-  await playOpeningPresentation(playOpeningSequence);
+  if (initialLevel.playOpeningSequence) {
+    await playOpeningPresentation(initialLevel.playOpeningSequence);
+  } else {
+    hideLoading();
+  }
 }
 
 start().catch((error) => {

@@ -517,9 +517,17 @@ export class PlayerStatsSystem {
     }
   }
 
-  public dispose() {
+  public resetTransientLevelState() {
     if (this.disposed) return;
     this.cancelLightAbsorption("disposed");
+    this.pendingContinuousDrains.length = 0;
+    this.activeShadowGrabberCaptures.clear();
+    this.setHealthRegeneration(false);
+  }
+
+  public dispose() {
+    if (this.disposed) return;
+    this.resetTransientLevelState();
     this.disposed = true;
     this.pendingContinuousDrains.length = 0;
     this.activeShadowGrabberCaptures.clear();

@@ -6,6 +6,8 @@ const SFX_VOLUME_KEY = "bosque.sfxVolume";
 const DEFAULT_MUSIC_VOLUME = 0.7;
 const DEFAULT_AMBIENT_VOLUME = 0.85;
 const DEFAULT_SFX_VOLUME = 0.8;
+const DEFAULT_WALK_FOOTSTEP_TRACK =
+  "assets/audio/sfx/Footsteps_crunching_walking.mp3";
 // The supplied recording peaks around -23.5 dBFS. A dedicated Web Audio gain
 // restores useful headroom without changing the other ambience tracks.
 const WATERFALL_GAIN_COMPENSATION = 4.5;
@@ -38,10 +40,21 @@ export type WaterfallAudioArea = {
   volumeScale?: number;
 };
 
+export type LevelAudioProfile = {
+  backgroundTrack: string;
+  ambientTrack?: string | null;
+  waterfallArea?: WaterfallAudioArea | null;
+  walkFootstepTrack?: string;
+};
+
 export type MusicPlayerHandle = {
+  configureLevelAudio: (profile: LevelAudioProfile) => void;
   configureWaterfallArea: (area: WaterfallAudioArea) => void;
+  clearWaterfallArea: () => void;
+  prepareForLevelTransition: () => void;
   updateListenerPosition: (position: WorldPosition) => void;
   getSfxVolume: () => number;
+  dispose: () => void;
 };
 
 function clamp01(value: number) {
@@ -81,7 +94,9 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
 
   if (!musicSlider || !ambientSlider || !sfxSlider) return null;
 
-  const music = new Audio(asset("assets/audio/music/Echoes_in_the_Dark_ingame.mp3"));
+  let currentBackgroundTrack = "assets/audio/music/Echoes_in_the_Dark_ingame.mp3";
+  let currentAmbientTrack: string | null = "assets/audio/ambience/Gentle_cricket_chirp.mp3";
+  const music = new Audio(asset(currentBackgroundTrack));
   music.loop = true;
   music.preload = "auto";
 
@@ -89,7 +104,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   skyEyeMusic.loop = false;
   skyEyeMusic.preload = "auto";
 
-  const ambient = new Audio(asset("assets/audio/ambience/Gentle_cricket_chirp.mp3"));
+  const ambient = new Audio(asset(currentAmbientTrack));
   ambient.loop = true;
   ambient.preload = "auto";
 
@@ -98,7 +113,8 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   waterfall.preload = "auto";
   waterfall.volume = 0;
 
-  const walkSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_walking.mp3"));
+  let currentWalkFootstepTrack = DEFAULT_WALK_FOOTSTEP_TRACK;
+  const walkSfx = new Audio(asset(currentWalkFootstepTrack));
   const runSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_running.mp3"));
   const jumpSfx = new Audio(asset("assets/audio/sfx/jump_on_road.mp3"));
   const doorSfx = new Audio(asset("assets/audio/sfx/HouseInTheWoods-DoorOpen.mp3"));
@@ -110,6 +126,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   doorSfx.preload = "auto";
 
   let started = false;
+  let playbackUnlocked = false;
   let skyEyeMusicActive = false;
   let ambientStarted = false;
   let waterfallStarted = false;
@@ -120,6 +137,9 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   let waterfallGain: GainNode | null = null;
   let waterfallArea: WaterfallAudioArea | null = null;
   let waterfallProximity = 0;
+  let disposed = false;
+  const abortController = new AbortController();
+  const signal = abortController.signal;
 
   const volumes: Record<VolumeChannel, number> = {
     music: readSavedVolume(MUSIC_VOLUME_KEY, DEFAULT_MUSIC_VOLUME),
@@ -229,6 +249,16 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     if (mode === "run") void playLoop(runSfx);
   }
 
+  function setWalkFootstepTrack(path: string) {
+    if (path === currentWalkFootstepTrack) return;
+    const resumeWalking = footstepMode === "walk";
+    stopLoop(walkSfx);
+    currentWalkFootstepTrack = path;
+    walkSfx.src = asset(path);
+    walkSfx.load();
+    if (resumeWalking && playbackUnlocked) void playLoop(walkSfx);
+  }
+
   function playGameSfx(name: "jump" | "walk" | "run" | "door") {
     if (volumes.sfx <= 0) return;
     if (name === "walk" || name === "run") {
@@ -243,6 +273,8 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   }
 
   async function start() {
+    if (disposed) return;
+    playbackUnlocked = true;
     const context = ensureAudioContext();
     const playbackRequests: Promise<void>[] = [];
     if (context.state === "suspended") {
@@ -259,7 +291,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       }
     }
 
-    if (!ambientStarted) {
+    if (currentAmbientTrack && !ambientStarted) {
       ambientStarted = true;
       playbackRequests.push(ambient.play().catch((error) => {
         ambientStarted = false;
@@ -267,7 +299,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       }));
     }
 
-    if (!waterfallStarted) {
+    if (waterfallArea && !waterfallStarted) {
       waterfallStarted = true;
       playbackRequests.push(waterfall.play().catch((error) => {
         waterfallStarted = false;
@@ -276,6 +308,51 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     }
 
     await Promise.all(playbackRequests);
+  }
+
+  function setBackgroundTrack(path: string) {
+    if (path === currentBackgroundTrack) return;
+    currentBackgroundTrack = path;
+    music.pause();
+    music.currentTime = 0;
+    music.src = asset(path);
+    music.load();
+    started = false;
+  }
+
+  function setAmbientTrack(path: string | null) {
+    if (path === currentAmbientTrack) return;
+    stopLoop(ambient);
+    ambientStarted = false;
+    currentAmbientTrack = path;
+    if (!path) {
+      ambient.removeAttribute("src");
+      ambient.load();
+      return;
+    }
+    ambient.src = asset(path);
+    ambient.load();
+  }
+
+  function clearWaterfallArea() {
+    waterfallArea = null;
+    waterfallProximity = 0;
+    updateWaterfallVolume();
+    if (waterfallStarted) stopLoop(waterfall);
+    waterfallStarted = false;
+  }
+
+  function prepareForLevelTransition() {
+    setFootstepMode("idle");
+    skyEyeMusicActive = false;
+    stopLoop(skyEyeMusic);
+    stopLoop(music);
+    stopLoop(ambient);
+    if (waterfallStarted) stopLoop(waterfall);
+    started = false;
+    ambientStarted = false;
+    waterfallStarted = false;
+    clearWaterfallArea();
   }
 
   function setVolume(channel: VolumeChannel, volume: number, save = true) {
@@ -311,15 +388,15 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     binding?.slider.addEventListener("input", () => {
       setVolume(channel, Number(binding.slider.value) / 100);
       void start();
-    });
+    }, { signal });
 
     binding?.slider.addEventListener("change", () => {
       if (previewSfx) playUiSfx();
-    });
+    }, { signal });
   }
 
-  pauseMenu?.addEventListener("pointerdown", (event) => event.stopPropagation());
-  pauseMenu?.addEventListener("click", (event) => event.stopPropagation());
+  pauseMenu?.addEventListener("pointerdown", (event) => event.stopPropagation(), { signal });
+  pauseMenu?.addEventListener("click", (event) => event.stopPropagation(), { signal });
 
   bindSlider(musicSlider, "music");
   bindSlider(ambientSlider, "ambient");
@@ -327,7 +404,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
 
   pauseMenu?.addEventListener("click", (event) => {
     if ((event.target as HTMLElement | null)?.closest("button")) playUiSfx();
-  });
+  }, { signal });
 
   window.addEventListener("bosque:sfx", (event) => {
     const { name, active } = (event as GameSfxEvent).detail ?? {};
@@ -337,7 +414,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       return;
     }
     playGameSfx(name);
-  });
+  }, { signal });
 
   window.addEventListener("bosque:sky-eye", (event) => {
     const { state } = (event as SkyEyeEvent).detail ?? {};
@@ -366,12 +443,12 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
         );
       });
     }
-  });
+  }, { signal });
 
   const startOnGesture = () => void start();
-  window.addEventListener("pointerdown", startOnGesture, { passive: true });
-  window.addEventListener("keydown", startOnGesture);
-  window.addEventListener("touchstart", startOnGesture, { passive: true });
+  window.addEventListener("pointerdown", startOnGesture, { passive: true, signal });
+  window.addEventListener("keydown", startOnGesture, { signal });
+  window.addEventListener("touchstart", startOnGesture, { passive: true, signal });
 
   setVolume("music", volumes.music, false);
   setVolume("ambient", volumes.ambient, false);
@@ -380,6 +457,20 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
 
   return {
     getSfxVolume: () => volumes.sfx,
+    configureLevelAudio(profile) {
+      setBackgroundTrack(profile.backgroundTrack);
+      setWalkFootstepTrack(
+        profile.walkFootstepTrack ?? DEFAULT_WALK_FOOTSTEP_TRACK
+      );
+      if (profile.ambientTrack !== undefined) {
+        setAmbientTrack(profile.ambientTrack);
+      }
+      if (profile.waterfallArea === null) clearWaterfallArea();
+      else if (profile.waterfallArea) this.configureWaterfallArea(profile.waterfallArea);
+      setVolume("music", volumes.music, false);
+      setVolume("ambient", volumes.ambient, false);
+      if (playbackUnlocked) void start();
+    },
     configureWaterfallArea(area) {
       const fullVolumeRadius = Number.isFinite(area.fullVolumeRadius)
         ? Math.max(0, area.fullVolumeRadius)
@@ -397,6 +488,8 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       };
       updateWaterfallVolume();
     },
+    clearWaterfallArea,
+    prepareForLevelTransition,
     updateListenerPosition(position) {
       if (!waterfallArea) return;
       const distance = Math.hypot(
@@ -414,6 +507,17 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
         distance
       );
       updateWaterfallVolume();
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      abortController.abort();
+      prepareForLevelTransition();
+      void audioContext?.close();
+      audioContext = null;
+      sfxGain = null;
+      waterfallSource = null;
+      waterfallGain = null;
     },
   };
 }

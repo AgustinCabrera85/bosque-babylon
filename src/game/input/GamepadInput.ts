@@ -17,6 +17,16 @@ type RawGamepadState = {
   buttons: boolean[];
 };
 
+export type GamepadRumbleOptions = {
+  durationMs: number;
+  strongMagnitude: number;
+  weakMagnitude: number;
+};
+
+type LegacyHapticActuator = {
+  pulse?: (value: number, duration: number) => Promise<boolean> | boolean;
+};
+
 export class GamepadInput implements InputDeviceAdapter {
   public readonly type = "gamepad" as const;
 
@@ -48,6 +58,65 @@ export class GamepadInput implements InputDeviceAdapter {
   public getActiveGamepad() {
     const pads = this.getConnectedGamepads();
     return pads.find((pad) => pad.index === this.activeIndex) ?? pads[0] ?? null;
+  }
+
+  public rumble(options: GamepadRumbleOptions) {
+    const gamepad = this.getActiveGamepad() as (Gamepad & {
+      hapticActuators?: readonly LegacyHapticActuator[];
+    }) | null;
+    if (!gamepad) return false;
+
+    const duration = Math.max(0, Math.round(options.durationMs));
+    const strongMagnitude = clampUnit(options.strongMagnitude);
+    const weakMagnitude = clampUnit(options.weakMagnitude);
+    const actuator = gamepad.vibrationActuator;
+    if (actuator && typeof actuator.playEffect === "function") {
+      try {
+        void Promise.resolve(actuator.playEffect("dual-rumble", {
+          duration,
+          strongMagnitude,
+          weakMagnitude,
+        })).catch(() => {});
+        return true;
+      } catch {
+        // Try the legacy pulse API below.
+      }
+    }
+
+    const legacyActuator = gamepad.hapticActuators?.[0];
+    if (!legacyActuator?.pulse) return false;
+    try {
+      void Promise.resolve(
+        legacyActuator.pulse(Math.max(strongMagnitude, weakMagnitude), duration)
+      ).catch(() => {});
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  public stopRumble() {
+    const gamepad = this.getActiveGamepad() as (Gamepad & {
+      hapticActuators?: readonly LegacyHapticActuator[];
+    }) | null;
+    if (!gamepad) return;
+
+    const actuator = gamepad.vibrationActuator;
+    if (actuator && typeof actuator.reset === "function") {
+      try {
+        void Promise.resolve(actuator.reset()).catch(() => {});
+      } catch {
+        // Ignore unsupported or disconnected actuators.
+      }
+    }
+
+    const legacyActuator = gamepad.hapticActuators?.[0];
+    if (!legacyActuator?.pulse) return;
+    try {
+      void Promise.resolve(legacyActuator.pulse(0, 0)).catch(() => {});
+    } catch {
+      // Ignore unsupported or disconnected actuators.
+    }
   }
 
   public update(): DeviceInputSnapshot {
@@ -238,4 +307,8 @@ export function applyRadialDeadZone(
   const normalizedMagnitude = Math.min(1, (magnitude - safeDeadZone) / (1 - safeDeadZone));
   const scale = normalizedMagnitude / magnitude;
   return { x: x * scale, y: y * scale };
+}
+
+function clampUnit(value: number) {
+  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 }

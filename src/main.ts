@@ -12,6 +12,7 @@ import { LevelRegistry } from "./game/runtime/LevelRegistry";
 import type { LevelId, PerformanceTier } from "./game/runtime/LevelTypes";
 import { GameSession } from "./game/runtime/GameSession";
 import { setupInputPrompts } from "./game/input/InputPrompts";
+import { setupGamepadFeedback } from "./game/input/GamepadFeedback";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement | null;
 if (!canvas) throw new Error("No se encontro #renderCanvas");
@@ -159,6 +160,10 @@ async function start() {
       import.meta.env.DEV &&
       new URLSearchParams(window.location.search).get("debugSurvival") === "1",
   });
+  const gamepadFeedback = setupGamepadFeedback({
+    input,
+    playerStats: session.playerStats,
+  });
 
   const registry = new LevelRegistry().register("forest", async () => {
     const module = await import("./game/levels/forest/createForestLevel");
@@ -247,6 +252,7 @@ async function start() {
   const scene = initialLevel.scene;
   window.addEventListener("pagehide", () => {
     levelManager.dispose();
+    gamepadFeedback.dispose();
     input.dispose();
     inputPrompts.dispose();
     pauseMenu.dispose();
@@ -296,12 +302,23 @@ async function start() {
     inventory.update();
     itemInspector.update(deltaSeconds);
 
-    if (
+    const gameplayBlocked =
       modalWasOpen ||
       pauseMenu.isPaused() ||
       itemInspector.isOpen() ||
-      inventory.isOpen()
-    ) return;
+      inventory.isOpen();
+    const cinematicActive =
+      document.body.classList.contains("opening-sequence-active") ||
+      document.body.classList.contains("sky-eye-cinematic-active");
+    const loadingActive = loadingScreen
+      ? !loadingScreen.classList.contains("hidden")
+      : false;
+    gamepadFeedback.update(
+      deltaSeconds,
+      !gameplayBlocked && !cinematicActive && !loadingActive
+    );
+
+    if (gameplayBlocked) return;
     levelManager.update(deltaSeconds);
     levelManager.render();
   });

@@ -22,7 +22,7 @@ import {
   type KeyboardMouseActionBinding,
   type KeyboardMouseBindings,
 } from "./InputBindings";
-import { GamepadInput } from "./GamepadInput";
+import { GamepadInput, type GamepadRumbleOptions } from "./GamepadInput";
 import { KeyboardMouseInput } from "./KeyboardMouseInput";
 import { TouchInput } from "./TouchInput";
 import {
@@ -187,6 +187,15 @@ export class InputManager {
 
   public getActiveGamepad() {
     return this.gamepad.getActiveGamepad();
+  }
+
+  public rumbleGamepad(options: GamepadRumbleOptions) {
+    if (this.disposed || this.activeDevice !== "gamepad") return false;
+    return this.gamepad.rumble(options);
+  }
+
+  public stopGamepadRumble() {
+    this.gamepad.stopRumble();
   }
 
   public getActionBindingLabel(
@@ -365,6 +374,7 @@ export class InputManager {
   public dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.gamepad.stopRumble();
     this.keyboardMouse.dispose();
     this.gamepad.dispose();
     this.touch.dispose();
@@ -374,6 +384,9 @@ export class InputManager {
 
   private setActiveDevice(device: InputDeviceType) {
     if (this.activeDevice === device) return;
+    if (this.activeDevice === "gamepad" && device !== "gamepad") {
+      this.gamepad.stopRumble();
+    }
     this.activeDevice = device;
     for (const listener of this.activeDeviceListeners) listener(device);
   }

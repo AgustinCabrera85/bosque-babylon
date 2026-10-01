@@ -1,4 +1,5 @@
 import type { Engine } from "@babylonjs/core/Engines/engine";
+import type { InputManager } from "./input/InputManager";
 
 export type ResolutionMode = "auto" | "100" | "80" | "67" | "50";
 
@@ -9,6 +10,7 @@ type StoredVideoSettings = {
 type PauseVideoOptions = {
   engine: Engine;
   automaticHardwareScaling: number;
+  input: InputManager;
   signal: AbortSignal;
   onChanged?: (message: string) => void;
 };
@@ -67,6 +69,7 @@ function getEffectiveScalePercent(engine: Engine) {
 export function setupPauseVideo({
   engine,
   automaticHardwareScaling,
+  input,
   signal,
   onChanged,
 }: PauseVideoOptions): PauseVideoHandle {
@@ -102,9 +105,11 @@ export function setupPauseVideo({
     fullscreenToggle.disabled = !supported;
     fullscreenToggle.checked = document.fullscreenElement !== null;
     if (fullscreenHint) {
-      fullscreenHint.textContent = supported
-        ? "El HUD y el menú permanecen visibles. Pulsa Esc para salir."
-        : "Pantalla completa no está disponible en este navegador.";
+      fullscreenHint.textContent = !supported
+        ? "Pantalla completa no está disponible en este navegador."
+        : input.getActiveDevice() === "keyboardMouse"
+          ? "El HUD y el menú permanecen visibles. Pulsa Esc para salir."
+          : "El HUD y el menú permanecen visibles. La salida depende del navegador.";
     }
   };
 
@@ -168,6 +173,8 @@ export function setupPauseVideo({
   }, { signal });
 
   window.addEventListener("resize", renderResolution, { signal });
+  const unsubscribe = input.onActiveDeviceChanged(renderFullscreen);
+  signal.addEventListener("abort", unsubscribe, { once: true });
 
   renderResolution();
   renderFullscreen();

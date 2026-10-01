@@ -11,6 +11,8 @@ import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 
 import { asset } from "../utils/asset";
 import { applyPhotoCardMaterials } from "./PhotoCard";
+import type { InputManager } from "./input/InputManager";
+import { renderActionPrompt } from "./input/InputPrompts";
 
 export type InspectableItem = {
   id: string;
@@ -49,13 +51,23 @@ export type ItemInspectorHandle = {
   inspect: (item: InspectableItem) => void;
   isOpen: () => boolean;
   close: () => void;
+  update: (deltaSeconds: number) => void;
   dispose: () => void;
 };
 
-export function setupItemInspector(): ItemInspectorHandle {
+type InspectorMode = "model" | "image";
+type InspectorInteraction = (deltaSeconds: number) => void;
+
+type ItemInspectorOptions = {
+  input: InputManager;
+};
+
+export function setupItemInspector({ input }: ItemInspectorOptions): ItemInspectorHandle {
   const dom = createInspectorDom();
   let engine: Engine | null = null;
   let scene: Scene | null = null;
+  let interaction: InspectorInteraction | null = null;
+  let currentMode: InspectorMode | null = null;
   let open = false;
   const abortController = new AbortController();
   const signal = abortController.signal;
@@ -72,13 +84,26 @@ export function setupItemInspector(): ItemInspectorHandle {
     engine?.dispose();
     scene = null;
     engine = null;
+    interaction = null;
+    currentMode = null;
   };
 
   const inspect = (item: InspectableItem) => {
-    void openItem(item, dom, () => ({ engine, scene }), (nextEngine, nextScene) => {
-      engine = nextEngine;
-      scene = nextScene;
-    });
+    currentMode = resolveInspectorMode(item);
+    renderInspectorControls(dom, input, currentMode);
+    void openItem(
+      item,
+      dom,
+      input,
+      () => ({ engine, scene }),
+      (nextEngine, nextScene) => {
+        engine = nextEngine;
+        scene = nextScene;
+      },
+      (nextInteraction) => {
+        interaction = nextInteraction;
+      }
+    );
     open = true;
   };
 
@@ -89,11 +114,18 @@ export function setupItemInspector(): ItemInspectorHandle {
   window.addEventListener("bosque:inspect-item", (event) => {
     inspect((event as InspectItemEvent).detail);
   }, { signal });
+  const unsubscribeInput = input.onActiveDeviceChanged(() => {
+    if (currentMode) renderInspectorControls(dom, input, currentMode);
+  });
+  signal.addEventListener("abort", unsubscribeInput, { once: true });
 
   return {
     inspect,
     isOpen: () => open,
     close,
+    update: (deltaSeconds) => {
+      if (open) interaction?.(deltaSeconds);
+    },
     dispose: () => {
       close();
       abortController.abort();
@@ -105,13 +137,16 @@ export function setupItemInspector(): ItemInspectorHandle {
 async function openItem(
   item: InspectableItem,
   dom: InspectorDom,
+  input: InputManager,
   getState: () => { engine: Engine | null; scene: Scene | null },
-  setState: (engine: Engine, scene: Scene) => void
+  setState: (engine: Engine, scene: Scene) => void,
+  setInteraction: (interaction: InspectorInteraction | null) => void
 ) {
   const previous = getState();
   previous.engine?.stopRenderLoop();
   previous.scene?.dispose();
   previous.engine?.dispose();
+  setInteraction(null);
 
   dom.title.textContent = item.name;
   dom.type.textContent = item.typeLabel;
@@ -125,23 +160,17 @@ async function openItem(
   window.dispatchEvent(new CustomEvent("bosque:pause", { detail: { paused: true } }));
 
   if (item.inspectMode === "image") {
-    openImageItem(item, dom);
+    openImageItem(item, dom, input, setInteraction);
     return;
   }
 
   if (!item.modelRootPath || !item.modelFileName) {
-    openImageItem(item, dom);
+    openImageItem(item, dom, input, setInteraction);
     return;
   }
 
   dom.canvas.classList.remove("hidden");
   dom.image.classList.add("hidden");
-  dom.controls.textContent = "";
-  const rotate = document.createElement("span");
-  rotate.textContent = "Arrastrar para rotar";
-  const zoom = document.createElement("span");
-  zoom.textContent = "Rueda para zoom";
-  dom.controls.append(rotate, zoom);
 
   const engine = new Engine(dom.canvas, true, {
     preserveDrawingBuffer: false,
@@ -166,6 +195,9 @@ async function openItem(
   camera.angularSensibilityX = 900;
   camera.angularSensibilityY = 900;
   camera.attachControl(dom.canvas, true);
+  setInteraction((deltaSeconds) => {
+    updateModelWithGamepad(input, camera, deltaSeconds);
+  });
 
   const hemi = new HemisphericLight("itemInspectorHemi", new Vector3(0, 1, 0), scene);
   hemi.intensity = 1.25;
@@ -191,19 +223,16 @@ async function openItem(
   engine.resize();
 }
 
-function openImageItem(item: InspectableItem, dom: InspectorDom) {
+function openImageItem(
+  item: InspectableItem,
+  dom: InspectorDom,
+  input: InputManager,
+  setInteraction: (interaction: InspectorInteraction | null) => void
+) {
   dom.canvas.classList.add("hidden");
   dom.image.classList.remove("hidden");
   dom.image.alt = item.name;
   dom.image.draggable = false;
-  dom.controls.textContent = "";
-  const zoom = document.createElement("span");
-  zoom.textContent = "Rueda para acercar";
-  const pan = document.createElement("span");
-  pan.textContent = "Arrastrar para panear";
-  const close = document.createElement("span");
-  close.textContent = "Guardar para cerrar";
-  dom.controls.append(zoom, pan, close);
 
   let scale = 1;
   const offset = { x: 0, y: 0 };
@@ -247,7 +276,7 @@ function openImageItem(item: InspectableItem, dom: InspectorDom) {
     dom.controls.textContent = "";
     const error = document.createElement("span");
     error.textContent = "Imagen no disponible";
-    dom.controls.append(error, close);
+    dom.controls.append(error);
   };
   dom.image.src = imagePath ? asset(imagePath) : "";
   dom.image.classList.toggle("unavailable", !imagePath);
@@ -317,6 +346,103 @@ function openImageItem(item: InspectableItem, dom: InspectorDom) {
   dom.view.ontouchend = () => {
     initialPinchDistance = null;
   };
+
+  setInteraction((deltaSeconds) => {
+    if (input.getActiveDevice() !== "gamepad") return;
+
+    const movement = input.getMovement();
+    const look = input.getLook();
+    const zoomDirection = Number(input.isDown("attack")) - Number(input.isDown("absorbLight"));
+    let changed = false;
+
+    if (zoomDirection !== 0) {
+      scale = Math.max(1, Math.min(2.8, scale + zoomDirection * deltaSeconds * 1.15));
+      changed = true;
+    }
+
+    if (scale > 1.01) {
+      const panSpeed = 420 * deltaSeconds;
+      offset.x += movement.x * panSpeed + look.x * 180;
+      offset.y += -movement.y * panSpeed + look.y * 180;
+      changed ||= Math.abs(movement.x) + Math.abs(movement.y) > 0.001;
+      changed ||= Math.abs(look.x) + Math.abs(look.y) > 0.001;
+    } else if (offset.x !== 0 || offset.y !== 0) {
+      offset.x = 0;
+      offset.y = 0;
+      changed = true;
+    }
+
+    if (changed) applyTransform();
+  });
+}
+
+function resolveInspectorMode(item: InspectableItem): InspectorMode {
+  return item.inspectMode === "image" || !item.modelRootPath || !item.modelFileName
+    ? "image"
+    : "model";
+}
+
+function renderInspectorControls(
+  dom: InspectorDom,
+  input: InputManager,
+  mode: InspectorMode
+) {
+  dom.controls.replaceChildren();
+  const device = input.getActiveDevice();
+
+  const addText = (text: string) => {
+    const row = document.createElement("span");
+    row.textContent = text;
+    dom.controls.appendChild(row);
+  };
+
+  if (device === "gamepad") {
+    addText(mode === "model" ? "Sticks: rotar objeto" : "Sticks: desplazar imagen");
+    for (const [action, copy] of [
+      ["attack", "Acercar"],
+      ["absorbLight", "Alejar"],
+      ["cancel", "Cerrar"],
+    ] as const) {
+      const row = document.createElement("div");
+      row.className = "item-inspector-control-row";
+      renderActionPrompt(row, input, action, copy);
+      dom.controls.appendChild(row);
+    }
+    return;
+  }
+
+  if (device === "touch") {
+    addText(mode === "model" ? "Arrastrar para rotar" : "Arrastrar para desplazar");
+    addText("Pellizcar para acercar o alejar");
+    return;
+  }
+
+  addText(mode === "model" ? "Arrastrar para rotar" : "Arrastrar para desplazar");
+  addText("Rueda para acercar o alejar");
+  addText("Guardar para cerrar");
+}
+
+function updateModelWithGamepad(
+  input: InputManager,
+  camera: ArcRotateCamera,
+  deltaSeconds: number
+) {
+  if (input.getActiveDevice() !== "gamepad") return;
+
+  const movement = input.getMovement();
+  const look = input.getLook();
+  camera.alpha -= movement.x * deltaSeconds * 1.75 + look.x * 0.8;
+  camera.beta += -movement.y * deltaSeconds * 1.45 + look.y * 0.8;
+  camera.beta = Math.max(0.15, Math.min(Math.PI - 0.15, camera.beta));
+
+  const zoomDirection = Number(input.isDown("absorbLight")) - Number(input.isDown("attack"));
+  if (zoomDirection === 0) return;
+  const minRadius = camera.lowerRadiusLimit ?? 1.2;
+  const maxRadius = camera.upperRadiusLimit ?? 5.2;
+  camera.radius = Math.max(
+    minRadius,
+    Math.min(maxRadius, camera.radius + zoomDirection * deltaSeconds * 2.25)
+  );
 }
 
 function getTouchDistance(a: Touch, b: Touch) {

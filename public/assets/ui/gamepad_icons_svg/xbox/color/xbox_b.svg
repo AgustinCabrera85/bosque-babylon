@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Xbox B button">
+  <title>Xbox B button</title>
+  
+  <circle cx="64" cy="64" r="50" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <g fill="#E54545" stroke="#E54545" stroke-linecap="round" stroke-linejoin="round">
+    <text x="64" y="67" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="800" stroke="none">B</text>
+  </g>
+</svg>

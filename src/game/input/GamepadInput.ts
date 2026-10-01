@@ -45,6 +45,11 @@ export class GamepadInput implements InputDeviceAdapter {
     this.settings = settings;
   }
 
+  public getActiveGamepad() {
+    const pads = this.getConnectedGamepads();
+    return pads.find((pad) => pad.index === this.activeIndex) ?? pads[0] ?? null;
+  }
+
   public update(): DeviceInputSnapshot {
     const pads = this.getConnectedGamepads();
     const activity = pads
@@ -78,11 +83,12 @@ export class GamepadInput implements InputDeviceAdapter {
       };
     }
 
-    const movement = this.readAxisPair(
+    const analogMovement = this.readAxisPair(
       selected,
       this.bindings.movement,
       this.settings.movementDeadZone
     );
+    const movement = this.readMovement(selected, analogMovement);
     const look = this.readAxisPair(selected, this.bindings.look, this.settings.lookDeadZone);
     const held = this.readHeldActions(selected);
     const pressed = new Set<GameAction>();
@@ -137,6 +143,14 @@ export class GamepadInput implements InputDeviceAdapter {
     const x = (gamepad.axes[pair.x] ?? 0) * (pair.invertX ? -1 : 1);
     const y = (gamepad.axes[pair.y] ?? 0) * (pair.invertY ? -1 : 1);
     return applyRadialDeadZone(x, y, deadZone);
+  }
+
+  private readMovement(gamepad: Gamepad, analog: InputVector2) {
+    if (gamepad.mapping !== "standard") return analog;
+    const dpadX = Number(gamepad.buttons[15]?.pressed) - Number(gamepad.buttons[14]?.pressed);
+    const dpadY = Number(gamepad.buttons[12]?.pressed) - Number(gamepad.buttons[13]?.pressed);
+    if (dpadX === 0 && dpadY === 0) return analog;
+    return { x: dpadX, y: dpadY };
   }
 
   private readHeldActions(gamepad: Gamepad) {

@@ -11,6 +11,7 @@ import { LevelManager } from "./game/runtime/LevelManager";
 import { LevelRegistry } from "./game/runtime/LevelRegistry";
 import type { LevelId, PerformanceTier } from "./game/runtime/LevelTypes";
 import { GameSession } from "./game/runtime/GameSession";
+import { setupInputPrompts } from "./game/input/InputPrompts";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement | null;
 if (!canvas) throw new Error("No se encontro #renderCanvas");
@@ -90,11 +91,14 @@ async function playOpeningPresentation(startCinematic: () => Promise<void>) {
   }
 }
 
+function isTouchFirstDevice() {
+  return window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
+}
+
 function shouldUseMobileQuality() {
-  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
   const smallScreen = Math.min(window.innerWidth, window.innerHeight) < 760;
   const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
-  return coarsePointer || navigator.maxTouchPoints > 0 || smallScreen || memory <= 4;
+  return isTouchFirstDevice() || smallScreen || memory <= 4;
 }
 
 const performanceTier: PerformanceTier = shouldUseMobileQuality() ? "mobile" : "desktop";
@@ -128,20 +132,25 @@ async function start() {
     }
   }
 
+  const input = new InputManager(renderCanvas);
+
   armDesktopControlFromStartGesture();
   const musicPlayer = setupMusicPlayer();
-  const selectedCharacter = await setupCharacterSelection();
+  const selectedCharacter = await setupCharacterSelection({
+    input,
+    requireInitialInput: !isTouchFirstDevice(),
+  });
   document.body.classList.remove("character-selecting");
   showLoading();
-  const input = new InputManager(renderCanvas);
+  const inputPrompts = setupInputPrompts(input);
   const pauseMenu = setupPauseMenu({
     canvas: renderCanvas,
     engine,
     automaticHardwareScaling,
     input,
   });
-  const itemInspector = setupItemInspector();
-  const inventory = setupInventory({ inspectItem: itemInspector.inspect });
+  const itemInspector = setupItemInspector({ input });
+  const inventory = setupInventory({ input, inspectItem: itemInspector.inspect });
   const session = new GameSession({
     selectedCharacter,
     inventory,
@@ -239,6 +248,7 @@ async function start() {
   window.addEventListener("pagehide", () => {
     levelManager.dispose();
     input.dispose();
+    inputPrompts.dispose();
     pauseMenu.dispose();
     session.dispose();
     musicPlayer?.dispose();
@@ -250,7 +260,10 @@ async function start() {
     scene.onAfterRenderObservable.addOnce(() => resolve());
   });
   engine.runRenderLoop(() => {
-    input.update(engine.getDeltaTime() / 1000);
+    const deltaSeconds = engine.getDeltaTime() / 1000;
+    input.update(deltaSeconds);
+    const modalWasOpen =
+      pauseMenu.isPaused() || itemInspector.isOpen() || inventory.isOpen();
 
     let modalActionHandled = false;
     if (input.wasPressed("cancel")) {
@@ -279,8 +292,17 @@ async function start() {
       inventory.toggle();
     }
 
-    if (pauseMenu.isPaused() || itemInspector.isOpen() || inventory.isOpen()) return;
-    levelManager.update(engine.getDeltaTime() / 1000);
+    pauseMenu.update();
+    inventory.update();
+    itemInspector.update(deltaSeconds);
+
+    if (
+      modalWasOpen ||
+      pauseMenu.isPaused() ||
+      itemInspector.isOpen() ||
+      inventory.isOpen()
+    ) return;
+    levelManager.update(deltaSeconds);
     levelManager.render();
   });
 

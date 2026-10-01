@@ -1177,11 +1177,19 @@ export class Segments {
   spawnDemoInteractables() {
     const note = MeshBuilder.CreateBox("note", { width: 0.25, height: 0.02, depth: 0.18 }, this.scene);
     note.position.set(0.8, this.terrain.getHeightAt(0.8, 8) + 1, 8);
-    note.metadata = { interactable: true };
+    note.metadata = {
+      interactable: true,
+      type: "inspect",
+      interactionLabel: "examinar",
+    };
 
     const door = MeshBuilder.CreateBox("door", { width: 1, height: 2.2, depth: 0.1 }, this.scene);
     door.position.set(-1.5, this.terrain.getHeightAt(-1.5, 14) + 1.1, 14);
-    door.metadata = { interactable: true };
+    door.metadata = {
+      interactable: true,
+      type: "door",
+      interactionLabel: "abrir",
+    };
 
     const m = new StandardMaterial("demoMat", this.scene);
     m.diffuseColor.set(0.35, 0.33, 0.30);
@@ -2422,6 +2430,7 @@ export class Segments {
       type: "inspect",
       id: "blood-axe",
       title: "Hacha ensangrentada",
+      interactionLabel: "examinar",
       onInteract: () => {
         if (!this.worldObjectInspectionHandler) {
           return { suppressAction: true };
@@ -3299,6 +3308,7 @@ export class Segments {
       interactable: true,
       type: "door",
       locked: true,
+      interactionLabel: () => open ? "cerrar" : "abrir",
       onInteract: () => {
         if (openDelayTimer !== null) {
           return {

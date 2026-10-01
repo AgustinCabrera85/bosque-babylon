@@ -1,5 +1,7 @@
 import type { InspectableItem } from "./ItemInspector";
 import { asset } from "../utils/asset";
+import type { InputManager } from "./input/InputManager";
+import { GamepadMenuNavigator } from "./GamepadMenuNavigator";
 
 type InventoryItem = InspectableItem & {
   count: number;
@@ -7,6 +9,7 @@ type InventoryItem = InspectableItem & {
 
 type InventoryOptions = {
   inspectItem: (item: InspectableItem) => void;
+  input: InputManager;
 };
 
 type InventoryDom = {
@@ -38,10 +41,11 @@ export type InventoryHandle = {
   isOpen: () => boolean;
   toggle: () => void;
   close: () => void;
+  update: () => void;
   dispose: () => void;
 };
 
-export function setupInventory({ inspectItem }: InventoryOptions): InventoryHandle {
+export function setupInventory({ inspectItem, input }: InventoryOptions): InventoryHandle {
   const dom = createInventoryDom();
   const items = new Map<string, InventoryItem>();
   let selectedId: string | null = null;
@@ -49,6 +53,14 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
   let open = false;
   const abortController = new AbortController();
   const signal = abortController.signal;
+  const navigator = new GamepadMenuNavigator({
+    input,
+    root: dom.overlay,
+    getInitialFocus: () =>
+      dom.overlay.querySelector<HTMLElement>(".inventory-item-card.selected") ??
+      dom.overlay.querySelector<HTMLElement>(".inventory-filter.active") ??
+      dom.overlay.querySelector<HTMLElement>("button:not(:disabled)"),
+  });
 
   const render = () => {
     renderFilters(dom, items, currentFilter, (filter) => {
@@ -69,6 +81,7 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
     dom.overlay.setAttribute("aria-hidden", "true");
     dom.button.setAttribute("aria-pressed", "false");
     document.body.classList.remove("inventory-open");
+    navigator.reset();
     window.dispatchEvent(new CustomEvent("bosque:pause", { detail: { paused: false } }));
   };
 
@@ -83,6 +96,7 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
     if (document.pointerLockElement instanceof HTMLElement) document.exitPointerLock?.();
     window.dispatchEvent(new CustomEvent("bosque:pause", { detail: { paused: true } }));
     render();
+    navigator.focusInitial();
   };
 
   const toggle = () => {
@@ -155,6 +169,7 @@ export function setupInventory({ inspectItem }: InventoryOptions): InventoryHand
     isOpen: () => open,
     toggle,
     close,
+    update: () => navigator.update(open),
     dispose: () => {
       close();
       abortController.abort();

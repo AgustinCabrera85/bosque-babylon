@@ -2,6 +2,7 @@ import { setupPauseControls } from "./PauseControls";
 import { setupPauseVideo } from "./PauseVideo";
 import type { Engine } from "@babylonjs/core/Engines/engine";
 import type { InputManager } from "./input/InputManager";
+import { GamepadMenuNavigator } from "./GamepadMenuNavigator";
 
 type PauseMenuOptions = {
   canvas: HTMLCanvasElement;
@@ -14,6 +15,7 @@ export type PauseMenuHandle = {
   isPaused: () => boolean;
   setPaused: (paused: boolean) => void;
   toggle: () => void;
+  update: () => void;
   dispose: () => void;
 };
 
@@ -72,9 +74,17 @@ export function setupPauseMenu({
   const video = setupPauseVideo({
     engine,
     automaticHardwareScaling,
+    input,
     signal,
     onChanged: setStatus,
   });
+  const navigator = menu ? new GamepadMenuNavigator({
+    input,
+    root: menu,
+    getInitialFocus: () =>
+      menu.querySelector<HTMLElement>("[data-pause-tab].selected") ??
+      menu.querySelector<HTMLElement>("button:not(:disabled), input:not(:disabled)"),
+  }) : null;
 
   const setActiveTab = (tab: PauseTab, focus = false) => {
     for (const button of tabButtons) {
@@ -101,6 +111,9 @@ export function setupPauseMenu({
       pauseContent?.scrollTo({ top: 0 });
       controls.refresh();
       video.refresh();
+      navigator?.focusInitial();
+    } else {
+      navigator?.reset();
     }
   };
 
@@ -200,7 +213,9 @@ export function setupPauseMenu({
       if (paused && performance.now() < ignoreEscapeUntil) return;
       setPaused(!paused);
     },
+    update: () => navigator?.update(paused),
     dispose: () => {
+      navigator?.reset();
       abortController.abort();
       if (statusTimer !== null) window.clearTimeout(statusTimer);
     },

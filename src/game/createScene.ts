@@ -85,6 +85,8 @@ import {
   HermanoMayorBehavior,
 } from "./enemies/boss";
 import { HermanoMayorGrabHud } from "./enemies/boss/HermanoMayorGrabHud";
+import { renderActionPrompt } from "./input/InputPrompts";
+import type { GameAction } from "./input/InputActions";
 import { ForestPlayerWorld } from "./levels/forest/ForestPlayerWorld";
 
 
@@ -939,18 +941,19 @@ scene.onBeforeRenderObservable.add(() => {
   });
 
   // =========================
-  // UI hints + Interacción (E)
+  // UI hints + interacción contextual
   // =========================
   const hints = {
-    set(text: string | null) {
+    set(text: string | null, action?: GameAction) {
       const el = document.getElementById("hint");
       if (!el) return;
       if (!text) {
         el.classList.add("hidden");
-        el.textContent = "";
+        el.replaceChildren();
         return;
       }
-      el.textContent = text;
+      if (action) renderActionPrompt(el, input, action, text);
+      else el.textContent = text;
       el.classList.remove("hidden");
     },
   };
@@ -1580,10 +1583,13 @@ scene.onBeforeRenderObservable.add(() => {
     }
 
     if (!interactSystem.isMessageActive()) {
-      const looking = worldObjectInspectionActive
+      const interactionLabel = worldObjectInspectionActive
         ? null
-        : interactSystem.peekInteractable();
-      hints.set(looking ? "E: interactuar" : null);
+        : interactSystem.getInteractionLabel();
+      hints.set(
+        interactionLabel,
+        interactionLabel ? "interact" : undefined
+      );
     }
   });
 

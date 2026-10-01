@@ -26,6 +26,7 @@ type InteractableMetadata = {
   id?: string;
   title?: string;
   locked?: boolean;
+  interactionLabel?: string | (() => string);
   onInteract?: () => InteractResult | void;
 };
 
@@ -65,6 +66,17 @@ export class InteractSystem {
 
   peekInteractable() {
     return this.findInteractable(this.getLookRay());
+  }
+
+  getInteractionLabel() {
+    const pickedMesh = this.peekInteractable();
+    if (!pickedMesh) return null;
+    const data = pickedMesh.metadata as InteractableMetadata | undefined;
+    const explicitLabel = typeof data?.interactionLabel === "function"
+      ? data.interactionLabel()
+      : data?.interactionLabel;
+    if (explicitLabel?.trim()) return explicitLabel.trim();
+    return defaultInteractionLabel(data);
   }
 
   tryInteract() {
@@ -152,5 +164,23 @@ export class InteractSystem {
     if (value < min) return min - value;
     if (value > max) return value - max;
     return 0;
+  }
+}
+
+function defaultInteractionLabel(data: InteractableMetadata | undefined) {
+  switch (data?.type) {
+    case "key":
+    case "matches":
+    case "note":
+    case "photo":
+      return "recoger";
+    case "door":
+      return "abrir";
+    case "inspect":
+      return "examinar";
+    case "clue":
+      return "leer";
+    default:
+      return "interactuar";
   }
 }

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="PlayStation triangle button">
+  <title>PlayStation triangle button</title>
+  
+  <circle cx="64" cy="64" r="50" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <g fill="#FFFFFF" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 39L88 84H40z" fill="none" stroke-width="9"/>
+  </g>
+</svg>

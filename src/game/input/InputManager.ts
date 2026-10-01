@@ -25,6 +25,13 @@ import {
 import { GamepadInput } from "./GamepadInput";
 import { KeyboardMouseInput } from "./KeyboardMouseInput";
 import { TouchInput } from "./TouchInput";
+import {
+  detectControllerFamily,
+  formatGamepadBindingPresentation,
+  formatKeyboardBinding,
+  formatKeyboardMovement,
+  type InputBindingPresentation,
+} from "./InputBindingLabels";
 
 export type ExportedInputBindings = {
   version: 1;
@@ -102,7 +109,6 @@ export class InputManager {
       this.movement = { ...ZERO_MOVEMENT };
       this.look = { x: 0, y: 0 };
       this.gameplayEnabled = false;
-      this.refreshHelpVisibility();
       return;
     }
 
@@ -145,7 +151,6 @@ export class InputManager {
       };
     }
     this.gameplayEnabled = snapshot.gameplayEnabled;
-    this.refreshHelpVisibility();
   }
 
   public getMovement(): MovementInput {
@@ -180,6 +185,50 @@ export class InputManager {
     return this.activeDevice;
   }
 
+  public getActiveGamepad() {
+    return this.gamepad.getActiveGamepad();
+  }
+
+  public getActionBindingLabel(
+    action: GameAction,
+    device: InputDeviceType = this.activeDevice
+  ): string | null {
+    const presentations = this.getActionBindingPresentations(action, device);
+    return presentations.length
+      ? [...new Set(presentations.map(({ label }) => label))].join(" / ")
+      : null;
+  }
+
+  public getActionBindingPresentations(
+    action: GameAction,
+    device: InputDeviceType = this.activeDevice
+  ): readonly InputBindingPresentation[] {
+    if (device === "touch") return [];
+    if (device === "keyboardMouse") {
+      return (this.keyboardMouseBindings.actions[action] ?? [])
+        .map((binding) => ({ label: formatKeyboardBinding(binding) }));
+    }
+
+    const gamepad = this.getActiveGamepad();
+    const family = gamepad ? detectControllerFamily(gamepad.id) : "generic";
+    const usesStandardMapping = gamepad?.mapping === "standard" || !gamepad;
+    return (this.gamepadBindings.actions[action] ?? [])
+      .map((binding) =>
+        formatGamepadBindingPresentation(binding, family, usesStandardMapping)
+      );
+  }
+
+  public getMovementBindingLabel(device: InputDeviceType = this.activeDevice) {
+    if (device === "touch") return "Joystick táctil";
+    if (device === "keyboardMouse") {
+      return formatKeyboardMovement(this.keyboardMouseBindings.movement);
+    }
+    const movement = this.gamepadBindings.movement;
+    return movement.x === 0 && movement.y === 1
+      ? "Stick izquierdo / Cruceta"
+      : `Ejes ${movement.x} / ${movement.y}`;
+  }
+
   public onActiveDeviceChanged(listener: ActiveDeviceListener) {
     this.activeDeviceListeners.add(listener);
     listener(this.activeDevice);
@@ -194,6 +243,13 @@ export class InputManager {
     if (this.selectionMode === mode) return;
     this.selectionMode = mode;
     if (mode !== "auto") this.setActiveDevice(mode);
+    this.clearFrameState();
+  }
+
+  /** Activates a detected device while keeping automatic switching enabled. */
+  public setPreferredDevice(device: InputDeviceType) {
+    if (this.selectionMode !== "auto") return;
+    this.setActiveDevice(device);
     this.clearFrameState();
   }
 
@@ -273,7 +329,6 @@ export class InputManager {
   public setTouchEnabled(enabled: boolean) {
     this.touch.setEnabled(enabled);
     if (enabled && this.selectionMode === "auto") this.setActiveDevice("touch");
-    this.refreshHelpVisibility();
   }
 
   public setTouchMovement(
@@ -333,9 +388,4 @@ export class InputManager {
     this.gameplayEnabled = false;
   }
 
-  private refreshHelpVisibility() {
-    this.keyboardMouse.setOtherGameplayInputEnabled(
-      this.activeDevice !== "keyboardMouse" && this.gameplayEnabled
-    );
-  }
 }

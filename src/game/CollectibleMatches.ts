@@ -109,6 +109,7 @@ export function createCollectibleMatchbox(
     type: "matches",
     id: MATCHES_ITEM_ID,
     title: "Caja de fósforos",
+    interactionLabel: "recoger",
     onInteract: () => {
       if (pickedUp) return { suppressAction: true };
 

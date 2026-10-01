@@ -78,6 +78,7 @@ export function createCollectibleNote(scene: Scene, config: CollectibleNoteConfi
     type: "note",
     id: config.id,
     title: config.name,
+    interactionLabel: "recoger",
     onInteract: () => {
       if (pickedUp) return { suppressAction: true };
 

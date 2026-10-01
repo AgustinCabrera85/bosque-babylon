@@ -130,6 +130,7 @@ export async function createPhotoCard(
     type: "photo",
     id: config.name,
     title: "Foto",
+    interactionLabel: "recoger",
     onInteract: () => {
       if (pickedUp) {
         return {

@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="xbox-a" viewBox="0 0 128 128">
+
+  <title>Xbox A button</title>
+  
+  <circle cx="64" cy="64" r="50" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <g fill="#FFFFFF" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <text x="64" y="67" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="800" stroke="none">A</text>
+  </g>
+
+  </symbol>
+  <symbol id="xbox-b" viewBox="0 0 128 128">
+
+  <title>Xbox B button</title>
+  
+  <circle cx="64" cy="64" r="50" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <g fill="#FFFFFF" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <text x="64" y="67" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="800" stroke="none">B</text>
+  </g>
+
+  </symbol>
+  <symbol id="xbox-dpad" viewBox="0 0 128 128">
+
+  <title>Xbox D-pad</title>
+  <path d="M49 18h30v31h31v30H79v31H49V79H18V49h31z" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+  <circle cx="64" cy="64" r="6" fill="#FFFFFF" stroke="none"/>
+
+  </symbol>
+  <symbol id="xbox-dpad-down" viewBox="0 0 128 128">
+
+  <title>Xbox D-pad down</title>
+  <path d="M49 18h30v31h31v30H79v31H49V79H18V49h31z" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M64 99l-12-15h24z" fill="#FFFFFF" stroke="none"/>
+
+  </symbol>
+  <symbol id="xbox-dpad-left" viewBox="0 0 128 128">
+
+  <title>Xbox D-pad left</title>
+  <path d="M49 18h30v31h31v30H79v31H49V79H18V49h31z" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M29 64l15-12v24z" fill="#FFFFFF" stroke="none"/>
+
+  </symbol>
+  <symbol id="xbox-dpad-right" viewBox="0 0 128 128">
+
+  <title>Xbox D-pad right</title>
+  <path d="M49 18h30v31h31v30H79v31H49V79H18V49h31z" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M99 64L84 52v24z" fill="#FFFFFF" stroke="none"/>
+
+  </symbol>
+  <symbol id="xbox-dpad-up" viewBox="0 0 128 128">
+
+  <title>Xbox D-pad up</title>
+  <path d="M49 18h30v31h31v30H79v31H49V79H18V49h31z" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M64 29l-12 15h24z" fill="#FFFFFF" stroke="none"/>
+
+  </symbol>
+  <symbol id="xbox-home" viewBox="0 0 128 128">
+
+  <title>Xbox home button</title>
+  
+  <circle cx="64" cy="64" r="48" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  
+  <path d="M43 64l21-18 21 18v22H70V71H58v15H43z" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+
+  </symbol>
+  <symbol id="xbox-lb" viewBox="0 0 128 128">
+
+  <title>Xbox LB button</title>
+  
+  <rect x="11" y="33" width="106" height="62" rx="24" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <text x="64" y="66" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">LB</text>
+
+  </symbol>
+  <symbol id="xbox-ls" viewBox="0 0 128 128">
+
+  <title>Xbox LS stick button</title>
+  
+  <circle cx="64" cy="64" r="48" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <circle cx="64" cy="58" r="24" fill="none" stroke="#FFFFFF" stroke-width="7"/>
+  <path d="M42 91h44" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+  <text x="64" y="60" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">LS</text>
+
+  </symbol>
+  <symbol id="xbox-lt" viewBox="0 0 128 128">
+
+  <title>Xbox LT button</title>
+  
+  <rect x="11" y="33" width="106" height="62" rx="24" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <text x="64" y="66" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">LT</text>
+
+  </symbol>
+  <symbol id="xbox-menu" viewBox="0 0 128 128">
+
+  <title>Xbox menu button</title>
+  
+  <circle cx="64" cy="64" r="48" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  
+  <path d="M47 50h34M47 64h34M47 78h34" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+
+  </symbol>
+  <symbol id="xbox-rb" viewBox="0 0 128 128">
+
+  <title>Xbox RB button</title>
+  
+  <rect x="11" y="33" width="106" height="62" rx="24" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <text x="64" y="66" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">RB</text>
+
+  </symbol>
+  <symbol id="xbox-rs" viewBox="0 0 128 128">
+
+  <title>Xbox RS stick button</title>
+  
+  <circle cx="64" cy="64" r="48" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <circle cx="64" cy="58" r="24" fill="none" stroke="#FFFFFF" stroke-width="7"/>
+  <path d="M42 91h44" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+  <text x="64" y="60" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">RS</text>
+
+  </symbol>
+  <symbol id="xbox-rt" viewBox="0 0 128 128">
+
+  <title>Xbox RT button</title>
+  
+  <rect x="11" y="33" width="106" height="62" rx="24" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <text x="64" y="66" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">RT</text>
+
+  </symbol>
+  <symbol id="xbox-view" viewBox="0 0 128 128">
+
+  <title>Xbox view button</title>
+  
+  <circle cx="64" cy="64" r="48" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  
+  <rect x="46" y="47" width="30" height="25" rx="3" fill="none" stroke="#FFFFFF" stroke-width="5"/>
+  <rect x="55" y="56" width="30" height="25" rx="3" fill="none" stroke="#FFFFFF" stroke-width="5"/>
+
+  </symbol>
+  <symbol id="xbox-x" viewBox="0 0 128 128">
+
+  <title>Xbox X button</title>
+  
+  <circle cx="64" cy="64" r="50" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <g fill="#FFFFFF" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <text x="64" y="67" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="800" stroke="none">X</text>
+  </g>
+
+  </symbol>
+  <symbol id="xbox-y" viewBox="0 0 128 128">
+
+  <title>Xbox Y button</title>
+  
+  <circle cx="64" cy="64" r="50" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <g fill="#FFFFFF" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <text x="64" y="67" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="800" stroke="none">Y</text>
+  </g>
+
+  </symbol>
+</svg>

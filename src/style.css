@@ -53,6 +53,61 @@ body.character-selecting #renderCanvas {
   gap: clamp(16px, 2.4vh, 25px);
 }
 
+.initial-input-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 24px;
+  color: #f2ead9;
+  text-align: center;
+  background:
+    radial-gradient(circle at center, rgba(20, 35, 30, 0.72), rgba(5, 10, 9, 0.94) 68%),
+    rgba(5, 10, 9, 0.92);
+}
+
+.initial-input-gate.hidden {
+  display: none;
+}
+
+.initial-input-title {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.35rem, 3vw, 2.15rem);
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-wrap: balance;
+  animation: initial-input-pulse 1.8s ease-in-out infinite;
+}
+
+.initial-input-hint {
+  margin: 12px 0 0;
+  color: rgba(242, 234, 217, 0.72);
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.character-selection.awaiting-initial-input .character-selection-shell {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@keyframes initial-input-pulse {
+  0%,
+  100% {
+    opacity: 0.68;
+    transform: scale(0.985);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .character-selection-header {
   justify-self: center;
   width: min(720px, 100%);
@@ -593,6 +648,49 @@ body.sky-eye-cinematic-active #inventoryButton {
   font-size: 12px;
 }
 
+.input-prompt-line,
+.input-prompt-entry,
+.input-binding-token {
+  display: inline-flex;
+  align-items: center;
+}
+
+.input-prompt-line {
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+#help .input-prompt-line {
+  display: flex;
+}
+
+#help .input-prompt-line + .input-prompt-line {
+  margin-top: 5px;
+}
+
+.input-prompt-entry,
+.input-binding-token {
+  gap: 4px;
+}
+
+.input-prompt-separator {
+  opacity: 0.48;
+}
+
+.input-binding-separator {
+  margin: 0 1px;
+  opacity: 0.68;
+}
+
+.input-button-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  vertical-align: middle;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.68));
+}
+
 #reticle {
   position: absolute;
   left: var(--reticle-x, 50%);
@@ -777,7 +875,14 @@ body.attack-aiming #reticle {
 }
 
 .hermano-grab-prompt strong {
+  display: inline-flex;
+  align-items: center;
   color: #ffd796;
+}
+
+.hermano-grab-prompt .input-button-icon {
+  width: 28px;
+  height: 28px;
 }
 
 #hermanoMayorGrabCount {
@@ -853,6 +958,18 @@ body.attack-aiming #reticle {
   pointer-events: none;
   max-width: 70vw;
   text-align: center;
+}
+
+#hint:not(.hidden) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+#hint .input-button-icon {
+  width: 30px;
+  height: 30px;
 }
 
 .thought-messages {
@@ -1766,6 +1883,18 @@ body.inventory-open #hud {
   text-align: right;
 }
 
+.control-mapping-bindings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.control-mapping-icon {
+  width: 26px;
+  height: 26px;
+}
+
 .settings {
   display: flex;
   flex-direction: column;
@@ -1997,6 +2126,10 @@ body.inventory-open #hud {
   position: relative;
   width: min(940px, calc(100vw - 32px));
   min-height: min(560px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
   padding: 28px;
   border: 2px solid rgba(122, 76, 38, 0.9);
   border-radius: 8px;
@@ -2050,9 +2183,17 @@ body.inventory-open #hud {
 .inventory-layout {
   position: relative;
   z-index: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 300px;
   gap: 18px;
+}
+
+.inventory-layout .inventory-section:first-child {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .inventory-section {
@@ -2094,6 +2235,7 @@ body.inventory-open #hud {
 }
 
 .inventory-filter:hover,
+.inventory-filter:focus-visible,
 .inventory-filter.active {
   background: linear-gradient(#7b4a25, #43200d);
   color: var(--bone);
@@ -2105,6 +2247,12 @@ body.inventory-open #hud {
   grid-template-columns: repeat(4, minmax(88px, 1fr));
   gap: 12px;
   min-height: 300px;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #936536 rgba(14, 8, 5, 0.72);
+  padding-right: 4px;
 }
 
 .inventory-item-card {
@@ -2122,7 +2270,8 @@ body.inventory-open #hud {
   cursor: pointer;
 }
 
-.inventory-item-card:hover {
+.inventory-item-card:hover,
+.inventory-item-card:focus-visible {
   transform: translateY(-2px);
   border-color: rgba(216, 189, 122, 0.55);
   background-color: rgba(216, 189, 122, 0.08);
@@ -2408,9 +2557,20 @@ body.inventory-open #hud {
   font-size: 14px;
 }
 
-.item-inspector-controls span {
+.item-inspector-controls > span,
+.item-inspector-control-row {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+}
+
+.item-inspector-control-row .input-binding-token {
+  justify-content: flex-start;
+}
+
+.item-inspector-control-row .input-button-icon {
+  width: 24px;
+  height: 24px;
 }
 
 #mobileControls {
@@ -2419,6 +2579,16 @@ body.inventory-open #hud {
 
 #mobileControls.enabled {
   display: block;
+}
+
+.gamepad-navigation-active :is(button, input, select, textarea):focus {
+  outline: 2px solid rgba(245, 205, 119, 0.92);
+  outline-offset: 3px;
+}
+
+.gamepad-navigation-active .toggle-row:has(input:focus) {
+  outline: 2px solid rgba(245, 205, 119, 0.92);
+  outline-offset: 4px;
 }
 
 #mobileActionHud {

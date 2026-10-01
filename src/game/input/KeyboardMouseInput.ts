@@ -50,7 +50,6 @@ export class KeyboardMouseInput implements InputDeviceAdapter {
   private lookY = 0;
   private significantActivity = false;
   private activityTimestamp = 0;
-  private otherGameplayInputEnabled = false;
 
   public constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -66,20 +65,13 @@ export class KeyboardMouseInput implements InputDeviceAdapter {
     window.addEventListener("mousemove", this.onMouseMove, { signal });
     canvas.addEventListener("contextmenu", this.onContextMenu, { signal });
     document.addEventListener("click", this.onDocumentClick, { signal });
-    document.addEventListener("pointerlockchange", this.updatePointerLockHelp, { signal });
     document.addEventListener("visibilitychange", this.onVisibilityChange, { signal });
     window.addEventListener("blur", this.onBlur, { signal });
-    this.updatePointerLockHelp();
   }
 
   public setBindings(bindings: KeyboardMouseBindings) {
     this.bindings = bindings;
     this.recordActionTransitions();
-  }
-
-  public setOtherGameplayInputEnabled(enabled: boolean) {
-    this.otherGameplayInputEnabled = enabled;
-    this.updatePointerLockHelp();
   }
 
   public update(): DeviceInputSnapshot {
@@ -195,14 +187,6 @@ export class KeyboardMouseInput implements InputDeviceAdapter {
   };
 
   private readonly onBlur = () => this.reset();
-
-  private readonly updatePointerLockHelp = () => {
-    const help = document.getElementById("help");
-    if (!help) return;
-    const hidden =
-      document.pointerLockElement === this.canvas || this.otherGameplayInputEnabled;
-    help.style.display = hidden ? "none" : "block";
-  };
 
   private readHeldActions() {
     const held = new Set<GameAction>();

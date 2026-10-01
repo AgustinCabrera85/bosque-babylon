@@ -105,6 +105,7 @@ export async function createCollectibleForestKey(
     type: "key",
     id: FOREST_KEY_ITEM_ID,
     title: "Llave del bosque",
+    interactionLabel: "recoger",
     onInteract: () => {
       if (pickedUp) return { suppressAction: true };
 

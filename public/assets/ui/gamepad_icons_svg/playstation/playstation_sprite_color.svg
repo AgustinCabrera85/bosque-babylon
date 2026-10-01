@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="ps-circle" viewBox="0 0 128 128">
+
+  <title>PlayStation circle button</title>
+  
+  <circle cx="64" cy="64" r="50" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <g fill="#FF6C8A" stroke="#FF6C8A" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="64" cy="64" r="22" fill="none" stroke-width="9"/>
+  </g>
+
+  </symbol>
+  <symbol id="ps-create" viewBox="0 0 128 128">
+
+  <title>PlayStation create button</title>
+  
+  <circle cx="64" cy="64" r="48" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  
+  <path d="M43 49h30v30H43zM57 39h28v28" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+
+  </symbol>
+  <symbol id="ps-cross" viewBox="0 0 128 128">
+
+  <title>PlayStation cross button</title>
+  
+  <circle cx="64" cy="64" r="50" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <g fill="#5CA9FF" stroke="#5CA9FF" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M47 47l34 34M81 47L47 81" fill="none" stroke-width="9"/>
+  </g>
+
+  </symbol>
+  <symbol id="ps-dpad" viewBox="0 0 128 128">
+
+  <title>PlayStation D-pad</title>
+  <path d="M49 18h30v31h31v30H79v31H49V79H18V49h31z" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+  <circle cx="64" cy="64" r="6" fill="#FFFFFF" stroke="none"/>
+
+  </symbol>
+  <symbol id="ps-dpad-down" viewBox="0 0 128 128">
+
+  <title>PlayStation D-pad down</title>
+  <path d="M49 18h30v31h31v30H79v31H49V79H18V49h31z" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M64 99l-12-15h24z" fill="#FFFFFF" stroke="none"/>
+
+  </symbol>
+  <symbol id="ps-dpad-left" viewBox="0 0 128 128">
+
+  <title>PlayStation D-pad left</title>
+  <path d="M49 18h30v31h31v30H79v31H49V79H18V49h31z" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M29 64l15-12v24z" fill="#FFFFFF" stroke="none"/>
+
+  </symbol>
+  <symbol id="ps-dpad-right" viewBox="0 0 128 128">
+
+  <title>PlayStation D-pad right</title>
+  <path d="M49 18h30v31h31v30H79v31H49V79H18V49h31z" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M99 64L84 52v24z" fill="#FFFFFF" stroke="none"/>
+
+  </symbol>
+  <symbol id="ps-dpad-up" viewBox="0 0 128 128">
+
+  <title>PlayStation D-pad up</title>
+  <path d="M49 18h30v31h31v30H79v31H49V79H18V49h31z" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M64 29l-12 15h24z" fill="#FFFFFF" stroke="none"/>
+
+  </symbol>
+  <symbol id="ps-home" viewBox="0 0 128 128">
+
+  <title>PlayStation home button</title>
+  
+  <circle cx="64" cy="64" r="48" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  
+  <path d="M43 64l21-18 21 18v22H70V71H58v15H43z" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+
+  </symbol>
+  <symbol id="ps-l1" viewBox="0 0 128 128">
+
+  <title>PlayStation L1 button</title>
+  
+  <rect x="11" y="33" width="106" height="62" rx="24" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <text x="64" y="66" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">L1</text>
+
+  </symbol>
+  <symbol id="ps-l2" viewBox="0 0 128 128">
+
+  <title>PlayStation L2 button</title>
+  
+  <rect x="11" y="33" width="106" height="62" rx="24" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <text x="64" y="66" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">L2</text>
+
+  </symbol>
+  <symbol id="ps-l3" viewBox="0 0 128 128">
+
+  <title>PlayStation L3 stick button</title>
+  
+  <circle cx="64" cy="64" r="48" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <circle cx="64" cy="58" r="24" fill="none" stroke="#FFFFFF" stroke-width="7"/>
+  <path d="M42 91h44" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+  <text x="64" y="60" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">L3</text>
+
+  </symbol>
+  <symbol id="ps-options" viewBox="0 0 128 128">
+
+  <title>PlayStation options button</title>
+  
+  <circle cx="64" cy="64" r="48" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  
+  <path d="M46 50h36M46 64h36M46 78h36" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+
+  </symbol>
+  <symbol id="ps-r1" viewBox="0 0 128 128">
+
+  <title>PlayStation R1 button</title>
+  
+  <rect x="11" y="33" width="106" height="62" rx="24" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <text x="64" y="66" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">R1</text>
+
+  </symbol>
+  <symbol id="ps-r2" viewBox="0 0 128 128">
+
+  <title>PlayStation R2 button</title>
+  
+  <rect x="11" y="33" width="106" height="62" rx="24" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <text x="64" y="66" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">R2</text>
+
+  </symbol>
+  <symbol id="ps-r3" viewBox="0 0 128 128">
+
+  <title>PlayStation R3 stick button</title>
+  
+  <circle cx="64" cy="64" r="48" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <circle cx="64" cy="58" r="24" fill="none" stroke="#FFFFFF" stroke-width="7"/>
+  <path d="M42 91h44" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+  <text x="64" y="60" text-anchor="middle" dominant-baseline="middle"
+        fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">R3</text>
+
+  </symbol>
+  <symbol id="ps-square" viewBox="0 0 128 128">
+
+  <title>PlayStation square button</title>
+  
+  <circle cx="64" cy="64" r="50" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <g fill="#F18CFF" stroke="#F18CFF" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="43" y="43" width="42" height="42" rx="2" fill="none" stroke-width="9"/>
+  </g>
+
+  </symbol>
+  <symbol id="ps-touchpad" viewBox="0 0 128 128">
+
+  <title>PlayStation touchpad button</title>
+  
+  <circle cx="64" cy="64" r="48" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  
+  <rect x="38" y="43" width="52" height="42" rx="7" fill="none" stroke="#FFFFFF" stroke-width="6"/>
+  <path d="M46 52h36" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+
+  </symbol>
+  <symbol id="ps-triangle" viewBox="0 0 128 128">
+
+  <title>PlayStation triangle button</title>
+  
+  <circle cx="64" cy="64" r="50" fill="#101318" fill-opacity="0.88" stroke="#FFFFFF" stroke-width="8"/>
+  <g fill="#6AD49B" stroke="#6AD49B" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 39L88 84H40z" fill="none" stroke-width="9"/>
+  </g>
+
+  </symbol>
+</svg>

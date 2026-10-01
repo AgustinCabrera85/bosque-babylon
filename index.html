@@ -7,6 +7,10 @@
   </head>
   <body class="character-selecting">
     <div id="characterSelection" class="character-selection" role="dialog" aria-modal="true" aria-labelledby="characterSelectionTitle">
+      <div id="initialInputGate" class="initial-input-gate hidden" aria-hidden="true">
+        <p class="initial-input-title">Presiona un botón para comenzar</p>
+        <p class="initial-input-hint">Teclado, mouse o gamepad</p>
+      </div>
       <div class="character-selection-shell">
         <header class="character-selection-header">
           <p class="character-selection-kicker">Bosque Babylon</p>
@@ -66,9 +70,7 @@
 
     <div id="hud">
       <div id="help">
-        Click para entrar<br/>
-        <span class="small">V 1P/3P/ISO - F linterna - F8 sombras - Esc pausa</span><br/>
-        <span class="small">WASD mover - Shift correr - Space saltar/bucear - E interactuar - RMB modo orbe + LMB lanzar - Q aferrarse a la luz</span>
+        Preparando controles...
       </div>
       <div id="hint" class="hidden"></div>
       <div id="reticle" aria-hidden="true"></div>
@@ -87,7 +89,7 @@
           <div id="hermanoMayorGrabFill" class="hermano-grab-fill"></div>
         </div>
         <div class="hermano-grab-prompt">
-          PULSA <strong>INTERACTUAR</strong> REPETIDAMENTE
+          PULSA <strong id="hermanoMayorGrabAction">INTERACTUAR</strong> REPETIDAMENTE
           <span id="hermanoMayorGrabCount">0 / 10</span>
         </div>
       </div>
@@ -180,7 +182,7 @@
           <button id="jumpButton" class="mobile-button" type="button" aria-label="Saltar">^</button>
           <button id="runButton" class="mobile-button" type="button" aria-label="Correr o bucear">R</button>
           <button id="mobileCameraButton" class="mobile-button" type="button" aria-label="Cambiar modo de camara" aria-pressed="false">1P</button>
-          <button id="interactButton" class="mobile-button" type="button" aria-label="Interactuar">E</button>
+          <button id="interactButton" class="mobile-button" type="button" aria-label="Interactuar">Usar</button>
           <button id="absorbLightButton" class="mobile-button" type="button" aria-label="Mantener para aferrarse a la luz y recuperar cordura">C</button>
         </div>
       </div>
@@ -313,7 +315,7 @@
               <label class="toggle-row video-toggle-row" for="fullscreenToggle">
                 <span class="video-toggle-copy">
                   <span class="setting-label">Pantalla completa</span>
-                  <small id="fullscreenHint">El HUD y el menú permanecen visibles. Pulsa Esc para salir.</small>
+                  <small id="fullscreenHint">El HUD y el menú permanecen visibles.</small>
                 </span>
                 <input id="fullscreenToggle" type="checkbox" />
                 <span class="toggle-track" aria-hidden="true">

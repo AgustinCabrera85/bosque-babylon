@@ -87,6 +87,7 @@ import {
 import { HermanoMayorGrabHud } from "./enemies/boss/HermanoMayorGrabHud";
 import { renderActionPrompt } from "./input/InputPrompts";
 import type { GameAction } from "./input/InputActions";
+import { setHermanoMayorGrabHapticsActive } from "./input/GamepadFeedback";
 import { ForestPlayerWorld } from "./levels/forest/ForestPlayerWorld";
 
 
@@ -1346,6 +1347,7 @@ scene.onBeforeRenderObservable.add(() => {
         onGrabStarted: () => {
           attackSystem.cancelCharge();
           playerStats.cancelLightAbsorption("grab");
+          setHermanoMayorGrabHapticsActive(true);
         },
         onGrabDamage: (kind) => {
           const initial = kind === "initial";
@@ -1358,10 +1360,12 @@ scene.onBeforeRenderObservable.add(() => {
             `hermano-mayor:neck-grab:${kind}:sanity`
           );
         },
+        onGrabEnded: () => setHermanoMayorGrabHapticsActive(false),
       })
     : null;
   scene.onDisposeObservable.addOnce(() => {
     hermanoMayorBehavior?.dispose();
+    setHermanoMayorGrabHapticsActive(false);
     hermanoMayorGrabHud.dispose();
     player.setNeckGrabState({ active: false });
   });

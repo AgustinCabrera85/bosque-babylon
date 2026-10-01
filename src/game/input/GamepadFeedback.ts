@@ -14,6 +14,14 @@ export type GamepadFeedbackHandle = {
 const DAMAGE_SANITY_PAUSE_SECONDS = 0.45;
 const LOW_SANITY_LONG_INTERVAL_SECONDS = 1.65;
 const LOW_SANITY_SHORT_INTERVAL_SECONDS = 0.65;
+const INTENSE_GRAB_REFRESH_SECONDS = 0.38;
+const HERMANO_MAYOR_GRAB_HAPTIC_EVENT = "bosque:hermano-mayor-grab-haptics";
+
+export function setHermanoMayorGrabHapticsActive(active: boolean) {
+  window.dispatchEvent(new CustomEvent(HERMANO_MAYOR_GRAB_HAPTIC_EVENT, {
+    detail: { active },
+  }));
+}
 
 export function setupGamepadFeedback({
   input,
@@ -21,8 +29,24 @@ export function setupGamepadFeedback({
 }: GamepadFeedbackOptions): GamepadFeedbackHandle {
   let previousHealth = playerStats.snapshot.health;
   let lowSanityCooldown = 0;
+  let intenseGrabCooldown = 0;
+  let intenseGrabActive = false;
   let gameplayActive = false;
   let disposed = false;
+
+  const onHermanoMayorGrabHaptics = (event: Event) => {
+    intenseGrabActive =
+      (event as CustomEvent<{ active?: boolean }>).detail?.active === true;
+    intenseGrabCooldown = 0;
+    if (!intenseGrabActive) {
+      input.stopGamepadRumble();
+      lowSanityCooldown = Math.max(lowSanityCooldown, 0.3);
+    }
+  };
+  window.addEventListener(
+    HERMANO_MAYOR_GRAB_HAPTIC_EVENT,
+    onHermanoMayorGrabHaptics
+  );
 
   const unsubscribeStats = playerStats.onChange((event) => {
     const lostHealth = Math.max(0, previousHealth - event.snapshot.health);
@@ -30,11 +54,20 @@ export function setupGamepadFeedback({
     if (!gameplayActive || lostHealth <= 0) return;
 
     const severity = clamp01((lostHealth / event.snapshot.maxHealth) * 5);
-    input.rumbleGamepad({
-      durationMs: lerp(140, 310, severity),
-      strongMagnitude: lerp(0.38, 1, severity),
-      weakMagnitude: lerp(0.2, 0.68, severity),
-    });
+    if (intenseGrabActive) {
+      input.rumbleGamepad({
+        durationMs: 560,
+        strongMagnitude: 1,
+        weakMagnitude: 0.95,
+      });
+      intenseGrabCooldown = INTENSE_GRAB_REFRESH_SECONDS;
+    } else {
+      input.rumbleGamepad({
+        durationMs: lerp(140, 310, severity),
+        strongMagnitude: lerp(0.38, 1, severity),
+        weakMagnitude: lerp(0.2, 0.68, severity),
+      });
+    }
     lowSanityCooldown = Math.max(lowSanityCooldown, DAMAGE_SANITY_PAUSE_SECONDS);
   });
 
@@ -45,10 +78,25 @@ export function setupGamepadFeedback({
         if (gameplayActive) input.stopGamepadRumble();
         gameplayActive = false;
         lowSanityCooldown = 0;
+        intenseGrabCooldown = 0;
         return;
       }
 
       gameplayActive = true;
+      const safeDeltaSeconds = Math.max(0, Math.min(deltaSeconds, 0.1));
+      if (intenseGrabActive) {
+        intenseGrabCooldown -= safeDeltaSeconds;
+        if (intenseGrabCooldown <= 0) {
+          const played = input.rumbleGamepad({
+            durationMs: 560,
+            strongMagnitude: 1,
+            weakMagnitude: 0.95,
+          });
+          intenseGrabCooldown = played ? INTENSE_GRAB_REFRESH_SECONDS : 0;
+        }
+        return;
+      }
+
       const snapshot = playerStats.snapshot;
       const threshold = Math.min(
         playerStats.config.lowSanityThreshold,
@@ -59,7 +107,7 @@ export function setupGamepadFeedback({
         return;
       }
 
-      lowSanityCooldown -= Math.max(0, Math.min(deltaSeconds, 0.1));
+      lowSanityCooldown -= safeDeltaSeconds;
       if (lowSanityCooldown > 0) return;
 
       const severity = clamp01(1 - snapshot.sanity / threshold);
@@ -80,6 +128,10 @@ export function setupGamepadFeedback({
       if (disposed) return;
       disposed = true;
       unsubscribeStats();
+      window.removeEventListener(
+        HERMANO_MAYOR_GRAB_HAPTIC_EVENT,
+        onHermanoMayorGrabHaptics
+      );
       input.stopGamepadRumble();
     },
   };

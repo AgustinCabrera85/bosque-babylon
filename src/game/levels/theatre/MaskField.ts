@@ -10,6 +10,8 @@ const MASK_FILES = [
   "rostro_1_escalera.glb",
   "rostro_2_escalera.glb",
   "rostro_3_escalera.glb",
+  "rostro_4_escalera.glb",
+  "rostro_5_escalera_evil1.glb",
 ] as const;
 
 type MaskInstance = {
@@ -79,7 +81,7 @@ export async function createMaskField(
   let time = 0;
   let disposed = false;
   const rows = 22;
-  const modelPattern = [0, 1, 2, 1, 0, 2, 2, 0, 1] as const;
+  const modelPattern = [0, 1, 2, 3, 4, 1, 3, 0, 4, 2] as const;
 
   for (let i = 0; i < rows; i += 1) {
     const t = i / Math.max(1, rows - 1);

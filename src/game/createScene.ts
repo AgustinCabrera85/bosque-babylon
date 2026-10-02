@@ -77,6 +77,7 @@ import { loadInitialForestEnemies } from "./levels/ForestEnemySpawns";
 import { HouseArrivalCinematic } from "./levels/HouseArrivalCinematic";
 import { TerminalSkyEyeEncounter } from "./levels/TerminalSkyEyeEncounter";
 import { BlackSmokeWrapSystem } from "./BlackSmokeWrapSystem";
+import type { CursorController } from "./input/CursorController";
 import type { InputManager } from "./input/InputManager";
 import { EnemyHealthHud } from "./EnemyHealthHud";
 import { createThoughtMessages } from "./ThoughtMessages";
@@ -268,10 +269,14 @@ export async function createScene(
   inventory: InventoryHandle | undefined,
   input: InputManager,
   sharedPlayerStats?: PlayerStatsSystem,
-  prepareOpeningSequence = true
+  prepareOpeningSequence = true,
+  cursorController?: CursorController
 ) {
   onProgress(0.08, "Creando escena...");
   const scene = new Scene(engine);
+  scene.onDisposeObservable.addOnce(() => {
+    cursorController?.setCursorRequest("interaction", null);
+  });
   installSceneMaterialLightBudgetGuard(scene);
   const blackSmokeWrapSystem = new BlackSmokeWrapSystem(
     scene,
@@ -1586,10 +1591,15 @@ scene.onBeforeRenderObservable.add(() => {
       }
     }
 
+    const interactionState = worldObjectInspectionActive
+      ? null
+      : interactSystem.getInteractionState();
+    cursorController?.setCursorRequest(
+      "interaction",
+      interactionState?.cursor ?? null
+    );
     if (!interactSystem.isMessageActive()) {
-      const interactionLabel = worldObjectInspectionActive
-        ? null
-        : interactSystem.getInteractionLabel();
+      const interactionLabel = interactionState?.label ?? null;
       hints.set(
         interactionLabel,
         interactionLabel ? "interact" : undefined

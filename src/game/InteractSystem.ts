@@ -3,6 +3,7 @@ import { Ray } from "@babylonjs/core/Culling/ray";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { InputManager } from "./input/InputManager";
+import type { CursorType } from "./input/CursorController";
 
 type Hints = { set(text: string | null): void };
 type LookRay = {
@@ -20,14 +21,22 @@ type InteractResult =
       suppressAction?: boolean;
     };
 
-type InteractableMetadata = {
+type InteractionCursorType = Exclude<CursorType, "menu" | "default">;
+
+export type InteractableMetadata = {
   interactable?: boolean;
   type?: string;
   id?: string;
   title?: string;
   locked?: boolean;
+  interactionCursor?: InteractionCursorType;
   interactionLabel?: string | (() => string);
   onInteract?: () => InteractResult | void;
+};
+
+export type InteractionState = {
+  label: string;
+  cursor: InteractionCursorType;
 };
 
 const INTERACTION_RAY_LENGTH = 4.25;
@@ -69,14 +78,20 @@ export class InteractSystem {
   }
 
   getInteractionLabel() {
+    return this.getInteractionState()?.label ?? null;
+  }
+
+  getInteractionState(): InteractionState | null {
     const pickedMesh = this.peekInteractable();
     if (!pickedMesh) return null;
     const data = pickedMesh.metadata as InteractableMetadata | undefined;
     const explicitLabel = typeof data?.interactionLabel === "function"
       ? data.interactionLabel()
       : data?.interactionLabel;
-    if (explicitLabel?.trim()) return explicitLabel.trim();
-    return defaultInteractionLabel(data);
+    return {
+      label: explicitLabel?.trim() || defaultInteractionLabel(data),
+      cursor: resolveInteractionCursorType(data),
+    };
   }
 
   tryInteract() {
@@ -164,6 +179,21 @@ export class InteractSystem {
     if (value < min) return min - value;
     if (value > max) return value - max;
     return 0;
+  }
+}
+
+export function resolveInteractionCursorType(
+  data: Pick<InteractableMetadata, "type" | "interactionCursor"> | undefined
+): InteractionCursorType {
+  if (data?.interactionCursor) return data.interactionCursor;
+  switch (data?.type) {
+    case "key":
+    case "matches":
+    case "note":
+    case "photo":
+      return "pickup";
+    default:
+      return "interact";
   }
 }
 

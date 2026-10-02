@@ -4,6 +4,7 @@ import type { InventoryHandle } from "../Inventory";
 import type { MusicPlayerHandle } from "../MusicPlayer";
 import type { CharacterId } from "../PlayerController";
 import type { PlayerStatsSystem } from "../PlayerStatsSystem";
+import type { CursorController } from "../input/CursorController";
 import type { InputManager } from "../input/InputManager";
 
 export type LevelId = "forest" | "theatre";
@@ -24,6 +25,7 @@ export interface LevelCreateContext {
   engine: Engine;
   canvas: HTMLCanvasElement;
   input: InputManager;
+  cursorController?: CursorController;
   selectedCharacter: CharacterId;
   inventory: InventoryHandle;
   playerStats: PlayerStatsSystem;

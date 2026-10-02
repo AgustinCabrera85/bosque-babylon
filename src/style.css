@@ -8,6 +8,16 @@ html, body {
   user-select: none;
 }
 
+html[data-bosque-cursor-managed="true"],
+html[data-bosque-cursor-managed="true"] * {
+  cursor: var(--bosque-cursor, default) !important;
+}
+
+html[data-bosque-cursor-hidden],
+html[data-bosque-cursor-hidden] * {
+  cursor: none !important;
+}
+
 .character-selection {
   position: fixed;
   inset: 0;

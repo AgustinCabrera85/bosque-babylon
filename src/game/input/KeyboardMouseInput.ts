@@ -161,10 +161,11 @@ export class KeyboardMouseInput implements InputDeviceAdapter {
   };
 
   private readonly onMouseMove = (event: MouseEvent) => {
+    const movement = Math.abs(event.movementX) + Math.abs(event.movementY);
+    if (movement >= 0.5) this.markActivity();
     if (document.pointerLockElement !== this.canvas) return;
     this.lookX += event.movementX;
     this.lookY += event.movementY;
-    if (Math.abs(event.movementX) + Math.abs(event.movementY) >= 0.5) this.markActivity();
   };
 
   private readonly onContextMenu = (event: MouseEvent) => {

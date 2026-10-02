@@ -13,6 +13,7 @@ import type { LevelId, PerformanceTier } from "./game/runtime/LevelTypes";
 import { GameSession } from "./game/runtime/GameSession";
 import { setupInputPrompts } from "./game/input/InputPrompts";
 import { setupGamepadFeedback } from "./game/input/GamepadFeedback";
+import { CursorController } from "./game/input/CursorController";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement | null;
 if (!canvas) throw new Error("No se encontro #renderCanvas");
@@ -134,6 +135,13 @@ async function start() {
   }
 
   const input = new InputManager(renderCanvas);
+  const cursorController = new CursorController(renderCanvas);
+  cursorController.setCursorRequest("ui", "menu");
+  await cursorController.preload();
+  const unsubscribeCursorDevice = input.onActiveDeviceChanged((device) => {
+    if (device === "keyboardMouse") cursorController.showCursor();
+    else cursorController.hideCursor();
+  });
 
   armDesktopControlFromStartGesture();
   const musicPlayer = setupMusicPlayer();
@@ -179,6 +187,7 @@ async function start() {
       engine,
       canvas: renderCanvas,
       input,
+      cursorController,
       selectedCharacter: session.selectedCharacter,
       inventory: session.inventory,
       playerStats: session.playerStats,
@@ -190,6 +199,7 @@ async function start() {
     playerStats: session.playerStats,
     musicPlayer: session.musicPlayer,
     onActiveSceneChanged: (scene) => {
+      if (!scene) cursorController.setCursorRequest("interaction", null);
       activeDebug?.dispose();
       activeDebug = scene ? debugBootstrap?.bootstrapDebug(scene) ?? null : null;
     },
@@ -253,6 +263,8 @@ async function start() {
   window.addEventListener("pagehide", () => {
     levelManager.dispose();
     gamepadFeedback.dispose();
+    unsubscribeCursorDevice();
+    cursorController.dispose();
     input.dispose();
     inputPrompts.dispose();
     pauseMenu.dispose();
@@ -313,6 +325,15 @@ async function start() {
     const loadingActive = loadingScreen
       ? !loadingScreen.classList.contains("hidden")
       : false;
+    const menuCursorActive =
+      pauseMenu.isPaused() ||
+      itemInspector.isOpen() ||
+      inventory.isOpen() ||
+      cinematicActive ||
+      loadingActive ||
+      document.body.classList.contains("house-arrival-cinematic-active") ||
+      document.body.classList.contains("character-selecting");
+    cursorController.setCursorRequest("ui", menuCursorActive ? "menu" : null);
     gamepadFeedback.update(
       deltaSeconds,
       !gameplayBlocked && !cinematicActive && !loadingActive

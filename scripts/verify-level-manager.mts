@@ -41,7 +41,12 @@ registry.register("theatre", async () => async () => createLevel("theatre"));
 
 let inputResets = 0;
 let saves = 0;
+let statResets = 0;
 let audioTransitions = 0;
+const playerStats = {
+  save: () => { saves += 1; },
+  resetForLevel: () => { statResets += 1; },
+};
 const manager = new LevelManager({
   registry,
   context: {
@@ -50,13 +55,13 @@ const manager = new LevelManager({
     input: { reset: () => { inputResets += 1; } } as never,
     selectedCharacter: "lautaro" as never,
     inventory: {} as never,
-    playerStats: { save: () => { saves += 1; } } as never,
+    playerStats: playerStats as never,
     musicPlayer: { prepareForLevelTransition: () => { audioTransitions += 1; } } as never,
     performanceTier: "desktop",
     onProgress() {},
   },
   input: { reset: () => { inputResets += 1; } } as never,
-  playerStats: { save: () => { saves += 1; } } as never,
+  playerStats: playerStats as never,
   musicPlayer: { prepareForLevelTransition: () => { audioTransitions += 1; } } as never,
 });
 
@@ -69,6 +74,7 @@ assert.equal(scenes.filter((scene) => !scene.isDisposed).length, 1);
 assert.equal(disposedByLevel.get("forest"), 1);
 assert.equal(disposedByLevel.get("theatre"), 1);
 assert.equal(saves, 3);
+assert.equal(statResets, 3);
 assert.equal(audioTransitions, 3);
 assert.equal(inputResets, 6);
 
@@ -93,13 +99,13 @@ const concurrentManager = new LevelManager({
     input: { reset() {} } as never,
     selectedCharacter: "lautaro" as never,
     inventory: {} as never,
-    playerStats: { save() {} } as never,
+    playerStats: { save() {}, resetForLevel() {} } as never,
     musicPlayer: null,
     performanceTier: "desktop",
     onProgress() {},
   },
   input: { reset() {} } as never,
-  playerStats: { save() {} } as never,
+  playerStats: { save() {}, resetForLevel() {} } as never,
   musicPlayer: null,
 });
 const pendingLoad = concurrentManager.loadLevel("forest");
@@ -125,13 +131,13 @@ const failureManager = new LevelManager({
     input: { reset() {} } as never,
     selectedCharacter: "lautaro" as never,
     inventory: {} as never,
-    playerStats: { save() {} } as never,
+    playerStats: { save() {}, resetForLevel() {} } as never,
     musicPlayer: null,
     performanceTier: "desktop",
     onProgress() {},
   },
   input: { reset() {} } as never,
-  playerStats: { save() {} } as never,
+  playerStats: { save() {}, resetForLevel() {} } as never,
   musicPlayer: null,
 });
 await assert.rejects(failureManager.loadLevel("theatre"), /factory failed/);

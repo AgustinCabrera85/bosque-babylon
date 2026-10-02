@@ -205,6 +205,20 @@ const tests: Array<[string, () => void]> = [
     advance(restarted, 1, { darknessDrainPerSecond: 1 });
     close(restarted.sanity, 49);
   }],
+  ["21. cada nivel reinicia Vida y Cordura sin reponer recursos", () => {
+    const stats = createStats({ initialHealth: 45, initialSanity: 35 });
+    stats.consumeLightOrb("pre-level-resource-use");
+    stats.takeDamage(10, { type: "scripted", ignoreSanityModifier: true });
+    stats.setSanity(20, "pre-level-sanity-loss");
+    const remainingOrbs = stats.lightOrbs;
+
+    stats.resetForLevel();
+
+    assert.equal(stats.health, stats.maxHealth);
+    assert.equal(stats.sanity, stats.maxSanity);
+    assert.equal(stats.lightOrbs, remainingOrbs);
+    assert.equal(stats.lastDamageTime, Number.NEGATIVE_INFINITY);
+  }],
 ];
 
 for (const [name, test] of tests) {

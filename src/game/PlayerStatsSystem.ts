@@ -517,6 +517,28 @@ export class PlayerStatsSystem {
     }
   }
 
+  public resetForLevel() {
+    if (this.disposed) return;
+    const previousBand = this.currentSanityBand;
+
+    this.resetTransientLevelState();
+    this.health = this.maxHealth;
+    this.sanity = this.maxSanity;
+    this.elapsed = 0;
+    this.lastDamageTime = Number.NEGATIVE_INFINITY;
+    this.absorptionElapsed = 0;
+    this.absorptionOrbsConsumed = 0;
+    this.currentSanityBand = getSanityBand(100);
+
+    if (previousBand !== this.currentSanityBand) {
+      this.emit("sanity-band-changed", "level-load", {
+        previousBand,
+        currentBand: this.currentSanityBand,
+      });
+    }
+    this.emit("state-changed", "level-load");
+  }
+
   public resetTransientLevelState() {
     if (this.disposed) return;
     this.cancelLightAbsorption("disposed");

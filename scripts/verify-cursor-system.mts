@@ -6,6 +6,7 @@ import {
   resolveCursorType,
 } from "../src/game/input/CursorController";
 import { resolveInteractionCursorType } from "../src/game/InteractSystem";
+import { POINTER_LOCK_EXCLUSIONS } from "../src/game/input/KeyboardMouseInput";
 
 assert.deepEqual(CURSOR_PRIORITY, [
   "menu",
@@ -18,6 +19,10 @@ assert.deepEqual(CURSOR_PRIORITY, [
 assert.equal(resolveCursorType(["default", "danger", "interact"]), "interact");
 assert.equal(resolveCursorType(["pickup", "menu", "anomaly"]), "menu");
 assert.equal(resolveCursorType([]), "default");
+assert.ok(
+  POINTER_LOCK_EXCLUSIONS.includes("#characterSelection"),
+  "character selection clicks must not request pointer lock"
+);
 
 for (const [type, definition] of Object.entries(CURSORS)) {
   const publicPath = `public/${definition.url.replace(/^\//, "")}`;

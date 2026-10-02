@@ -9,7 +9,7 @@ import type {
   KeyboardMouseBindings,
 } from "./InputBindings";
 
-const POINTER_LOCK_EXCLUSIONS = [
+export const POINTER_LOCK_EXCLUSIONS = [
   "#mobileControls",
   "#musicControls",
   "#viewControls",
@@ -18,6 +18,7 @@ const POINTER_LOCK_EXCLUSIONS = [
   "#inventoryOverlay",
   "#inventoryButton",
   "#shadowAuraDebug",
+  "#characterSelection",
   "#openingSequence",
 ];
 

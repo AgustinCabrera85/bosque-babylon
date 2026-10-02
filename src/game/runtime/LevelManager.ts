@@ -56,13 +56,15 @@ export class LevelManager {
 
     try {
       this.options.input.reset();
-      this.options.playerStats.save();
       this.options.musicPlayer?.prepareForLevelTransition();
 
       const previous = this.activeLevel;
       this.activeLevel = null;
       this.options.onActiveSceneChanged?.(null);
       if (previous) this.disposeLevel(previous);
+
+      this.options.playerStats.resetForLevel();
+      this.options.playerStats.save();
 
       const factory = await this.options.registry.resolve(id);
       const level = await factory({

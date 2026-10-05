@@ -8,6 +8,14 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Scene } from "@babylonjs/core/scene";
 import { EnemyHealthHud } from "../src/game/EnemyHealthHud.ts";
+import {
+  PLAYER_DODGE_REACTION_DURATION_SECONDS,
+  getPlayerDodgeReactionDuration,
+  getPlayerHitReactionDuration,
+  getPlayerHitReactionTravelDistance,
+  samplePlayerDodgeReaction,
+  samplePlayerHitReaction,
+} from "../src/game/animation/PlayerReaction.ts";
 import { BaseEnemyController } from "../src/game/enemies/core/EnemyController.ts";
 import { getDeferredSceneDisposalStats } from "../src/game/enemies/core/DeferredSceneDisposal.ts";
 import { HermanoMayorGrabAttack } from "../src/game/enemies/boss/HermanoMayorGrabAttack.ts";
@@ -24,6 +32,25 @@ import {
   HERMANO_MAYOR_AXE_PICKUP_TIMING,
   HERMANO_MAYOR_AXE_READY_WRIST_ROLL_DEGREES,
 } from "../src/game/enemies/boss/HermanoMayorAxePickupAction.ts";
+import {
+  HERMANO_MAYOR_AXE_ATTACK_ANIMATION,
+  HERMANO_MAYOR_AXE_ATTACK_TIMING,
+  getHermanoMayorAxeTrailIntensity,
+} from "../src/game/enemies/boss/HermanoMayorAxeAttackAction.ts";
+import {
+  HERMANO_MAYOR_AXE_ATTACK_HIT_DISTANCE,
+  HERMANO_MAYOR_AXE_ATTACK_START_DISTANCE,
+  HERMANO_MAYOR_AXE_BLADE_HIT_RADIUS,
+  HERMANO_MAYOR_AXE_ATTACK_COOLDOWN_SECONDS,
+  HERMANO_MAYOR_AXE_ATTACK_DAMAGE_FRACTION,
+  HERMANO_MAYOR_AXE_DODGE_WINDOW_MAX_SECONDS,
+  HERMANO_MAYOR_AXE_DODGE_WINDOW_MIN_SECONDS,
+  HermanoMayorAxeAttack,
+  bladeSweepIntersectsCapsule,
+  getAxeDodgeWindowSeconds,
+  isAxeTargetInRange,
+} from "../src/game/enemies/boss/HermanoMayorAxeAttack.ts";
+import { HermanoMayorAxeTrail } from "../src/game/enemies/boss/HermanoMayorAxeTrail.ts";
 import {
   HERMANO_MAYOR_AXE_PICKUP_TRIGGER_RADIUS,
   HermanoMayorBehavior,
@@ -243,6 +270,22 @@ async function verify() {
     true,
     "a mirrored hand hierarchy must activate the handedness bridge"
   );
+  const bladeLower = Vector3.Zero();
+  const bladeUpper = Vector3.Zero();
+  assert.equal(
+    axe.getBladeEdgeWorldSegmentToRef(bladeLower, bladeUpper),
+    true,
+    "the equipped axe must expose its actual cutting edge"
+  );
+  assert.ok(
+    Vector3.Distance(bladeLower, bladeUpper) > 0.15 &&
+      Vector3.Distance(bladeLower, bladeUpper) < 0.18,
+    "the combat edge must cover the sharpened part of the metal head only"
+  );
+  assert.ok(
+    Vector3.Distance(axeGrip, bladeLower) > 0.85,
+    "the cutting edge must remain at the head, far from the wooden grip"
+  );
   assert.equal(
     HERMANO_MAYOR_AXE_PICKUP_ANIMATION.timeline.at(-1)?.time,
     HERMANO_MAYOR_AXE_PICKUP_TIMING.settleEnd
@@ -268,6 +311,317 @@ async function verify() {
       .length >= 16,
     "the grip pose must curl the hand and every right-hand finger chain"
   );
+  assert.equal(
+    HERMANO_MAYOR_AXE_ATTACK_ANIMATION.timeline.at(-1)?.time,
+    HERMANO_MAYOR_AXE_ATTACK_TIMING.recoveryEnd,
+    "the procedural axe attack must recover into its equipped ready pose"
+  );
+  assert.ok(
+    HERMANO_MAYOR_AXE_ATTACK_TIMING.damageStart <
+      HERMANO_MAYOR_AXE_ATTACK_TIMING.impactAt &&
+      HERMANO_MAYOR_AXE_ATTACK_TIMING.impactAt <
+        HERMANO_MAYOR_AXE_ATTACK_TIMING.damageEnd,
+    "the blade damage window must surround the authored impact pose"
+  );
+  assert.ok(
+    Object.keys(
+      HERMANO_MAYOR_AXE_ATTACK_ANIMATION.poses["axe-attack-impact"].bones
+    ).filter((bone) => bone.includes("RightHand")).length >= 16,
+    "the striking pose must keep the fist closed around the axe handle"
+  );
+  assert.ok(
+    getHermanoMayorAxeTrailIntensity(HERMANO_MAYOR_AXE_ATTACK_TIMING.impactAt) >
+      0.99 &&
+      getHermanoMayorAxeTrailIntensity(
+        HERMANO_MAYOR_AXE_ATTACK_TIMING.commitAt - 0.08
+      ) === 0 &&
+      getHermanoMayorAxeTrailIntensity(
+        HERMANO_MAYOR_AXE_ATTACK_TIMING.followThroughEnd
+      ) === 0,
+    "the red axe halo must peak at impact and disappear outside the cutting arc"
+  );
+  const axeTrail = new HermanoMayorAxeTrail(scene);
+  axeTrail.begin(new Vector3(0, 0.7, 0), new Vector3(0, 1.05, 0));
+  axeTrail.sample(new Vector3(0.8, 0.6, 0), new Vector3(0.8, 0.95, 0), 1);
+  assert.deepEqual(
+    axeTrail.getDebugSnapshot(),
+    { active: true, intensity: 1 },
+    "the blade-history ribbon must activate at full intensity during impact"
+  );
+  axeTrail.end();
+  axeTrail.dispose();
+  const bloodSplashAsset = readFileSync(
+    "public/assets/vfx/blood_splashes/blood_splash_right_bottom.png"
+  );
+  assert.ok(
+    bloodSplashAsset.subarray(0, 8).equals(
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+    ) && bloodSplashAsset.indexOf(Buffer.from("acTL")) >= 0,
+    "the lower-right player-hit VFX must remain a valid animated PNG"
+  );
+  assert.equal(
+    bladeSweepIntersectsCapsule(
+      new Vector3(-1, 0.55, 0),
+      new Vector3(-1, 1.2, 0),
+      new Vector3(1, 0.55, 0),
+      new Vector3(1, 1.2, 0),
+      new Vector3(0, 0.2, 0),
+      new Vector3(0, 1.7, 0),
+      0.2
+    ),
+    true,
+    "a fast cutting-edge sweep must not tunnel through the player capsule"
+  );
+  assert.equal(
+    bladeSweepIntersectsCapsule(
+      new Vector3(-1, 0.55, 2),
+      new Vector3(-1, 1.2, 2),
+      new Vector3(1, 0.55, 2),
+      new Vector3(1, 1.2, 2),
+      new Vector3(0, 0.2, 0),
+      new Vector3(0, 1.7, 0),
+      0.2
+    ),
+    false,
+    "a nearby handle-independent swing must miss when the cutting edge stays away"
+  );
+
+  const attackRoot = new TransformNode("test-axe-attack-root", scene);
+  let attackTime = 0;
+  let attackState: "ready" | "attacking" = "ready";
+  let attackStartCount = 0;
+  const axeDamageFractions: number[] = [];
+  const attack = new HermanoMayorAxeAttack({
+    actor: {
+      root: attackRoot,
+      hasAxe: true,
+      startAxeAttack: () => {
+        attackStartCount += 1;
+        attackTime = 0;
+        attackState = "attacking";
+        return true;
+      },
+      cancelAxeAttack: () => {
+        attackState = "ready";
+        return true;
+      },
+      getAxeAttackDebugSnapshot: () => ({
+        state: attackState,
+        time: attackTime,
+      }),
+      getAxeBladeEdgeWorldSegmentToRef: (lower: Vector3, upper: Vector3) => {
+        lower.set(30, 0.52, 30);
+        upper.set(30, 1.25, 30);
+        return true;
+      },
+    } as never,
+    playerPosition: () => new Vector3(0, 1.7, 1),
+    playerNeckPosition: () => new Vector3(0, 1.52, 1),
+    canHitPlayer: () => true,
+    onAxeDamage: (fraction) => axeDamageFractions.push(fraction),
+  });
+  attack.forceAttack();
+  attack.update(0.05, true, 1.2);
+  for (let step = 0; step < 40; step++) {
+    attackTime += 0.05;
+    if (attackTime >= HERMANO_MAYOR_AXE_ATTACK_TIMING.recoveryEnd) {
+      attackState = "ready";
+    }
+    attack.update(0.05, true, 1.2);
+  }
+  assert.deepEqual(
+    axeDamageFractions,
+    [HERMANO_MAYOR_AXE_ATTACK_DAMAGE_FRACTION],
+    "a stationary in-range player must take exactly one hit even if the diagnostic blade sweep drifts"
+  );
+  assert.equal(
+    getAxeDodgeWindowSeconds(0),
+    HERMANO_MAYOR_AXE_DODGE_WINDOW_MIN_SECONDS,
+    "zero sanity must use the shortest dodge window"
+  );
+  assert.equal(
+    getAxeDodgeWindowSeconds(1),
+    HERMANO_MAYOR_AXE_DODGE_WINDOW_MAX_SECONDS,
+    "full sanity must use the longest dodge window"
+  );
+  assert.ok(
+    getAxeDodgeWindowSeconds(0.2) < getAxeDodgeWindowSeconds(0.8),
+    "lower sanity must make the axe strike harder to dodge"
+  );
+  assert.ok(
+    attack.getDebugSnapshot().cooldownRemaining <=
+      HERMANO_MAYOR_AXE_ATTACK_COOLDOWN_SECONDS,
+    "the completed swing must enter its configured cooldown"
+  );
+  assert.ok(
+    HERMANO_MAYOR_AXE_ATTACK_START_DISTANCE >= 2.3 &&
+      HERMANO_MAYOR_AXE_ATTACK_HIT_DISTANCE >= 2.55 &&
+      HERMANO_MAYOR_AXE_BLADE_HIT_RADIUS >= 0.4,
+    "the axe must use the widened engagement and impact ranges"
+  );
+  assert.ok(
+    isAxeTargetInRange(HERMANO_MAYOR_AXE_ATTACK_HIT_DISTANCE) &&
+      !isAxeTargetInRange(HERMANO_MAYOR_AXE_ATTACK_HIT_DISTANCE + 0.01),
+    "only leaving the authored impact range may avoid an undodged swing"
+  );
+  while (attack.getDebugSnapshot().cooldownRemaining > 0.11) {
+    attack.update(0.05, true, 1.2);
+    assert.equal(
+      attackStartCount,
+      1,
+      "the boss must not begin another swing during the cooldown"
+    );
+  }
+  for (let step = 0; step < 8 && attackStartCount === 1; step++) {
+    attack.update(0.05, true, 1.2);
+  }
+  assert.equal(
+    attackStartCount,
+    2,
+    "the boss may attack again once the cooldown expires"
+  );
+  attack.dispose();
+
+  const dodgeRoot = new TransformNode("test-axe-dodge-root", scene);
+  let dodgeTime = 0;
+  let dodgeState: "ready" | "attacking" = "ready";
+  let dodgePressed = false;
+  let dodgePressIssued = false;
+  let dodgeReactionCount = 0;
+  const dodgeDamageFractions: number[] = [];
+  const dodgePromptStates: string[] = [];
+  const dodgeAttack = new HermanoMayorAxeAttack({
+    actor: {
+      root: dodgeRoot,
+      hasAxe: true,
+      startAxeAttack: () => {
+        dodgeTime = 0;
+        dodgeState = "attacking";
+        return true;
+      },
+      cancelAxeAttack: () => {
+        dodgeState = "ready";
+        return true;
+      },
+      getAxeAttackDebugSnapshot: () => ({
+        state: dodgeState,
+        time: dodgeTime,
+      }),
+      getAxeBladeEdgeWorldSegmentToRef: (lower: Vector3, upper: Vector3) => {
+        const x = -0.9 + dodgeTime * 1.35;
+        lower.set(x, 0.52, 1);
+        upper.set(x, 1.25, 1);
+        return true;
+      },
+    } as never,
+    playerPosition: () => new Vector3(0, 1.7, 1),
+    playerNeckPosition: () => new Vector3(0, 1.52, 1),
+    canHitPlayer: () => true,
+    onAxeDamage: (fraction) => dodgeDamageFractions.push(fraction),
+    onAxeDodged: () => {
+      dodgeReactionCount += 1;
+    },
+    getPlayerSanity: () => 1,
+    wasDodgePressed: () => {
+      const pressed = dodgePressed;
+      dodgePressed = false;
+      return pressed;
+    },
+    setDodgePrompt: (state) => dodgePromptStates.push(state),
+  });
+  dodgeAttack.forceAttack();
+  dodgeAttack.update(0.05, true, 1.2);
+  for (let step = 0; step < 40; step++) {
+    dodgeTime += 0.05;
+    if (!dodgePressIssued && dodgeTime >= 0.5) {
+      dodgePressed = true;
+      dodgePressIssued = true;
+    }
+    if (dodgeTime >= HERMANO_MAYOR_AXE_ATTACK_TIMING.recoveryEnd) {
+      dodgeState = "ready";
+    }
+    dodgeAttack.update(0.05, true, 1.2);
+  }
+  assert.deepEqual(
+    dodgeDamageFractions,
+    [],
+    "pressing action inside the timing window must evade the current swing"
+  );
+  assert.ok(
+    dodgePromptStates.includes("window") &&
+      dodgePromptStates.includes("success"),
+    "a dodgeable swing must expose both its action window and success feedback"
+  );
+  assert.equal(
+    dodgeReactionCount,
+    1,
+    "a successful timing input must emit exactly one reusable player dodge reaction"
+  );
+  assert.equal(
+    getPlayerDodgeReactionDuration(1),
+    PLAYER_DODGE_REACTION_DURATION_SECONDS,
+    "a full-strength dodge must use the authored reusable reaction duration"
+  );
+  assert.ok(
+    getPlayerDodgeReactionDuration(1) > getPlayerHitReactionDuration(1),
+    "the full dodge motion must remain readable beyond the sharper hit recoil"
+  );
+  assert.ok(
+    getPlayerHitReactionDuration(1, "heavy") >
+      getPlayerHitReactionDuration(1, "blunt"),
+    "a heavy impact must retain a longer struggle-to-recover phase"
+  );
+  assert.ok(
+    getPlayerHitReactionTravelDistance(1, "heavy") > 1.15,
+    "a full heavy impact must produce visible collision-aware backward travel"
+  );
+  const firstHitStep = samplePlayerHitReaction(0.13, 1, "heavy");
+  const secondHitStep = samplePlayerHitReaction(0.33, 1, "heavy");
+  const thirdHitStep = samplePlayerHitReaction(0.53, 1, "heavy");
+  const fourthHitStep = samplePlayerHitReaction(0.73, 1, "heavy");
+  const recoveredHit = samplePlayerHitReaction(1, 1, "heavy");
+  assert.ok(
+    firstHitStep.firstStep > firstHitStep.secondStep &&
+      secondHitStep.secondStep > secondHitStep.thirdStep &&
+      thirdHitStep.thirdStep > thirdHitStep.fourthStep &&
+      fourthHitStep.fourthStep > fourthHitStep.thirdStep,
+    "the heavy reaction must expose four distinct alternating backward steps"
+  );
+  assert.ok(
+    firstHitStep.stanceOpen > 0.5 &&
+      firstHitStep.supportBrace > 0.7 &&
+      firstHitStep.pushFollow > 0.4,
+    "the heavy reaction must widen and flex its support while carrying the torso with the incoming push"
+  );
+  assert.ok(
+    firstHitStep.travel < secondHitStep.travel &&
+      secondHitStep.travel < thirdHitStep.travel &&
+      thirdHitStep.travel < fourthHitStep.travel,
+    "the heavy reaction must distribute backward displacement across all four planted steps"
+  );
+  assert.ok(
+    Math.max(
+      Math.abs(firstHitStep.armSwing),
+      Math.abs(secondHitStep.armSwing),
+      Math.abs(thirdHitStep.armSwing),
+      Math.abs(fourthHitStep.armSwing)
+    ) > 0.1 &&
+      recoveredHit.travel === getPlayerHitReactionTravelDistance(1, "heavy"),
+    "the heavy reaction must flail its arms while completing the authored retreat"
+  );
+  const rightDodgeSample = samplePlayerDodgeReaction(0.4, 1, "sidestep", 1);
+  const leftDodgeSample = samplePlayerDodgeReaction(0.4, 1, "sidestep", -1);
+  const duckSample = samplePlayerDodgeReaction(0.4, 1, "duck", 1);
+  assert.ok(
+    rightDodgeSample.lateral > 0 && leftDodgeSample.lateral < 0,
+    "the reusable dodge choreography must mirror cleanly on both sides"
+  );
+  assert.ok(
+    duckSample.crouch > rightDodgeSample.crouch &&
+      rightDodgeSample.visualDisplacement > 0.2,
+    "dodge styles must expose visibly different reusable motion profiles"
+  );
+  dodgeAttack.dispose();
   const rightHand = new TransformNode("test-right-hand", scene);
   const fingerBases = [
     [3.758, 10.071, -0.678],
@@ -1226,7 +1580,7 @@ async function verify() {
   lateHud.dispose();
 
   console.log(
-    "Enemy combat: collision-stall recovery, player-first pursuit, visible 2.5m table-radius axe pickup, exact axe grip, dynamic grab escape, 40% cap, candle hunting, 2/18 hits, gray-to-ash death and SVG HUD OK"
+    "Enemy combat: collision-stall recovery, player-first pursuit, visible 2.5m table-radius axe pickup, exact axe grip, range-guaranteed axe strike, red blade halo, animated player blood hit, 2.5s cooldown, sanity-scaled action dodge, reusable player hit/dodge reactions, dynamic grab escape, 40% cap, candle hunting, 2/18 hits, gray-to-ash death and SVG HUD OK"
   );
 }
 

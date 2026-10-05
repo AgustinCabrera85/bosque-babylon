@@ -26,6 +26,11 @@ import {
   HermanoMayorAxePickupAction,
   type HermanoMayorAxePickupState,
 } from "./HermanoMayorAxePickupAction";
+import {
+  HERMANO_MAYOR_AXE_ATTACK_ACTION,
+  HermanoMayorAxeAttackAction,
+  type HermanoMayorAxeAttackActionState,
+} from "./HermanoMayorAxeAttackAction";
 import { patchHermanoMayorMaterial } from "./HermanoMayorMaterials";
 
 export const HERMANO_MAYOR_MODEL_ROOT_URL = "/assets/models/enemies/boss/";
@@ -57,6 +62,13 @@ export type HermanoMayorHandle = {
   startAxePickup(): boolean;
   cancelAxePickup(): boolean;
   getAxePickupState(): HermanoMayorAxePickupState;
+  startAxeAttack(): boolean;
+  cancelAxeAttack(): boolean;
+  getAxeAttackState(): HermanoMayorAxeAttackActionState;
+  getAxeBladeEdgeWorldSegmentToRef(lower: Vector3, upper: Vector3): boolean;
+  getAxeAttackDebugSnapshot(): ReturnType<
+    HermanoMayorAxeAttackAction["getDebugSnapshot"]
+  >;
   getAxeApproachPositionToRef(result: Vector3): boolean;
   getAxeGripPositionToRef(result: Vector3): boolean;
   getAxePickupTableCenterPositionToRef(result: Vector3): boolean;
@@ -114,7 +126,12 @@ export async function loadHermanoMayor(
     action: "idle" | "walk" | "run",
     options: HermanoMayorPlayOptions = {}
   ) => {
-    if (axePickupAction?.state === "picking-up") return;
+    if (
+      axePickupAction?.state === "picking-up" ||
+      axeAttackAction?.state === "attacking"
+    ) {
+      return;
+    }
     // A real locomotion request takes ownership away from the temporary
     // walk-in-place used by the procedural look/body turn action.
     bodyTurnWalkOwned = false;
@@ -170,6 +187,23 @@ export async function loadHermanoMayor(
     }
   );
   animations.registerProcedural(HERMANO_MAYOR_AXE_PICKUP_ACTION, axePickupAction);
+  const restorePostAxeAttackPresentation = () => {
+    axePickupAction.setArmedPoseEnabled(true);
+    bodyTurnWalkOwned = false;
+    animations.play("idle", { loop: true, blendingSpeed: BODY_TURN_BLEND_SPEED });
+    lookAction.setEnabled(true);
+  };
+  const axeAttackAction = new HermanoMayorAxeAttackAction(
+    scene,
+    meshes,
+    result.animationGroups,
+    {
+      onStarted: () => axePickupAction.setArmedPoseEnabled(false),
+      onFinished: restorePostAxeAttackPresentation,
+      onCancelled: restorePostAxeAttackPresentation,
+    }
+  );
+  animations.registerProcedural(HERMANO_MAYOR_AXE_ATTACK_ACTION, axeAttackAction);
   let axeTarget: HermanoMayorAxeHandle | null = null;
 
   const handle: HermanoMayorHandle = {
@@ -186,6 +220,7 @@ export async function loadHermanoMayor(
     setAxePickupTarget: (axe) => {
       axeTarget = axe;
       axePickupAction.setAxe(axe);
+      axeAttackAction.setAxe(axe);
     },
     startAxePickup: () => {
       if (!axePickupAction.canStart()) return false;
@@ -199,6 +234,21 @@ export async function loadHermanoMayor(
     },
     cancelAxePickup: () => axePickupAction.cancel(),
     getAxePickupState: () => axePickupAction.state,
+    startAxeAttack: () => {
+      if (!axeAttackAction.canStart()) return false;
+      lookAction.setEnabled(false);
+      neckGrabAction.setEnabled(false);
+      bodyTurnWalkOwned = false;
+      animations.play("idle", { loop: true, blendingSpeed: BODY_TURN_BLEND_SPEED });
+      if (axeAttackAction.start()) return true;
+      restorePostAxeAttackPresentation();
+      return false;
+    },
+    cancelAxeAttack: () => axeAttackAction.cancel(),
+    getAxeAttackState: () => axeAttackAction.state,
+    getAxeBladeEdgeWorldSegmentToRef: (lower, upper) =>
+      axeAttackAction.getBladeEdgeWorldSegmentToRef(lower, upper),
+    getAxeAttackDebugSnapshot: () => axeAttackAction.getDebugSnapshot(),
     getAxeApproachPositionToRef: (result) =>
       axePickupAction.getApproachPositionToRef(result),
     getAxeGripPositionToRef: (result) =>
@@ -228,6 +278,7 @@ export async function loadHermanoMayor(
     getNeckGrabDebugSnapshot: () => neckGrabAction.getDebugSnapshot(),
   };
   scene.onDisposeObservable.addOnce(() => {
+    axeAttackAction.dispose();
     axePickupAction.dispose();
     neckGrabAction.dispose();
     lookAction.dispose();

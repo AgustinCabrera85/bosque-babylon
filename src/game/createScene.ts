@@ -37,8 +37,9 @@ import {
   type LightProjectileAttackTarget,
 } from "./PlayerAttackSystem";
 import { PlayerLightAbsorptionVFX } from "./PlayerLightAbsorptionVFX";
+import { PlayerHitBloodVFX } from "./PlayerHitBloodVFX";
 import { PlayerStatsSystem } from "./PlayerStatsSystem";
-import type { ProceduralHitReactionZone } from "./animation/ProceduralGrabStruggleController";
+import type { PlayerHitReactionZone } from "./animation/PlayerReaction";
 import {
   PlayerSurvivalSystem,
   isPlayerPhysicallySurrounded,
@@ -90,6 +91,7 @@ import {
   HermanoMayorBehavior,
 } from "./enemies/boss";
 import { HermanoMayorGrabHud } from "./enemies/boss/HermanoMayorGrabHud";
+import { HermanoMayorAxeDodgeHud } from "./enemies/boss/HermanoMayorAxeDodgeHud";
 import { HermanoMayorAxePickupCinematic } from "./enemies/boss/HermanoMayorAxePickupCinematic";
 import { HermanoMayorForestCrossingCinematic } from "./levels/HermanoMayorForestCrossingCinematic";
 import { renderActionPrompt } from "./input/InputPrompts";
@@ -1184,7 +1186,7 @@ scene.onBeforeRenderObservable.add(() => {
       ) => player.setGrabStruggleDebugPoseMask(mask),
       triggerPlayerHitReaction: (
         strength = 1,
-        hitZone: ProceduralHitReactionZone = "chest",
+        hitZone: PlayerHitReactionZone = "chest",
         localRight = 0,
         localForward = -1
       ) => {
@@ -1195,6 +1197,18 @@ scene.onBeforeRenderObservable.add(() => {
           -localRight * Math.sin(yaw) + localForward * Math.cos(yaw)
         );
         player.playHitReaction({ direction, strength, hitZone });
+        return player.getGrabStruggleDebugSnapshot();
+      },
+      triggerPlayerDodgeReaction: (
+        side: "left" | "right" = "right",
+        strength = 1
+      ) => {
+        player.playDodgeReaction({
+          side,
+          strength,
+          style: "sidestep",
+          movementLockSeconds: 0.34,
+        });
         return player.getGrabStruggleDebugSnapshot();
       },
       getPlayerPosition: () => player.position.clone(),
@@ -1368,6 +1382,8 @@ scene.onBeforeRenderObservable.add(() => {
   scene.metadata.hermanoMayorForestCrossingCinematic =
     hermanoMayorForestCrossingCinematic;
   const hermanoMayorGrabHud = new HermanoMayorGrabHud();
+  const hermanoMayorAxeDodgeHud = new HermanoMayorAxeDodgeHud();
+  const playerHitBloodVfx = new PlayerHitBloodVFX();
   const endHouseBounds = segments.getEndHouseBounds();
   const hermanoMayorNavigationProbe = Vector3.Zero();
   const hermanoMayorNeckTarget = Vector3.Zero();
@@ -1451,6 +1467,39 @@ scene.onBeforeRenderObservable.add(() => {
             `hermano-mayor:neck-grab:${kind}:sanity`
           );
         },
+        onAxeDamage: (fractionOfMaxHealth) => {
+          attackSystem.cancelCharge();
+          playerHitBloodVfx.play();
+          playerStats.takeDamage(
+            playerStats.snapshot.maxHealth * fractionOfMaxHealth,
+            {
+              type: "physical",
+              source: "hermano-mayor:axe-blade",
+              ignoreSanityModifier: true,
+            }
+          );
+          player.playReaction({
+            kind: "hit",
+            sourcePosition: hermanoMayor.root.position,
+            strength: 1,
+            hitZone: "chest",
+            impactType: "heavy",
+            movementLockSeconds: 1.25,
+          });
+        },
+        onAxeDodged: () =>
+          player.playReaction({
+            kind: "dodge",
+            sourcePosition: hermanoMayor.root.position,
+            strength: 1,
+            style: "sidestep",
+            side: "auto",
+            movementLockSeconds: 0.34,
+          }),
+        getPlayerSanity: () => playerStats.normalizedSanity,
+        wasAxeDodgePressed: () => input.wasPressed("interact"),
+        setAxeDodgePrompt: (state, remaining, sanity) =>
+          hermanoMayorAxeDodgeHud.setState(state, remaining, sanity),
         onGrabEnded: () => setHermanoMayorGrabHapticsActive(false),
         beginAxePickupCinematic: () => {
           attackSystem.cancelCharge();
@@ -1485,6 +1534,8 @@ scene.onBeforeRenderObservable.add(() => {
     hermanoMayorAxeCinematic?.dispose();
     setHermanoMayorGrabHapticsActive(false);
     hermanoMayorGrabHud.dispose();
+    hermanoMayorAxeDodgeHud.dispose();
+    playerHitBloodVfx.dispose();
     player.setNeckGrabState({ active: false });
   });
   if (import.meta.env.DEV && hermanoMayor && hermanoMayorBehavior) {
@@ -1492,6 +1543,7 @@ scene.onBeforeRenderObservable.add(() => {
       getGrab: () => hermanoMayorBehavior.getGrabDebugSnapshot(),
       getAxe: () => ({
         pickup: hermanoMayor.getAxePickupDebugSnapshot(),
+        attack: hermanoMayor.getAxeAttackDebugSnapshot(),
         cinematic: hermanoMayorAxeCinematic?.getDebugSnapshot() ?? null,
       }),
       getForestCrossing: () =>
@@ -1506,6 +1558,7 @@ scene.onBeforeRenderObservable.add(() => {
         return actionMoved && cameraMoved;
       },
       forceAxePickup: () => hermanoMayorBehavior.forceAxePickup(),
+      forceAxeAttack: () => hermanoMayorBehavior.forceAxeAttack(),
       forceGrab: (positionPlayer = true) => {
         if (positionPlayer) {
           const yaw = hermanoMayor.root.rotation.y;

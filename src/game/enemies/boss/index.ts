@@ -46,3 +46,24 @@ export {
   type HermanoMayorGrabReleaseReason,
   type HermanoMayorGrabState,
 } from "./HermanoMayorGrabAttack";
+export {
+  HERMANO_MAYOR_AXE_ATTACK_COOLDOWN_SECONDS,
+  HERMANO_MAYOR_AXE_ATTACK_DAMAGE_FRACTION,
+  HERMANO_MAYOR_AXE_ATTACK_START_DISTANCE,
+  HERMANO_MAYOR_AXE_BLADE_HIT_RADIUS,
+  HERMANO_MAYOR_AXE_DODGE_WINDOW_MAX_SECONDS,
+  HERMANO_MAYOR_AXE_DODGE_WINDOW_MIN_SECONDS,
+  HermanoMayorAxeAttack,
+  bladeSweepIntersectsCapsule,
+  getAxeDodgeWindowSeconds,
+  type HermanoMayorAxeAttackOptions,
+  type HermanoMayorAxeAttackState,
+  type HermanoMayorAxeDodgePromptState,
+} from "./HermanoMayorAxeAttack";
+export {
+  HERMANO_MAYOR_AXE_ATTACK_ACTION,
+  HERMANO_MAYOR_AXE_ATTACK_ANIMATION,
+  HERMANO_MAYOR_AXE_ATTACK_TIMING,
+  HermanoMayorAxeAttackAction,
+  type HermanoMayorAxeAttackActionState,
+} from "./HermanoMayorAxeAttackAction";

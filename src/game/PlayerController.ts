@@ -30,9 +30,16 @@ import {
   ProceduralGrabStruggleController,
   type ProceduralGrabStruggleDebugPoseMask,
   type ProceduralGrabStruggleDebugSnapshot,
-  type ProceduralHitReactionEvent,
   type ProceduralNeckGrabState,
 } from "./animation/ProceduralGrabStruggleController";
+import {
+  getPlayerHitReactionDuration,
+  samplePlayerHitReaction,
+  type PlayerDodgeReactionEvent,
+  type PlayerHitReactionEvent,
+  type PlayerImpactType,
+  type PlayerReactionEvent,
+} from "./animation/PlayerReaction";
 
 type Settings = {
   eyeHeight: number;
@@ -316,6 +323,14 @@ export class PlayerController {
     pitch: number;
   } | null = null;
   private movementLockTimer = 0;
+  private hitReactionMovement: {
+    direction: Vector3;
+    elapsed: number;
+    duration: number;
+    previousTravel: number;
+    strength: number;
+    impactType: PlayerImpactType;
+  } | null = null;
   private enemyGrabPressureTimer = 0;
   private enemyGrabMovementMultiplier = 1;
   private enemyGrabPullSpeed = 0;
@@ -803,18 +818,52 @@ export class PlayerController {
     }
   }
 
-  /** Plays a short bounded procedural impact over the current locomotion clip. */
-  playHitReaction(event?: ProceduralHitReactionEvent) {
+  /** Plays a scene-independent procedural reaction requested by any combat source. */
+  playReaction(event: PlayerReactionEvent) {
     if (this.controlsLocked) return false;
-    const direction =
-      event?.direction ??
-      new Vector3(-Math.sin(this.root.rotation.y), 0, -Math.cos(this.root.rotation.y));
-    return (
-      this.grabStruggleController?.triggerHitReaction({
-        ...event,
-        direction,
-      }) ?? false
-    );
+    let played = false;
+    if (event.kind === "hit") {
+      const direction = this.resolveHitReactionDirection(event);
+      const resolvedEvent: PlayerHitReactionEvent = { ...event, direction };
+      played =
+        this.grabStruggleController?.triggerHitReaction(resolvedEvent) ?? false;
+      if (
+        played &&
+        (event.direction !== undefined ||
+          event.sourcePosition !== undefined ||
+          (event.movementLockSeconds ?? 0) > 0)
+      ) {
+        this.hitReactionMovement = {
+          direction,
+          elapsed: 0,
+          duration: getPlayerHitReactionDuration(
+            event.strength ?? 1,
+            event.impactType
+          ),
+          previousTravel: 0,
+          strength: event.strength ?? 1,
+          impactType: event.impactType ?? "blunt",
+        };
+      }
+    } else {
+      this.hitReactionMovement = null;
+      played =
+        this.grabStruggleController?.triggerDodgeReaction(event) ?? false;
+    }
+    if (played && (event.movementLockSeconds ?? 0) > 0) {
+      this.lockMovement(event.movementLockSeconds ?? 0);
+    }
+    return played;
+  }
+
+  /** Convenience wrapper retained for damage systems that only need an impact. */
+  playHitReaction(event: Omit<PlayerHitReactionEvent, "kind"> = {}) {
+    return this.playReaction({ ...event, kind: "hit" });
+  }
+
+  /** Convenience wrapper for traps, enemies and other timed-avoidance systems. */
+  playDodgeReaction(event: Omit<PlayerDodgeReactionEvent, "kind"> = {}) {
+    return this.playReaction({ ...event, kind: "dodge" });
   }
 
   setNeckGrabState(state: ProceduralNeckGrabState) {
@@ -893,6 +942,63 @@ export class PlayerController {
   ) {
     this.grabStruggleController?.setDebugPoseMask(mask);
     return this.getGrabStruggleDebugSnapshot();
+  }
+
+  private resolveHitReactionDirection(event: PlayerHitReactionEvent) {
+    const direction = event.direction?.clone() ?? Vector3.Zero();
+    direction.y = 0;
+    if (direction.lengthSquared() <= 0.000001 && event.sourcePosition) {
+      direction.set(
+        this.root.position.x - event.sourcePosition.x,
+        0,
+        this.root.position.z - event.sourcePosition.z
+      );
+    }
+    if (direction.lengthSquared() <= 0.000001) {
+      direction.set(
+        -Math.sin(this.root.rotation.y),
+        0,
+        -Math.cos(this.root.rotation.y)
+      );
+    } else {
+      direction.normalize();
+    }
+    return direction;
+  }
+
+  private updateHitReactionMovement(dt: number, world: PlayerWorldQuery) {
+    const movement = this.hitReactionMovement;
+    if (!movement || movement.duration <= 0) return;
+    movement.elapsed = Math.min(movement.duration, movement.elapsed + dt);
+    const progress = movement.elapsed / movement.duration;
+    const sample = samplePlayerHitReaction(
+      progress,
+      movement.strength,
+      movement.impactType
+    );
+    const travel = Math.max(movement.previousTravel, sample.travel);
+    const step = travel - movement.previousTravel;
+    movement.previousTravel = travel;
+
+    if (
+      step > 0.00001 &&
+      this.waterLocomotionStateValue === "grounded"
+    ) {
+      const feetY = this.root.position.y - this.settings.eyeHeight;
+      const headY = this.root.position.y + 0.25;
+      const targetX = this.root.position.x + movement.direction.x * step;
+      if (!world.isColliding(targetX, this.root.position.z, 0, feetY, headY)) {
+        this.root.position.x = targetX;
+      }
+      const targetZ = this.root.position.z + movement.direction.z * step;
+      if (!world.isColliding(this.root.position.x, targetZ, 0, feetY, headY)) {
+        this.root.position.z = targetZ;
+      }
+    }
+
+    if (movement.elapsed >= movement.duration) {
+      this.hitReactionMovement = null;
+    }
   }
 
   private lockMovement(seconds: number) {
@@ -1139,6 +1245,8 @@ export class PlayerController {
         this.shallowWaterTransitionTimer - dt
       );
     }
+
+    this.updateHitReactionMovement(dt, world);
 
     this.refreshWaterEnvironment(world);
     this.refreshWaterLocomotionState();

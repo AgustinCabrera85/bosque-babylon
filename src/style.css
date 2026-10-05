@@ -412,6 +412,7 @@ body.character-selecting #renderCanvas {
 #hud {
   position: fixed;
   inset: 0;
+  isolation: isolate;
   pointer-events: none;
   color: #dbe6df;
   transition: opacity 500ms ease;
@@ -913,12 +914,174 @@ body.attack-aiming #reticle {
   to { box-shadow: 0 0 0 2px rgba(15, 9, 8, .78), 0 10px 42px rgba(0,0,0,.74), inset 0 0 27px rgba(151,48,32,.36); }
 }
 
+#hermanoMayorAxeDodgeHud {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(148px, 20vh, 232px);
+  width: min(430px, calc(100vw - 40px));
+  z-index: 49;
+  box-sizing: border-box;
+  padding: 12px 18px 11px;
+  color: #f7ead0;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 16px) scale(.95);
+  transition: opacity .1s ease, transform .12s ease-out;
+  border: 1px solid rgba(229, 172, 91, .8);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(38, 22, 14, .95), rgba(10, 8, 8, .97)),
+    radial-gradient(circle at 50% 0%, rgba(197, 106, 44, .34), transparent 72%);
+  box-shadow:
+    0 0 0 2px rgba(13, 9, 7, .82),
+    0 10px 34px rgba(0, 0, 0, .7),
+    inset 0 0 18px rgba(160, 74, 30, .22);
+}
+
+#hermanoMayorAxeDodgeHud.active {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  animation: hermanoAxeDodgeWarning .3s ease-in-out infinite alternate;
+}
+
+#hermanoMayorAxeDodgeHud.low-sanity {
+  border-color: rgba(224, 77, 55, .9);
+  box-shadow:
+    0 0 0 2px rgba(18, 6, 6, .86),
+    0 10px 38px rgba(0, 0, 0, .74),
+    inset 0 0 22px rgba(177, 35, 28, .3);
+}
+
+#hermanoMayorAxeDodgeHud.success {
+  border-color: rgba(147, 218, 190, .84);
+  animation: none;
+}
+
+.hermano-axe-dodge-title {
+  margin-bottom: 7px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(16px, 2.3vw, 22px);
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-shadow: 0 2px 5px #000, 0 0 13px rgba(226, 113, 48, .78);
+}
+
+.hermano-axe-dodge-track {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(236, 194, 119, .58);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .76);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .9);
+}
+
+.hermano-axe-dodge-fill {
+  --axe-dodge-remaining: 0;
+  width: calc(var(--axe-dodge-remaining) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c63828, #e79843 58%, #ffe09a);
+  box-shadow: 0 0 12px rgba(243, 150, 67, .76);
+  transition: width .04s linear;
+}
+
+#hermanoMayorAxeDodgeHud.success .hermano-axe-dodge-fill {
+  background: linear-gradient(90deg, #477f68, #8fd2aa, #d3f1c9);
+  box-shadow: 0 0 12px rgba(130, 221, 169, .64);
+}
+
+.hermano-axe-dodge-prompt {
+  margin-top: 7px;
+  font-size: clamp(10px, 1.45vw, 13px);
+  letter-spacing: .1em;
+  color: rgba(246, 229, 199, .94);
+}
+
+.hermano-axe-dodge-prompt strong {
+  display: inline-flex;
+  align-items: center;
+  color: #ffda8e;
+}
+
+.hermano-axe-dodge-prompt .input-button-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.hermano-axe-dodge-success-copy {
+  display: none;
+  color: #bce8c9;
+}
+
+#hermanoMayorAxeDodgeHud.success .hermano-axe-dodge-action-copy {
+  display: none;
+}
+
+#hermanoMayorAxeDodgeHud.success .hermano-axe-dodge-success-copy {
+  display: inline;
+}
+
+#interactButton.dodge-window {
+  animation: hermanoAxeDodgeButton .28s ease-in-out infinite alternate;
+}
+
+.player-hit-blood-vfx {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: min(740px, 68vw);
+  aspect-ratio: 658 / 576;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: right bottom;
+}
+
+.player-hit-blood-vfx.active {
+  animation: playerHitBloodReveal 1.05s ease-out forwards;
+}
+
+.player-hit-blood-vfx img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right bottom;
+  user-select: none;
+}
+
+@keyframes playerHitBloodReveal {
+  0% { opacity: .72; transform: scale(.97); }
+  72% { opacity: .62; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.015); }
+}
+
+@keyframes hermanoAxeDodgeWarning {
+  from { filter: brightness(.96); }
+  to { filter: brightness(1.2); }
+}
+
+@keyframes hermanoAxeDodgeButton {
+  from { transform: translate(-50%, -50%) scale(1); filter: brightness(1); }
+  to { transform: translate(-50%, -50%) scale(1.12); filter: brightness(1.42); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   #hermanoMayorGrabHud,
   #hermanoMayorGrabHud.active,
-  .hermano-grab-fill {
+  .hermano-grab-fill,
+  #hermanoMayorAxeDodgeHud,
+  #hermanoMayorAxeDodgeHud.active,
+  .hermano-axe-dodge-fill,
+  #interactButton.dodge-window {
     animation: none;
     transition: none;
+  }
+
+  .player-hit-blood-vfx.active {
+    animation: playerHitBloodReveal 1.05s linear forwards;
   }
 }
 

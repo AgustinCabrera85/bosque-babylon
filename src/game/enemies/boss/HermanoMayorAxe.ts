@@ -16,6 +16,12 @@ const AXE_APPROACH_CLEARANCE_ATTEMPTS = 10;
 // Leave a short butt below the little finger, as in a real one-handed axe
 // grip, instead of pinning the very end of the handle to the palm center.
 const AXE_GRIP_FROM_BASE_FRACTION = 0.11;
+// Hacha_Sangre is authored along +Y. Its broad cutting edge is the negative-X
+// side of the metal head (the positive-X side is the short poll). These two
+// points describe only that sharpened edge, so combat never hits with the
+// handle or the blunt back of the head.
+const AXE_BLADE_EDGE_LOWER_FRACTION = 0.85;
+const AXE_BLADE_EDGE_UPPER_FRACTION = 0.985;
 const PALM_GRIP_FROM_WRIST_FRACTION = 0.56;
 // A real handle enters the fist through the web between index and thumb. The
 // average of all four knuckles sits too far toward the middle/ring fingers and
@@ -124,6 +130,7 @@ export type HermanoMayorAxeHandle = {
   getGripWorldPositionToRef(result: Vector3): boolean;
   getRootWorldPositionToRef(result: Vector3): boolean;
   getGripWorldAxesToRef(x: Vector3, y: Vector3, z: Vector3): boolean;
+  getBladeEdgeWorldSegmentToRef(lower: Vector3, upper: Vector3): boolean;
   getPickupTableCenterWorldPositionToRef(result: Vector3): boolean;
   getPickupApproachWorldPositionToRef(result: Vector3): boolean;
   attachToHandSocket(handSocket: TransformNode): boolean;
@@ -161,6 +168,17 @@ export function createHermanoMayorAxeHandle(
   const gripSocket = new TransformNode("endHouseAxeGripSocket", scene);
   gripSocket.parent = root;
   gripSocket.position.copyFrom(gripPoint);
+  const bladeCenterZ = (sourceBounds.min.z + sourceBounds.max.z) * 0.5;
+  const bladeEdgeLowerLocal = new Vector3(
+    sourceBounds.min.x,
+    sourceBounds.min.y + sourceLength * AXE_BLADE_EDGE_LOWER_FRACTION,
+    bladeCenterZ
+  );
+  const bladeEdgeUpperLocal = new Vector3(
+    sourceBounds.min.x,
+    sourceBounds.min.y + sourceLength * AXE_BLADE_EDGE_UPPER_FRACTION,
+    bladeCenterZ
+  );
   const pickupTableCenter = options.pickupSurfaceCenter?.clone() ?? null;
   const pickupApproachPosition = Vector3.Zero();
   let hasPickupApproachPosition = false;
@@ -292,6 +310,21 @@ export function createHermanoMayorAxeHandle(
         Vector3.Forward(),
         gripSocket.getWorldMatrix(),
         z
+      );
+      return true;
+    },
+    getBladeEdgeWorldSegmentToRef: (lower, upper) => {
+      if (root.isDisposed()) return false;
+      root.computeWorldMatrix(true);
+      Vector3.TransformCoordinatesToRef(
+        bladeEdgeLowerLocal,
+        root.getWorldMatrix(),
+        lower
+      );
+      Vector3.TransformCoordinatesToRef(
+        bladeEdgeUpperLocal,
+        root.getWorldMatrix(),
+        upper
       );
       return true;
     },

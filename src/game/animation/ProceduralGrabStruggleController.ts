@@ -15,6 +15,17 @@ import {
   shouldUseProceduralStairPose,
   type StairLocomotionState,
 } from "./StairLocomotion";
+import {
+  getPlayerDodgeReactionDuration,
+  getPlayerHitReactionDuration,
+  samplePlayerDodgeReaction,
+  samplePlayerHitReaction,
+  type PlayerDodgeReactionEvent,
+  type PlayerDodgeStyle,
+  type PlayerHitReactionEvent,
+  type PlayerHitReactionZone,
+  type PlayerImpactType,
+} from "./PlayerReaction";
 
 type JointName = MixamoJointName;
 
@@ -59,22 +70,12 @@ export type ProceduralGrabStruggleConfig = {
   hitVisualRootMeters: number;
 };
 
-export type ProceduralHitReactionZone =
-  | "head"
-  | "chest"
-  | "abdomen"
-  | "leftShoulder"
-  | "rightShoulder";
-
-export type ProceduralHitReactionType = "blunt" | "heavy" | "projectile";
-
-export type ProceduralHitReactionEvent = {
-  direction: Vector3;
-  strength?: number;
-  hitZone?: ProceduralHitReactionZone;
-  type?: ProceduralHitReactionType;
-  sourcePosition?: Vector3;
-};
+/** @deprecated Use the scene-independent types from PlayerReaction instead. */
+export type ProceduralHitReactionZone = PlayerHitReactionZone;
+/** @deprecated Use PlayerImpactType. */
+export type ProceduralHitReactionType = PlayerImpactType;
+/** @deprecated Use PlayerHitReactionEvent through PlayerController.playReaction. */
+export type ProceduralHitReactionEvent = Omit<PlayerHitReactionEvent, "kind">;
 
 export type ProceduralNeckGrabState = {
   active: boolean;
@@ -116,6 +117,11 @@ export type ProceduralGrabStruggleDebugSnapshot = {
   staggerWeight: number;
   headLagWeight: number;
   recoveryWeight: number;
+  dodgeActive: boolean;
+  dodgeStyle: PlayerDodgeStyle;
+  dodgeProgress: number;
+  dodgeDuration: number;
+  dodgeDirection: { x: number; y: number; z: number };
   visualRootOffset: { x: number; y: number; z: number };
   neckGrabActive: boolean;
   neckGrabWeight: number;
@@ -161,19 +167,19 @@ const DEFAULT_CONFIG: ProceduralGrabStruggleConfig = {
   headCounterDegrees: 7,
   lookMaxYawDegrees: 52,
   lookMaxPitchDegrees: 20,
-  hitHipsPitchDegrees: 7,
-  hitSpinePitchDegrees: 7,
-  hitSpine1PitchDegrees: 11,
-  hitSpine2PitchDegrees: 18,
-  hitTorsoTwistDegrees: 5.5,
-  hitTorsoSideBendDegrees: 5,
-  hitKneeFlexDegrees: 12,
-  hitNeckPitchDegrees: 6,
-  hitHeadPitchDegrees: 9,
-  hitShoulderDegrees: 7,
-  hitUpperArmDegrees: 5,
-  hitForearmDegrees: 5,
-  hitVisualRootMeters: 0.065,
+  hitHipsPitchDegrees: 12,
+  hitSpinePitchDegrees: 11,
+  hitSpine1PitchDegrees: 17,
+  hitSpine2PitchDegrees: 26,
+  hitTorsoTwistDegrees: 10,
+  hitTorsoSideBendDegrees: 9,
+  hitKneeFlexDegrees: 23,
+  hitNeckPitchDegrees: 10,
+  hitHeadPitchDegrees: 15,
+  hitShoulderDegrees: 12,
+  hitUpperArmDegrees: 9,
+  hitForearmDegrees: 10,
+  hitVisualRootMeters: 0.17,
 };
 
 const DEFAULT_DEBUG_POSE_MASK: ProceduralGrabStruggleDebugPoseMask = {
@@ -203,23 +209,23 @@ const LIMB_LOCAL_AXIS_MAPPING = {
 } as const;
 
 const COMBINED_POSE_LIMITS = {
-  hipsPitch: radians(12),
-  hipsYaw: radians(12),
-  hipsSideBend: radians(12),
-  spinePitch: radians(14),
-  spine1Pitch: radians(18),
-  spine2Pitch: radians(25),
-  spineYaw: radians(9),
-  spine1Yaw: radians(12),
-  spine2Yaw: radians(16),
-  spineSideBend: radians(12),
-  upperLegPitch: radians(32),
-  kneeFlex: radians(45),
-  footPitch: radians(24),
-  neckPitch: radians(16),
-  headPitch: radians(22),
-  neckYaw: radians(14),
-  headYaw: radians(18),
+  hipsPitch: radians(18),
+  hipsYaw: radians(18),
+  hipsSideBend: radians(18),
+  spinePitch: radians(22),
+  spine1Pitch: radians(28),
+  spine2Pitch: radians(38),
+  spineYaw: radians(14),
+  spine1Yaw: radians(20),
+  spine2Yaw: radians(28),
+  spineSideBend: radians(22),
+  upperLegPitch: radians(42),
+  kneeFlex: radians(58),
+  footPitch: radians(28),
+  neckPitch: radians(24),
+  headPitch: radians(34),
+  neckYaw: radians(22),
+  headYaw: radians(28),
 } as const;
 
 const NECK_GRAB_UPPER_ARM_LIMIT = radians(68);
@@ -249,8 +255,16 @@ type HitReactionPose = {
   torsoSideBend: number;
   leftThighPitch: number;
   rightThighPitch: number;
+  leftThighOutward: number;
+  rightThighOutward: number;
+  leftThighYaw: number;
+  rightThighYaw: number;
   leftKneeFlex: number;
   rightKneeFlex: number;
+  leftFootPitch: number;
+  rightFootPitch: number;
+  leftFootRoll: number;
+  rightFootRoll: number;
   neckPitch: number;
   headPitch: number;
   neckYaw: number;
@@ -263,6 +277,7 @@ type HitReactionPose = {
   rightArmReach: number;
   leftForearmFlex: number;
   rightForearmFlex: number;
+  visualRootDrop: number;
   visualRootDisplacement: number;
 };
 
@@ -299,7 +314,7 @@ type HitZoneProfile = {
   abdomenCurl: number;
 };
 
-const HIT_ZONE_PROFILES: Record<ProceduralHitReactionZone, HitZoneProfile> = {
+const HIT_ZONE_PROFILES: Record<PlayerHitReactionZone, HitZoneProfile> = {
   chest: {
     chest: 1,
     lowerBody: 0.82,
@@ -404,8 +419,8 @@ export class ProceduralGrabStruggleController {
   private hitElapsed = Number.POSITIVE_INFINITY;
   private hitDuration = 0;
   private hitStrength = 0;
-  private hitZone: ProceduralHitReactionZone = "chest";
-  private hitType: ProceduralHitReactionType = "blunt";
+  private hitZone: PlayerHitReactionZone = "chest";
+  private hitType: PlayerImpactType = "blunt";
   private readonly hitDirectionWorld = Vector3.Zero();
   private readonly hitPlanarDirectionWorld = Vector3.Zero();
   private hitDirectionLocalRight = 0;
@@ -414,9 +429,16 @@ export class ProceduralGrabStruggleController {
   private hitShoulderBias = 0;
   private hitStaggerVariation = 1;
   private hitHeadLagVariation = 1;
+  private hitStepLead = 1;
   private readonly hitWeights: HitReactionWeights = createEmptyHitReactionWeights();
   private readonly hitPose: HitReactionPose = createEmptyHitReactionPose();
   private readonly visualRootHitOffset = Vector3.Zero();
+  private dodgeElapsed = Number.POSITIVE_INFINITY;
+  private dodgeDuration = 0;
+  private dodgeStrength = 0;
+  private dodgeStyle: PlayerDodgeStyle = "sidestep";
+  private readonly dodgeDirectionWorld = Vector3.Zero();
+  private readonly dodgePlanarDirectionWorld = Vector3.Zero();
   private stairLocomotion: StairLocomotionState = {
     ...INACTIVE_STAIR_LOCOMOTION,
   };
@@ -535,17 +557,18 @@ export class ProceduralGrabStruggleController {
     if (typeof mask.legs === "boolean") this.poseMask.legs = mask.legs;
   }
 
-  public triggerHitReaction(event: ProceduralHitReactionEvent) {
+  public triggerHitReaction(event: PlayerHitReactionEvent) {
     if (!this.available || this.disposed) return false;
     const strength = clamp(event.strength ?? 1, 0, 1);
     if (strength <= 0.0001) return false;
 
+    this.cancelDodgeReaction();
     this.hitStrength = strength;
     this.hitZone = event.hitZone ?? "chest";
-    this.hitType = event.type ?? "blunt";
-    this.hitDuration = durationForHitStrength(strength);
+    this.hitType = event.impactType ?? "blunt";
+    this.hitDuration = getPlayerHitReactionDuration(strength, this.hitType);
     this.hitElapsed = 0;
-    this.hitDirectionWorld.copyFrom(event.direction);
+    this.hitDirectionWorld.copyFrom(event.direction ?? Vector3.Zero());
     if (this.hitDirectionWorld.lengthSquared() <= 0.000001 && event.sourcePosition) {
       this.root.position.subtractToRef(event.sourcePosition, this.hitDirectionWorld);
     }
@@ -566,6 +589,18 @@ export class ProceduralGrabStruggleController {
     } else {
       this.hitPlanarDirectionWorld.normalize();
     }
+    const yaw = this.root.rotation.y;
+    const directionRight =
+      this.hitPlanarDirectionWorld.x * Math.cos(yaw) -
+      this.hitPlanarDirectionWorld.z * Math.sin(yaw);
+    this.hitStepLead =
+      Math.abs(directionRight) > 0.18
+        ? directionRight > 0
+          ? -1
+          : 1
+        : this.nextRandom() < 0.5
+          ? -1
+          : 1;
 
     // Cached once per hit: no per-frame randomness or jitter.
     this.hitTwistVariation = this.nextRandom() * 2 - 1;
@@ -575,6 +610,22 @@ export class ProceduralGrabStruggleController {
     resetHitReactionWeights(this.hitWeights);
     resetHitReactionPose(this.hitPose);
     this.visualRootHitOffset.setAll(0);
+    return true;
+  }
+
+  public triggerDodgeReaction(event: PlayerDodgeReactionEvent) {
+    if (!this.available || this.disposed) return false;
+    const strength = clamp(event.strength ?? 1, 0, 1);
+    if (strength <= 0.0001) return false;
+
+    this.cancelHitReaction();
+    this.dodgeStrength = strength;
+    this.dodgeStyle = event.style ?? "sidestep";
+    this.dodgeDuration = getPlayerDodgeReactionDuration(strength);
+    this.dodgeElapsed = 0;
+    this.resolveDodgeDirection(event);
+    this.visualRootHitOffset.setAll(0);
+    resetHitReactionPose(this.hitPose);
     return true;
   }
 
@@ -646,6 +697,7 @@ export class ProceduralGrabStruggleController {
 
     this.updateJerk();
     this.updateHitReaction(dt);
+    this.updateDodgeReaction(dt);
     this.updateNeckGrab(dt);
     this.stairLocomotionBlend = damp(
       this.stairLocomotionBlend,
@@ -654,9 +706,10 @@ export class ProceduralGrabStruggleController {
       dt
     );
 
-    const hasGrabOrHitPose =
+    const hasGrabOrReactionPose =
       this.blend > 0.0001 ||
       this.isHitActive() ||
+      this.isDodgeActive() ||
       this.neckGrabWeight > 0.0001;
     const hasStairPose =
       this.stairLocomotionBlend > 0.0001 ||
@@ -664,6 +717,7 @@ export class ProceduralGrabStruggleController {
     if (
       this.blend <= 0.0001 &&
       !this.isHitActive() &&
+      !this.isDodgeActive() &&
       this.neckGrabWeight <= 0.0001 &&
       !hasStairPose
     ) {
@@ -672,7 +726,7 @@ export class ProceduralGrabStruggleController {
     }
     this.captureBasePose();
     this.captureNeckGrabAnchorIfNeeded();
-    if (hasGrabOrHitPose) {
+    if (hasGrabOrReactionPose) {
       this.applyPose(smoothStep(this.blend) * this.intensity);
     } else {
       this.visualRootHitOffset.setAll(0);
@@ -691,6 +745,7 @@ export class ProceduralGrabStruggleController {
         this.requestedActive ||
         this.blend > 0.0001 ||
         this.isHitActive() ||
+        this.isDodgeActive() ||
         this.neckGrabRequested ||
         this.neckGrabWeight > 0.0001,
       activeGrabberCount: this.activeGrabberCount,
@@ -727,6 +782,14 @@ export class ProceduralGrabStruggleController {
       staggerWeight: this.hitWeights.stagger,
       headLagWeight: this.hitWeights.headLag,
       recoveryWeight: this.hitWeights.recovery,
+      dodgeActive: this.isDodgeActive(),
+      dodgeStyle: this.dodgeStyle,
+      dodgeProgress:
+        this.dodgeDuration > 0
+          ? clamp(this.dodgeElapsed / this.dodgeDuration, 0, 1)
+          : 0,
+      dodgeDuration: this.dodgeDuration,
+      dodgeDirection: vectorSnapshot(this.dodgeDirectionWorld),
       visualRootOffset: vectorSnapshot(this.visualRootHitOffset),
       neckGrabActive: this.neckGrabRequested || this.neckGrabWeight > 0.0001,
       neckGrabWeight: this.neckGrabWeight,
@@ -754,6 +817,8 @@ export class ProceduralGrabStruggleController {
     this.neckGrabWeight = 0;
     this.neckGrabLift = 0;
     this.neckGrabAnchorCaptured = false;
+    this.cancelHitReaction();
+    this.cancelDodgeReaction();
     this.disposed = true;
     if (this.beforeAnimationsObserver) {
       this.scene.onBeforeAnimationsObservable.remove(this.beforeAnimationsObserver);
@@ -860,7 +925,7 @@ export class ProceduralGrabStruggleController {
     const yaw = this.root.rotation.y;
     this.rightAxis.set(Math.cos(yaw), 0, -Math.sin(yaw));
     this.forwardAxis.set(Math.sin(yaw), 0, Math.cos(yaw));
-    this.computeHitReactionPose();
+    this.computePlayerReactionPose();
     this.computeNeckGrabPose();
 
     const directionRight = Vector3.Dot(this.smoothedGrabDirection, this.rightAxis);
@@ -979,6 +1044,7 @@ export class ProceduralGrabStruggleController {
     // Lower only the rendered avatar. Gameplay collision, camera and water
     // state remain attached to `root` and therefore keep their normal height.
     this.visualRoot.position.y -= stanceDrop;
+    this.visualRoot.position.y -= this.hitPose.visualRootDrop;
     this.visualRoot.position.y += this.neckGrabPose.visualLift;
     this.visualRootHitOffset.set(
       this.hitDirectionLocalRight * this.hitPose.visualRootDisplacement,
@@ -1029,9 +1095,7 @@ export class ProceduralGrabStruggleController {
         "leftUpLeg",
         this.rightAxis,
         clamp(
-          kneeBase * 0.46 +
-            legKick +
-            this.hitPose.leftThighPitch,
+          kneeBase * 0.46 + legKick,
           -COMBINED_POSE_LIMITS.upperLegPitch,
           COMBINED_POSE_LIMITS.upperLegPitch
         )
@@ -1040,9 +1104,7 @@ export class ProceduralGrabStruggleController {
         "rightUpLeg",
         this.rightAxis,
         clamp(
-          kneeBase * 0.46 -
-            legKick * 0.82 +
-            this.hitPose.rightThighPitch,
+          kneeBase * 0.46 - legKick * 0.82,
           -COMBINED_POSE_LIMITS.upperLegPitch,
           COMBINED_POSE_LIMITS.upperLegPitch
         )
@@ -1050,21 +1112,28 @@ export class ProceduralGrabStruggleController {
       this.rotate(
         "leftUpLeg",
         this.forwardAxis,
-        -stanceWidth - hipSway * 0.34
+        -stanceWidth - hipSway * 0.34 + this.hitPose.leftThighOutward
       );
       this.rotate(
         "rightUpLeg",
         this.forwardAxis,
-        stanceWidth - hipSway * 0.3
+        stanceWidth - hipSway * 0.3 + this.hitPose.rightThighOutward
       );
-      this.rotate("leftUpLeg", Axis.Y, legKick * 0.32);
-      this.rotate("rightUpLeg", Axis.Y, -legKick * 0.28);
+      this.rotate(
+        "leftUpLeg",
+        Axis.Y,
+        legKick * 0.32 + this.hitPose.leftThighYaw
+      );
+      this.rotate(
+        "rightUpLeg",
+        Axis.Y,
+        -legKick * 0.28 + this.hitPose.rightThighYaw
+      );
       this.rotate(
         "leftLeg",
         this.rightAxis,
         clamp(
-          -kneeBase * (0.94 + legNoise * 0.1) -
-            this.hitPose.leftKneeFlex,
+          -kneeBase * (0.94 + legNoise * 0.1),
           -COMBINED_POSE_LIMITS.kneeFlex,
           COMBINED_POSE_LIMITS.kneeFlex
         )
@@ -1073,8 +1142,7 @@ export class ProceduralGrabStruggleController {
         "rightLeg",
         this.rightAxis,
         clamp(
-          -kneeBase * (0.9 - legNoise * 0.08) -
-            this.hitPose.rightKneeFlex,
+          -kneeBase * (0.9 - legNoise * 0.08),
           -COMBINED_POSE_LIMITS.kneeFlex,
           COMBINED_POSE_LIMITS.kneeFlex
         )
@@ -1085,7 +1153,7 @@ export class ProceduralGrabStruggleController {
         "leftFoot",
         this.rightAxis,
         clamp(
-          kneeBase * 0.34 - legKick * 0.34 + this.hitPose.leftKneeFlex * 0.2,
+          kneeBase * 0.34 - legKick * 0.34,
           -COMBINED_POSE_LIMITS.footPitch,
           COMBINED_POSE_LIMITS.footPitch
         )
@@ -1094,17 +1162,31 @@ export class ProceduralGrabStruggleController {
         "rightFoot",
         this.rightAxis,
         clamp(
-          kneeBase * 0.32 + legKick * 0.28 + this.hitPose.rightKneeFlex * 0.2,
+          kneeBase * 0.32 + legKick * 0.28,
           -COMBINED_POSE_LIMITS.footPitch,
           COMBINED_POSE_LIMITS.footPitch
         )
       );
-      this.rotate("leftFoot", this.forwardAxis, stanceWidth * 0.16);
-      this.rotate("rightFoot", this.forwardAxis, -stanceWidth * 0.16);
+      this.rotate(
+        "leftFoot",
+        this.forwardAxis,
+        stanceWidth * 0.16 + this.hitPose.leftFootRoll
+      );
+      this.rotate(
+        "rightFoot",
+        this.forwardAxis,
+        -stanceWidth * 0.16 + this.hitPose.rightFootRoll
+      );
 
       // Both player GLBs expose the sagittal leg hinge as local X even though
       // their bind-pose longitudinal axes differ. Appending in joint space
       // preserves the authored pose and avoids Sofia's former sideways knees.
+      this.appendLocalOffset("leftUpLeg", Axis.X, this.hitPose.leftThighPitch);
+      this.appendLocalOffset("rightUpLeg", Axis.X, this.hitPose.rightThighPitch);
+      this.appendLocalOffset("leftLeg", Axis.X, -this.hitPose.leftKneeFlex);
+      this.appendLocalOffset("rightLeg", Axis.X, -this.hitPose.rightKneeFlex);
+      this.appendLocalOffset("leftFoot", Axis.X, this.hitPose.leftFootPitch);
+      this.appendLocalOffset("rightFoot", Axis.X, this.hitPose.rightFootPitch);
       this.appendLocalOffset(
         "leftUpLeg",
         Axis.X,
@@ -1241,16 +1323,27 @@ export class ProceduralGrabStruggleController {
       radians(this.config.armForwardReachDegrees) * struggleWeight;
     const forearmLift = radians(this.config.forearmLiftDegrees) * struggleWeight;
     const neckGrabLimitWeight = smoothStep(this.neckGrabWeight);
-    const shoulderMax = radians(this.config.shoulderMaxDegrees);
+    const hitLimitWeight = this.isHitActive()
+      ? clamp(
+          this.hitStrength * (this.hitType === "heavy" ? 1 : 0.72),
+          0,
+          1
+        )
+      : 0;
+    const shoulderMax = lerp(
+      radians(this.config.shoulderMaxDegrees),
+      radians(25),
+      hitLimitWeight
+    );
     const upperArmMax = lerp(
       radians(this.config.upperArmMaxDegrees),
-      NECK_GRAB_UPPER_ARM_LIMIT,
-      neckGrabLimitWeight
+      Math.max(NECK_GRAB_UPPER_ARM_LIMIT, radians(64)),
+      Math.max(neckGrabLimitWeight, hitLimitWeight)
     );
     const forearmMax = lerp(
       radians(this.config.forearmMaxDegrees),
-      NECK_GRAB_FOREARM_LIMIT,
-      neckGrabLimitWeight
+      Math.max(NECK_GRAB_FOREARM_LIMIT, radians(76)),
+      Math.max(neckGrabLimitWeight, hitLimitWeight)
     );
 
     if (this.poseMask.shoulders) {
@@ -1554,6 +1647,14 @@ export class ProceduralGrabStruggleController {
     this.hitWeights.overshoot = asymmetricPulse(progress, 0.68, 0.84, 1);
   }
 
+  private updateDodgeReaction(dt: number) {
+    if (!Number.isFinite(this.dodgeElapsed) || this.dodgeDuration <= 0) return;
+    this.dodgeElapsed = Math.min(
+      this.dodgeDuration,
+      this.dodgeElapsed + dt
+    );
+  }
+
   private isHitActive() {
     return (
       this.hitDuration > 0 &&
@@ -1562,8 +1663,77 @@ export class ProceduralGrabStruggleController {
     );
   }
 
-  private computeHitReactionPose() {
+  private isDodgeActive() {
+    return (
+      this.dodgeDuration > 0 &&
+      Number.isFinite(this.dodgeElapsed) &&
+      this.dodgeElapsed < this.dodgeDuration
+    );
+  }
+
+  private cancelHitReaction() {
+    this.hitElapsed = Number.POSITIVE_INFINITY;
+    this.hitDuration = 0;
+    resetHitReactionWeights(this.hitWeights);
+  }
+
+  private cancelDodgeReaction() {
+    this.dodgeElapsed = Number.POSITIVE_INFINITY;
+    this.dodgeDuration = 0;
+    this.dodgeDirectionWorld.setAll(0);
+    this.dodgePlanarDirectionWorld.setAll(0);
+  }
+
+  private resolveDodgeDirection(event: PlayerDodgeReactionEvent) {
+    this.dodgeDirectionWorld.copyFrom(event.direction ?? Vector3.Zero());
+    this.dodgeDirectionWorld.y = 0;
+    if (this.dodgeDirectionWorld.lengthSquared() > 0.000001) {
+      this.dodgeDirectionWorld.normalize();
+      this.dodgePlanarDirectionWorld.copyFrom(this.dodgeDirectionWorld);
+      return;
+    }
+
+    const yaw = this.root.rotation.y;
+    const rightX = Math.cos(yaw);
+    const rightZ = -Math.sin(yaw);
+    const forwardX = Math.sin(yaw);
+    const forwardZ = Math.cos(yaw);
+    if (this.dodgeStyle === "backstep") {
+      if (event.sourcePosition) {
+        this.dodgeDirectionWorld.set(
+          this.root.position.x - event.sourcePosition.x,
+          0,
+          this.root.position.z - event.sourcePosition.z
+        );
+      }
+      if (this.dodgeDirectionWorld.lengthSquared() <= 0.000001) {
+        this.dodgeDirectionWorld.set(-forwardX, 0, -forwardZ);
+      } else {
+        this.dodgeDirectionWorld.normalize();
+      }
+      this.dodgePlanarDirectionWorld.copyFrom(this.dodgeDirectionWorld);
+      return;
+    }
+
+    let side = event.side === "left" ? -1 : event.side === "right" ? 1 : 0;
+    if (side === 0 && event.sourcePosition) {
+      const sourceX = event.sourcePosition.x - this.root.position.x;
+      const sourceZ = event.sourcePosition.z - this.root.position.z;
+      const sourceRight = sourceX * rightX + sourceZ * rightZ;
+      if (Math.abs(sourceRight) > 0.12) side = -Math.sign(sourceRight);
+    }
+    if (side === 0) side = this.nextRandom() < 0.5 ? -1 : 1;
+    this.dodgeDirectionWorld.set(rightX * side, 0, rightZ * side);
+    this.dodgePlanarDirectionWorld.copyFrom(this.dodgeDirectionWorld);
+  }
+
+  private computePlayerReactionPose() {
     resetHitReactionPose(this.hitPose);
+    if (this.isHitActive()) this.computeHitReactionPose();
+    if (this.isDodgeActive()) this.computeDodgeReactionPose();
+  }
+
+  private computeHitReactionPose() {
     this.hitDirectionLocalRight = Vector3.Dot(
       this.hitPlanarDirectionWorld,
       this.rightAxis
@@ -1576,8 +1746,8 @@ export class ProceduralGrabStruggleController {
 
     const weights = this.hitWeights;
     const profile = HIT_ZONE_PROFILES[this.hitZone];
-    const typeScale = this.hitType === "heavy" ? 1.08 : this.hitType === "projectile" ? 0.84 : 1;
-    const strength = clamp(this.hitStrength * typeScale, 0, 1);
+    const typeScale = this.hitType === "heavy" ? 1.32 : this.hitType === "projectile" ? 0.78 : 1;
+    const strength = clamp(this.hitStrength * typeScale, 0, 1.35);
     const forward = clamp(this.hitDirectionLocalForward, -1, 1);
     const right = clamp(this.hitDirectionLocalRight, -1, 1);
     const chestResponse = clamp(
@@ -1676,8 +1846,8 @@ export class ProceduralGrabStruggleController {
     const balanceBias = right * 0.12 + this.hitShoulderBias * 0.35;
     this.hitPose.leftKneeFlex = kneeFlex * clamp(1 + balanceBias, 0.78, 1.2);
     this.hitPose.rightKneeFlex = kneeFlex * clamp(1 - balanceBias, 0.78, 1.2);
-    this.hitPose.leftThighPitch = this.hitPose.leftKneeFlex * 0.28;
-    this.hitPose.rightThighPitch = this.hitPose.rightKneeFlex * 0.28;
+    this.hitPose.leftThighPitch = this.hitPose.leftKneeFlex * 0.06;
+    this.hitPose.rightThighPitch = this.hitPose.rightKneeFlex * 0.06;
 
     this.hitPose.neckPitch =
       radians(this.config.hitNeckPitchDegrees) *
@@ -1739,6 +1909,130 @@ export class ProceduralGrabStruggleController {
     this.hitPose.leftForearmFlex = forearmAmount * (0.9 + armBias);
     this.hitPose.rightForearmFlex = forearmAmount * (0.9 - armBias);
 
+    const progress = clamp(this.hitElapsed / this.hitDuration, 0, 1);
+    const motion = samplePlayerHitReaction(
+      progress,
+      this.hitStrength,
+      this.hitType
+    );
+    const motionScale = this.hitType === "heavy" ? 1 : this.hitType === "projectile" ? 0.5 : 0.76;
+    const lead = this.hitStepLead;
+    const stepWave =
+      motion.firstStep -
+      motion.secondStep +
+      motion.thirdStep -
+      motion.fourthStep +
+      motion.settleStep * 0.3;
+
+    // A backward stumble alternates roles: one leg reaches behind the moving
+    // root while the other compresses under the body to keep it upright.
+    // Local-X hip extension (negative pitch) prevents the old forward kick.
+    const leftLeads = lead > 0;
+    const oddSteps = motion.firstStep + motion.thirdStep;
+    const evenSteps = motion.secondStep + motion.fourthStep;
+    const leftBackStep = leftLeads ? oddSteps : evenSteps;
+    const rightBackStep = leftLeads ? evenSteps : oddSteps;
+    const leftSupport = rightBackStep;
+    const rightSupport = leftBackStep;
+    const backReach = radians(18) * motionScale;
+    const supportFold = radians(5) * motionScale;
+    this.hitPose.leftThighPitch +=
+      -backReach * leftBackStep +
+      supportFold * (leftSupport + motion.settleStep * 0.7);
+    this.hitPose.rightThighPitch +=
+      -backReach * rightBackStep +
+      supportFold * (rightSupport + motion.settleStep * 0.7);
+
+    const backStepKneeFlex = radians(28) * motionScale;
+    const supportKneeFlex = radians(39) * motionScale;
+    this.hitPose.leftKneeFlex +=
+      backStepKneeFlex * leftBackStep +
+      supportKneeFlex * leftSupport +
+      supportKneeFlex * 0.78 * motion.settleStep;
+    this.hitPose.rightKneeFlex +=
+      backStepKneeFlex * rightBackStep +
+      supportKneeFlex * rightSupport +
+      supportKneeFlex * 0.78 * motion.settleStep;
+    this.hitPose.leftKneeFlex = clamp(
+      this.hitPose.leftKneeFlex,
+      0,
+      COMBINED_POSE_LIMITS.kneeFlex
+    );
+    this.hitPose.rightKneeFlex = clamp(
+      this.hitPose.rightKneeFlex,
+      0,
+      COMBINED_POSE_LIMITS.kneeFlex
+    );
+    this.hitPose.leftFootPitch = clamp(
+      this.hitPose.leftKneeFlex * 0.38 + radians(4) * leftBackStep,
+      -COMBINED_POSE_LIMITS.footPitch,
+      COMBINED_POSE_LIMITS.footPitch
+    );
+    this.hitPose.rightFootPitch = clamp(
+      this.hitPose.rightKneeFlex * 0.38 + radians(4) * rightBackStep,
+      -COMBINED_POSE_LIMITS.footPitch,
+      COMBINED_POSE_LIMITS.footPitch
+    );
+    this.hitPose.visualRootDrop = 0.12 * motion.supportBrace * motionScale;
+
+    // Widen the support base while each foot searches for balance. The small
+    // opposing yaw and foot roll keep the retreat from reading as two straight
+    // hinge rotations, while remaining independent of a specific attacker.
+    const legOpen = radians(10) * motion.stanceOpen;
+    const openingAsymmetry = clamp(stepWave * lead * 0.12, -0.12, 0.12);
+    this.hitPose.leftThighOutward -= legOpen * (1 + openingAsymmetry);
+    this.hitPose.rightThighOutward += legOpen * (1 - openingAsymmetry);
+    const legArc = radians(4) * motion.stanceOpen * stepWave * lead;
+    this.hitPose.leftThighYaw += legArc;
+    this.hitPose.rightThighYaw -= legArc;
+    this.hitPose.leftFootRoll -= radians(4) * motion.stanceOpen;
+    this.hitPose.rightFootRoll += radians(4) * motion.stanceOpen;
+
+    // Let the rib cage continue in the actual push direction while the hips
+    // counterbalance. Distributing this across the spine avoids tilting the
+    // complete character as one rigid block.
+    this.hitPose.spinePitch += radians(3.5) * forward * motion.pushFollow;
+    this.hitPose.spine1Pitch += radians(5) * forward * motion.pushFollow;
+    this.hitPose.spine2Pitch += radians(8.5) * forward * motion.pushFollow;
+    this.hitPose.torsoSideBend += radians(8) * right * motion.pushFollow;
+    this.hitPose.torsoYaw += radians(4) * right * motion.pushFollow;
+    this.hitPose.hipsSideBend -= radians(2.8) * right * motion.pushFollow;
+
+    const balanceWobble = motion.imbalance * lead;
+    this.hitPose.torsoSideBend += radians(12) * balanceWobble;
+    this.hitPose.hipsSideBend -= radians(5) * balanceWobble;
+    this.hitPose.torsoYaw += radians(9) * balanceWobble;
+    this.hitPose.hipsYaw -= radians(4) * balanceWobble;
+    this.hitPose.neckYaw -= radians(5) * balanceWobble;
+    this.hitPose.headYaw -= radians(8) * balanceWobble;
+
+    const armSpread = radians(27) * motion.armSpread;
+    const armSwing = radians(36) * motion.armSwing;
+    this.hitPose.leftShoulderRetraction +=
+      radians(9) * (motion.armSwing + motion.armSpread * 0.35);
+    this.hitPose.rightShoulderRetraction +=
+      radians(9) * (-motion.armSwing + motion.armSpread * 0.35);
+    this.hitPose.leftArmLift -=
+      armSpread * (0.92 + Math.max(0, motion.armSwing) * 0.24);
+    this.hitPose.rightArmLift -=
+      armSpread * (0.92 + Math.max(0, -motion.armSwing) * 0.24);
+    this.hitPose.leftArmReach +=
+      (armSwing + radians(11) * balanceWobble) * LEFT_FORWARD_FLEX_SIGN;
+    this.hitPose.rightArmReach +=
+      (-armSwing + radians(11) * balanceWobble) * RIGHT_FORWARD_FLEX_SIGN;
+    this.hitPose.leftForearmFlex +=
+      radians(24) *
+      clamp(motion.armSpread * 0.74 + Math.max(0, -motion.armSwing) * 0.48, 0, 1);
+    this.hitPose.rightForearmFlex +=
+      radians(24) *
+      clamp(motion.armSpread * 0.74 + Math.max(0, motion.armSwing) * 0.48, 0, 1);
+
+    this.hitPose.spinePitch += radians(7) * motion.recoveryStrain;
+    this.hitPose.spine1Pitch += radians(6) * motion.recoveryStrain;
+    this.hitPose.leftKneeFlex += radians(9) * motion.recoveryStrain;
+    this.hitPose.rightKneeFlex += radians(9) * motion.recoveryStrain;
+    this.hitPose.headPitch -= radians(4) * motion.recoveryStrain;
+
     this.hitPose.visualRootDisplacement =
       this.config.hitVisualRootMeters *
       strength *
@@ -1748,6 +2042,65 @@ export class ProceduralGrabStruggleController {
         -0.04,
         1
       );
+  }
+
+  private computeDodgeReactionPose() {
+    const progress = clamp(this.dodgeElapsed / this.dodgeDuration, 0, 1);
+    const right = clamp(
+      Vector3.Dot(this.dodgePlanarDirectionWorld, this.rightAxis),
+      -1,
+      1
+    );
+    const forward = clamp(
+      Vector3.Dot(this.dodgePlanarDirectionWorld, this.forwardAxis),
+      -1,
+      1
+    );
+    const sample = samplePlayerDodgeReaction(
+      progress,
+      this.dodgeStrength,
+      this.dodgeStyle,
+      right
+    );
+    const { weight, crouch, lateral, turn } = sample;
+    if (weight <= 0.0001) return;
+
+    const isDuck = this.dodgeStyle === "duck";
+
+    this.hitDirectionLocalRight = right;
+    this.hitDirectionLocalForward = forward;
+    this.hitPose.hipsPitch = radians(5.5) * crouch;
+    this.hitPose.spinePitch = radians(3.5) * crouch;
+    this.hitPose.spine1Pitch = radians(5.5) * crouch;
+    this.hitPose.spine2Pitch = radians(7) * crouch;
+    this.hitPose.hipsSideBend = radians(-3.5) * lateral;
+    this.hitPose.torsoSideBend = radians(-11.5) * lateral;
+    this.hitPose.hipsYaw = radians(-4) * turn;
+    this.hitPose.torsoYaw = radians(-10) * turn;
+
+    const kneeFlex = radians(isDuck ? 31 : 20) * crouch;
+    const outsideBias = 0.18 * lateral;
+    this.hitPose.leftKneeFlex = kneeFlex * clamp(1 + outsideBias, 0.78, 1.22);
+    this.hitPose.rightKneeFlex = kneeFlex * clamp(1 - outsideBias, 0.78, 1.22);
+    this.hitPose.leftThighPitch = radians(7) * crouch + radians(4) * lateral;
+    this.hitPose.rightThighPitch = radians(7) * crouch - radians(4) * lateral;
+
+    this.hitPose.leftShoulderRetraction = radians(5) * weight;
+    this.hitPose.rightShoulderRetraction = radians(5) * weight;
+    this.hitPose.leftArmLift = radians(-8 - Math.max(0, lateral) * 5) * weight;
+    this.hitPose.rightArmLift = radians(-8 - Math.max(0, -lateral) * 5) * weight;
+    this.hitPose.leftArmReach =
+      radians(8) * LEFT_FORWARD_FLEX_SIGN * weight;
+    this.hitPose.rightArmReach =
+      radians(8) * RIGHT_FORWARD_FLEX_SIGN * weight;
+    this.hitPose.leftForearmFlex = radians(12) * weight;
+    this.hitPose.rightForearmFlex = radians(12) * weight;
+
+    this.hitPose.neckPitch = radians(-3.5) * crouch;
+    this.hitPose.headPitch = radians(-5) * crouch;
+    this.hitPose.neckYaw = radians(3.5) * turn;
+    this.hitPose.headYaw = radians(5.5) * turn;
+    this.hitPose.visualRootDisplacement = sample.visualDisplacement;
   }
 
   private rotate(name: JointName, axis: Vector3, amount: number) {
@@ -1847,8 +2200,16 @@ function createEmptyHitReactionPose(): HitReactionPose {
     torsoSideBend: 0,
     leftThighPitch: 0,
     rightThighPitch: 0,
+    leftThighOutward: 0,
+    rightThighOutward: 0,
+    leftThighYaw: 0,
+    rightThighYaw: 0,
     leftKneeFlex: 0,
     rightKneeFlex: 0,
+    leftFootPitch: 0,
+    rightFootPitch: 0,
+    leftFootRoll: 0,
+    rightFootRoll: 0,
     neckPitch: 0,
     headPitch: 0,
     neckYaw: 0,
@@ -1861,6 +2222,7 @@ function createEmptyHitReactionPose(): HitReactionPose {
     rightArmReach: 0,
     leftForearmFlex: 0,
     rightForearmFlex: 0,
+    visualRootDrop: 0,
     visualRootDisplacement: 0,
   };
 }
@@ -1876,8 +2238,16 @@ function resetHitReactionPose(pose: HitReactionPose) {
   pose.torsoSideBend = 0;
   pose.leftThighPitch = 0;
   pose.rightThighPitch = 0;
+  pose.leftThighOutward = 0;
+  pose.rightThighOutward = 0;
+  pose.leftThighYaw = 0;
+  pose.rightThighYaw = 0;
   pose.leftKneeFlex = 0;
   pose.rightKneeFlex = 0;
+  pose.leftFootPitch = 0;
+  pose.rightFootPitch = 0;
+  pose.leftFootRoll = 0;
+  pose.rightFootRoll = 0;
   pose.neckPitch = 0;
   pose.headPitch = 0;
   pose.neckYaw = 0;
@@ -1890,6 +2260,7 @@ function resetHitReactionPose(pose: HitReactionPose) {
   pose.rightArmReach = 0;
   pose.leftForearmFlex = 0;
   pose.rightForearmFlex = 0;
+  pose.visualRootDrop = 0;
   pose.visualRootDisplacement = 0;
 }
 
@@ -1939,16 +2310,6 @@ function resetNeckGrabPose(pose: NeckGrabPose) {
   pose.leftForearmFlex = 0;
   pose.rightForearmFlex = 0;
   pose.visualLift = 0;
-}
-
-function durationForHitStrength(strength: number) {
-  if (strength <= 0.45) {
-    return lerp(0.25, 0.32, strength / 0.45);
-  }
-  if (strength <= 0.75) {
-    return lerp(0.32, 0.4, (strength - 0.45) / 0.3);
-  }
-  return lerp(0.4, 0.48, (strength - 0.75) / 0.25);
 }
 
 function asymmetricPulse(

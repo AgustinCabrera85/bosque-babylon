@@ -233,6 +233,7 @@ export class HermanoMayorAxePickupAction
   private currentState: HermanoMayorAxePickupState = "unarmed";
   private attached = false;
   private hasGripRootPosition = false;
+  private armedPoseEnabled = true;
 
   public constructor(
     private readonly scene: Scene,
@@ -291,6 +292,11 @@ export class HermanoMayorAxePickupAction
     this.axe = axe;
     if (!axe || !axe.getGripWorldPositionToRef(this.axeTarget)) return;
     this.updateApproachPosition();
+  }
+
+  /** Temporarily yields the equipped-arm layer to another procedural action. */
+  public setArmedPoseEnabled(enabled: boolean) {
+    this.armedPoseEnabled = enabled;
   }
 
   public canStart() {
@@ -369,6 +375,7 @@ export class HermanoMayorAxePickupAction
       duration: playback.duration,
       progress: playback.duration > 0 ? playback.time / playback.duration : 0,
       attached: this.attached,
+      armedPoseEnabled: this.armedPoseEnabled,
       axeGripTarget: vectorSnapshot(this.axeTarget),
       handGripPosition: vectorSnapshot(this.handPosition),
       approachPosition: vectorSnapshot(this.approachPosition),
@@ -431,6 +438,10 @@ export class HermanoMayorAxePickupAction
   private update(dt: number) {
     if (!this.rig.available || !this.handGripSocket || dt <= 0) return;
     if (this.currentState === "unarmed") {
+      this.updateDebugMarkers();
+      return;
+    }
+    if (this.currentState === "armed" && !this.armedPoseEnabled) {
       this.updateDebugMarkers();
       return;
     }

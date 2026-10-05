@@ -5,6 +5,8 @@ import {
   HermanoMayorGrabAttack,
   type HermanoMayorGrabReleaseReason,
 } from "./HermanoMayorGrabAttack";
+import { HermanoMayorAxeAttack } from "./HermanoMayorAxeAttack";
+import type { HermanoMayorAxeDodgePromptState } from "./HermanoMayorAxeAttack";
 import { HermanoMayorNavigation } from "./HermanoMayorNavigation";
 
 export const HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER = 1.15;
@@ -29,7 +31,8 @@ export type HermanoMayorBehaviorState =
   | "watching"
   | "picking-up-axe"
   | "stunned"
-  | "grabbing";
+  | "grabbing"
+  | "attacking";
 
 export type HermanoMayorBehaviorOptions = {
   actor: HermanoMayorHandle;
@@ -56,6 +59,15 @@ export type HermanoMayorBehaviorOptions = {
     fractionOfMaxHealth: number,
     kind: "initial" | "squeeze"
   ) => void;
+  onAxeDamage?: (fractionOfMaxHealth: number) => void;
+  onAxeDodged?: () => void;
+  getPlayerSanity?: () => number;
+  wasAxeDodgePressed?: () => boolean;
+  setAxeDodgePrompt?: (
+    state: HermanoMayorAxeDodgePromptState,
+    remaining: number,
+    sanity: number
+  ) => void;
   onGrabEnded?: (reason: HermanoMayorGrabReleaseReason) => void;
   beginAxePickupCinematic?: () => boolean;
   endAxePickupCinematic?: (completed: boolean) => void;
@@ -80,6 +92,7 @@ export class HermanoMayorBehavior {
   private readonly audio: HermanoMayorAudio;
   private readonly navigation: HermanoMayorNavigation;
   private readonly grabAttack: HermanoMayorGrabAttack;
+  private readonly axeAttack: HermanoMayorAxeAttack;
   private state: HermanoMayorBehaviorState = "waiting";
   private locomotion: "idle" | "walk" = "idle";
   private hasEnteredHouse = false;
@@ -117,6 +130,17 @@ export class HermanoMayorBehavior {
       onGrabDamage: options.onGrabDamage,
       onGrabEnded: options.onGrabEnded,
     });
+    this.axeAttack = new HermanoMayorAxeAttack({
+      actor: options.actor,
+      playerPosition: options.playerPosition,
+      playerNeckPosition: options.playerNeckPosition,
+      canHitPlayer: options.canGrabPlayer,
+      onAxeDamage: options.onAxeDamage ?? (() => {}),
+      onAxeDodged: options.onAxeDodged,
+      getPlayerSanity: options.getPlayerSanity,
+      wasDodgePressed: options.wasAxeDodgePressed,
+      setDodgePrompt: options.setAxeDodgePrompt,
+    });
     this.audio.setBreathing("idle");
     this.actor.setLookTargetProvider(options.playerPosition);
     window.addEventListener("bosque:pause", this.onPause);
@@ -129,6 +153,7 @@ export class HermanoMayorBehavior {
   /** Switches the pursuit spacing used while the axe is equipped. */
   public setArmed(armed: boolean) {
     this.armed = armed;
+    if (!armed) this.axeAttack.interrupt();
   }
 
   /** Plays the nearby/off-camera cue immediately for authored sightings. */
@@ -194,6 +219,17 @@ export class HermanoMayorBehavior {
       return;
     }
 
+    const axeAttackOwnsMovement = this.axeAttack.update(
+      dt,
+      this.engaged && this.armed && this.canSeePlayer(player, distance),
+      distance
+    );
+    if (axeAttackOwnsMovement) {
+      this.navigation.clear();
+      this.enterState("attacking");
+      return;
+    }
+
     // Grabbing the player remains the unarmed boss's first priority. The axe
     // is only noticed after no grab action owns this frame.
     const grabOwnsMovement = this.grabAttack.update(
@@ -253,6 +289,7 @@ export class HermanoMayorBehavior {
 
   public dispose() {
     window.removeEventListener("bosque:pause", this.onPause);
+    this.axeAttack.dispose();
     this.grabAttack.dispose();
     this.actor.cancelAxePickup();
     this.finishAxeCinematic(false);
@@ -262,6 +299,11 @@ export class HermanoMayorBehavior {
   public forceGrab() {
     if (this.armed || this.actor.getAxePickupState() !== "unarmed") return false;
     return this.grabAttack.forceGrab();
+  }
+
+  public forceAxeAttack() {
+    if (!this.armed || !this.actor.hasAxe) return false;
+    return this.axeAttack.forceAttack();
   }
 
   /** Development helper: places the boss at the table and lets the real state machine start the pickup. */
@@ -292,6 +334,7 @@ export class HermanoMayorBehavior {
     const duration = Math.max(0, durationSeconds);
     if (duration <= 0) return false;
     this.grabAttack.interrupt("stunned");
+    this.axeAttack.interrupt();
     if (this.actor.getAxePickupState() === "picking-up") {
       this.actor.cancelAxePickup();
       this.finishAxeCinematic(false);
@@ -308,6 +351,7 @@ export class HermanoMayorBehavior {
     return {
       ...grab,
       axe: this.actor.getAxePickupDebugSnapshot(),
+      axeAttack: this.axeAttack.getDebugSnapshot(),
       navigation: this.navigation.getDebugSnapshot(),
     };
   }
@@ -321,7 +365,9 @@ export class HermanoMayorBehavior {
       return;
     }
     this.setLocomotion("idle");
-    this.audio.setBreathing(next === "grabbing" ? "chase" : "idle");
+    this.audio.setBreathing(
+      next === "grabbing" || next === "attacking" ? "chase" : "idle"
+    );
   }
 
   private setLocomotion(next: "idle" | "walk") {

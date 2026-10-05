@@ -120,6 +120,7 @@ function appendHelpLine(
 export function setupInputPrompts(input: InputManager): InputPromptsHandle {
   const help = document.getElementById("help");
   const grabAction = document.getElementById("hermanoMayorGrabAction");
+  const axeDodgeAction = document.getElementById("hermanoMayorAxeDodgeAction");
   const mobileInteractButton = document.getElementById("interactButton");
   const abortController = new AbortController();
   const signal = abortController.signal;
@@ -128,6 +129,9 @@ export function setupInputPrompts(input: InputManager): InputPromptsHandle {
     const device = input.getActiveDevice();
     if (mobileInteractButton) mobileInteractButton.textContent = "Usar";
     if (grabAction) renderActionBinding(grabAction, input, "interact", "INTERACTUAR");
+    if (axeDodgeAction) {
+      renderActionBinding(axeDodgeAction, input, "interact", "ACCIÓN");
+    }
     if (!help) return;
 
     help.replaceChildren();

@@ -24,7 +24,10 @@ import {
   HERMANO_MAYOR_AXE_PICKUP_TIMING,
   HERMANO_MAYOR_AXE_READY_WRIST_ROLL_DEGREES,
 } from "../src/game/enemies/boss/HermanoMayorAxePickupAction.ts";
-import { HermanoMayorBehavior } from "../src/game/enemies/boss/HermanoMayorBehavior.ts";
+import {
+  HERMANO_MAYOR_AXE_PICKUP_TRIGGER_RADIUS,
+  HermanoMayorBehavior,
+} from "../src/game/enemies/boss/HermanoMayorBehavior.ts";
 import {
   EnemyLifecycleState,
   type EnemyControllerContext,
@@ -44,6 +47,7 @@ import { ShadowGrabberLightQuery } from "../src/game/enemies/shadowGrabber/Shado
 
 // The boss systems emit browser events and own audio elements. Lightweight
 // EventTarget-backed doubles are enough for deterministic NullEngine checks.
+const playedAudioSources: string[] = [];
 class TestAudio extends EventTarget {
   loop = false;
   preload = "";
@@ -51,7 +55,12 @@ class TestAudio extends EventTarget {
   volume = 1;
   muted = false;
 
+  constructor(public readonly src = "") {
+    super();
+  }
+
   play() {
+    playedAudioSources.push(this.src);
     return Promise.resolve();
   }
 
@@ -159,7 +168,16 @@ async function verify() {
   });
   const axeGripBeforePickup = Vector3.Zero();
   const axeApproachBeforePickup = Vector3.Zero();
+  const axeTableCenterBeforePickup = Vector3.Zero();
   assert.equal(axe.getGripWorldPositionToRef(axeGripBeforePickup), true);
+  assert.equal(
+    axe.getPickupTableCenterWorldPositionToRef(axeTableCenterBeforePickup),
+    true
+  );
+  assert.deepEqual(
+    axeTableCenterBeforePickup.asArray(),
+    pickupSurfaceCenter.asArray()
+  );
   assert.equal(
     axe.getPickupApproachWorldPositionToRef(axeApproachBeforePickup),
     true
@@ -400,6 +418,7 @@ async function verify() {
   const pickupRoot = new TransformNode("test-axe-pickup-root", scene);
   const pickupApproach = new Vector3(2, 0, 3);
   const pickupGrip = new Vector3(2, 1, 4);
+  const pickupTableCenter = new Vector3(2, 0, 4);
   let pickupState: "unarmed" | "picking-up" = "unarmed";
   let cinematicStartCount = 0;
   const pickupActor = {
@@ -418,6 +437,10 @@ async function verify() {
     },
     getAxeGripPositionToRef: (result: Vector3) => {
       result.copyFrom(pickupGrip);
+      return true;
+    },
+    getAxePickupTableCenterPositionToRef: (result: Vector3) => {
+      result.copyFrom(pickupTableCenter);
       return true;
     },
     startAxePickup: () => {
@@ -451,6 +474,14 @@ async function verify() {
       return true;
     },
   });
+  playedAudioSources.length = 0;
+  pickupBehavior.playNearbyUnseenCue();
+  assert.ok(
+    playedAudioSources.some((source) =>
+      source.endsWith("HermanoMayor_cercano_no_visible.mp3")
+    ),
+    "the authored forest sighting must play the nearby/off-camera boss cue"
+  );
   assert.equal(
     pickupBehavior.forceAxePickup(),
     true,
@@ -464,17 +495,19 @@ async function verify() {
   );
   pickupBehavior.dispose();
 
-  const stalledRoot = new TransformNode("test-stalled-axe-approach-root", scene);
-  stalledRoot.position.set(0, 0, -0.6);
-  stalledRoot.rotation.y = Math.PI;
-  const stalledApproach = Vector3.Zero();
-  const stalledGrip = new Vector3(0, 1, 1);
-  let stalledPickupState: "unarmed" | "picking-up" = "unarmed";
-  let stalledPlayerPosition = Vector3.Zero();
-  let stalledCinematicStarts = 0;
-  const stalledBehavior = new HermanoMayorBehavior({
+  const pursuitRoot = new TransformNode("test-player-first-axe-pickup-root", scene);
+  pursuitRoot.position.set(0, 0, 0);
+  pursuitRoot.rotation.y = 0;
+  const pursuitTableCenter = new Vector3(0, 0, 4);
+  const pursuitAxeGrip = new Vector3(0, 1, 4);
+  const pursuitAxeApproach = new Vector3(0, 0, 2.95);
+  let pursuitPlayerPosition = Vector3.Zero();
+  let pursuitPickupState: "unarmed" | "picking-up" = "unarmed";
+  let pursuitCinematicStarts = 0;
+  let axeLineOfSightOpen = true;
+  const pursuitBehavior = new HermanoMayorBehavior({
     actor: {
-      root: stalledRoot,
+      root: pursuitRoot,
       meshes: [],
       hasAxe: false,
       hasAxePickupTarget: true,
@@ -482,138 +515,175 @@ async function verify() {
       setLookTargetProvider: () => {},
       setNeckGrabPose: () => {},
       getNeckGrabDebugSnapshot: () => null,
-      getAxePickupState: () => stalledPickupState,
+      getAxePickupState: () => pursuitPickupState,
       getAxeApproachPositionToRef: (result: Vector3) => {
-        result.copyFrom(stalledApproach);
+        result.copyFrom(pursuitAxeApproach);
         return true;
       },
       getAxeGripPositionToRef: (result: Vector3) => {
-        result.copyFrom(stalledGrip);
+        result.copyFrom(pursuitAxeGrip);
+        return true;
+      },
+      getAxePickupTableCenterPositionToRef: (result: Vector3) => {
+        result.copyFrom(pursuitTableCenter);
         return true;
       },
       startAxePickup: () => {
-        stalledPickupState = "picking-up";
+        pursuitPickupState = "picking-up";
         return true;
       },
       cancelAxePickup: () => {
-        stalledPickupState = "unarmed";
+        pursuitPickupState = "unarmed";
         return true;
       },
-      getAxePickupDebugSnapshot: () => ({ state: stalledPickupState }),
+      getAxePickupDebugSnapshot: () => ({ state: pursuitPickupState }),
     } as never,
-    playerPosition: () => stalledPlayerPosition,
-    playerNeckPosition: () => stalledPlayerPosition.add(new Vector3(0, 1.6, 0)),
-    houseBounds: { min: new Vector3(-1, -1, -1), max: new Vector3(1, 1, 1) },
-    visionRange: 30,
-    getGroundHeight: () => 0,
-    // Reproduce the table edge case: the authored goal is open, but every
-    // sampled point leading to it is rejected by conservative clearance.
-    isBlocked: (x, z) => Math.hypot(x, z) > 0.001,
-    hasLineOfSight: () => true,
-    isVisibleToPlayer: () => true,
-    canGrabPlayer: () => false,
-    wasGrabEscapePressed: () => false,
-    setGrabVictimPose: () => {},
-    setGrabEscapeHud: () => {},
-    onGrabStarted: () => {},
-    onGrabDamage: () => {},
-    beginAxePickupCinematic: () => {
-      stalledCinematicStarts += 1;
-      return true;
-    },
-  });
-  stalledBehavior.update(0.05);
-  stalledPlayerPosition = new Vector3(0, 0, -2);
-  for (let step = 0; step < 50 && stalledPickupState === "unarmed"; step++) {
-    stalledBehavior.update(0.05);
-  }
-  assert.equal(
-    stalledPickupState,
-    "picking-up",
-    "a conservative table collider must not leave the boss stuck beside the axe"
-  );
-  assert.equal(stalledCinematicStarts, 1);
-  stalledBehavior.dispose();
-
-  const blockedGoalRoot = new TransformNode("test-blocked-axe-goal-root", scene);
-  blockedGoalRoot.position.set(0, 0, -1.4);
-  blockedGoalRoot.rotation.y = Math.PI;
-  const blockedGoalApproach = Vector3.Zero();
-  const blockedGoalGrip = new Vector3(0, 1, 0.6);
-  let blockedGoalPlayerPosition = Vector3.Zero();
-  let blockedGoalPickupState: "unarmed" | "picking-up" = "unarmed";
-  let blockedGoalCinematicStarts = 0;
-  const blockedGoalBehavior = new HermanoMayorBehavior({
-    actor: {
-      root: blockedGoalRoot,
-      meshes: [],
-      hasAxe: false,
-      hasAxePickupTarget: true,
-      playLocomotion: () => {},
-      setLookTargetProvider: () => {},
-      setNeckGrabPose: () => {},
-      getNeckGrabDebugSnapshot: () => null,
-      getAxePickupState: () => blockedGoalPickupState,
-      getAxeApproachPositionToRef: (result: Vector3) => {
-        result.copyFrom(blockedGoalApproach);
-        return true;
-      },
-      getAxeGripPositionToRef: (result: Vector3) => {
-        result.copyFrom(blockedGoalGrip);
-        return true;
-      },
-      startAxePickup: () => {
-        blockedGoalPickupState = "picking-up";
-        return true;
-      },
-      cancelAxePickup: () => {
-        blockedGoalPickupState = "unarmed";
-        return true;
-      },
-      getAxePickupDebugSnapshot: () => ({ state: blockedGoalPickupState }),
-    } as never,
-    playerPosition: () => blockedGoalPlayerPosition,
+    playerPosition: () => pursuitPlayerPosition,
     playerNeckPosition: () =>
-      blockedGoalPlayerPosition.add(new Vector3(0, 1.6, 0)),
+      pursuitPlayerPosition.add(new Vector3(0, 1.6, 0)),
     houseBounds: { min: new Vector3(-1, -1, -1), max: new Vector3(1, 1, 1) },
     visionRange: 30,
     getGroundHeight: () => 0,
-    // The authored point is inside water/clearance, while the boss is already
-    // standing on the closest valid dry point returned by navigation.
-    isBlocked: (_x, z) => z > -0.2,
-    hasLineOfSight: () => true,
+    isBlocked: () => false,
+    hasLineOfSight: (_origin, target) =>
+      target.z < pursuitTableCenter.z - 0.5 || axeLineOfSightOpen,
     isVisibleToPlayer: () => true,
-    canGrabPlayer: () => false,
+    canGrabPlayer: () => true,
     wasGrabEscapePressed: () => false,
     setGrabVictimPose: () => {},
     setGrabEscapeHud: () => {},
     onGrabStarted: () => {},
     onGrabDamage: () => {},
     beginAxePickupCinematic: () => {
-      blockedGoalCinematicStarts += 1;
+      pursuitCinematicStarts += 1;
       return true;
     },
   });
-  blockedGoalBehavior.update(0.05);
-  blockedGoalPlayerPosition = new Vector3(0, 0, -2);
-  for (
-    let step = 0;
-    step < 50 && blockedGoalPickupState === "unarmed";
-    step++
-  ) {
-    blockedGoalBehavior.update(0.05);
-  }
-  assert.equal(
-    blockedGoalPickupState,
-    "picking-up",
-    "a blocked authored approach must trigger pickup from navigation's safe goal"
-  );
-  assert.equal(blockedGoalCinematicStarts, 1);
+
+  pursuitBehavior.update(0.05);
+  pursuitPlayerPosition = new Vector3(4, 0, 0);
+  pursuitBehavior.update(0.05);
+  assert.equal(pursuitBehavior.currentState, "following");
   assert.ok(
-    blockedGoalRoot.position.z <= -0.2,
-    "the cinematic staging cut must keep the boss on navigation's safe side of the table"
+    pursuitRoot.position.x > 0,
+    "leaving the house must make the unarmed boss pursue the player, not the axe"
   );
-  blockedGoalBehavior.dispose();
+  assert.equal(pursuitPickupState, "unarmed");
+  assert.equal(pursuitCinematicStarts, 0);
+
+  pursuitRoot.position.set(
+    0,
+    0,
+    pursuitTableCenter.z - HERMANO_MAYOR_AXE_PICKUP_TRIGGER_RADIUS + 0.1
+  );
+  pursuitRoot.rotation.y = Math.PI;
+  pursuitPlayerPosition = new Vector3(0, 0, -4);
+  pursuitBehavior.update(0.05);
+  assert.equal(
+    pursuitPickupState,
+    "unarmed",
+    "being inside the table radius must not count when the axe is behind the boss"
+  );
+
+  pursuitRoot.position.set(0, 0, 1.6);
+  pursuitRoot.rotation.y = 0;
+  axeLineOfSightOpen = false;
+  pursuitBehavior.update(0.05);
+  assert.equal(
+    pursuitPickupState,
+    "unarmed",
+    "the table radius must not bypass an occluded axe"
+  );
+
+  pursuitRoot.position.set(0, 0, 1.6);
+  pursuitRoot.rotation.y = 0;
+  pursuitPlayerPosition = new Vector3(0, 0, 2.8);
+  axeLineOfSightOpen = true;
+  assert.equal(pursuitBehavior.forceGrab(), true);
+  pursuitBehavior.update(0.05);
+  assert.equal(pursuitBehavior.currentState, "grabbing");
+  assert.equal(
+    pursuitPickupState,
+    "unarmed",
+    "a reachable player must keep grab priority over the visible axe"
+  );
+  assert.equal(pursuitCinematicStarts, 0);
+
+  pursuitBehavior.stun(0.05);
+  pursuitRoot.position.set(0, 0, 1.6);
+  pursuitRoot.rotation.y = 0;
+  pursuitPlayerPosition = new Vector3(0, 0, -4);
+  axeLineOfSightOpen = true;
+  pursuitBehavior.update(0.05);
+  assert.equal(pursuitPickupState, "picking-up");
+  assert.equal(pursuitCinematicStarts, 1);
+  assert.deepEqual(pursuitRoot.position.asArray(), pursuitAxeApproach.asArray());
+  pursuitBehavior.dispose();
+
+  const recoveryRoot = new TransformNode("test-boss-navigation-recovery-root", scene);
+  recoveryRoot.position.set(0, 0, 0);
+  recoveryRoot.rotation.y = 0;
+  let recoveryPlayerPosition = Vector3.Zero();
+  const recoveryBehavior = new HermanoMayorBehavior({
+    actor: {
+      root: recoveryRoot,
+      meshes: [],
+      hasAxe: false,
+      hasAxePickupTarget: false,
+      playLocomotion: () => {},
+      setLookTargetProvider: () => {},
+      setNeckGrabPose: () => {},
+      getNeckGrabDebugSnapshot: () => null,
+      getAxePickupState: () => "unarmed",
+      getAxeApproachPositionToRef: () => false,
+      getAxeGripPositionToRef: () => false,
+      getAxePickupTableCenterPositionToRef: () => false,
+      startAxePickup: () => false,
+      cancelAxePickup: () => false,
+      getAxePickupDebugSnapshot: () => ({ state: "unarmed" }),
+    } as never,
+    playerPosition: () => recoveryPlayerPosition,
+    playerNeckPosition: () =>
+      recoveryPlayerPosition.add(new Vector3(0, 1.6, 0)),
+    houseBounds: { min: new Vector3(-1, -1, -1), max: new Vector3(1, 1, 1) },
+    visionRange: 30,
+    getGroundHeight: () => 0,
+    // A narrow collision seam falls between the navigator's regular samples.
+    // Movement detects it, reports the stall and must force a lateral detour.
+    isBlocked: (x, z) => x >= 0.26 && x <= 0.39 && Math.abs(z) <= 0.5,
+    hasLineOfSight: () => false,
+    isVisibleToPlayer: () => true,
+    canGrabPlayer: () => true,
+    wasGrabEscapePressed: () => false,
+    setGrabVictimPose: () => {},
+    setGrabEscapeHud: () => {},
+    onGrabStarted: () => {},
+    onGrabDamage: () => {},
+  });
+  recoveryBehavior.update(0.05);
+  recoveryPlayerPosition = new Vector3(4, 0, 0);
+  let maximumRecoveryDetour = 0;
+  for (let step = 0; step < 240 && recoveryRoot.position.x < 2; step++) {
+    recoveryBehavior.update(0.05);
+    maximumRecoveryDetour = Math.max(
+      maximumRecoveryDetour,
+      Math.abs(recoveryRoot.position.z)
+    );
+  }
+  const recoveryDebug = recoveryBehavior.getGrabDebugSnapshot().navigation;
+  assert.ok(
+    recoveryDebug.recoveryCount >= 1,
+    "a sustained collision must invalidate the stuck route"
+  );
+  assert.ok(
+    maximumRecoveryDetour > 0.5,
+    "the recalculated route must leave the invisible collision seam laterally"
+  );
+  assert.ok(
+    recoveryRoot.position.x >= 2,
+    "the boss must resume progress toward the player after replanning"
+  );
+  recoveryBehavior.dispose();
 
   const grabberRoot = {
     position: Vector3.Zero(),
@@ -1156,7 +1226,7 @@ async function verify() {
   lateHud.dispose();
 
   console.log(
-    "Enemy combat: collision-safe table axe cinematic, exact axe grip, dynamic grab escape, 40% cap, candle hunting, 2/18 hits, gray-to-ash death and SVG HUD OK"
+    "Enemy combat: collision-stall recovery, player-first pursuit, visible 2.5m table-radius axe pickup, exact axe grip, dynamic grab escape, 40% cap, candle hunting, 2/18 hits, gray-to-ash death and SVG HUD OK"
   );
 }
 

@@ -345,6 +345,10 @@ export class HermanoMayorAxePickupAction
     return this.axe?.getGripWorldPositionToRef(result) ?? false;
   }
 
+  public getPickupTableCenterPositionToRef(result: Vector3) {
+    return this.axe?.getPickupTableCenterWorldPositionToRef(result) ?? false;
+  }
+
   public getHandGripPositionToRef(result: Vector3) {
     if (!this.handGripSocket) return false;
     this.handGripSocket.computeWorldMatrix(true);

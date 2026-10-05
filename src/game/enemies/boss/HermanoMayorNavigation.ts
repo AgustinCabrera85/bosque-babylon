@@ -18,6 +18,13 @@ const WAYPOINT_REACHED_DISTANCE = 0.68;
 const TARGET_REPLAN_DISTANCE = 1.6;
 const REPLAN_INTERVAL_SECONDS = 0.42;
 const FAILED_RETRY_SECONDS = 0.28;
+const COLLISION_REPLAN_SECONDS = 0.32;
+const STALLED_REPLAN_SECONDS = 0.72;
+const PROGRESS_RESET_DISTANCE = 0.12;
+const RECOVERY_BLOCKER_DISTANCE = 0.88;
+const RECOVERY_BLOCKER_RADIUS = 0.62;
+const RECOVERY_BLOCKER_SECONDS = 3.4;
+const MAX_RECOVERY_BLOCKERS = 5;
 const SEARCH_MARGIN = 14;
 const MAX_EXPANDED_NODES = 6500;
 const SQRT_TWO = Math.SQRT2;
@@ -31,6 +38,12 @@ const NEIGHBORS = [
   { x: -1, z: 1, cost: SQRT_TWO },
   { x: -1, z: -1, cost: SQRT_TWO },
 ] as const;
+
+type RecoveryBlocker = {
+  x: number;
+  z: number;
+  remaining: number;
+};
 
 function planarDistanceSquared(a: Vector3, b: Vector3) {
   const dx = a.x - b.x;
@@ -108,6 +121,12 @@ export class HermanoMayorNavigation {
   private hasPlannedGoal = false;
   private replanElapsed = Number.POSITIVE_INFINITY;
   private retryDelay = 0;
+  private collisionBlockedSeconds = 0;
+  private stationarySeconds = 0;
+  private hasObservedOrigin = false;
+  private recoveryCount = 0;
+  private readonly observedOrigin = Vector3.Zero();
+  private readonly recoveryBlockers: RecoveryBlocker[] = [];
 
   public constructor(private readonly options: HermanoMayorNavigationOptions) {}
 
@@ -116,6 +135,37 @@ export class HermanoMayorNavigation {
     this.hasPlannedGoal = false;
     this.replanElapsed = Number.POSITIVE_INFINITY;
     this.retryDelay = 0;
+    this.collisionBlockedSeconds = 0;
+    this.stationarySeconds = 0;
+    this.hasObservedOrigin = false;
+  }
+
+  /** Feeds collision-resolution results back into the path planner. */
+  public reportMovementResult(
+    position: Vector3,
+    steeringTarget: Vector3,
+    movedDistance: number,
+    deltaSeconds: number
+  ) {
+    if (movedDistance > 0.002) {
+      this.collisionBlockedSeconds = 0;
+      return;
+    }
+
+    this.collisionBlockedSeconds += Math.max(0, deltaSeconds);
+    if (this.collisionBlockedSeconds < COLLISION_REPLAN_SECONDS) return;
+    this.collisionBlockedSeconds = 0;
+    this.registerRecoveryBlocker(position, steeringTarget);
+  }
+
+  public getDebugSnapshot() {
+    return {
+      waypointCount: this.waypoints.length,
+      recoveryBlockerCount: this.recoveryBlockers.length,
+      recoveryCount: this.recoveryCount,
+      collisionBlockedSeconds: this.collisionBlockedSeconds,
+      stationarySeconds: this.stationarySeconds,
+    };
   }
 
   /**
@@ -142,6 +192,8 @@ export class HermanoMayorNavigation {
     const dt = Math.max(0, deltaSeconds);
     this.replanElapsed += dt;
     this.retryDelay = Math.max(0, this.retryDelay - dt);
+    this.ageRecoveryBlockers(dt);
+    this.observeProgress(origin, dt);
 
     const goal = this.resolveWalkableGoal(origin, requestedTarget);
     if (!goal) {
@@ -208,7 +260,10 @@ export class HermanoMayorNavigation {
     const steps = Math.max(1, Math.ceil(distance / DIRECT_PATH_SAMPLE_STEP));
     for (let step = 1; step <= steps; step++) {
       const amount = step / steps;
-      if (this.options.isBlocked(from.x + dx * amount, from.z + dz * amount)) {
+      if (this.isNavigationBlocked(
+        from.x + dx * amount,
+        from.z + dz * amount
+      )) {
         return false;
       }
     }
@@ -239,7 +294,10 @@ export class HermanoMayorNavigation {
       if (key === startKey) return false;
       const cached = blockedCache.get(key);
       if (cached !== undefined) return cached;
-      const blocked = this.options.isBlocked(x * CELL_SIZE, z * CELL_SIZE);
+      const blocked = this.isNavigationBlocked(
+        x * CELL_SIZE,
+        z * CELL_SIZE
+      );
       blockedCache.set(key, blocked);
       return blocked;
     };
@@ -319,7 +377,9 @@ export class HermanoMayorNavigation {
   }
 
   private findOpenGoalCell(x: number, z: number, exactGoal: Vector3) {
-    if (!this.options.isBlocked(x * CELL_SIZE, z * CELL_SIZE)) return { x, z };
+    if (!this.isNavigationBlocked(x * CELL_SIZE, z * CELL_SIZE)) {
+      return { x, z };
+    }
     let best: { x: number; z: number; distance: number } | null = null;
     for (let ring = 1; ring <= 5; ring++) {
       for (let offsetX = -ring; offsetX <= ring; offsetX++) {
@@ -355,7 +415,7 @@ export class HermanoMayorNavigation {
   ) {
     const worldX = x * CELL_SIZE;
     const worldZ = z * CELL_SIZE;
-    if (this.options.isBlocked(worldX, worldZ)) return current;
+    if (this.isNavigationBlocked(worldX, worldZ)) return current;
     const distance = (worldX - exactGoal.x) ** 2 + (worldZ - exactGoal.z) ** 2;
     if (current && current.distance <= distance) return current;
     return { x, z, distance };
@@ -378,5 +438,88 @@ export class HermanoMayorNavigation {
       index = selected + 1;
     }
     return simplified;
+  }
+
+  private observeProgress(origin: Vector3, deltaSeconds: number) {
+    if (!this.hasObservedOrigin) {
+      this.observedOrigin.copyFrom(origin);
+      this.hasObservedOrigin = true;
+      this.stationarySeconds = 0;
+      return;
+    }
+
+    if (
+      planarDistanceSquared(origin, this.observedOrigin) >=
+      PROGRESS_RESET_DISTANCE * PROGRESS_RESET_DISTANCE
+    ) {
+      this.observedOrigin.copyFrom(origin);
+      this.stationarySeconds = 0;
+      return;
+    }
+
+    this.stationarySeconds += deltaSeconds;
+    if (
+      this.stationarySeconds < STALLED_REPLAN_SECONDS ||
+      !this.waypoints[0]
+    ) {
+      return;
+    }
+
+    this.stationarySeconds = 0;
+    this.observedOrigin.copyFrom(origin);
+    this.registerRecoveryBlocker(origin, this.waypoints[0]);
+  }
+
+  private registerRecoveryBlocker(origin: Vector3, target: Vector3) {
+    const dx = target.x - origin.x;
+    const dz = target.z - origin.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance <= 0.05) return;
+
+    const markerDistance = Math.min(
+      RECOVERY_BLOCKER_DISTANCE,
+      Math.max(0.42, distance * 0.7)
+    );
+    const x = origin.x + (dx / distance) * markerDistance;
+    const z = origin.z + (dz / distance) * markerDistance;
+    const existing = this.recoveryBlockers.find(
+      (blocker) =>
+        (blocker.x - x) ** 2 + (blocker.z - z) ** 2 <= 0.18 ** 2
+    );
+    if (existing) {
+      existing.remaining = RECOVERY_BLOCKER_SECONDS;
+    } else {
+      this.recoveryBlockers.push({
+        x,
+        z,
+        remaining: RECOVERY_BLOCKER_SECONDS,
+      });
+      if (this.recoveryBlockers.length > MAX_RECOVERY_BLOCKERS) {
+        this.recoveryBlockers.shift();
+      }
+    }
+
+    this.waypoints.length = 0;
+    this.hasPlannedGoal = false;
+    this.replanElapsed = Number.POSITIVE_INFINITY;
+    this.retryDelay = 0;
+    this.recoveryCount += 1;
+  }
+
+  private ageRecoveryBlockers(deltaSeconds: number) {
+    for (let index = this.recoveryBlockers.length - 1; index >= 0; index--) {
+      const blocker = this.recoveryBlockers[index];
+      blocker.remaining -= deltaSeconds;
+      if (blocker.remaining <= 0) this.recoveryBlockers.splice(index, 1);
+    }
+  }
+
+  private isNavigationBlocked(x: number, z: number) {
+    if (this.options.isBlocked(x, z)) return true;
+    return this.recoveryBlockers.some(
+      (blocker) =>
+        (blocker.x - x) ** 2 + (blocker.z - z) ** 2 <=
+        RECOVERY_BLOCKER_RADIUS * RECOVERY_BLOCKER_RADIUS
+    );
   }
 }

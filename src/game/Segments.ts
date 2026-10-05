@@ -336,6 +336,7 @@ export class Segments {
   private startBlockerLoaded = false;
   private firstMatchboxCreated = false;
   private firstNoteCreated = false;
+  private firstPathNotePosition: Vector3 | null = null;
   private endHouseCheckpoint: Vector3 | null = null;
   private endHouseMeshes: AbstractMesh[] = [];
   private endHouseBrazierFire: BrazierProceduralFireHandle | null = null;
@@ -380,6 +381,10 @@ export class Segments {
 
   getHermanoMayorAxe() {
     return this.hermanoMayorAxe;
+  }
+
+  getFirstPathNotePosition() {
+    return this.firstPathNotePosition?.clone() ?? null;
   }
 
   getEndHouseBounds() {
@@ -1173,6 +1178,8 @@ export class Segments {
     const z = FIRST_NOTE_SEGMENT_ID * segLen + segLen * 0.43;
     const x = -0.95;
     const y = this.terrain.getHeightAt(x, z) + 0.045;
+    const position = new Vector3(x, y, z);
+    this.firstPathNotePosition = position.clone();
 
     createCollectibleNote(this.scene, {
       id: "note-1",
@@ -1180,7 +1187,7 @@ export class Segments {
       description: "Una nota enrollada encontrada en el camino.",
       worldTexturePath: "assets/models/props/png/generics/ItemRolledNoteGeneric.png",
       contentImagePath: "assets/models/props/png/notes/Note_1.png",
-      position: new Vector3(x, y, z),
+      position,
       rotationY: Math.PI * -0.08,
     });
   }

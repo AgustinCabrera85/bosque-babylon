@@ -9,6 +9,7 @@ import { HermanoMayorNavigation } from "./HermanoMayorNavigation";
 
 export const HERMANO_MAYOR_VISION_SEGMENT_MULTIPLIER = 1.15;
 export const HERMANO_MAYOR_LIGHT_STUN_SECONDS = 1.65;
+export const HERMANO_MAYOR_AXE_PICKUP_TRIGGER_RADIUS = 2.5;
 
 const VISION_HALF_ANGLE = (78 * Math.PI) / 180;
 const UNARMED_STOP_DISTANCE = 1.35;
@@ -21,18 +22,11 @@ const WALK_SPEED_RATIO = 0.88;
 const ANIMATION_BLEND_SPEED = 0.09;
 const NEARBY_UNSEEN_DISTANCE = 13;
 const NEARBY_UNSEEN_COOLDOWN = 18;
-// This is a cinematic hand-off, not a physical reach test. Once the boss is
-// near the final safe staging point, framing and IK are allowed to sell the
-// remaining distance instead of forcing him against the table collider.
-const AXE_CINEMATIC_TRIGGER_DISTANCE = 0.9;
-const AXE_APPROACH_STALL_SECONDS = 0.7;
-const AXE_APPROACH_STALL_RECOVERY_DISTANCE = 1.55;
 
 export type HermanoMayorBehaviorState =
   | "waiting"
   | "following"
   | "watching"
-  | "approaching-axe"
   | "picking-up-axe"
   | "stunned"
   | "grabbing";
@@ -89,7 +83,6 @@ export class HermanoMayorBehavior {
   private state: HermanoMayorBehaviorState = "waiting";
   private locomotion: "idle" | "walk" = "idle";
   private hasEnteredHouse = false;
-  private waitingForVisibleExit = false;
   private engaged = false;
   private armed = false;
   private paused = false;
@@ -97,12 +90,10 @@ export class HermanoMayorBehavior {
   private wasPlayerInside: boolean;
   private nearbyUnseenCooldown = 0;
   private axeCinematicActive = false;
-  private axeApproachStallSeconds = 0;
-  private axeLastApproachDistance = Number.POSITIVE_INFINITY;
-  private axeFinishingApproach = false;
   private readonly axeApproachTarget = Vector3.Zero();
   private readonly axeWalkableApproachTarget = Vector3.Zero();
   private readonly axeGripTarget = Vector3.Zero();
+  private readonly axeTableCenter = Vector3.Zero();
 
   private readonly onPause = (event: Event) => {
     const detail = (event as CustomEvent<{ paused?: boolean }>).detail;
@@ -140,6 +131,13 @@ export class HermanoMayorBehavior {
     this.armed = armed;
   }
 
+  /** Plays the nearby/off-camera cue immediately for authored sightings. */
+  public playNearbyUnseenCue() {
+    this.audio.setAudibility(1);
+    this.audio.requestNearbyUnseen();
+    this.audio.update(0);
+  }
+
   public update(deltaSeconds: number) {
     const dt = Math.max(0, Math.min(deltaSeconds, 0.05));
     const player = this.options.playerPosition();
@@ -167,21 +165,12 @@ export class HermanoMayorBehavior {
     const playerInside = this.isPlayerInside(player);
     if (playerInside) {
       this.hasEnteredHouse = true;
-      if (!this.engaged) this.waitingForVisibleExit = false;
     } else if (this.hasEnteredHouse && this.wasPlayerInside) {
-      this.waitingForVisibleExit = true;
+      // Leaving the house starts the hunt immediately. From this point the
+      // boss follows the player even if the doorway briefly occludes them.
+      this.engaged = true;
     }
     this.wasPlayerInside = playerInside;
-
-    if (
-      !this.engaged &&
-      this.waitingForVisibleExit &&
-      !playerInside &&
-      this.canSeePlayer(player, distance)
-    ) {
-      this.engaged = true;
-      this.waitingForVisibleExit = false;
-    }
 
     this.nearbyUnseenCooldown = Math.max(0, this.nearbyUnseenCooldown - dt);
     if (
@@ -197,22 +186,16 @@ export class HermanoMayorBehavior {
     const axeState = this.actor.getAxePickupState();
     if (axeState === "armed") {
       this.armed = true;
-      this.resetAxeApproachProgress();
       this.finishAxeCinematic(true);
     }
-    if (
-      this.engaged &&
-      !this.armed &&
-      this.actor.hasAxePickupTarget
-    ) {
-      if (axeState === "picking-up") {
-        this.navigation.clear();
-        this.enterState("picking-up-axe");
-        return;
-      }
-      if (this.updateAxeApproach(dt)) return;
+    if (axeState === "picking-up") {
+      this.navigation.clear();
+      this.enterState("picking-up-axe");
+      return;
     }
 
+    // Grabbing the player remains the unarmed boss's first priority. The axe
+    // is only noticed after no grab action owns this frame.
     const grabOwnsMovement = this.grabAttack.update(
       dt,
       this.engaged && !this.armed && this.canSeePlayer(player, distance),
@@ -221,6 +204,15 @@ export class HermanoMayorBehavior {
     if (grabOwnsMovement) {
       this.navigation.clear();
       this.enterState("grabbing");
+      return;
+    }
+
+    if (
+      this.engaged &&
+      !this.armed &&
+      this.actor.hasAxePickupTarget &&
+      this.tryStartVisibleAxePickup()
+    ) {
       return;
     }
 
@@ -284,32 +276,12 @@ export class HermanoMayorBehavior {
     this.grabAttack.interrupt("stunned");
     this.stunRemaining = 0;
     this.engaged = true;
-    this.waitingForVisibleExit = false;
     this.navigation.clear();
-    if (
-      !this.navigation.resolveWalkableGoalToRef(
-        this.actor.root.position,
-        this.axeApproachTarget,
-        this.axeWalkableApproachTarget
-      )
-    ) {
-      return false;
-    }
-    this.actor.root.position.set(
-      this.axeWalkableApproachTarget.x,
-      this.options.getGroundHeight(
-        this.axeWalkableApproachTarget.x,
-        this.axeWalkableApproachTarget.z
-      ),
-      this.axeWalkableApproachTarget.z
-    );
-    this.resetAxeApproachProgress();
-    // Start deliberately facing away so this helper exercises the same final
-    // alignment and transition used by the real walk-to-table flow.
-    this.actor.root.rotation.y += Math.PI * 0.5;
-    this.enterState("approaching-axe");
-    this.updateAxeApproach(1 / 60);
-    return this.actor.getAxePickupState() === "picking-up";
+    if (!this.actor.getAxeGripPositionToRef(this.axeGripTarget)) return false;
+    if (!this.stageActorForAxePickup()) return false;
+    this.faceTargetImmediately(this.axeGripTarget);
+    this.enterState("picking-up-axe");
+    return this.startAxePickupAtTable();
   }
 
   public simulateGrabEscapePress() {
@@ -336,13 +308,14 @@ export class HermanoMayorBehavior {
     return {
       ...grab,
       axe: this.actor.getAxePickupDebugSnapshot(),
+      navigation: this.navigation.getDebugSnapshot(),
     };
   }
 
   private enterState(next: HermanoMayorBehaviorState) {
     if (this.state === next) return;
     this.state = next;
-    if (next === "following" || next === "approaching-axe") {
+    if (next === "following") {
       this.setLocomotion("walk");
       this.audio.setBreathing("chase");
       return;
@@ -361,103 +334,80 @@ export class HermanoMayorBehavior {
     });
   }
 
-  private updateAxeApproach(dt: number) {
-    if (!this.actor.getAxeApproachPositionToRef(this.axeApproachTarget)) {
-      this.resetAxeApproachProgress();
+  private tryStartVisibleAxePickup() {
+    if (
+      !this.actor.getAxePickupTableCenterPositionToRef(this.axeTableCenter) ||
+      !this.actor.getAxeGripPositionToRef(this.axeGripTarget)
+    ) {
       return false;
     }
+
     const root = this.actor.root;
+    const tableDistance = Math.hypot(
+      this.axeTableCenter.x - root.position.x,
+      this.axeTableCenter.z - root.position.z
+    );
+    if (tableDistance > HERMANO_MAYOR_AXE_PICKUP_TRIGGER_RADIUS) return false;
+    if (!this.canSeeAxe(this.axeGripTarget)) return false;
+    if (!this.stageActorForAxePickup()) return false;
+
+    this.navigation.clear();
+    this.faceTargetImmediately(this.axeGripTarget);
+    this.enterState("picking-up-axe");
+    return this.startAxePickupAtTable();
+  }
+
+  private stageActorForAxePickup() {
+    if (!this.actor.getAxeApproachPositionToRef(this.axeApproachTarget)) {
+      return false;
+    }
+
+    let stagingTarget = this.axeApproachTarget;
     if (
-      !this.navigation.resolveWalkableGoalToRef(
-        root.position,
-        this.axeApproachTarget,
-        this.axeWalkableApproachTarget
+      this.options.isBlocked(
+        this.axeApproachTarget.x,
+        this.axeApproachTarget.z
       )
     ) {
-      this.navigation.clear();
-      this.enterState("watching");
-      return true;
-    }
-    const distance = Math.hypot(
-      this.axeWalkableApproachTarget.x - root.position.x,
-      this.axeWalkableApproachTarget.z - root.position.z
-    );
-    if (distance + 0.02 < this.axeLastApproachDistance) {
-      this.axeApproachStallSeconds = 0;
-    } else {
-      this.axeApproachStallSeconds += dt;
-    }
-    this.axeLastApproachDistance = distance;
-
-    if (distance > AXE_CINEMATIC_TRIGGER_DISTANCE) {
       if (
-        !this.axeFinishingApproach &&
-        this.axeApproachStallSeconds >= AXE_APPROACH_STALL_SECONDS &&
-        distance <= AXE_APPROACH_STALL_RECOVERY_DISTANCE &&
-        !this.options.isBlocked(
-          this.axeWalkableApproachTarget.x,
-          this.axeWalkableApproachTarget.z
+        !this.navigation.resolveWalkableGoalToRef(
+          this.actor.root.position,
+          this.axeApproachTarget,
+          this.axeWalkableApproachTarget
         )
       ) {
-        // The A* grid and the boss clearance can disagree by a fraction of a
-        // cell beside authored props. Once the final target itself is safe,
-        // finish this short walk directly instead of idling forever nearby.
-        this.axeFinishingApproach = true;
-        this.navigation.clear();
+        return false;
       }
-      if (this.axeFinishingApproach) {
-        this.enterState("approaching-axe");
-        this.moveDirectlyTowardAxe(
-          this.axeWalkableApproachTarget,
-          distance,
-          dt
-        );
-        return true;
-      }
-
-      const steeringTarget = this.navigation.getSteeringTarget(
-        root.position,
-        this.axeWalkableApproachTarget,
-        dt
-      );
-      if (steeringTarget) {
-        this.enterState("approaching-axe");
-        this.moveToward(
-          steeringTarget,
-          distance,
-          dt,
-          AXE_CINEMATIC_TRIGGER_DISTANCE
-        );
-      } else {
-        this.navigation.clear();
-        this.enterState("watching");
-      }
-      return true;
+      stagingTarget = this.axeWalkableApproachTarget;
     }
 
-    this.resetAxeApproachProgress();
-    this.navigation.clear();
-    this.enterState("picking-up-axe");
-    if (!this.actor.getAxeGripPositionToRef(this.axeGripTarget)) return true;
-    // Entering the nearby staging radius is enough for this cinematic. Align
-    // once toward the prop and use the camera cut to place the actor on the
-    // authored safe mark. This keeps navigation forgiving while giving the IK
-    // enough real arm length to put the palm visibly on the handle.
-    const cinematicStagingTarget = this.options.isBlocked(
-      this.axeApproachTarget.x,
-      this.axeApproachTarget.z
-    )
-      ? this.axeWalkableApproachTarget
-      : this.axeApproachTarget;
-    root.position.x = cinematicStagingTarget.x;
-    root.position.z = cinematicStagingTarget.z;
-    root.position.y = this.options.getGroundHeight(
-      cinematicStagingTarget.x,
-      cinematicStagingTarget.z
+    this.actor.root.position.set(
+      stagingTarget.x,
+      this.options.getGroundHeight(stagingTarget.x, stagingTarget.z),
+      stagingTarget.z
     );
-    this.faceTargetImmediately(this.axeGripTarget);
-    this.startAxePickupAtTable();
     return true;
+  }
+
+  private canSeeAxe(target: Vector3) {
+    const root = this.actor.root;
+    const dx = target.x - root.position.x;
+    const dz = target.z - root.position.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance <= 0.001) return true;
+
+    const yaw = root.rotation.y;
+    const facingDot =
+      Math.sin(yaw) * (dx / distance) +
+      Math.cos(yaw) * (dz / distance);
+    if (facingDot < Math.cos(VISION_HALF_ANGLE)) return false;
+
+    const origin = new Vector3(
+      root.position.x,
+      root.position.y + 2.15,
+      root.position.z
+    );
+    return this.options.hasLineOfSight(origin, target);
   }
 
   private startAxePickupAtTable() {
@@ -476,32 +426,6 @@ export class HermanoMayorBehavior {
     if (Math.hypot(dx, dz) <= 0.001) return;
     root.rotationQuaternion = null;
     root.rotation.y = Math.atan2(dx, dz);
-  }
-
-  private moveDirectlyTowardAxe(
-    target: Vector3,
-    distance: number,
-    dt: number
-  ) {
-    const root = this.actor.root;
-    if (distance <= 0.001) return;
-    const directionX = (target.x - root.position.x) / distance;
-    const directionZ = (target.z - root.position.z) / distance;
-    root.rotationQuaternion = null;
-    root.rotation.y = Math.atan2(directionX, directionZ);
-    const step = Math.min(
-      Math.max(0, distance - AXE_CINEMATIC_TRIGGER_DISTANCE),
-      WALK_SPEED * dt
-    );
-    root.position.x += directionX * step;
-    root.position.z += directionZ * step;
-    root.position.y = this.options.getGroundHeight(root.position.x, root.position.z);
-  }
-
-  private resetAxeApproachProgress() {
-    this.axeApproachStallSeconds = 0;
-    this.axeLastApproachDistance = Number.POSITIVE_INFINITY;
-    this.axeFinishingApproach = false;
   }
 
   private finishAxeCinematic(completed: boolean) {
@@ -556,22 +480,36 @@ export class HermanoMayorBehavior {
     );
     if (step <= 0) return;
 
+    const startX = root.position.x;
+    const startZ = root.position.z;
     const nextX = root.position.x + directionX * step;
     const nextZ = root.position.z + directionZ * step;
-    let moved = false;
     if (!this.options.isBlocked(nextX, nextZ)) {
       root.position.x = nextX;
       root.position.z = nextZ;
-      moved = true;
-    } else if (!this.options.isBlocked(nextX, root.position.z)) {
+    } else if (
+      Math.abs(nextX - root.position.x) > 0.0001 &&
+      !this.options.isBlocked(nextX, root.position.z)
+    ) {
       root.position.x = nextX;
-      moved = true;
-    } else if (!this.options.isBlocked(root.position.x, nextZ)) {
+    } else if (
+      Math.abs(nextZ - root.position.z) > 0.0001 &&
+      !this.options.isBlocked(root.position.x, nextZ)
+    ) {
       root.position.z = nextZ;
-      moved = true;
     }
 
-    if (!moved) return;
+    const movedDistance = Math.hypot(
+      root.position.x - startX,
+      root.position.z - startZ
+    );
+    this.navigation.reportMovementResult(
+      root.position,
+      steeringTarget,
+      movedDistance,
+      deltaSeconds
+    );
+    if (movedDistance <= 0.002) return;
     const groundY = this.options.getGroundHeight(root.position.x, root.position.z);
     const groundBlend = Math.min(1, deltaSeconds * 8);
     root.position.y += (groundY - root.position.y) * groundBlend;

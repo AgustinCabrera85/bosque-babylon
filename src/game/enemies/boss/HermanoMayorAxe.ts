@@ -4,7 +4,7 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 
-export const HERMANO_MAYOR_AXE_WORLD_LENGTH = 1.08;
+export const HERMANO_MAYOR_AXE_WORLD_LENGTH = 1.2;
 export const HERMANO_MAYOR_AXE_APPROACH_DISTANCE_FROM_GRIP = 1.05;
 export const HERMANO_MAYOR_AXE_GRIP_LOWER_METERS = 0.025;
 export const HERMANO_MAYOR_AXE_GRIP_TOWARD_THUMB_METERS = 0.08;
@@ -124,6 +124,7 @@ export type HermanoMayorAxeHandle = {
   getGripWorldPositionToRef(result: Vector3): boolean;
   getRootWorldPositionToRef(result: Vector3): boolean;
   getGripWorldAxesToRef(x: Vector3, y: Vector3, z: Vector3): boolean;
+  getPickupTableCenterWorldPositionToRef(result: Vector3): boolean;
   getPickupApproachWorldPositionToRef(result: Vector3): boolean;
   attachToHandSocket(handSocket: TransformNode): boolean;
   getAttachmentDebugSnapshot(
@@ -160,13 +161,14 @@ export function createHermanoMayorAxeHandle(
   const gripSocket = new TransformNode("endHouseAxeGripSocket", scene);
   gripSocket.parent = root;
   gripSocket.position.copyFrom(gripPoint);
+  const pickupTableCenter = options.pickupSurfaceCenter?.clone() ?? null;
   const pickupApproachPosition = Vector3.Zero();
   let hasPickupApproachPosition = false;
-  if (options.pickupSurfaceCenter) {
+  if (pickupTableCenter) {
     root.computeWorldMatrix(true);
     gripSocket.computeWorldMatrix(true);
     const gripWorldPosition = gripSocket.getAbsolutePosition();
-    const outward = gripWorldPosition.subtract(options.pickupSurfaceCenter);
+    const outward = gripWorldPosition.subtract(pickupTableCenter);
     outward.y = 0;
     if (outward.lengthSquared() > 0.000001) {
       outward.normalize();
@@ -291,6 +293,11 @@ export function createHermanoMayorAxeHandle(
         gripSocket.getWorldMatrix(),
         z
       );
+      return true;
+    },
+    getPickupTableCenterWorldPositionToRef: (result) => {
+      if (root.isDisposed() || attached || !pickupTableCenter) return false;
+      result.copyFrom(pickupTableCenter);
       return true;
     },
     getPickupApproachWorldPositionToRef: (result) => {

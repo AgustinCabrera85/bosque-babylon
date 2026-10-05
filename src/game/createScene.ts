@@ -55,6 +55,7 @@ import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"
 import { Light } from "@babylonjs/core/Lights/light";
 import { ShadowAuraController } from "./ShadowAura";
 import { createShadowAuraDebugControls } from "./ShadowAuraDebug";
+import { CharacterContactShadow } from "./CharacterContactShadow";
 import {
   DEFAULT_END_HOUSE_SEGMENT,
   DEFAULT_WORLD_SEGMENT_LENGTH,
@@ -90,6 +91,7 @@ import {
 } from "./enemies/boss";
 import { HermanoMayorGrabHud } from "./enemies/boss/HermanoMayorGrabHud";
 import { HermanoMayorAxePickupCinematic } from "./enemies/boss/HermanoMayorAxePickupCinematic";
+import { HermanoMayorForestCrossingCinematic } from "./levels/HermanoMayorForestCrossingCinematic";
 import { renderActionPrompt } from "./input/InputPrompts";
 import type { GameAction } from "./input/InputActions";
 import { setHermanoMayorGrabHapticsActive } from "./input/GamepadFeedback";
@@ -478,6 +480,20 @@ const playerWorld = new ForestPlayerWorld(terrain, {
 
   onProgress(0.36, "Cargando personaje...");
   await player.loadCharacter();
+  const playerContactShadow = new CharacterContactShadow(
+    scene,
+    {
+      root: player.root,
+      getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(playerWorld, x, z),
+      getFootPositionToRef: (result) => player.getGroundContactPositionToRef(result),
+    },
+    {
+      name: "player",
+      radiusX: 0.52,
+      radiusZ: 0.36,
+      opacity: 0.34,
+    }
+  );
   const shadowAura = new ShadowAuraController(
     scene,
     {
@@ -532,7 +548,11 @@ const playerWorld = new ForestPlayerWorld(terrain, {
     }
   });
   const shadowAuraDebug = createShadowAuraDebugControls(shadowAura);
-  player.onViewModeChange((mode) => shadowAura.setVisible(mode !== "first"));
+  player.onViewModeChange((mode) => {
+    const avatarVisible = mode !== "first";
+    shadowAura.setVisible(avatarVisible);
+    playerContactShadow.setVisible(avatarVisible);
+  });
   const requestedShadowView = new URLSearchParams(window.location.search).get("shadowView");
   if (
     requestedShadowView === "first" ||
@@ -1305,11 +1325,48 @@ scene.onBeforeRenderObservable.add(() => {
     return !hit?.hit || hit.distance >= distance - 0.35;
   };
   const hermanoMayor = segments.getHermanoMayor();
+  const hermanoMayorContactShadow = hermanoMayor
+    ? new CharacterContactShadow(
+        scene,
+        {
+          root: hermanoMayor.root,
+          getGroundHeight: (x, z) =>
+            player.getWalkableSurfaceHeight(playerWorld, x, z),
+        },
+        {
+          name: "hermanoMayor",
+          radiusX: 0.72,
+          radiusZ: 0.44,
+          opacity: 0.38,
+          maxDistance: 70,
+        }
+      )
+    : null;
   const hermanoMayorAxe = segments.getHermanoMayorAxe();
+  const firstPathNotePosition = segments.getFirstPathNotePosition();
+  let hermanoMayorBehavior: HermanoMayorBehavior | null = null;
   hermanoMayor?.setAxePickupTarget(hermanoMayorAxe);
   const hermanoMayorAxeCinematic = hermanoMayor
     ? new HermanoMayorAxePickupCinematic(player, hermanoMayor)
     : null;
+  const hermanoMayorForestCrossingCinematic =
+    hermanoMayor && firstPathNotePosition
+      ? new HermanoMayorForestCrossingCinematic({
+          player,
+          actor: hermanoMayor,
+          firstNotePosition: firstPathNotePosition,
+          getGroundHeight: (x, z) =>
+            player.getWalkableSurfaceHeight(playerWorld, x, z),
+          onStart: () => {
+            attackSystem.cancelCharge();
+            playerStats.cancelLightAbsorption("controls-locked");
+            interactSystem.clearMessage();
+            hermanoMayorBehavior?.playNearbyUnseenCue();
+          },
+        })
+      : null;
+  scene.metadata.hermanoMayorForestCrossingCinematic =
+    hermanoMayorForestCrossingCinematic;
   const hermanoMayorGrabHud = new HermanoMayorGrabHud();
   const endHouseBounds = segments.getEndHouseBounds();
   const hermanoMayorNavigationProbe = Vector3.Zero();
@@ -1328,7 +1385,7 @@ scene.onBeforeRenderObservable.add(() => {
       0.85
     );
   };
-  const hermanoMayorBehavior = hermanoMayor && endHouseBounds
+  hermanoMayorBehavior = hermanoMayor && endHouseBounds
     ? new HermanoMayorBehavior({
         actor: hermanoMayor,
         playerPosition: () => player.position,
@@ -1422,6 +1479,8 @@ scene.onBeforeRenderObservable.add(() => {
     };
   }
   scene.onDisposeObservable.addOnce(() => {
+    hermanoMayorForestCrossingCinematic?.dispose();
+    hermanoMayorContactShadow?.dispose();
     hermanoMayorBehavior?.dispose();
     hermanoMayorAxeCinematic?.dispose();
     setHermanoMayorGrabHapticsActive(false);
@@ -1435,6 +1494,10 @@ scene.onBeforeRenderObservable.add(() => {
         pickup: hermanoMayor.getAxePickupDebugSnapshot(),
         cinematic: hermanoMayorAxeCinematic?.getDebugSnapshot() ?? null,
       }),
+      getForestCrossing: () =>
+        hermanoMayorForestCrossingCinematic?.getDebugSnapshot() ?? null,
+      forceForestCrossing: () =>
+        hermanoMayorForestCrossingCinematic?.forceForestCrossing() ?? false,
       setAxeDebugVisible: (visible: boolean) =>
         hermanoMayor.setAxePickupDebugVisible(visible),
       seekAxePickup: (time: number) => {
@@ -1609,6 +1672,7 @@ scene.onBeforeRenderObservable.add(() => {
     }
     interactSystem.update(dt);
     houseArrivalCinematic.update(dt);
+    hermanoMayorForestCrossingCinematic?.update(dt);
     // During the reveal, upload the already-preassembled final streaming window
     // before the player crosses the boundary that used to expose the hitch.
     segments.update(
@@ -1624,7 +1688,9 @@ scene.onBeforeRenderObservable.add(() => {
       0.78
     );
     player.update(dt, playerWorld);
-    hermanoMayorBehavior?.update(dt);
+    if (!hermanoMayorForestCrossingCinematic?.isActive) {
+      hermanoMayorBehavior?.update(dt);
+    }
     hermanoMayorAxeCinematic?.update(dt);
     skyEyeEncounter.update(dt);
     shadowGrabberBehaviorSystem.update(dt);

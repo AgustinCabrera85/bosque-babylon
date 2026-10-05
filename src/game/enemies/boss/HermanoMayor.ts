@@ -59,6 +59,7 @@ export type HermanoMayorHandle = {
   getAxePickupState(): HermanoMayorAxePickupState;
   getAxeApproachPositionToRef(result: Vector3): boolean;
   getAxeGripPositionToRef(result: Vector3): boolean;
+  getAxePickupTableCenterPositionToRef(result: Vector3): boolean;
   getAxeHandPositionToRef(result: Vector3): boolean;
   getAxePickupDebugSnapshot(): ReturnType<
     HermanoMayorAxePickupAction["getDebugSnapshot"]
@@ -202,6 +203,8 @@ export async function loadHermanoMayor(
       axePickupAction.getApproachPositionToRef(result),
     getAxeGripPositionToRef: (result) =>
       axePickupAction.getAxeGripPositionToRef(result),
+    getAxePickupTableCenterPositionToRef: (result) =>
+      axePickupAction.getPickupTableCenterPositionToRef(result),
     getAxeHandPositionToRef: (result) =>
       axePickupAction.getHandGripPositionToRef(result),
     getAxePickupDebugSnapshot: () => axePickupAction.getDebugSnapshot(),

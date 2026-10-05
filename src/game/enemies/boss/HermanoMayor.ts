@@ -80,7 +80,10 @@ export type HermanoMayorHandle = {
   seekAxePickupForDebug(time: number): boolean;
   setLookTargetProvider(provider: HermanoMayorLookTargetProvider | null): void;
   setNeckGrabTargetProvider(provider: HermanoMayorNeckTargetProvider | null): void;
-  setNeckGrabPose(state: HermanoMayorNeckGrabPoseState | null): void;
+  setNeckGrabPose(
+    state: HermanoMayorNeckGrabPoseState | null,
+    immediate?: boolean
+  ): void;
   getNeckGrabDebugSnapshot(): ReturnType<
     HermanoMayorNeckGrabAction["getDebugSnapshot"]
   >;
@@ -264,7 +267,7 @@ export async function loadHermanoMayor(
     setLookTargetProvider: (provider) => lookAction.setTargetProvider(provider),
     setNeckGrabTargetProvider: (provider) =>
       neckGrabAction.setTargetProvider(provider),
-    setNeckGrabPose: (state) => {
+    setNeckGrabPose: (state, immediate = false) => {
       if (state) {
         if (axePickupAction.state !== "unarmed") return;
         lookAction.setEnabled(false);
@@ -272,7 +275,8 @@ export async function loadHermanoMayor(
         neckGrabAction.setEnabled(true);
         return;
       }
-      neckGrabAction.setEnabled(false);
+      if (immediate) neckGrabAction.stopImmediately();
+      else neckGrabAction.setEnabled(false);
       lookAction.setEnabled(true);
     },
     getNeckGrabDebugSnapshot: () => neckGrabAction.getDebugSnapshot(),

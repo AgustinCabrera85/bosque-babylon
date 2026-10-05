@@ -155,6 +155,9 @@ export class HermanoMayorGrabAttack {
       while (this.squeezeTimer >= SQUEEZE_INTERVAL_SECONDS) {
         this.squeezeTimer -= SQUEEZE_INTERVAL_SECONDS;
         this.applyGrabDamage("squeeze");
+        // Lethal damage may synchronously interrupt this attack through the
+        // player-death callback. Do not reapply the choke pose afterward.
+        if (this.state !== "holding" || !this.captured) return true;
       }
       this.setActorPose(1, 1, this.escapeProgress, 1);
       this.updateVictim(1);
@@ -253,6 +256,9 @@ export class HermanoMayorGrabAttack {
     this.grabDamageFraction = 0;
     this.options.onGrabStarted();
     this.applyGrabDamage("initial");
+    // onGrabDamage may synchronously begin the death sequence and interrupt
+    // the grab. Respect that new state instead of resurrecting the hold.
+    if (!this.captured || this.state !== "windup") return;
     this.options.setEscapeHud(true, 0);
     this.enterState("lifting");
     this.updateVictim(0);

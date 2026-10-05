@@ -1,4 +1,8 @@
 import { createScene, desktopQuality, mobileQuality } from "../../createScene";
+import {
+  requestCharacterSelectionReturn,
+  requestCheckpointRestart,
+} from "../../runtime/CheckpointRestart";
 import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
 
 export async function createForestLevel(
@@ -17,7 +21,17 @@ export async function createForestLevel(
     context.input,
     context.playerStats,
     context.entryPoint === "initial",
-    context.cursorController
+    context.cursorController,
+    {
+      entryPoint: context.entryPoint,
+      onPlayerDeathChoice: (choice, entryPoint) => {
+        if (choice === "checkpoint") {
+          requestCheckpointRestart({ level: "forest", entryPoint });
+          return;
+        }
+        requestCharacterSelectionReturn();
+      },
+    }
   );
   let disposed = false;
 

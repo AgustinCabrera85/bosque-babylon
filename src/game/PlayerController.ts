@@ -86,6 +86,7 @@ export type CharacterId = "lautaro" | "sofia";
 export type PlayerWaterLocomotionState = "grounded" | "treadingWater" | "swimming";
 type AnimationKey =
   | "idle"
+  | "dying"
   | "jump"
   | "strafeLeftRun"
   | "strafeLeftWalk"
@@ -112,6 +113,7 @@ const CHARACTER_VISUAL_SCALE: Record<CharacterId, number> = {
 };
 const CHARACTER_ANIMATIONS: Record<AnimationKey, string> = {
   idle: "Idle",
+  dying: "Dying",
   jump: "Jump_InPlace",
   strafeLeftRun: "Left_Strafe_Run_InPlace",
   strafeLeftWalk: "Left_Strafe_Walk_InPlace",
@@ -237,6 +239,7 @@ export function getNextPrimaryViewMode(
 export class PlayerController {
   public readonly root: TransformNode;
   public readonly camera: UniversalCamera;
+  private readonly deathPresentationRoot: TransformNode;
 
   private velY = 0;
   private grounded = false;
@@ -261,6 +264,8 @@ export class PlayerController {
   } | null = null;
   private avatarRoot: TransformNode | null = null;
   private avatarMeshes: AbstractMesh[] = [];
+  private deathBodyAnchorMesh: Mesh | null = null;
+  private deathBodyAnchorBone: Bone | null = null;
   private throwHandMesh: Mesh | null = null;
   private throwHandBone: Bone | null = null;
   private throwHandMiddleBone: Bone | null = null;
@@ -311,6 +316,7 @@ export class PlayerController {
     duration: number;
   } | null = null;
   private cinematicSequenceActive = false;
+  private deathSequenceActive = false;
   private cinematicCameraState: {
     worldPosition: Vector3;
     worldTarget: Vector3;
@@ -359,6 +365,11 @@ export class PlayerController {
   ) {
     this.root = new TransformNode("playerRoot", scene);
     this.root.position = new Vector3(0, settings.eyeHeight, 5);
+    this.deathPresentationRoot = new TransformNode(
+      "playerDeathPresentationRoot",
+      scene
+    );
+    this.deathPresentationRoot.parent = this.root;
 
     this.camera = new UniversalCamera("playerCam", new Vector3(0, 0, 0), scene);
     this.camera.parent = this.root;
@@ -387,6 +398,27 @@ export class PlayerController {
   getGroundContactPositionToRef(result: Vector3) {
     result.copyFrom(this.root.position);
     result.y -= this.settings.eyeHeight;
+    return result;
+  }
+
+  /** Writes the animated torso center used to align death follow-up effects. */
+  getAnimatedBodyCenterPositionToRef(result: Vector3) {
+    if (this.deathBodyAnchorMesh && this.deathBodyAnchorBone) {
+      this.deathBodyAnchorMesh.computeWorldMatrix(true);
+      this.deathBodyAnchorBone.getAbsolutePositionToRef(
+        this.deathBodyAnchorMesh,
+        result
+      );
+      return result;
+    }
+
+    const bounds = this.getAvatarBounds();
+    if (bounds) {
+      result.copyFrom(bounds.min).addInPlace(bounds.max).scaleInPlace(0.5);
+      return result;
+    }
+    result.copyFrom(this.root.position);
+    result.y -= this.settings.eyeHeight * 0.5;
     return result;
   }
 
@@ -456,7 +488,11 @@ export class PlayerController {
   }
 
   private get controlsLocked() {
-    return this.openingSequenceActive || this.cinematicSequenceActive;
+    return (
+      this.openingSequenceActive ||
+      this.cinematicSequenceActive ||
+      this.deathSequenceActive
+    );
   }
 
   setWaterSurfaceRegistry(registry: WaterSurfaceRegistry) {
@@ -543,7 +579,7 @@ export class PlayerController {
 
     const res = await SceneLoader.ImportMeshAsync(null, rootUrl, fileName, this.scene);
     const avatarRoot = new TransformNode("playerAvatarRoot", this.scene);
-    avatarRoot.parent = this.root;
+    avatarRoot.parent = this.deathPresentationRoot;
     avatarRoot.position.set(0, -this.settings.eyeHeight, 0);
 
     const importedNodes = [...res.meshes, ...res.transformNodes];
@@ -553,6 +589,7 @@ export class PlayerController {
 
     this.avatarRoot = avatarRoot;
     this.avatarMeshes = res.meshes.filter((mesh) => mesh.getTotalVertices() > 0);
+    this.resolveDeathBodyAnchor(res.meshes);
     this.resolveThrowHandBones(res.meshes);
     for (const mesh of this.avatarMeshes) {
       mesh.isPickable = false;
@@ -854,6 +891,46 @@ export class PlayerController {
       this.lockMovement(event.movementLockSeconds ?? 0);
     }
     return played;
+  }
+
+  /**
+   * Gives every lethal damage source the same authored death reaction. The
+   * final frame remains held so a level-owned sequence can present a portal,
+   * burial, respawn, or any other follow-up without the idle clip returning.
+   */
+  playDeathAnimation() {
+    if (this.deathSequenceActive) return 0;
+    this.deathSequenceActive = true;
+    this.cancelChargedThrow();
+    this.setNeckGrabState({ active: false });
+    this.clearEnemyGrabStruggles();
+    this.hitReactionMovement = null;
+    this.movementLockTimer = 0;
+    this.grabStruggleController?.dispose();
+    this.grabStruggleController = null;
+    this.resetInputState();
+
+    this.actionPlaying = true;
+    const group = this.playAnimation("dying", false, ACTION_BLEND_TIME);
+    if (!group) return 1.8;
+
+    const duration = this.getAnimationDurationSeconds(group);
+    group.onAnimationGroupEndObservable.addOnce(() => {
+      if (!this.deathSequenceActive || this.currentAnimation !== group.name) return;
+      group.goToFrame(group.to, true);
+      group.pause();
+      this.actionPlaying = true;
+    });
+    return duration;
+  }
+
+  /** Sinks only the avatar presentation; collision and the cinematic camera stay fixed. */
+  setDeathSinkProgress(progress: number) {
+    const amount = Math.max(0, Math.min(1, progress));
+    const eased = amount * amount * (3 - 2 * amount);
+    this.deathPresentationRoot.position.y = -2.35 * eased;
+    const scale = 1 - eased * 0.12;
+    this.deathPresentationRoot.scaling.setAll(scale);
   }
 
   /** Convenience wrapper retained for damage systems that only need an impact. */
@@ -2491,6 +2568,27 @@ export class PlayerController {
     this.avatarRoot.position.x -= centerX - rootWorld.x;
     this.avatarRoot.position.y -= scaledBounds.min.y - groundY - CHARACTER_FOOT_CLEARANCE;
     this.avatarRoot.position.z -= centerZ - rootWorld.z;
+  }
+
+  private resolveDeathBodyAnchor(meshes: readonly AbstractMesh[]) {
+    this.deathBodyAnchorMesh = null;
+    this.deathBodyAnchorBone = null;
+
+    for (const candidate of meshes) {
+      if (!(candidate instanceof Mesh) || !candidate.skeleton) continue;
+      const normalizedBones = candidate.skeleton.bones.map((bone) => ({
+        bone,
+        name: bone.name.toLowerCase().replace(/[^a-z0-9]/g, ""),
+      }));
+      const anchor =
+        normalizedBones.find(({ name }) => name.endsWith("spine1")) ??
+        normalizedBones.find(({ name }) => name.endsWith("spine")) ??
+        normalizedBones.find(({ name }) => name.endsWith("hips"));
+      if (!anchor) continue;
+      this.deathBodyAnchorMesh = candidate;
+      this.deathBodyAnchorBone = anchor.bone;
+      return;
+    }
   }
 
   private resolveThrowHandBones(meshes: readonly AbstractMesh[]) {

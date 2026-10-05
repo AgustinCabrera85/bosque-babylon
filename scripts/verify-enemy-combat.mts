@@ -9,6 +9,11 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Scene } from "@babylonjs/core/scene";
 import { EnemyHealthHud } from "../src/game/EnemyHealthHud.ts";
 import {
+  PLAYER_DEATH_SEQUENCE_TIMING,
+  samplePlayerDeathSequence,
+  samplePlayerSoulLight,
+} from "../src/game/PlayerDeathSequence.ts";
+import {
   PLAYER_DODGE_REACTION_DURATION_SECONDS,
   getPlayerDodgeReactionDuration,
   getPlayerHitReactionDuration,
@@ -621,6 +626,41 @@ async function verify() {
       rightDodgeSample.visualDisplacement > 0.2,
     "dodge styles must expose visibly different reusable motion profiles"
   );
+  const deathStart = samplePlayerDeathSequence(0);
+  const deathPortalOpen = samplePlayerDeathSequence(
+    PLAYER_DEATH_SEQUENCE_TIMING.portalOpenSeconds
+  );
+  const deathComplete = samplePlayerDeathSequence(
+    PLAYER_DEATH_SEQUENCE_TIMING.completeSeconds
+  );
+  assert.deepEqual(deathStart, {
+    portalProgress: 0,
+    sinkProgress: 0,
+    fadeToBlack: false,
+    showMessage: false,
+    extinguishMessage: false,
+    complete: false,
+  });
+  assert.equal(deathPortalOpen.portalProgress, 1);
+  assert.ok(
+    deathPortalOpen.sinkProgress > 0,
+    "the portal must begin swallowing the body once its opening is readable"
+  );
+  assert.equal(deathComplete.sinkProgress, 1);
+  assert.equal(deathComplete.fadeToBlack, true);
+  assert.equal(deathComplete.showMessage, true);
+  assert.equal(deathComplete.extinguishMessage, true);
+  assert.equal(deathComplete.complete, true);
+  const soulHidden = samplePlayerSoulLight(0);
+  const soulReleased = samplePlayerSoulLight(1.1);
+  const soulEscaped = samplePlayerSoulLight(2.8);
+  assert.equal(soulHidden.opacity, 0);
+  assert.ok(
+    soulReleased.opacity > 0.9 && soulReleased.riseProgress > 0,
+    "the player light must detach visibly and travel upward"
+  );
+  assert.equal(soulEscaped.riseProgress, 1);
+  assert.equal(soulEscaped.opacity, 0);
   dodgeAttack.dispose();
   const rightHand = new TransformNode("test-right-hand", scene);
   const fingerBases = [
@@ -972,6 +1012,15 @@ async function verify() {
   assert.equal(pursuitPickupState, "picking-up");
   assert.equal(pursuitCinematicStarts, 1);
   assert.deepEqual(pursuitRoot.position.asArray(), pursuitAxeApproach.asArray());
+  assert.equal(pursuitBehavior.beginRetreatAfterPlayerDeath(), true);
+  assert.equal(pursuitPickupState, "unarmed");
+  assert.equal(pursuitBehavior.currentState, "retreating");
+  const retreatStartZ = pursuitRoot.position.z;
+  pursuitBehavior.update(0.05);
+  assert.ok(
+    pursuitRoot.position.z < retreatStartZ,
+    "death must cancel combat and make the boss walk back toward the house"
+  );
   pursuitBehavior.dispose();
 
   const recoveryRoot = new TransformNode("test-boss-navigation-recovery-root", scene);
@@ -1169,6 +1218,59 @@ async function verify() {
     "a stun must interrupt the active grab"
   );
   damageGrab.dispose();
+
+  const lethalGrabRoot = {
+    position: Vector3.Zero(),
+    rotation: Vector3.Zero(),
+  };
+  let lethalVictimRestrained = false;
+  let lethalGrabPoseActive = false;
+  let lethalGrab!: HermanoMayorGrabAttack;
+  lethalGrab = new HermanoMayorGrabAttack({
+    actor: {
+      root: lethalGrabRoot,
+      setNeckGrabPose: (pose: unknown) => {
+        lethalGrabPoseActive = pose !== null;
+      },
+      getNeckGrabDebugSnapshot: () => null,
+    } as never,
+    playerPosition: () => new Vector3(0, 0, 1),
+    playerNeckPosition: () => new Vector3(0, 1.62, 1),
+    canCapturePlayer: () => true,
+    wasEscapePressed: () => false,
+    setVictimPose: (active) => {
+      lethalVictimRestrained = active;
+    },
+    setEscapeHud: () => {},
+    onGrabStarted: () => {},
+    onGrabDamage: (_fractionOfMaxHealth, kind) => {
+      if (kind === "squeeze") lethalGrab.interrupt("player-unavailable");
+    },
+  });
+  lethalGrab.forceGrab();
+  for (
+    let step = 0;
+    step < 180 && lethalGrab.currentState !== "cooldown";
+    step++
+  ) {
+    lethalGrab.update(0.05, true, 1);
+  }
+  assert.equal(
+    lethalGrab.currentState,
+    "cooldown",
+    "lethal squeeze damage must interrupt the grab synchronously"
+  );
+  assert.equal(
+    lethalVictimRestrained,
+    false,
+    "a lethal squeeze must release the victim without restoring the hold"
+  );
+  assert.equal(
+    lethalGrabPoseActive,
+    false,
+    "a lethal squeeze must not reapply the attacker's arm pose"
+  );
+  lethalGrab.dispose();
 
   const candleLights = [
     {
@@ -1580,7 +1682,7 @@ async function verify() {
   lateHud.dispose();
 
   console.log(
-    "Enemy combat: collision-stall recovery, player-first pursuit, visible 2.5m table-radius axe pickup, exact axe grip, range-guaranteed axe strike, red blade halo, animated player blood hit, 2.5s cooldown, sanity-scaled action dodge, reusable player hit/dodge reactions, dynamic grab escape, 40% cap, candle hunting, 2/18 hits, gray-to-ash death and SVG HUD OK"
+    "Enemy combat: collision-stall recovery, player-first pursuit, visible 2.5m table-radius axe pickup, exact axe grip, range-guaranteed axe strike, red blade halo, animated player blood hit, 2.5s cooldown, sanity-scaled action dodge, reusable player hit/dodge/death reactions, portal swallow timing, dynamic grab escape, 40% cap, candle hunting, 2/18 hits, gray-to-ash death and SVG HUD OK"
   );
 }
 

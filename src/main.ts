@@ -14,6 +14,11 @@ import { GameSession } from "./game/runtime/GameSession";
 import { setupInputPrompts } from "./game/input/InputPrompts";
 import { setupGamepadFeedback } from "./game/input/GamepadFeedback";
 import { CursorController } from "./game/input/CursorController";
+import {
+  CHARACTER_SELECTION_RETURN_EVENT,
+  CHECKPOINT_RESTART_EVENT,
+  type CheckpointRestartRequest,
+} from "./game/runtime/CheckpointRestart";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement | null;
 if (!canvas) throw new Error("No se encontro #renderCanvas");
@@ -218,6 +223,56 @@ async function start() {
       setLoading(1, "No se pudo cambiar de nivel");
     },
   });
+  let checkpointRestartPending = false;
+  const onCheckpointRestartRequested = (event: Event) => {
+    if (checkpointRestartPending) return;
+    const request = (event as CustomEvent<CheckpointRestartRequest>).detail;
+    if (!request || (request.level !== "forest" && request.level !== "theatre")) {
+      return;
+    }
+
+    checkpointRestartPending = true;
+    pauseMenu.setPaused(false);
+    inventory.close();
+    itemInspector.close();
+    showLoading();
+    setLoading(0.02, "Regresando al último recuerdo...");
+    void (async () => {
+      let restarted = false;
+      try {
+        const loaded = await levelManager.loadLevel(
+          request.level,
+          request.entryPoint
+        );
+        await new Promise<void>((resolve) => {
+          loaded.scene.onAfterRenderObservable.addOnce(() => resolve());
+        });
+        restarted = true;
+      } catch (error) {
+        console.error("No se pudo volver al checkpoint", error);
+        setLoading(1, "No se pudo volver al checkpoint");
+      } finally {
+        checkpointRestartPending = false;
+        if (restarted) hideLoading();
+      }
+    })();
+  };
+  window.addEventListener(
+    CHECKPOINT_RESTART_EVENT,
+    onCheckpointRestartRequested
+  );
+  const onCharacterSelectionReturnRequested = () => {
+    pauseMenu.setPaused(false);
+    inventory.close();
+    itemInspector.close();
+    // A clean navigation reconstructs the one-shot selection flow and drops
+    // development query modes that could otherwise bypass it.
+    window.location.replace(window.location.pathname);
+  };
+  window.addEventListener(
+    CHARACTER_SELECTION_RETURN_EVENT,
+    onCharacterSelectionReturnRequested
+  );
 
   const requestedLevel = import.meta.env.DEV
     ? new URLSearchParams(window.location.search).get("level")
@@ -271,6 +326,14 @@ async function start() {
   );
   const scene = initialLevel.scene;
   window.addEventListener("pagehide", () => {
+    window.removeEventListener(
+      CHECKPOINT_RESTART_EVENT,
+      onCheckpointRestartRequested
+    );
+    window.removeEventListener(
+      CHARACTER_SELECTION_RETURN_EVENT,
+      onCharacterSelectionReturnRequested
+    );
     levelManager.dispose();
     gamepadFeedback.dispose();
     unsubscribeCursorDevice();

@@ -38,6 +38,10 @@ import {
 } from "./PlayerAttackSystem";
 import { PlayerLightAbsorptionVFX } from "./PlayerLightAbsorptionVFX";
 import { PlayerHitBloodVFX } from "./PlayerHitBloodVFX";
+import {
+  PlayerDeathSequence,
+  type PlayerDeathChoice,
+} from "./PlayerDeathSequence";
 import { PlayerStatsSystem } from "./PlayerStatsSystem";
 import type { PlayerHitReactionZone } from "./animation/PlayerReaction";
 import {
@@ -124,6 +128,12 @@ const ISO_VINTAGE_PRESET = {
   exposure: 1.34,
 };
 type LoadingProgress = (value: number, text: string) => void;
+export const FOREST_KEY_CHECKPOINT_ENTRY_POINT = "checkpoint:forest-key";
+export const FOREST_START_CHECKPOINT_ENTRY_POINT = "checkpoint:forest-start";
+export type ForestSceneRuntimeOptions = {
+  entryPoint?: string;
+  onPlayerDeathChoice?: (choice: PlayerDeathChoice, entryPoint: string) => void;
+};
 export type QualityProfile = {
   name: "desktop" | "mobile";
   terrainSegments: number;
@@ -278,7 +288,8 @@ export async function createScene(
   input: InputManager,
   sharedPlayerStats?: PlayerStatsSystem,
   prepareOpeningSequence = true,
-  cursorController?: CursorController
+  cursorController?: CursorController,
+  runtimeOptions: ForestSceneRuntimeOptions = {}
 ) {
   onProgress(0.08, "Creando escena...");
   const useAxePickupDebugLighting =
@@ -523,11 +534,18 @@ const playerWorld = new ForestPlayerWorld(terrain, {
   let auraHealth = Number.NaN;
   let auraSanity = Number.NaN;
   let animatedHealth = playerStats.snapshot.health;
+  let playerDeathSequence: PlayerDeathSequence | null = null;
   const unsubscribePlayerStatsAura = playerStats.onChange((event) => {
     if (event.type === "light-orb-absorbed") playerLightAbsorptionVfx.play();
-    if (event.snapshot.health < animatedHealth) player.playHitReaction();
+    const tookDamage = event.snapshot.health < animatedHealth;
+    const wasAlive = animatedHealth > 0;
+    if (tookDamage && event.snapshot.health <= 0 && wasAlive) {
+      player.clearEnemyGrabStruggles();
+      playerDeathSequence?.start();
+    } else if (tookDamage) {
+      player.playHitReaction();
+    }
     animatedHealth = event.snapshot.health;
-    if (event.snapshot.health <= 0) player.clearEnemyGrabStruggles();
     const health = event.snapshot.health / event.snapshot.maxHealth;
     const sanity = event.snapshot.sanity / event.snapshot.maxSanity;
     if (health !== auraHealth) {
@@ -784,6 +802,16 @@ scene.onBeforeRenderObservable.add(() => {
     enemyManager.preload(SHADOW_GRABBER_TYPE),
     enemyManager.preload(SKY_EYE_TYPE),
   ]);
+  const forestKeyCheckpoint = segments.getForestKeyCheckpoint();
+  let forestKeyCheckpointReached =
+    runtimeOptions.entryPoint === FOREST_KEY_CHECKPOINT_ENTRY_POINT;
+  if (forestKeyCheckpointReached) {
+    player.position.set(
+      forestKeyCheckpoint.x,
+      forestKeyCheckpoint.y + player.getCollisionHeight(),
+      forestKeyCheckpoint.z
+    );
+  }
   onProgress(0.89, "Preparando tramo final...");
   const waterfallQuery = new URLSearchParams(window.location.search);
   const fluidWaterfallEnabled = waterfallQuery.get("fluidWaterfall") === "1";
@@ -1013,7 +1041,7 @@ scene.onBeforeRenderObservable.add(() => {
     () => player.getLookRay(),
     hints,
     (type, movementLockSeconds) => player.playInteractionAction(type, movementLockSeconds),
-    () => !player.isNeckGrabbed
+    () => !player.isNeckGrabbed && !playerStats.isDead
   );
   const attackLightSources = [
     ...endTorches.safeLightPositions.map((position) => position.clone()),
@@ -1384,6 +1412,25 @@ scene.onBeforeRenderObservable.add(() => {
   const hermanoMayorGrabHud = new HermanoMayorGrabHud();
   const hermanoMayorAxeDodgeHud = new HermanoMayorAxeDodgeHud();
   const playerHitBloodVfx = new PlayerHitBloodVFX();
+  playerDeathSequence = new PlayerDeathSequence(scene, {
+    player,
+    smokeSystem: blackSmokeWrapSystem,
+    portalQuality: quality.name === "desktop" ? "high" : "low",
+    onStart: () => {
+      attackSystem.cancelCharge();
+      playerStats.cancelLightAbsorption("death");
+      interactSystem.clearMessage();
+      hints.set(null);
+      hermanoMayorBehavior?.beginRetreatAfterPlayerDeath();
+    },
+    onChoice: (choice) =>
+      runtimeOptions.onPlayerDeathChoice?.(
+        choice,
+        forestKeyCheckpointReached
+          ? FOREST_KEY_CHECKPOINT_ENTRY_POINT
+          : FOREST_START_CHECKPOINT_ENTRY_POINT
+      ),
+  });
   const endHouseBounds = segments.getEndHouseBounds();
   const hermanoMayorNavigationProbe = Vector3.Zero();
   const hermanoMayorNeckTarget = Vector3.Zero();
@@ -1478,6 +1525,7 @@ scene.onBeforeRenderObservable.add(() => {
               ignoreSanityModifier: true,
             }
           );
+          if (playerStats.isDead) return;
           player.playReaction({
             kind: "hit",
             sourcePosition: hermanoMayor.root.position,
@@ -1720,7 +1768,7 @@ scene.onBeforeRenderObservable.add(() => {
   let grassWindTimer = 0;
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.max(0, Math.min(engine.getDeltaTime() / 1000, 0.05));
-    if (input.wasPressed("toggleFlashlight")) {
+    if (!playerStats.isDead && input.wasPressed("toggleFlashlight")) {
       setFlashlightEnabled(!flashlightEnabled);
     }
     interactSystem.update(dt);
@@ -1741,6 +1789,12 @@ scene.onBeforeRenderObservable.add(() => {
       0.78
     );
     player.update(dt, playerWorld);
+    if (
+      !forestKeyCheckpointReached &&
+      player.position.z >= forestKeyCheckpoint.z - 1.2
+    ) {
+      forestKeyCheckpointReached = true;
+    }
     if (!hermanoMayorForestCrossingCinematic?.isActive) {
       hermanoMayorBehavior?.update(dt);
     }
@@ -1756,6 +1810,7 @@ scene.onBeforeRenderObservable.add(() => {
       skyEye.maxHealth
     );
     survivalSystem.update(dt);
+    playerDeathSequence?.update(dt);
     waterContactSystem.update(dt);
     waterInteractionVfx.update(dt);
     musicPlayer?.updateListenerPosition(player.position);

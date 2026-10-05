@@ -371,6 +371,14 @@ export class Segments {
     return new Vector3(0, this.terrain.getHeightAt(0, fallbackZ) + 1.4, fallbackZ);
   }
 
+  /** Ground-level respawn point a few steps before the Forest Key. */
+  getForestKeyCheckpoint() {
+    const keyPosition = this.getForestKeyPosition();
+    const x = 0;
+    const z = keyPosition.z - 2.6;
+    return new Vector3(x, this.terrain.getHeightAt(x, z), z);
+  }
+
   getEndHouseMeshes(): readonly AbstractMesh[] {
     return this.endHouseMeshes;
   }
@@ -2177,17 +2185,22 @@ export class Segments {
   }
 
   async loadForestKey() {
+    if ((this.inventory?.getItemCount(FOREST_KEY_ITEM_ID) ?? 0) > 0) return;
+    const position = this.getForestKeyPosition();
+
+    await createCollectibleForestKey(this.scene, {
+      position,
+      rotationY: Math.PI * -0.16,
+    });
+  }
+
+  private getForestKeyPosition() {
     const segmentLength = this.cfg.segmentLength;
     const houseSegment = this.cfg.endHouseSegment ?? 8;
     const keySegment = Math.max(FIRST_NOTE_SEGMENT_ID + 1, houseSegment - 2);
     const z = keySegment * segmentLength + segmentLength * 0.68;
     const x = -0.85;
-    const y = this.terrain.getHeightAt(x, z) + 0.04;
-
-    await createCollectibleForestKey(this.scene, {
-      position: new Vector3(x, y, z),
-      rotationY: Math.PI * -0.16,
-    });
+    return new Vector3(x, this.terrain.getHeightAt(x, z) + 0.04, z);
   }
 
   private registerEndHousePicnicTableColliders(

@@ -28,6 +28,7 @@ const NEARBY_UNSEEN_COOLDOWN = 18;
 export type HermanoMayorBehaviorState =
   | "waiting"
   | "following"
+  | "retreating"
   | "watching"
   | "picking-up-axe"
   | "stunned"
@@ -103,6 +104,8 @@ export class HermanoMayorBehavior {
   private wasPlayerInside: boolean;
   private nearbyUnseenCooldown = 0;
   private axeCinematicActive = false;
+  private retreatingAfterPlayerDeath = false;
+  private readonly retreatTarget = Vector3.Zero();
   private readonly axeApproachTarget = Vector3.Zero();
   private readonly axeWalkableApproachTarget = Vector3.Zero();
   private readonly axeGripTarget = Vector3.Zero();
@@ -143,6 +146,15 @@ export class HermanoMayorBehavior {
     });
     this.audio.setBreathing("idle");
     this.actor.setLookTargetProvider(options.playerPosition);
+    this.retreatTarget.set(
+      (options.houseBounds.min.x + options.houseBounds.max.x) * 0.5,
+      0,
+      (options.houseBounds.min.z + options.houseBounds.max.z) * 0.5
+    );
+    this.retreatTarget.y = options.getGroundHeight(
+      this.retreatTarget.x,
+      this.retreatTarget.z
+    );
     window.addEventListener("bosque:pause", this.onPause);
   }
 
@@ -174,6 +186,11 @@ export class HermanoMayorBehavior {
     this.audio.setAudibility(1 - smoothstep(5, audioRadius, distance));
     this.audio.update(dt);
     if (this.paused) return;
+
+    if (this.retreatingAfterPlayerDeath) {
+      this.updateDeathRetreat(dt);
+      return;
+    }
 
     this.stunRemaining = Math.max(0, this.stunRemaining - dt);
     if (this.stunRemaining > 0) {
@@ -296,6 +313,30 @@ export class HermanoMayorBehavior {
     this.audio.dispose();
   }
 
+  /** Ends combat immediately and sends the boss back toward the house. */
+  public beginRetreatAfterPlayerDeath() {
+    if (this.retreatingAfterPlayerDeath) return false;
+    this.retreatingAfterPlayerDeath = true;
+    this.engaged = false;
+    this.stunRemaining = 0;
+    this.grabAttack.interrupt("player-unavailable");
+    this.actor.setNeckGrabPose(null, true);
+    this.axeAttack.interrupt();
+    if (this.actor.getAxePickupState() === "picking-up") {
+      this.actor.cancelAxePickup();
+      this.finishAxeCinematic(false);
+      this.armed = this.actor.hasAxe;
+    }
+    this.actor.setLookTargetProvider(null);
+    this.navigation.clear();
+    // Attack cancellation restores the authored idle clip. Force the local
+    // locomotion cache to request walk again even if pursuit was walking just
+    // before the lethal frame.
+    this.locomotion = "idle";
+    this.enterState("retreating");
+    return true;
+  }
+
   public forceGrab() {
     if (this.armed || this.actor.getAxePickupState() !== "unarmed") return false;
     return this.grabAttack.forceGrab();
@@ -359,9 +400,9 @@ export class HermanoMayorBehavior {
   private enterState(next: HermanoMayorBehaviorState) {
     if (this.state === next) return;
     this.state = next;
-    if (next === "following") {
+    if (next === "following" || next === "retreating") {
       this.setLocomotion("walk");
-      this.audio.setBreathing("chase");
+      this.audio.setBreathing(next === "following" ? "chase" : "idle");
       return;
     }
     this.setLocomotion("idle");
@@ -559,6 +600,31 @@ export class HermanoMayorBehavior {
     const groundY = this.options.getGroundHeight(root.position.x, root.position.z);
     const groundBlend = Math.min(1, deltaSeconds * 8);
     root.position.y += (groundY - root.position.y) * groundBlend;
+  }
+
+  private updateDeathRetreat(deltaSeconds: number) {
+    const root = this.actor.root;
+    const distance = Math.hypot(
+      this.retreatTarget.x - root.position.x,
+      this.retreatTarget.z - root.position.z
+    );
+    if (distance <= 0.75) {
+      this.navigation.clear();
+      this.enterState("waiting");
+      return;
+    }
+
+    const steeringTarget = this.navigation.getSteeringTarget(
+      root.position,
+      this.retreatTarget,
+      deltaSeconds
+    );
+    if (!steeringTarget) {
+      this.enterState("waiting");
+      return;
+    }
+    this.enterState("retreating");
+    this.moveToward(steeringTarget, distance, deltaSeconds, 0.75);
   }
 
   private isPlayerInside(player: Vector3) {

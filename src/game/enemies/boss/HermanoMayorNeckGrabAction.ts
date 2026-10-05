@@ -216,6 +216,22 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
     }
   }
 
+  /** Removes every procedural grab offset before another action takes over. */
+  public stopImmediately() {
+    this.restoreBasePose();
+    this.requestedEnabled = false;
+    this.blend = 0;
+    this.requestedReach = 0;
+    this.requestedLift = 0;
+    this.requestedVictimStruggle = 0;
+    this.requestedShake = 0;
+    this.reach = 0;
+    this.lift = 0;
+    this.victimStruggle = 0;
+    this.shake = 0;
+    this.elapsed = 0;
+  }
+
   public setPoseState(state: HermanoMayorNeckGrabPoseState) {
     this.requestedReach = clamp01(state.reach);
     this.requestedLift = clamp01(state.lift);

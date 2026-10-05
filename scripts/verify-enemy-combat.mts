@@ -1,14 +1,30 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { Material } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Scene } from "@babylonjs/core/scene";
 import { EnemyHealthHud } from "../src/game/EnemyHealthHud.ts";
 import { BaseEnemyController } from "../src/game/enemies/core/EnemyController.ts";
 import { getDeferredSceneDisposalStats } from "../src/game/enemies/core/DeferredSceneDisposal.ts";
 import { HermanoMayorGrabAttack } from "../src/game/enemies/boss/HermanoMayorGrabAttack.ts";
+import {
+  createHermanoMayorAxeHandle,
+  createHermanoMayorHandGripSocket,
+  HERMANO_MAYOR_AXE_APPROACH_DISTANCE_FROM_GRIP,
+  HERMANO_MAYOR_AXE_GRIP_LOWER_METERS,
+  HERMANO_MAYOR_AXE_GRIP_TOWARD_THUMB_METERS,
+  HERMANO_MAYOR_AXE_WORLD_LENGTH,
+} from "../src/game/enemies/boss/HermanoMayorAxe.ts";
+import {
+  HERMANO_MAYOR_AXE_PICKUP_ANIMATION,
+  HERMANO_MAYOR_AXE_PICKUP_TIMING,
+  HERMANO_MAYOR_AXE_READY_WRIST_ROLL_DEGREES,
+} from "../src/game/enemies/boss/HermanoMayorAxePickupAction.ts";
+import { HermanoMayorBehavior } from "../src/game/enemies/boss/HermanoMayorBehavior.ts";
 import {
   EnemyLifecycleState,
   type EnemyControllerContext,
@@ -26,8 +42,26 @@ import { ShadowGrabberCoordinator } from "../src/game/enemies/shadowGrabber/Shad
 import { DEFAULT_SHADOW_GRABBER_CONFIG } from "../src/game/enemies/shadowGrabber/ShadowGrabberConfig.ts";
 import { ShadowGrabberLightQuery } from "../src/game/enemies/shadowGrabber/ShadowGrabberLightQuery.ts";
 
-// The combat controller emits browser events; EventTarget is enough here.
-Object.assign(globalThis, { window: new EventTarget() });
+// The boss systems emit browser events and own audio elements. Lightweight
+// EventTarget-backed doubles are enough for deterministic NullEngine checks.
+class TestAudio extends EventTarget {
+  loop = false;
+  preload = "";
+  currentTime = 0;
+  volume = 1;
+  muted = false;
+
+  play() {
+    return Promise.resolve();
+  }
+
+  pause() {}
+}
+
+Object.assign(globalThis, {
+  window: new EventTarget(),
+  Audio: TestAudio,
+});
 
 class TestEnemy extends BaseEnemyController {
   public grayProgress = 0;
@@ -100,6 +134,487 @@ function hit(enemy: BaseEnemyController, damage = 1) {
 }
 
 async function verify() {
+  const axeRoot = new TransformNode("test-axe-root", scene);
+  axeRoot.position.set(4, 1, 9);
+  const axeMesh = MeshBuilder.CreateBox(
+    "test-axe-mesh",
+    { width: 0.1, height: 2, depth: 0.1 },
+    scene
+  );
+  axeMesh.parent = axeRoot;
+  const disposedPickupEffects: string[] = [];
+  const pickupSurfaceCenter = new Vector3(4, 1, 10);
+  const axe = createHermanoMayorAxeHandle({
+    scene,
+    root: axeRoot,
+    meshes: [axeMesh],
+    sourceBounds: {
+      min: new Vector3(-0.05, -1, -0.05),
+      max: new Vector3(0.05, 1, 0.05),
+    },
+    pickupSurfaceCenter,
+    interaction: { dispose: () => disposedPickupEffects.push("interaction") },
+    pickupLight: { dispose: () => disposedPickupEffects.push("light") },
+    pickupFlare: { dispose: () => disposedPickupEffects.push("flare") },
+  });
+  const axeGripBeforePickup = Vector3.Zero();
+  const axeApproachBeforePickup = Vector3.Zero();
+  assert.equal(axe.getGripWorldPositionToRef(axeGripBeforePickup), true);
+  assert.equal(
+    axe.getPickupApproachWorldPositionToRef(axeApproachBeforePickup),
+    true
+  );
+  assert.ok(
+    Math.abs(
+      Math.hypot(
+        axeApproachBeforePickup.x - axeGripBeforePickup.x,
+        axeApproachBeforePickup.z - axeGripBeforePickup.z
+      ) - HERMANO_MAYOR_AXE_APPROACH_DISTANCE_FROM_GRIP
+    ) < 0.000001,
+    "the authored table approach must sit at a fixed distance beyond the handle base"
+  );
+  assert.ok(
+    Vector3.Dot(
+      axeApproachBeforePickup.subtract(axeGripBeforePickup),
+      axeGripBeforePickup.subtract(pickupSurfaceCenter)
+    ) > 0,
+    "the table approach must extend outward from the tabletop center"
+  );
+  const handSocket = new TransformNode("test-hand-socket", scene);
+  handSocket.position.set(3, 2, 1);
+  // Reproduce the negative determinant introduced by the boss GLB root.
+  handSocket.scaling.set(0.75, 0.75, -0.75);
+  axeMesh.computeWorldMatrix(true);
+  const axeDeterminantBeforePickup = axeMesh.getWorldMatrix().determinant();
+  assert.equal(axe.attachToHandSocket(handSocket), true);
+  assert.equal(axe.attached, true);
+  assert.deepEqual(disposedPickupEffects.sort(), ["flare", "interaction", "light"]);
+  const axeGrip = Vector3.Zero();
+  axe.getGripWorldPositionToRef(axeGrip);
+  handSocket.computeWorldMatrix(true);
+  assert.ok(
+    Vector3.Distance(
+      axeGrip,
+      handSocket.getAbsolutePosition().add(
+        new Vector3(0, -HERMANO_MAYOR_AXE_GRIP_LOWER_METERS, 0)
+      ).add(
+        Vector3.TransformNormal(Vector3.Right(), handSocket.getWorldMatrix())
+          .normalize()
+          .scale(HERMANO_MAYOR_AXE_GRIP_TOWARD_THUMB_METERS)
+      )
+    ) < 0.000001,
+    "the axe grip must sit just below the palm socket"
+  );
+  axeRoot.computeWorldMatrix(true);
+  const axeWorldLength = Vector3.Distance(
+    Vector3.TransformCoordinates(new Vector3(0, -1, 0), axeRoot.getWorldMatrix()),
+    Vector3.TransformCoordinates(new Vector3(0, 1, 0), axeRoot.getWorldMatrix())
+  );
+  assert.ok(
+    Math.abs(axeWorldLength - HERMANO_MAYOR_AXE_WORLD_LENGTH) < 0.000001,
+    "the equipped axe must retain its length at any angle"
+  );
+  assert.equal(
+    Math.sign(axeMesh.getWorldMatrix().determinant()),
+    Math.sign(axeDeterminantBeforePickup),
+    "the attachment bridge must preserve the visible axe handedness"
+  );
+  assert.equal(
+    axe.getAttachmentDebugSnapshot(handSocket).lastAttachment
+      ?.handednessCompensated,
+    true,
+    "a mirrored hand hierarchy must activate the handedness bridge"
+  );
+  assert.equal(
+    HERMANO_MAYOR_AXE_PICKUP_ANIMATION.timeline.at(-1)?.time,
+    HERMANO_MAYOR_AXE_PICKUP_TIMING.settleEnd
+  );
+  assert.ok(
+    HERMANO_MAYOR_AXE_PICKUP_TIMING.settleEnd >= 4.5,
+    "the pickup cinematic must leave time to read hand contact, grip and lift"
+  );
+  assert.ok(
+    HERMANO_MAYOR_AXE_PICKUP_TIMING.gripEnd -
+      HERMANO_MAYOR_AXE_PICKUP_TIMING.palmContactAt >=
+      0.75,
+    "the fingers must visibly close after the palm reaches the handle"
+  );
+  assert.equal(
+    HERMANO_MAYOR_AXE_READY_WRIST_ROLL_DEGREES,
+    45,
+    "the equipped wrist must hold the index-thumb line at a forty-five-degree carry angle"
+  );
+  assert.ok(
+    Object.keys(HERMANO_MAYOR_AXE_PICKUP_ANIMATION.poses["axe-grip"].bones)
+      .filter((bone) => bone.includes("RightHand"))
+      .length >= 16,
+    "the grip pose must curl the hand and every right-hand finger chain"
+  );
+  const rightHand = new TransformNode("test-right-hand", scene);
+  const fingerBases = [
+    [3.758, 10.071, -0.678],
+    [1.224, 9.739, -0.994],
+    [-0.921, 9.879, -0.095],
+    [-2.793, 9.564, 0.414],
+  ].map(([x, y, z], index) => {
+    const fingerBase = new TransformNode(`test-finger-base-${index}`, scene);
+    fingerBase.parent = rightHand;
+    fingerBase.position.set(x, y, z);
+    return fingerBase;
+  });
+  const anatomicalGripSocket = createHermanoMayorHandGripSocket(
+    scene,
+    rightHand,
+    fingerBases
+  );
+  assert.ok(
+    anatomicalGripSocket.position.x > 2 &&
+      anatomicalGripSocket.position.x < 2.25,
+    "the handle must enter through the index-thumb web instead of the finger center"
+  );
+  assert.ok(
+    anatomicalGripSocket.position.z > 1 &&
+      anatomicalGripSocket.position.z < 1.5,
+    "the handle must sit inside the thumb web instead of floating in front of the palm"
+  );
+  assert.ok(
+    HERMANO_MAYOR_AXE_PICKUP_ANIMATION.poses["axe-grip"].bones[
+      "mixamorig:RightHandThumb1"
+    ].rotationOffset[2] < 0,
+    "the thumb must close across the handle instead of opening away from it"
+  );
+  for (const finger of ["Index", "Middle", "Ring", "Pinky"]) {
+    for (const phalanx of [1, 2, 3]) {
+      const bone = `mixamorig:RightHand${finger}${phalanx}`;
+      assert.ok(
+        HERMANO_MAYOR_AXE_PICKUP_ANIMATION.poses["axe-grip"].bones[
+          bone
+        ].rotationOffset[0] > 0,
+        `${bone} must curl toward the palm on positive local X`
+      );
+    }
+  }
+  const readyWristRotation =
+    HERMANO_MAYOR_AXE_PICKUP_ANIMATION.poses["axe-ready"].bones[
+      "mixamorig:RightHand"
+    ].rotationOffset;
+  rightHand.rotationQuaternion = new Quaternion(...readyWristRotation);
+  // Reconstruct the boss's actual rest hierarchy and ready pose. This catches
+  // an axe that points forward on a neutral test hand but backward on the GLB.
+  const bossGlb = readFileSync(
+    "public/assets/models/enemies/boss/Hermano_mayor_Final_NLA.glb"
+  );
+  const bossGltf = JSON.parse(
+    bossGlb.subarray(20, 20 + bossGlb.readUInt32LE(12)).toString()
+  ) as {
+    nodes: {
+      name?: string;
+      translation?: number[];
+      rotation?: number[];
+      scale?: number[];
+      children?: number[];
+    }[];
+  };
+  const bossNodes = bossGltf.nodes.map((source, index) => {
+    const node = new TransformNode(source.name ?? `boss-rest-${index}`, scene);
+    node.position.copyFrom(Vector3.FromArray(source.translation ?? [0, 0, 0]));
+    node.rotationQuaternion = Quaternion.FromArray(
+      source.rotation ?? [0, 0, 0, 1]
+    );
+    node.scaling.copyFrom(Vector3.FromArray(source.scale ?? [1, 1, 1]));
+    return node;
+  });
+  bossGltf.nodes.forEach((source, index) => {
+    for (const child of source.children ?? []) bossNodes[child].parent = bossNodes[index];
+  });
+  const mirroredImportRoot = new TransformNode("boss-test-import-root", scene);
+  mirroredImportRoot.scaling.z = -1;
+  bossNodes.find((node) => node.name === "HermanoMayor_Armature")!.parent =
+    mirroredImportRoot;
+  for (const [boneName, bonePose] of Object.entries(
+    HERMANO_MAYOR_AXE_PICKUP_ANIMATION.poses["axe-ready"].bones
+  )) {
+    const node = bossNodes.find((candidate) => candidate.name === boneName);
+    if (!node) continue;
+    node.rotationQuaternion = node.rotationQuaternion!.multiply(
+      new Quaternion(...bonePose.rotationOffset)
+    );
+  }
+  const bossHand = bossNodes.find(
+    (node) => node.name === "mixamorig:RightHand"
+  )!;
+  const bossHandSocket = createHermanoMayorHandGripSocket(scene, bossHand);
+  const wristRotationBeforeAttachment = bossHand.rotationQuaternion!.clone();
+  const forwardAxeRoot = new TransformNode("test-forward-axe-root", scene);
+  const forwardAxeMesh = MeshBuilder.CreateBox(
+    "test-forward-axe-mesh",
+    { width: 0.1, height: 2, depth: 0.1 },
+    scene
+  );
+  forwardAxeMesh.parent = forwardAxeRoot;
+  const forwardAxe = createHermanoMayorAxeHandle({
+    scene,
+    root: forwardAxeRoot,
+    meshes: [forwardAxeMesh],
+    sourceBounds: {
+      min: new Vector3(-0.05, -1, -0.05),
+      max: new Vector3(0.05, 1, 0.05),
+    },
+  });
+  assert.equal(forwardAxe.attachToHandSocket(bossHandSocket), true);
+  assert.ok(
+    Math.abs(Quaternion.Dot(wristRotationBeforeAttachment, bossHand.rotationQuaternion!)) >
+      0.999999,
+    "turning the axe must not rotate the boss's wrist"
+  );
+  const metalDirection = Vector3.Zero();
+  assert.equal(
+    forwardAxe.getGripWorldAxesToRef(Vector3.Zero(), metalDirection, Vector3.Zero()),
+    true
+  );
+  assert.ok(
+    metalDirection.normalize().z < -0.65,
+    "the metal head must point toward the imported character's visible front"
+  );
+  assert.ok(
+    metalDirection.y < -0.45,
+    "the metal head must descend from the grip"
+  );
+  const bossGripPosition = Vector3.Zero();
+  forwardAxe.getGripWorldPositionToRef(bossGripPosition);
+  bossHandSocket.computeWorldMatrix(true);
+  assert.ok(
+    Vector3.Distance(
+      bossGripPosition,
+      bossHandSocket.getAbsolutePosition().add(
+        new Vector3(0, -HERMANO_MAYOR_AXE_GRIP_LOWER_METERS, 0)
+      ).add(
+        Vector3.TransformNormal(Vector3.Right(), bossHandSocket.getWorldMatrix())
+          .normalize()
+          .scale(HERMANO_MAYOR_AXE_GRIP_TOWARD_THUMB_METERS)
+      )
+    ) < 0.000001,
+    "the wooden grip must sit just below the boss's palm"
+  );
+
+  const pickupRoot = new TransformNode("test-axe-pickup-root", scene);
+  const pickupApproach = new Vector3(2, 0, 3);
+  const pickupGrip = new Vector3(2, 1, 4);
+  let pickupState: "unarmed" | "picking-up" = "unarmed";
+  let cinematicStartCount = 0;
+  const pickupActor = {
+    root: pickupRoot,
+    meshes: [],
+    hasAxe: false,
+    hasAxePickupTarget: true,
+    playLocomotion: () => {},
+    setLookTargetProvider: () => {},
+    setNeckGrabPose: () => {},
+    getNeckGrabDebugSnapshot: () => null,
+    getAxePickupState: () => pickupState,
+    getAxeApproachPositionToRef: (result: Vector3) => {
+      result.copyFrom(pickupApproach);
+      return true;
+    },
+    getAxeGripPositionToRef: (result: Vector3) => {
+      result.copyFrom(pickupGrip);
+      return true;
+    },
+    startAxePickup: () => {
+      pickupState = "picking-up";
+      return true;
+    },
+    cancelAxePickup: () => {
+      pickupState = "unarmed";
+      return true;
+    },
+    getAxePickupDebugSnapshot: () => ({ state: pickupState }),
+  } as never;
+  const pickupBehavior = new HermanoMayorBehavior({
+    actor: pickupActor,
+    playerPosition: () => new Vector3(8, 0, 8),
+    playerNeckPosition: () => new Vector3(8, 1.6, 8),
+    houseBounds: { min: new Vector3(-1, -1, -1), max: new Vector3(1, 1, 1) },
+    visionRange: 30,
+    getGroundHeight: () => 0,
+    isBlocked: () => false,
+    hasLineOfSight: () => true,
+    isVisibleToPlayer: () => true,
+    canGrabPlayer: () => true,
+    wasGrabEscapePressed: () => false,
+    setGrabVictimPose: () => {},
+    setGrabEscapeHud: () => {},
+    onGrabStarted: () => {},
+    onGrabDamage: () => {},
+    beginAxePickupCinematic: () => {
+      cinematicStartCount += 1;
+      return true;
+    },
+  });
+  assert.equal(
+    pickupBehavior.forceAxePickup(),
+    true,
+    "reaching the axe table must start pickup even when the boss arrives misaligned"
+  );
+  assert.equal(cinematicStartCount, 1);
+  assert.equal(pickupState, "picking-up");
+  assert.ok(
+    Math.abs(pickupRoot.rotation.y - Math.atan2(0, 1)) < 0.000001,
+    "the table transition must align the boss exactly toward the axe"
+  );
+  pickupBehavior.dispose();
+
+  const stalledRoot = new TransformNode("test-stalled-axe-approach-root", scene);
+  stalledRoot.position.set(0, 0, -0.6);
+  stalledRoot.rotation.y = Math.PI;
+  const stalledApproach = Vector3.Zero();
+  const stalledGrip = new Vector3(0, 1, 1);
+  let stalledPickupState: "unarmed" | "picking-up" = "unarmed";
+  let stalledPlayerPosition = Vector3.Zero();
+  let stalledCinematicStarts = 0;
+  const stalledBehavior = new HermanoMayorBehavior({
+    actor: {
+      root: stalledRoot,
+      meshes: [],
+      hasAxe: false,
+      hasAxePickupTarget: true,
+      playLocomotion: () => {},
+      setLookTargetProvider: () => {},
+      setNeckGrabPose: () => {},
+      getNeckGrabDebugSnapshot: () => null,
+      getAxePickupState: () => stalledPickupState,
+      getAxeApproachPositionToRef: (result: Vector3) => {
+        result.copyFrom(stalledApproach);
+        return true;
+      },
+      getAxeGripPositionToRef: (result: Vector3) => {
+        result.copyFrom(stalledGrip);
+        return true;
+      },
+      startAxePickup: () => {
+        stalledPickupState = "picking-up";
+        return true;
+      },
+      cancelAxePickup: () => {
+        stalledPickupState = "unarmed";
+        return true;
+      },
+      getAxePickupDebugSnapshot: () => ({ state: stalledPickupState }),
+    } as never,
+    playerPosition: () => stalledPlayerPosition,
+    playerNeckPosition: () => stalledPlayerPosition.add(new Vector3(0, 1.6, 0)),
+    houseBounds: { min: new Vector3(-1, -1, -1), max: new Vector3(1, 1, 1) },
+    visionRange: 30,
+    getGroundHeight: () => 0,
+    // Reproduce the table edge case: the authored goal is open, but every
+    // sampled point leading to it is rejected by conservative clearance.
+    isBlocked: (x, z) => Math.hypot(x, z) > 0.001,
+    hasLineOfSight: () => true,
+    isVisibleToPlayer: () => true,
+    canGrabPlayer: () => false,
+    wasGrabEscapePressed: () => false,
+    setGrabVictimPose: () => {},
+    setGrabEscapeHud: () => {},
+    onGrabStarted: () => {},
+    onGrabDamage: () => {},
+    beginAxePickupCinematic: () => {
+      stalledCinematicStarts += 1;
+      return true;
+    },
+  });
+  stalledBehavior.update(0.05);
+  stalledPlayerPosition = new Vector3(0, 0, -2);
+  for (let step = 0; step < 50 && stalledPickupState === "unarmed"; step++) {
+    stalledBehavior.update(0.05);
+  }
+  assert.equal(
+    stalledPickupState,
+    "picking-up",
+    "a conservative table collider must not leave the boss stuck beside the axe"
+  );
+  assert.equal(stalledCinematicStarts, 1);
+  stalledBehavior.dispose();
+
+  const blockedGoalRoot = new TransformNode("test-blocked-axe-goal-root", scene);
+  blockedGoalRoot.position.set(0, 0, -1.4);
+  blockedGoalRoot.rotation.y = Math.PI;
+  const blockedGoalApproach = Vector3.Zero();
+  const blockedGoalGrip = new Vector3(0, 1, 0.6);
+  let blockedGoalPlayerPosition = Vector3.Zero();
+  let blockedGoalPickupState: "unarmed" | "picking-up" = "unarmed";
+  let blockedGoalCinematicStarts = 0;
+  const blockedGoalBehavior = new HermanoMayorBehavior({
+    actor: {
+      root: blockedGoalRoot,
+      meshes: [],
+      hasAxe: false,
+      hasAxePickupTarget: true,
+      playLocomotion: () => {},
+      setLookTargetProvider: () => {},
+      setNeckGrabPose: () => {},
+      getNeckGrabDebugSnapshot: () => null,
+      getAxePickupState: () => blockedGoalPickupState,
+      getAxeApproachPositionToRef: (result: Vector3) => {
+        result.copyFrom(blockedGoalApproach);
+        return true;
+      },
+      getAxeGripPositionToRef: (result: Vector3) => {
+        result.copyFrom(blockedGoalGrip);
+        return true;
+      },
+      startAxePickup: () => {
+        blockedGoalPickupState = "picking-up";
+        return true;
+      },
+      cancelAxePickup: () => {
+        blockedGoalPickupState = "unarmed";
+        return true;
+      },
+      getAxePickupDebugSnapshot: () => ({ state: blockedGoalPickupState }),
+    } as never,
+    playerPosition: () => blockedGoalPlayerPosition,
+    playerNeckPosition: () =>
+      blockedGoalPlayerPosition.add(new Vector3(0, 1.6, 0)),
+    houseBounds: { min: new Vector3(-1, -1, -1), max: new Vector3(1, 1, 1) },
+    visionRange: 30,
+    getGroundHeight: () => 0,
+    // The authored point is inside water/clearance, while the boss is already
+    // standing on the closest valid dry point returned by navigation.
+    isBlocked: (_x, z) => z > -0.2,
+    hasLineOfSight: () => true,
+    isVisibleToPlayer: () => true,
+    canGrabPlayer: () => false,
+    wasGrabEscapePressed: () => false,
+    setGrabVictimPose: () => {},
+    setGrabEscapeHud: () => {},
+    onGrabStarted: () => {},
+    onGrabDamage: () => {},
+    beginAxePickupCinematic: () => {
+      blockedGoalCinematicStarts += 1;
+      return true;
+    },
+  });
+  blockedGoalBehavior.update(0.05);
+  blockedGoalPlayerPosition = new Vector3(0, 0, -2);
+  for (
+    let step = 0;
+    step < 50 && blockedGoalPickupState === "unarmed";
+    step++
+  ) {
+    blockedGoalBehavior.update(0.05);
+  }
+  assert.equal(
+    blockedGoalPickupState,
+    "picking-up",
+    "a blocked authored approach must trigger pickup from navigation's safe goal"
+  );
+  assert.equal(blockedGoalCinematicStarts, 1);
+  assert.ok(
+    blockedGoalRoot.position.z <= -0.2,
+    "the cinematic staging cut must keep the boss on navigation's safe side of the table"
+  );
+  blockedGoalBehavior.dispose();
+
   const grabberRoot = {
     position: Vector3.Zero(),
     rotation: Vector3.Zero(),
@@ -108,6 +623,7 @@ async function verify() {
   const grabTargetNeck = new Vector3(0, 1.62, 1.7);
   let latestGrabPose: { shake: number } | null = null;
   let victimRestrained = false;
+  const grabDamageFractions: number[] = [];
   const neckGrab = new HermanoMayorGrabAttack({
     actor: {
       root: grabberRoot,
@@ -125,7 +641,9 @@ async function verify() {
     },
     setEscapeHud: () => {},
     onGrabStarted: () => {},
-    onGrabDamage: () => {},
+    onGrabDamage: (fractionOfMaxHealth) => {
+      grabDamageFractions.push(fractionOfMaxHealth);
+    },
   });
   for (let step = 0; step < 25; step++) neckGrab.update(0.05, true, 1.7);
   assert.equal(
@@ -162,7 +680,71 @@ async function verify() {
     (latestGrabPose?.shake ?? 0) > 0,
     "the attacker shake must begin during the lift"
   );
+  assert.deepEqual(
+    grabDamageFractions,
+    [0.05],
+    "capture starts with five percent max-health damage"
+  );
+  neckGrab.simulateEscapePress();
+  neckGrab.update(0.05, true, 1);
+  const progressAfterPress = neckGrab.getDebugSnapshot().escapeProgress;
+  for (let step = 0; step < 8; step++) neckGrab.update(0.05, true, 1);
+  assert.ok(
+    neckGrab.getDebugSnapshot().escapeProgress < progressAfterPress,
+    "escape progress must drain while the player stops pressing"
+  );
+  for (let press = 0; press < 12 && neckGrab.isRestrainingPlayer; press++) {
+    neckGrab.simulateEscapePress();
+    neckGrab.update(0.05, true, 1);
+  }
+  assert.equal(
+    neckGrab.currentState,
+    "releasing",
+    "a sustained fast input cadence must release the player"
+  );
   neckGrab.dispose();
+
+  const damageRoot = {
+    position: Vector3.Zero(),
+    rotation: Vector3.Zero(),
+  };
+  const damageFractions: number[] = [];
+  let damageVictimRestrained = false;
+  const damageGrab = new HermanoMayorGrabAttack({
+    actor: {
+      root: damageRoot,
+      setNeckGrabPose: () => {},
+      getNeckGrabDebugSnapshot: () => null,
+    } as never,
+    playerPosition: () => new Vector3(0, 0, 1),
+    playerNeckPosition: () => new Vector3(0, 1.62, 1),
+    canCapturePlayer: () => true,
+    wasEscapePressed: () => false,
+    setVictimPose: (active) => {
+      damageVictimRestrained = active;
+    },
+    setEscapeHud: () => {},
+    onGrabStarted: () => {},
+    onGrabDamage: (fractionOfMaxHealth) => {
+      damageFractions.push(fractionOfMaxHealth);
+    },
+  });
+  damageGrab.forceGrab();
+  for (let step = 0; step < 180; step++) damageGrab.update(0.05, true, 1);
+  assert.ok(damageVictimRestrained);
+  assert.ok(
+    Math.abs(damageFractions.reduce((sum, damage) => sum + damage, 0) - 0.4) <
+      0.000001,
+    "one neck grab must never remove more than forty percent max health"
+  );
+  assert.equal(damageGrab.getDebugSnapshot().grabDamageFraction, 0.4);
+  damageGrab.interrupt("stunned");
+  assert.equal(
+    damageVictimRestrained,
+    false,
+    "a stun must interrupt the active grab"
+  );
+  damageGrab.dispose();
 
   const candleLights = [
     {
@@ -573,7 +1155,9 @@ async function verify() {
   }
   lateHud.dispose();
 
-  console.log("Enemy combat: candle hunting, 2/18 hits, gray-to-ash death and SVG HUD OK");
+  console.log(
+    "Enemy combat: collision-safe table axe cinematic, exact axe grip, dynamic grab escape, 40% cap, candle hunting, 2/18 hits, gray-to-ash death and SVG HUD OK"
+  );
 }
 
 await verify();

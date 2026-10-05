@@ -121,6 +121,9 @@ const engine = new Engine(renderCanvas, performanceTier === "desktop", {
 engine.setHardwareScalingLevel(hardwareScaling);
 
 async function start() {
+  const debugAxePickupMode =
+    import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).get("debugAxePickup") === "1";
   let debugBootstrap: typeof import("./debug/DebugBootstrap") | null = null;
   if (import.meta.env.DEV) {
     debugBootstrap = await import("./debug/DebugBootstrap");
@@ -145,10 +148,17 @@ async function start() {
 
   armDesktopControlFromStartGesture();
   const musicPlayer = setupMusicPlayer();
-  const selectedCharacter = await setupCharacterSelection({
-    input,
-    requireInitialInput: !isTouchFirstDevice(),
-  });
+  const selectedCharacter = debugAxePickupMode
+    ? "lautaro"
+    : await setupCharacterSelection({
+        input,
+        requireInitialInput: !isTouchFirstDevice(),
+      });
+  if (debugAxePickupMode) {
+    const selection = document.getElementById("characterSelection");
+    selection?.classList.add("hidden");
+    selection?.setAttribute("aria-hidden", "true");
+  }
   document.body.classList.remove("character-selecting");
   showLoading();
   const inputPrompts = setupInputPrompts(input);
@@ -345,7 +355,20 @@ async function start() {
   });
 
   await firstFrameReady;
-  if (initialLevel.playOpeningSequence) {
+  if (debugAxePickupMode) {
+    await initialLevel.playOpeningSequence?.();
+    hideLoading();
+    const debug = (
+      globalThis as typeof globalThis & {
+        __bosqueHermanoMayorDebug?: {
+          setAxeDebugVisible(visible: boolean): void;
+          forceAxePickup(): boolean;
+        };
+      }
+    ).__bosqueHermanoMayorDebug;
+    debug?.setAxeDebugVisible(true);
+    debug?.forceAxePickup();
+  } else if (initialLevel.playOpeningSequence) {
     await playOpeningPresentation(initialLevel.playOpeningSequence);
   } else {
     hideLoading();

@@ -14,6 +14,7 @@ export type HermanoMayorGrabReleaseReason =
   | "escaped"
   | "missed"
   | "player-unavailable"
+  | "stunned"
   | "disposed";
 
 export type HermanoMayorGrabAttackOptions = {
@@ -28,14 +29,12 @@ export type HermanoMayorGrabAttackOptions = {
     lift: number,
     escapeProgress: number
   ) => void;
-  setEscapeHud: (
-    active: boolean,
-    progress: number,
-    presses: number,
-    requiredPresses: number
-  ) => void;
+  setEscapeHud: (active: boolean, progress: number) => void;
   onGrabStarted: () => void;
-  onGrabDamage: (kind: "initial" | "squeeze") => void;
+  onGrabDamage: (
+    fractionOfMaxHealth: number,
+    kind: "initial" | "squeeze"
+  ) => void;
   onGrabEnded?: (reason: HermanoMayorGrabReleaseReason) => void;
 };
 
@@ -49,7 +48,11 @@ const LIFT_SECONDS = 0.58;
 const RELEASE_SECONDS = 0.44;
 const COOLDOWN_SECONDS = 4.8;
 const SQUEEZE_INTERVAL_SECONDS = 1;
-const REQUIRED_ESCAPE_PRESSES = 10;
+const ESCAPE_PROGRESS_PER_PRESS = 0.16;
+const ESCAPE_PROGRESS_DECAY_PER_SECOND = 0.22;
+const INITIAL_GRAB_DAMAGE_FRACTION = 0.05;
+const SQUEEZE_DAMAGE_FRACTION = 0.07;
+const MAX_GRAB_DAMAGE_FRACTION = 0.4;
 const FACE_TURN_SPEED = (320 * Math.PI) / 180;
 
 /** Combat lifecycle for the Hermano Mayor's neck-grab attack. */
@@ -60,6 +63,7 @@ export class HermanoMayorGrabAttack {
   private squeezeTimer = 0;
   private escapePresses = 0;
   private escapeProgress = 0;
+  private grabDamageFraction = 0;
   private captured = false;
   private disposed = false;
   private forceRequested = false;
@@ -126,7 +130,7 @@ export class HermanoMayorGrabAttack {
     }
 
     if (this.state === "lifting") {
-      this.consumeEscapePress();
+      this.updateEscape(dt);
       if (this.escapeProgress >= 1) {
         this.beginRelease("escaped");
         return true;
@@ -142,7 +146,7 @@ export class HermanoMayorGrabAttack {
     }
 
     if (this.state === "holding") {
-      this.consumeEscapePress();
+      this.updateEscape(dt);
       if (this.escapeProgress >= 1) {
         this.beginRelease("escaped");
         return true;
@@ -150,7 +154,7 @@ export class HermanoMayorGrabAttack {
       this.squeezeTimer += dt;
       while (this.squeezeTimer >= SQUEEZE_INTERVAL_SECONDS) {
         this.squeezeTimer -= SQUEEZE_INTERVAL_SECONDS;
-        this.options.onGrabDamage("squeeze");
+        this.applyGrabDamage("squeeze");
       }
       this.setActorPose(1, 1, this.escapeProgress, 1);
       this.updateVictim(1);
@@ -175,6 +179,17 @@ export class HermanoMayorGrabAttack {
     return true;
   }
 
+  public interrupt(reason: HermanoMayorGrabReleaseReason = "stunned") {
+    if (this.disposed) return false;
+    const wasActive = this.state !== "idle" && this.state !== "cooldown";
+    this.forceRequested = false;
+    if (this.captured) this.releaseVictim(reason);
+    this.options.actor.setNeckGrabPose(null);
+    this.cooldownRemaining = COOLDOWN_SECONDS;
+    this.enterState("cooldown");
+    return wasActive;
+  }
+
   public simulateEscapePress() {
     if (!this.isRestrainingPlayer) return false;
     this.simulatedEscapePresses++;
@@ -188,8 +203,11 @@ export class HermanoMayorGrabAttack {
       cooldownRemaining: this.cooldownRemaining,
       captured: this.captured,
       escapePresses: this.escapePresses,
-      requiredEscapePresses: REQUIRED_ESCAPE_PRESSES,
       escapeProgress: this.escapeProgress,
+      escapeProgressPerPress: ESCAPE_PROGRESS_PER_PRESS,
+      escapeDecayPerSecond: ESCAPE_PROGRESS_DECAY_PER_SECOND,
+      grabDamageFraction: this.grabDamageFraction,
+      maxGrabDamageFraction: MAX_GRAB_DAMAGE_FRACTION,
       attackerPose: {
         reach: this.actorPose.reach,
         lift: this.actorPose.lift,
@@ -216,9 +234,10 @@ export class HermanoMayorGrabAttack {
     this.captured = false;
     this.escapePresses = 0;
     this.escapeProgress = 0;
+    this.grabDamageFraction = 0;
     this.simulatedEscapePresses = 0;
     this.squeezeTimer = 0;
-    this.options.setEscapeHud(false, 0, 0, REQUIRED_ESCAPE_PRESSES);
+    this.options.setEscapeHud(false, 0);
     this.enterState("windup");
     this.setActorPose(0, 0, 0, 0);
   }
@@ -231,26 +250,44 @@ export class HermanoMayorGrabAttack {
     this.captured = true;
     this.escapePresses = 0;
     this.escapeProgress = 0;
+    this.grabDamageFraction = 0;
     this.options.onGrabStarted();
-    this.options.onGrabDamage("initial");
-    this.options.setEscapeHud(true, 0, 0, REQUIRED_ESCAPE_PRESSES);
+    this.applyGrabDamage("initial");
+    this.options.setEscapeHud(true, 0);
     this.enterState("lifting");
     this.updateVictim(0);
   }
 
-  private consumeEscapePress() {
+  private updateEscape(dt: number) {
     if (!this.captured) return;
-    const simulated = this.simulatedEscapePresses > 0;
-    if (!simulated && !this.options.wasEscapePressed()) return;
-    if (simulated) this.simulatedEscapePresses--;
-    this.escapePresses = Math.min(REQUIRED_ESCAPE_PRESSES, this.escapePresses + 1);
-    this.escapeProgress = this.escapePresses / REQUIRED_ESCAPE_PRESSES;
-    this.options.setEscapeHud(
-      true,
-      this.escapeProgress,
-      this.escapePresses,
-      REQUIRED_ESCAPE_PRESSES
+    this.escapeProgress = Math.max(
+      0,
+      this.escapeProgress - ESCAPE_PROGRESS_DECAY_PER_SECOND * dt
     );
+    const simulated = this.simulatedEscapePresses > 0;
+    if (simulated || this.options.wasEscapePressed()) {
+      if (simulated) this.simulatedEscapePresses--;
+      this.escapePresses++;
+      this.escapeProgress = Math.min(
+        1,
+        this.escapeProgress + ESCAPE_PROGRESS_PER_PRESS
+      );
+    }
+    this.options.setEscapeHud(true, this.escapeProgress);
+  }
+
+  private applyGrabDamage(kind: "initial" | "squeeze") {
+    const requested =
+      kind === "initial"
+        ? INITIAL_GRAB_DAMAGE_FRACTION
+        : SQUEEZE_DAMAGE_FRACTION;
+    const applied = Math.min(
+      requested,
+      MAX_GRAB_DAMAGE_FRACTION - this.grabDamageFraction
+    );
+    if (applied <= 0) return;
+    this.grabDamageFraction += applied;
+    this.options.onGrabDamage(applied, kind);
   }
 
   private updateVictim(lift: number) {
@@ -276,7 +313,7 @@ export class HermanoMayorGrabAttack {
       0,
       this.escapeProgress
     );
-    this.options.setEscapeHud(false, this.escapeProgress, 0, REQUIRED_ESCAPE_PRESSES);
+    this.options.setEscapeHud(false, this.escapeProgress);
     this.options.onGrabEnded?.(reason);
   }
 

@@ -20,6 +20,12 @@ import {
   type HermanoMayorNeckGrabPoseState,
   type HermanoMayorNeckTargetProvider,
 } from "./HermanoMayorNeckGrabAction";
+import type { HermanoMayorAxeHandle } from "./HermanoMayorAxe";
+import {
+  HERMANO_MAYOR_AXE_PICKUP_ACTION,
+  HermanoMayorAxePickupAction,
+  type HermanoMayorAxePickupState,
+} from "./HermanoMayorAxePickupAction";
 import { patchHermanoMayorMaterial } from "./HermanoMayorMaterials";
 
 export const HERMANO_MAYOR_MODEL_ROOT_URL = "/assets/models/enemies/boss/";
@@ -40,11 +46,25 @@ export type HermanoMayorPlacement = {
 export type HermanoMayorHandle = {
   root: TransformNode;
   meshes: readonly AbstractMesh[];
+  hasAxe: boolean;
+  hasAxePickupTarget: boolean;
   animations: HermanoMayorAnimationRegistry;
   playLocomotion(
-    action: "idle" | "walk",
+    action: "idle" | "walk" | "run",
     options?: HermanoMayorPlayOptions
   ): void;
+  setAxePickupTarget(axe: HermanoMayorAxeHandle | null): void;
+  startAxePickup(): boolean;
+  cancelAxePickup(): boolean;
+  getAxePickupState(): HermanoMayorAxePickupState;
+  getAxeApproachPositionToRef(result: Vector3): boolean;
+  getAxeGripPositionToRef(result: Vector3): boolean;
+  getAxeHandPositionToRef(result: Vector3): boolean;
+  getAxePickupDebugSnapshot(): ReturnType<
+    HermanoMayorAxePickupAction["getDebugSnapshot"]
+  >;
+  setAxePickupDebugVisible(visible: boolean): void;
+  seekAxePickupForDebug(time: number): boolean;
   setLookTargetProvider(provider: HermanoMayorLookTargetProvider | null): void;
   setNeckGrabTargetProvider(provider: HermanoMayorNeckTargetProvider | null): void;
   setNeckGrabPose(state: HermanoMayorNeckGrabPoseState | null): void;
@@ -85,13 +105,15 @@ export async function loadHermanoMayor(
 
   const animations = new HermanoMayorAnimationRegistry(result.animationGroups);
   animations.play("idle", { loop: true });
+  const actorMeshes: AbstractMesh[] = [...meshes];
 
   let bodyTurnWalkOwned = false;
   let playbackBeforeBodyTurn = animations.getCurrentNlaPlayback();
   const playLocomotion = (
-    action: "idle" | "walk",
+    action: "idle" | "walk" | "run",
     options: HermanoMayorPlayOptions = {}
   ) => {
+    if (axePickupAction?.state === "picking-up") return;
     // A real locomotion request takes ownership away from the temporary
     // walk-in-place used by the procedural look/body turn action.
     bodyTurnWalkOwned = false;
@@ -131,17 +153,67 @@ export async function loadHermanoMayor(
     result.animationGroups
   );
   animations.registerProcedural(HERMANO_MAYOR_NECK_GRAB_ACTION, neckGrabAction);
-
-  return {
+  const restorePostPickupPresentation = () => {
+    bodyTurnWalkOwned = false;
+    animations.play("idle", { loop: true, blendingSpeed: BODY_TURN_BLEND_SPEED });
+    lookAction.setEnabled(true);
+  };
+  const axePickupAction = new HermanoMayorAxePickupAction(
+    scene,
     root,
     meshes,
+    result.animationGroups,
+    {
+      onReady: restorePostPickupPresentation,
+      onCancelled: restorePostPickupPresentation,
+    }
+  );
+  animations.registerProcedural(HERMANO_MAYOR_AXE_PICKUP_ACTION, axePickupAction);
+  let axeTarget: HermanoMayorAxeHandle | null = null;
+
+  const handle: HermanoMayorHandle = {
+    root,
+    meshes: actorMeshes,
+    get hasAxe() {
+      return axePickupAction.hasAxe;
+    },
+    get hasAxePickupTarget() {
+      return axeTarget !== null;
+    },
     animations,
     playLocomotion,
+    setAxePickupTarget: (axe) => {
+      axeTarget = axe;
+      axePickupAction.setAxe(axe);
+    },
+    startAxePickup: () => {
+      if (!axePickupAction.canStart()) return false;
+      lookAction.setEnabled(false);
+      neckGrabAction.setEnabled(false);
+      bodyTurnWalkOwned = false;
+      animations.play("idle", { loop: true, blendingSpeed: BODY_TURN_BLEND_SPEED });
+      if (axePickupAction.start()) return true;
+      lookAction.setEnabled(true);
+      return false;
+    },
+    cancelAxePickup: () => axePickupAction.cancel(),
+    getAxePickupState: () => axePickupAction.state,
+    getAxeApproachPositionToRef: (result) =>
+      axePickupAction.getApproachPositionToRef(result),
+    getAxeGripPositionToRef: (result) =>
+      axePickupAction.getAxeGripPositionToRef(result),
+    getAxeHandPositionToRef: (result) =>
+      axePickupAction.getHandGripPositionToRef(result),
+    getAxePickupDebugSnapshot: () => axePickupAction.getDebugSnapshot(),
+    setAxePickupDebugVisible: (visible) =>
+      axePickupAction.setDebugVisible(visible),
+    seekAxePickupForDebug: (time) => axePickupAction.seekForDebug(time),
     setLookTargetProvider: (provider) => lookAction.setTargetProvider(provider),
     setNeckGrabTargetProvider: (provider) =>
       neckGrabAction.setTargetProvider(provider),
     setNeckGrabPose: (state) => {
       if (state) {
+        if (axePickupAction.state !== "unarmed") return;
         lookAction.setEnabled(false);
         neckGrabAction.setPoseState(state);
         neckGrabAction.setEnabled(true);
@@ -152,6 +224,12 @@ export async function loadHermanoMayor(
     },
     getNeckGrabDebugSnapshot: () => neckGrabAction.getDebugSnapshot(),
   };
+  scene.onDisposeObservable.addOnce(() => {
+    axePickupAction.dispose();
+    neckGrabAction.dispose();
+    lookAction.dispose();
+  });
+  return handle;
 }
 
 function centerAndGround(

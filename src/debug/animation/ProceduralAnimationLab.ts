@@ -24,6 +24,7 @@ import {
   HERMANO_MAYOR_MODEL_ROOT_URL,
   HERMANO_MAYOR_VISUAL_SCALE,
 } from "../../game/enemies/boss/HermanoMayor";
+import { HERMANO_MAYOR_AXE_PICKUP_ANIMATION } from "../../game/enemies/boss/HermanoMayorAxePickupAction";
 import { BonePoseController } from "./BonePoseController";
 import { PoseEditor } from "./PoseEditor";
 
@@ -240,6 +241,11 @@ export class ProceduralAnimationLab {
       this.loadedModel = nextModel;
       this.layerStack = new ProceduralLayerStack(controller);
       this.editor.bindController(controller);
+      if (definition.id === "hermanoMayor") {
+        this.editor.loadProceduralDefinition(
+          HERMANO_MAYOR_AXE_PICKUP_ANIMATION
+        );
+      }
       this.syncLayerStack();
       this.editor.setModels(
         LAB_MODELS.map(({ id: modelId, displayName }) => ({

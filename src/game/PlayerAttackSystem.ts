@@ -6,6 +6,7 @@ import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { LinesMesh } from "@babylonjs/core/Meshes/linesMesh";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -14,7 +15,6 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { PlayerController } from "./PlayerController";
 import type { PlayerStatsSystem } from "./PlayerStatsSystem";
 import { PlayerLightRechargeVFX } from "./PlayerLightRechargeVFX";
-import type { EnemyController } from "./enemies/core/EnemyTypes";
 import type { EnemyManager } from "./enemies/core/EnemyManager";
 import type { InputManager } from "./input/InputManager";
 
@@ -246,10 +246,24 @@ const LIGHT_ORB_SHELL_FRAGMENT_SHADER = `
   }
 `;
 
+export type LightProjectileAttackTarget = {
+  readonly id: string;
+  readonly type: string;
+  readonly enabled: boolean;
+  getAttackHitMeshes(): readonly AbstractMesh[];
+  getAttackTargetPositionToRef(result: Vector3): boolean;
+  receiveAttack(hit: {
+    damage: number;
+    point: Vector3;
+    direction: Vector3;
+  }): void;
+};
+
 type AttackSystemOptions = {
   input: InputManager;
   stats: PlayerStatsSystem;
   getLightSourcePositions: () => readonly Vector3[];
+  getAdditionalAttackTargets?: () => readonly LightProjectileAttackTarget[];
   findUnlitCandleSegmentHit: (
     from: Vector3,
     to: Vector3,
@@ -284,7 +298,7 @@ type AimSolution = {
   aimPoint: Vector3;
   direction: Vector3;
   speed: number;
-  target: EnemyController | null;
+  target: LightProjectileAttackTarget | null;
   power: number;
 };
 
@@ -317,8 +331,8 @@ type ImpactBurst = {
   strength: number;
 };
 
-type EnemySegmentHit = {
-  enemy: EnemyController;
+type AttackTargetSegmentHit = {
+  target: LightProjectileAttackTarget;
   point: Vector3;
   fraction: number;
 };
@@ -658,12 +672,12 @@ export class PlayerAttackSystem {
     const normalizedDirection = direction.normalizeToNew();
     const minimumDot = Math.cos(AIM_ASSIST_ANGLE_RADIANS);
     const targetPosition = Vector3.Zero();
-    let best: EnemyController | null = null;
+    let best: LightProjectileAttackTarget | null = null;
     let bestScore = Number.POSITIVE_INFINITY;
 
-    for (const enemy of this.enemyManager.getAll()) {
-      if (!enemy.enabled) continue;
-      enemy.getAttackTargetPositionToRef(targetPosition);
+    for (const target of this.getAttackTargets()) {
+      if (!target.enabled) continue;
+      target.getAttackTargetPositionToRef(targetPosition);
       const toTarget = targetPosition.subtract(origin);
       const distance = toTarget.length();
       if (distance < 1 || distance > AIM_ASSIST_MAX_DISTANCE) continue;
@@ -672,7 +686,7 @@ export class PlayerAttackSystem {
       const score = (1 - dot) * 100 + distance * 0.0025;
       if (score >= bestScore) continue;
       bestScore = score;
-      best = enemy;
+      best = target;
     }
     return best;
   }
@@ -848,7 +862,7 @@ export class PlayerAttackSystem {
         (!worldHit || enemyHit.fraction <= worldHit.fraction)
       ) {
         const direction = projectile.velocity.normalizeToNew();
-        enemyHit.enemy.receiveAttack({
+        enemyHit.target.receiveAttack({
           // Durability is measured in whole light orbs, independent of sanity.
           damage: PROJECTILE_DAMAGE,
           point: enemyHit.point,
@@ -898,14 +912,17 @@ export class PlayerAttackSystem {
     }
   }
 
-  private findEnemySegmentHit(from: Vector3, to: Vector3): EnemySegmentHit | null {
+  private findEnemySegmentHit(
+    from: Vector3,
+    to: Vector3
+  ): AttackTargetSegmentHit | null {
     const segment = to.subtract(from);
     const lengthSquared = segment.lengthSquared();
-    let best: EnemySegmentHit | null = null;
+    let best: AttackTargetSegmentHit | null = null;
 
-    for (const enemy of this.enemyManager.getAll()) {
-      if (!enemy.enabled) continue;
-      for (const mesh of enemy.getAttackHitMeshes()) {
+    for (const target of this.getAttackTargets()) {
+      if (!target.enabled) continue;
+      for (const mesh of target.getAttackHitMeshes()) {
         if (!mesh.isEnabled() || mesh.getTotalVertices() <= 0) continue;
         mesh.computeWorldMatrix(true);
         const sphere = mesh.getBoundingInfo().boundingSphere;
@@ -920,10 +937,16 @@ export class PlayerAttackSystem {
         if (Vector3.DistanceSquared(closest, sphere.centerWorld) > collisionRadius ** 2) {
           continue;
         }
-        best = { enemy, point: closest, fraction };
+        best = { target, point: closest, fraction };
       }
     }
     return best;
+  }
+
+  private getAttackTargets(): readonly LightProjectileAttackTarget[] {
+    const additional = this.options.getAdditionalAttackTargets?.() ?? [];
+    if (!additional.length) return this.enemyManager.getAll();
+    return [...this.enemyManager.getAll(), ...additional];
   }
 
   private findWorldSegmentHit(from: Vector3, to: Vector3): WorldSegmentHit | null {

@@ -37,6 +37,10 @@ import {
   loadHermanoMayor,
   type HermanoMayorHandle,
 } from "./enemies/boss";
+import {
+  createHermanoMayorAxeHandle,
+  type HermanoMayorAxeHandle,
+} from "./enemies/boss/HermanoMayorAxe";
 
 import type { TerrainHandle } from "./Terrain";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
@@ -270,6 +274,7 @@ const END_HOUSE_BACKYARD_PROPS = [
     offsetZ: -0.6,
     rotationY: Math.PI * 0.08,
     scale: 2.2,
+    isPicnicTable: true,
     hasFire: false,
     hasAxe: true,
   },
@@ -280,6 +285,7 @@ const END_HOUSE_BACKYARD_PROPS = [
     offsetZ: 1.25,
     rotationY: -Math.PI * 0.12,
     scale: 1.65,
+    isPicnicTable: false,
     hasFire: true,
     hasAxe: false,
   },
@@ -335,6 +341,7 @@ export class Segments {
   private endHouseBrazierFire: BrazierProceduralFireHandle | null = null;
   private endHouseBounds: WorldBounds | null = null;
   private hermanoMayor: HermanoMayorHandle | null = null;
+  private hermanoMayorAxe: HermanoMayorAxeHandle | null = null;
   private worldObjectInspectionHandler: WorldObjectInspectionHandler | null = null;
   private worldPrewarmed = false;
 
@@ -369,6 +376,10 @@ export class Segments {
 
   getHermanoMayor() {
     return this.hermanoMayor;
+  }
+
+  getHermanoMayorAxe() {
+    return this.hermanoMayorAxe;
   }
 
   getEndHouseBounds() {
@@ -2105,9 +2116,18 @@ export class Segments {
     if (!finalBounds) return;
 
     this.endHouseMeshes.push(...renderableMeshes);
+    // Register the table before resolving the axe approach so its pickup
+    // socket can be guaranteed to sit outside the boss-expanded collision.
+    if (placement.isPicnicTable) {
+      this.registerEndHousePicnicTableColliders(placementRoot, renderableMeshes);
+    }
     if (placement.hasAxe) {
       try {
-        await this.loadEndHousePicnicTableAxe(placementRoot, renderableMeshes);
+        this.hermanoMayorAxe =
+          (await this.loadEndHousePicnicTableAxe(
+            placementRoot,
+            renderableMeshes
+          )) ?? null;
       } catch (error) {
         console.warn(
           `[Segments] No se pudo apoyar el hacha '${PICNIC_TABLE_AXE_FILE}' sobre la mesa.`,
@@ -2134,11 +2154,9 @@ export class Segments {
         logBounds
       );
     }
-    if (placement.hasAxe) {
-      this.registerEndHousePicnicTableColliders(placementRoot, renderableMeshes);
-    } else if (placement.hasFire) {
+    if (placement.hasFire) {
       this.registerEndHouseBrazierCollider(finalBounds);
-    } else {
+    } else if (!placement.isPicnicTable) {
       this.staticBoxColliders.push({
         x: (finalBounds.min.x + finalBounds.max.x) * 0.5,
         z: (finalBounds.min.z + finalBounds.max.z) * 0.5,
@@ -2460,6 +2478,21 @@ export class Segments {
     };
 
     this.endHouseMeshes.push(...renderableMeshes);
+    const pickupSurfaceCenter = Vector3.TransformCoordinates(
+      new Vector3(tableCenterX, tableBounds.max.y, tableCenterZ),
+      tableRoot.getWorldMatrix()
+    );
+    return createHermanoMayorAxeHandle({
+      scene: this.scene,
+      root: axeRoot,
+      meshes: renderableMeshes,
+      sourceBounds,
+      pickupSurfaceCenter,
+      isPickupApproachBlocked: (x, z) => this.isColliding(x, z, 0.22),
+      interaction,
+      pickupLight: bladeLight,
+      pickupFlare: flare,
+    });
   }
 
   private async loadEndHouseBrazierLogs(

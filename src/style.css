@@ -498,16 +498,19 @@ body.character-selecting #renderCanvas {
 
 body.opening-sequence-active #hud,
 body.house-arrival-cinematic-active #hud,
+body.hermano-mayor-axe-cinematic-active #hud,
 body.sky-eye-cinematic-active #hud {
   opacity: 0;
 }
 
-body.house-arrival-cinematic-active #hud {
+body.house-arrival-cinematic-active #hud,
+body.hermano-mayor-axe-cinematic-active #hud {
   pointer-events: none;
 }
 
 body.opening-sequence-active #inventoryButton,
 body.house-arrival-cinematic-active #inventoryButton,
+body.hermano-mayor-axe-cinematic-active #inventoryButton,
 body.sky-eye-cinematic-active #inventoryButton {
   opacity: 0;
   pointer-events: none;
@@ -895,7 +898,7 @@ body.attack-aiming #reticle {
   height: 28px;
 }
 
-#hermanoMayorGrabCount {
+#hermanoMayorGrabPercent {
   min-width: 48px;
   margin-left: 5px;
   color: #df9b73;

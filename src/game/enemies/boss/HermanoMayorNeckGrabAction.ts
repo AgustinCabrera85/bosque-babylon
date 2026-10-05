@@ -152,9 +152,6 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
   private readonly projectedGripDirection = Vector3.Zero();
   private readonly twistCross = Vector3.Zero();
   private readonly jointPosition = Vector3.Zero();
-  private readonly currentDirection = Vector3.Zero();
-  private readonly targetDirection = Vector3.Zero();
-  private readonly rotationAxis = Vector3.Zero();
   private beforeAnimationsObserver: Observer<Scene> | null = null;
   private afterAnimationsObserver: Observer<Scene> | null = null;
   private requestedEnabled = false;
@@ -687,47 +684,15 @@ export class HermanoMayorNeckGrabAction implements HermanoMayorProceduralAction 
   ) {
     // Distal-to-proximal CCD is independent of Mixamo bone pre-rotations and
     // imported root scaling. Small bounded steps preserve the low-elbow seed.
-    for (let iteration = 0; iteration < 14; iteration += 1) {
-      this.rotateJointTowardTarget(foreArm, hand, target, radians(18));
-      this.rotateJointTowardTarget(upperArm, hand, target, radians(16));
-    }
-  }
-
-  private rotateJointTowardTarget(
-    joint: MixamoJointName,
-    hand: MixamoJointName,
-    target: Vector3,
-    maxAngle: number
-  ) {
-    if (
-      !this.rig.getJointWorldPositionToRef(joint, this.jointPosition) ||
-      !this.rig.getJointWorldPositionToRef(hand, this.leftHandPosition)
-    ) {
-      return;
-    }
-
-    this.leftHandPosition.subtractToRef(
-      this.jointPosition,
-      this.currentDirection
+    this.rig.solveCcdToTarget(
+      [
+        { joint: foreArm, maxAngle: radians(18) },
+        { joint: upperArm, maxAngle: radians(16) },
+      ],
+      hand,
+      target,
+      14
     );
-    target.subtractToRef(this.jointPosition, this.targetDirection);
-    const currentLength = this.currentDirection.length();
-    const targetLength = this.targetDirection.length();
-    if (currentLength <= 0.0001 || targetLength <= 0.0001) return;
-    this.currentDirection.scaleInPlace(1 / currentLength);
-    this.targetDirection.scaleInPlace(1 / targetLength);
-    Vector3.CrossToRef(
-      this.currentDirection,
-      this.targetDirection,
-      this.rotationAxis
-    );
-    const axisLength = this.rotationAxis.length();
-    if (axisLength <= 0.00001) return;
-    this.rotationAxis.scaleInPlace(1 / axisLength);
-    const dot = Vector3.Dot(this.currentDirection, this.targetDirection);
-    const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
-    this.rig.rotateWorld(joint, this.rotationAxis, Math.min(angle, maxAngle));
-    this.rig.prepare();
   }
 }
 

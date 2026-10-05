@@ -3,15 +3,10 @@ export class HermanoMayorGrabHud {
   private readonly root = document.getElementById("hermanoMayorGrabHud");
   private readonly fill = document.getElementById("hermanoMayorGrabFill");
   private readonly progress = document.getElementById("hermanoMayorGrabProgress");
-  private readonly count = document.getElementById("hermanoMayorGrabCount");
+  private readonly percent = document.getElementById("hermanoMayorGrabPercent");
   private visible = false;
 
-  public setState(
-    active: boolean,
-    progress: number,
-    presses: number,
-    requiredPresses: number
-  ) {
+  public setState(active: boolean, progress: number) {
     const safeProgress = Math.max(0, Math.min(1, progress));
     if (this.visible !== active) {
       this.visible = active;
@@ -20,12 +15,10 @@ export class HermanoMayorGrabHud {
     }
     this.fill?.style.setProperty("--grab-progress", String(safeProgress));
     this.progress?.setAttribute("aria-valuenow", String(Math.round(safeProgress * 100)));
-    if (this.count) {
-      this.count.textContent = `${Math.min(presses, requiredPresses)} / ${requiredPresses}`;
-    }
+    if (this.percent) this.percent.textContent = `${Math.round(safeProgress * 100)}%`;
   }
 
   public dispose() {
-    this.setState(false, 0, 0, 1);
+    this.setState(false, 0);
   }
 }

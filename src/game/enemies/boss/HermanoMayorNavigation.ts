@@ -118,6 +118,22 @@ export class HermanoMayorNavigation {
     this.retryDelay = 0;
   }
 
+  /**
+   * Resolves an authored destination to the nearest point the boss can
+   * actually occupy. This lets gameplay triggers use the same final goal as
+   * navigation when prop or water clearance covers the authored point.
+   */
+  public resolveWalkableGoalToRef(
+    origin: Vector3,
+    requestedTarget: Vector3,
+    result: Vector3
+  ) {
+    const goal = this.resolveWalkableGoal(origin, requestedTarget);
+    if (!goal) return false;
+    result.copyFrom(goal);
+    return true;
+  }
+
   public getSteeringTarget(
     origin: Vector3,
     requestedTarget: Vector3,

@@ -32,7 +32,10 @@ import { WaterInteractionVFX } from "./WaterInteractionVFX";
 import { WaterSurfaceRegistry } from "./WaterSurface";
 import type { MusicPlayerHandle } from "./MusicPlayer";
 import type { InventoryHandle } from "./Inventory";
-import { PlayerAttackSystem } from "./PlayerAttackSystem";
+import {
+  PlayerAttackSystem,
+  type LightProjectileAttackTarget,
+} from "./PlayerAttackSystem";
 import { PlayerLightAbsorptionVFX } from "./PlayerLightAbsorptionVFX";
 import { PlayerStatsSystem } from "./PlayerStatsSystem";
 import type { ProceduralHitReactionZone } from "./animation/ProceduralGrabStruggleController";
@@ -86,6 +89,7 @@ import {
   HermanoMayorBehavior,
 } from "./enemies/boss";
 import { HermanoMayorGrabHud } from "./enemies/boss/HermanoMayorGrabHud";
+import { HermanoMayorAxePickupCinematic } from "./enemies/boss/HermanoMayorAxePickupCinematic";
 import { renderActionPrompt } from "./input/InputPrompts";
 import type { GameAction } from "./input/InputActions";
 import { setHermanoMayorGrabHapticsActive } from "./input/GamepadFeedback";
@@ -273,6 +277,9 @@ export async function createScene(
   cursorController?: CursorController
 ) {
   onProgress(0.08, "Creando escena...");
+  const useAxePickupDebugLighting =
+    import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).get("debugAxePickup") === "1";
   const scene = new Scene(engine);
   scene.onDisposeObservable.addOnce(() => {
     cursorController?.setCursorRequest("interaction", null);
@@ -301,6 +308,11 @@ export async function createScene(
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogColor = new Color3(0.014, 0.017, 0.022); // casi negro azulado
   scene.fogDensity = BASE_FOG_DENSITY; // probá 0.010..0.018
+  if (useAxePickupDebugLighting) {
+    scene.fogMode = Scene.FOGMODE_NONE;
+    scene.fogColor.set(0.58, 0.72, 0.88);
+    scene.fogDensity = 0;
+  }
 
   // Para que el "horizonte" no se vea raro detrás de todo
   scene.clearColor = new Color4(
@@ -316,12 +328,21 @@ export async function createScene(
 const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
 hemi.intensity = BASE_HEMI_INTENSITY; // MUY bajo
 hemi.groundColor = BASE_HEMI_GROUND_COLOR.clone();
+if (useAxePickupDebugLighting) {
+  hemi.intensity = 1.15;
+  hemi.diffuse = new Color3(1, 0.97, 0.9);
+  hemi.groundColor.set(0.34, 0.38, 0.42);
+}
 
 const moon = new DirectionalLight("moon", new Vector3(-0.35, -1, 0.25), scene);
 moon.position = new Vector3(60, 120, 40);
 moon.intensity = BASE_MOON_INTENSITY; // suave
 moon.diffuse = new Color3(0.6, 0.65, 0.9);
 moon.specular = new Color3(0, 0, 0);
+if (useAxePickupDebugLighting) {
+  moon.intensity = 0.78;
+  moon.diffuse.set(1, 0.92, 0.78);
+}
 
 
   // =========================
@@ -411,6 +432,7 @@ const playerWorld = new ForestPlayerWorld(terrain, {
   photoDome.mesh.infiniteDistance = true;
   photoDome.mesh.isPickable = false;
   photoDome.mesh.renderingGroupId = 0;
+  photoDome.mesh.setEnabled(!useAxePickupDebugLighting);
   photoDome.photoTexture.updateSamplingMode(Texture.TRILINEAR_SAMPLINGMODE);
   photoDome.photoTexture.anisotropicFilteringLevel = quality.name === "desktop" ? 4 : 2;
 
@@ -979,10 +1001,13 @@ scene.onBeforeRenderObservable.add(() => {
     ...attackLightSources,
     ...segments.getLitSafeLightPositions(),
   ];
+  let hermanoMayorLightTarget: LightProjectileAttackTarget | null = null;
   const attackSystem = new PlayerAttackSystem(scene, player, enemyManager, {
     input,
     stats: playerStats,
     getLightSourcePositions: getAttackLightSources,
+    getAdditionalAttackTargets: () =>
+      hermanoMayorLightTarget ? [hermanoMayorLightTarget] : [],
     findUnlitCandleSegmentHit: (from, to, projectileRadius) =>
       segments.findUnlitCandleSegmentHit(from, to, projectileRadius),
     relightCandle: (id) => segments.relightCandle(id),
@@ -1280,6 +1305,11 @@ scene.onBeforeRenderObservable.add(() => {
     return !hit?.hit || hit.distance >= distance - 0.35;
   };
   const hermanoMayor = segments.getHermanoMayor();
+  const hermanoMayorAxe = segments.getHermanoMayorAxe();
+  hermanoMayor?.setAxePickupTarget(hermanoMayorAxe);
+  const hermanoMayorAxeCinematic = hermanoMayor
+    ? new HermanoMayorAxePickupCinematic(player, hermanoMayor)
+    : null;
   const hermanoMayorGrabHud = new HermanoMayorGrabHud();
   const endHouseBounds = segments.getEndHouseBounds();
   const hermanoMayorNavigationProbe = Vector3.Zero();
@@ -1342,34 +1372,58 @@ scene.onBeforeRenderObservable.add(() => {
             lift,
             escapeProgress,
           }),
-        setGrabEscapeHud: (active, progress, presses, requiredPresses) =>
-          hermanoMayorGrabHud.setState(
-            active,
-            progress,
-            presses,
-            requiredPresses
-          ),
+        setGrabEscapeHud: (active, progress) =>
+          hermanoMayorGrabHud.setState(active, progress),
         onGrabStarted: () => {
           attackSystem.cancelCharge();
           playerStats.cancelLightAbsorption("grab");
           setHermanoMayorGrabHapticsActive(true);
         },
-        onGrabDamage: (kind) => {
+        onGrabDamage: (fractionOfMaxHealth, kind) => {
           const initial = kind === "initial";
-          playerStats.takeDamage(initial ? 6 : 2, {
-            type: "physical",
-            source: `hermano-mayor:neck-grab:${kind}`,
-          });
+          playerStats.takeDamage(
+            playerStats.snapshot.maxHealth * fractionOfMaxHealth,
+            {
+              type: "physical",
+              source: `hermano-mayor:neck-grab:${kind}`,
+              ignoreSanityModifier: true,
+            }
+          );
           playerStats.modifySanity(
-            initial ? -7 : -2.5,
+            initial ? -4 : -1.5,
             `hermano-mayor:neck-grab:${kind}:sanity`
           );
         },
         onGrabEnded: () => setHermanoMayorGrabHapticsActive(false),
+        beginAxePickupCinematic: () => {
+          attackSystem.cancelCharge();
+          playerStats.cancelLightAbsorption("controls-locked");
+          interactSystem.clearMessage();
+          return hermanoMayorAxeCinematic?.start() ?? false;
+        },
+        endAxePickupCinematic: (completed) =>
+          hermanoMayorAxeCinematic?.finish(completed),
       })
     : null;
+  if (hermanoMayor && hermanoMayorBehavior) {
+    hermanoMayorLightTarget = {
+      id: "hermano-mayor",
+      type: "hermano-mayor",
+      enabled: true,
+      getAttackHitMeshes: () => hermanoMayor.meshes,
+      getAttackTargetPositionToRef: (result) => {
+        result.copyFrom(hermanoMayor.root.position);
+        result.y += 1.65;
+        return true;
+      },
+      receiveAttack: () => {
+        hermanoMayorBehavior.stun();
+      },
+    };
+  }
   scene.onDisposeObservable.addOnce(() => {
     hermanoMayorBehavior?.dispose();
+    hermanoMayorAxeCinematic?.dispose();
     setHermanoMayorGrabHapticsActive(false);
     hermanoMayorGrabHud.dispose();
     player.setNeckGrabState({ active: false });
@@ -1377,6 +1431,18 @@ scene.onBeforeRenderObservable.add(() => {
   if (import.meta.env.DEV && hermanoMayor && hermanoMayorBehavior) {
     const hermanoMayorDebug = {
       getGrab: () => hermanoMayorBehavior.getGrabDebugSnapshot(),
+      getAxe: () => ({
+        pickup: hermanoMayor.getAxePickupDebugSnapshot(),
+        cinematic: hermanoMayorAxeCinematic?.getDebugSnapshot() ?? null,
+      }),
+      setAxeDebugVisible: (visible: boolean) =>
+        hermanoMayor.setAxePickupDebugVisible(visible),
+      seekAxePickup: (time: number) => {
+        const actionMoved = hermanoMayor.seekAxePickupForDebug(time);
+        const cameraMoved = hermanoMayorAxeCinematic?.seekForDebug(time) ?? false;
+        return actionMoved && cameraMoved;
+      },
+      forceAxePickup: () => hermanoMayorBehavior.forceAxePickup(),
       forceGrab: (positionPlayer = true) => {
         if (positionPlayer) {
           const yaw = hermanoMayor.root.rotation.y;
@@ -1559,6 +1625,7 @@ scene.onBeforeRenderObservable.add(() => {
     );
     player.update(dt, playerWorld);
     hermanoMayorBehavior?.update(dt);
+    hermanoMayorAxeCinematic?.update(dt);
     skyEyeEncounter.update(dt);
     shadowGrabberBehaviorSystem.update(dt);
     enemyManager.update(dt);
@@ -1609,7 +1676,10 @@ scene.onBeforeRenderObservable.add(() => {
 
   // Hold the player and the elevated opening camera before the first frame that
   // can become visible. The UI presentation decides when both begin moving.
-  if (prepareOpeningSequence) player.prepareOpeningSequence();
+  const skipOpeningForAxeDebug = useAxePickupDebugLighting;
+  if (prepareOpeningSequence && !skipOpeningForAxeDebug) {
+    player.prepareOpeningSequence();
+  }
   survivalGameplayActive = true;
   onProgress(1, "Listo");
   return {

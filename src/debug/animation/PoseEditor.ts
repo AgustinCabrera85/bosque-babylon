@@ -362,6 +362,29 @@ export class PoseEditor {
     this.syncProceduralLayers();
   }
 
+  /** Loads an authored runtime definition into the existing editor controls. */
+  public loadProceduralDefinition(definition: ProceduralAnimationDefinition) {
+    for (const pose of Object.values(definition.poses)) {
+      this.savedPoses.set(pose.id, pose);
+    }
+    this.proceduralAnimations.set(definition.id, definition);
+    this.proceduralAnimationName.value = definition.id;
+    this.proceduralKeys.splice(
+      0,
+      this.proceduralKeys.length,
+      ...definition.timeline.map((key) => ({
+        ...key,
+        uid: this.nextProceduralKeyUid++,
+      }))
+    );
+    this.lastSavedPose = Object.values(definition.poses)[0] ?? null;
+    this.renderPoseLibrary();
+    this.renderProceduralKeys();
+    this.renderProceduralLayers();
+    this.syncProceduralLayers();
+    this.setStatus(`Loaded procedural preset '${definition.id}'.`);
+  }
+
   public setStatus(message: string, error = false) {
     this.status.textContent = message;
     this.status.dataset.error = String(error);

@@ -62,6 +62,11 @@ type ResolvedMixamoJoint = {
   baseRotation: Quaternion;
 };
 
+export type MixamoCcdJoint = {
+  joint: MixamoJointName;
+  maxAngle: number;
+};
+
 const JOINT_SUFFIXES: Record<MixamoJointName, string> = {
   hips: "hips",
   spine: "spine",
@@ -127,12 +132,18 @@ const JOINT_NAMES = Object.keys(JOINT_SUFFIXES) as MixamoJointName[];
 export class MixamoProceduralRig {
   public readonly mesh: Mesh | null;
   private readonly joints = new Map<MixamoJointName, ResolvedMixamoJoint>();
+  private readonly jointsByNormalizedName = new Map<string, ResolvedMixamoJoint>();
   private readonly orderedJoints: ResolvedMixamoJoint[] = [];
   private readonly resolvedBones = createEmptyResolvedBoneMap();
   private readonly animatedBones: MixamoJointName[] = [];
   private readonly missingRequiredBones: MixamoJointName[] = [];
   private readonly localOffset = Quaternion.Identity();
   private readonly localRotationScratch = Quaternion.Identity();
+  private readonly ccdJointPosition = Vector3.Zero();
+  private readonly ccdEffectorPosition = Vector3.Zero();
+  private readonly ccdCurrentDirection = Vector3.Zero();
+  private readonly ccdTargetDirection = Vector3.Zero();
+  private readonly ccdRotationAxis = Vector3.Zero();
 
   public constructor(
     meshes: readonly AbstractMesh[],
@@ -188,6 +199,8 @@ export class MixamoProceduralRig {
           baseRotation: node.rotationQuaternion.clone(),
         };
         this.joints.set(name, joint);
+        this.jointsByNormalizedName.set(normalizeMixamoBoneName(node.name), joint);
+        this.jointsByNormalizedName.set(normalizeMixamoBoneName(name), joint);
         this.orderedJoints.push(joint);
         if (animatedTargets.has(normalizeMixamoBoneName(node.name))) {
           this.animatedBones.push(name);
@@ -276,6 +289,79 @@ export class MixamoProceduralRig {
     );
     target.multiplyInPlace(this.localOffset);
     target.normalize();
+  }
+
+  /** Applies an authored quaternion offset over the current animation pose. */
+  public applyLocalQuaternionOffset(name: string, offset: Quaternion) {
+    const joint = this.jointsByNormalizedName.get(normalizeMixamoBoneName(name));
+    const target = joint?.node.rotationQuaternion;
+    if (!joint || !target) return false;
+    joint.baseRotation.multiplyToRef(offset, target);
+    target.normalize();
+    return true;
+  }
+
+  public getJointNode(name: MixamoJointName) {
+    return this.joints.get(name)?.node ?? null;
+  }
+
+  /**
+   * Small bounded CCD pass shared by procedural actions. The caller supplies
+   * the distal-to-proximal order so its authored seed and joint limits remain
+   * action-specific.
+   */
+  public solveCcdToTarget(
+    chain: readonly MixamoCcdJoint[],
+    effector: MixamoJointName | TransformNode,
+    target: Vector3,
+    iterations = 14
+  ) {
+    const effectorNode =
+      typeof effector === "string" ? this.getJointNode(effector) : effector;
+    if (!effectorNode) return false;
+
+    let solved = false;
+    for (let iteration = 0; iteration < iterations; iteration += 1) {
+      for (const step of chain) {
+        const joint = this.joints.get(step.joint);
+        if (!joint) continue;
+        joint.node.computeWorldMatrix(true);
+        effectorNode.computeWorldMatrix(true);
+        this.ccdJointPosition.copyFrom(joint.node.getAbsolutePosition());
+        this.ccdEffectorPosition.copyFrom(effectorNode.getAbsolutePosition());
+        this.ccdEffectorPosition.subtractToRef(
+          this.ccdJointPosition,
+          this.ccdCurrentDirection
+        );
+        target.subtractToRef(this.ccdJointPosition, this.ccdTargetDirection);
+        const currentLength = this.ccdCurrentDirection.length();
+        const targetLength = this.ccdTargetDirection.length();
+        if (currentLength <= 0.0001 || targetLength <= 0.0001) continue;
+        this.ccdCurrentDirection.scaleInPlace(1 / currentLength);
+        this.ccdTargetDirection.scaleInPlace(1 / targetLength);
+        Vector3.CrossToRef(
+          this.ccdCurrentDirection,
+          this.ccdTargetDirection,
+          this.ccdRotationAxis
+        );
+        const axisLength = this.ccdRotationAxis.length();
+        if (axisLength <= 0.00001) continue;
+        this.ccdRotationAxis.scaleInPlace(1 / axisLength);
+        const dot = Vector3.Dot(
+          this.ccdCurrentDirection,
+          this.ccdTargetDirection
+        );
+        const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+        this.rotateWorld(
+          step.joint,
+          this.ccdRotationAxis,
+          Math.min(angle, step.maxAngle)
+        );
+        this.prepare();
+        solved = true;
+      }
+    }
+    return solved;
   }
 
   private composeLocalOffset(

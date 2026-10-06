@@ -28,6 +28,14 @@ type SkyEyeEvent = CustomEvent<{
   state?: "presentation-started" | "watching";
 }>;
 
+type HouseArrivalEvent = CustomEvent<{
+  state?: "presentation-started" | "complete";
+}>;
+
+type SkyEyeDefeatCinematicEvent = CustomEvent<{
+  state?: "started" | "portal-opening" | "complete";
+}>;
+
 type WorldPosition = {
   x: number;
   z: number;
@@ -118,12 +126,27 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   const runSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_running.mp3"));
   const jumpSfx = new Audio(asset("assets/audio/sfx/jump_on_road.mp3"));
   const doorSfx = new Audio(asset("assets/audio/sfx/HouseInTheWoods-DoorOpen.mp3"));
+  const cinematicSfx = {
+    housePresentation: new Audio(
+      asset("assets/audio/sfx/cinematics/bosque/wooden-house-presentation.m4a")
+    ),
+    skyEyeDefeat: new Audio(
+      asset("assets/audio/sfx/cinematics/bosque/eye-in-the-sky-defeat.m4a")
+    ),
+    hermanoMayorPortal: new Audio(
+      asset("assets/audio/sfx/cinematics/bosque/portal-hermanomayor.m4a")
+    ),
+  };
   walkSfx.loop = true;
   runSfx.loop = true;
   walkSfx.preload = "auto";
   runSfx.preload = "auto";
   jumpSfx.preload = "auto";
   doorSfx.preload = "auto";
+  for (const audio of Object.values(cinematicSfx)) {
+    audio.loop = false;
+    audio.preload = "auto";
+  }
 
   let started = false;
   let playbackUnlocked = false;
@@ -205,6 +228,10 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     runSfx.muted = volume <= 0;
     jumpSfx.muted = volume <= 0;
     doorSfx.muted = volume <= 0;
+    for (const audio of Object.values(cinematicSfx)) {
+      audio.volume = volume;
+      audio.muted = volume <= 0;
+    }
   }
 
   function updateWaterfallVolume() {
@@ -270,6 +297,15 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     oneShot.pause();
     oneShot.currentTime = 0;
     void playLoop(oneShot);
+  }
+
+  function playCinematicSfx(audio: HTMLAudioElement, label: string) {
+    audio.pause();
+    audio.currentTime = 0;
+    if (volumes.sfx <= 0) return;
+    void audio.play().catch((error) => {
+      console.warn(`[MusicPlayer] Cinematic SFX '${label}' was blocked.`, error);
+    });
   }
 
   async function start() {
@@ -346,6 +382,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     setFootstepMode("idle");
     skyEyeMusicActive = false;
     stopLoop(skyEyeMusic);
+    for (const audio of Object.values(cinematicSfx)) stopLoop(audio);
     stopLoop(music);
     stopLoop(ambient);
     if (waterfallStarted) stopLoop(waterfall);
@@ -442,6 +479,31 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
           error
         );
       });
+    }
+  }, { signal });
+
+  window.addEventListener("bosque:house-arrival", (event) => {
+    const { state } = (event as HouseArrivalEvent).detail ?? {};
+    if (state === "presentation-started") {
+      playCinematicSfx(cinematicSfx.housePresentation, "house-presentation");
+    }
+  }, { signal });
+
+  window.addEventListener("bosque:sky-eye-defeat-cinematic", (event) => {
+    const { state } = (event as SkyEyeDefeatCinematicEvent).detail ?? {};
+    if (state === "started") {
+      stopLoop(cinematicSfx.hermanoMayorPortal);
+      playCinematicSfx(cinematicSfx.skyEyeDefeat, "sky-eye-defeat");
+      return;
+    }
+    if (state === "portal-opening") {
+      stopLoop(cinematicSfx.skyEyeDefeat);
+      playCinematicSfx(cinematicSfx.hermanoMayorPortal, "hermano-mayor-portal");
+      return;
+    }
+    if (state === "complete") {
+      stopLoop(cinematicSfx.skyEyeDefeat);
+      stopLoop(cinematicSfx.hermanoMayorPortal);
     }
   }, { signal });
 

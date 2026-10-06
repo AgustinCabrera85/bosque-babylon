@@ -11,6 +11,7 @@ import { setupMobileControls } from "../../MobileControls";
 import { createThoughtMessages } from "../../ThoughtMessages";
 import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
 import { createTheatreShell } from "./TheatreShell";
+import { createTheatreAudience } from "./TheatreAudience";
 import { createExpressionistStaircase, STAIR_CONFIG } from "./Staircase";
 import { createMaskField } from "./MaskField";
 import { TheatrePlayerWorld } from "./TheatrePlayerWorld";
@@ -81,6 +82,12 @@ export async function createTheatreLevel(
     portalSpot.range = 105;
 
     createTheatreShell(scene);
+    context.onProgress(0.18, "Abriendo el patio de butacas...");
+    const audience = await createTheatreAudience(
+      scene,
+      context.performanceTier
+    );
+    resourceDisposers.push(audience.dispose);
     const staircase = createExpressionistStaircase(scene);
     const playerWorld = new TheatrePlayerWorld(staircase);
     const portalFog = createPortalSideFog(

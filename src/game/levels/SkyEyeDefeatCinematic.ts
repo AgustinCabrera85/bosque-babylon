@@ -427,6 +427,7 @@ export class SkyEyeDefeatCinematic {
   private beforeAnimationsObserver: Observer<Scene> | null = null;
   private currentState: SkyEyeDefeatCinematicState = "waiting";
   private elapsed = 0;
+  private portalOpeningAnnounced = false;
   private actorHeight = 3;
   private actorWidth = 1.2;
   private actorGroundOffset = 0;
@@ -571,6 +572,7 @@ export class SkyEyeDefeatCinematic {
 
     this.currentState = "presenting";
     this.elapsed = 0;
+    this.portalOpeningAnnounced = false;
     this.captureEntryCamera();
     this.prepareActorStage();
     this.preparePortal();
@@ -597,6 +599,17 @@ export class SkyEyeDefeatCinematic {
       SKY_EYE_DEFEAT_CINEMATIC_TIMING.completeSeconds,
       this.elapsed + delta
     );
+    if (
+      !this.portalOpeningAnnounced &&
+      this.elapsed >= SKY_EYE_DEFEAT_CINEMATIC_TIMING.portalOpenStartSeconds
+    ) {
+      this.portalOpeningAnnounced = true;
+      window.dispatchEvent(
+        new CustomEvent("bosque:sky-eye-defeat-cinematic", {
+          detail: { state: "portal-opening" },
+        })
+      );
+    }
     const frame = sampleSkyEyeDefeatCinematic(this.elapsed);
     this.updatePortal(delta, frame);
     this.updateActor(frame);

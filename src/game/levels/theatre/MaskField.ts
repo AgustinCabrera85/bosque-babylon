@@ -4,6 +4,8 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import type { Scene } from "@babylonjs/core/scene";
+import { STAIR_CONFIG } from "./Staircase";
+import { THEATRE_CURTAIN_LAYOUT } from "./TheatreCurtains";
 
 const MASK_ROOT_URL = "/assets/models/masks/";
 const MASK_FILES = [
@@ -21,6 +23,147 @@ type MaskInstance = {
   phase: number;
   homeTarget: Vector3;
 };
+
+type MaskPlacement = {
+  name: string;
+  modelIndex: number;
+  position: Vector3;
+  scale: number;
+  roll: number;
+  phase: number;
+  targetYOffset: number;
+  targetZOffset: number;
+};
+
+const STAGE_VIEW_Z = -10.5;
+const CURTAIN_SIGHTLINE_GAP = 0.28;
+const STAIR_SIDE_GAP = 0.42;
+const MAX_MASK_ABS_X = 18.5;
+const MASK_SEPARATION_GAP = 0.38;
+
+function getMaskHorizontalRadius(scale: number) {
+  return scale * 0.43 + 0.16;
+}
+
+function getStairHalfWidth(z: number) {
+  const stairLength = STAIR_CONFIG.stepCount * STAIR_CONFIG.stepDepth;
+  const t = Math.max(
+    0,
+    Math.min(1, (z - STAIR_CONFIG.startZ) / Math.max(0.001, stairLength))
+  );
+  return (
+    (STAIR_CONFIG.baseWidth +
+      (STAIR_CONFIG.topWidth - STAIR_CONFIG.baseWidth) * t) *
+    0.5
+  );
+}
+
+function separateFromCurtainSightline(placement: MaskPlacement) {
+  const curtainDistance = THEATRE_CURTAIN_LAYOUT.z - STAGE_VIEW_Z;
+  const maskDistance = placement.position.z - STAGE_VIEW_Z;
+  if (maskDistance <= curtainDistance) return placement;
+
+  const projectionScale = curtainDistance / maskDistance;
+  const projectedCenter = Math.abs(placement.position.x) * projectionScale;
+  const projectedRadius =
+    getMaskHorizontalRadius(placement.scale) * projectionScale;
+  const curtainInner =
+    THEATRE_CURTAIN_LAYOUT.centerAbsX -
+    THEATRE_CURTAIN_LAYOUT.width * 0.5;
+  const curtainOuter =
+    THEATRE_CURTAIN_LAYOUT.centerAbsX +
+    THEATRE_CURTAIN_LAYOUT.width * 0.5;
+  const projectedMin = projectedCenter - projectedRadius;
+  const projectedMax = projectedCenter + projectedRadius;
+  if (
+    projectedMax <= curtainInner - CURTAIN_SIGHTLINE_GAP ||
+    projectedMin >= curtainOuter + CURTAIN_SIGHTLINE_GAP
+  ) {
+    return placement;
+  }
+
+  const maskRadius = getMaskHorizontalRadius(placement.scale);
+  const minimumStairSideX =
+    getStairHalfWidth(placement.position.z) + maskRadius + STAIR_SIDE_GAP;
+  const inwardX =
+    (curtainInner - CURTAIN_SIGHTLINE_GAP - projectedRadius) /
+    projectionScale;
+  const outwardX =
+    (curtainOuter + CURTAIN_SIGHTLINE_GAP + projectedRadius) /
+    projectionScale;
+  const choices: number[] = [];
+  if (inwardX >= minimumStairSideX) choices.push(inwardX);
+  if (outwardX <= MAX_MASK_ABS_X) choices.push(outwardX);
+  if (choices.length === 0) return null;
+
+  const currentX = Math.abs(placement.position.x);
+  const resolvedX = choices.reduce((best, candidate) =>
+    Math.abs(candidate - currentX) < Math.abs(best - currentX)
+      ? candidate
+      : best
+  );
+  const side = placement.position.x < 0 ? -1 : 1;
+  return {
+    ...placement,
+    position: new Vector3(
+      side * resolvedX,
+      placement.position.y,
+      placement.position.z
+    ),
+  };
+}
+
+function placementsOverlap(a: MaskPlacement, b: MaskPlacement) {
+  const deltaX = a.position.x - b.position.x;
+  const deltaY =
+    a.position.y + a.scale * 0.5 - (b.position.y + b.scale * 0.5);
+  const deltaZ = a.position.z - b.position.z;
+  const combinedX =
+    getMaskHorizontalRadius(a.scale) +
+    getMaskHorizontalRadius(b.scale) +
+    MASK_SEPARATION_GAP;
+  const combinedY =
+    (a.scale + b.scale) * 0.55 + MASK_SEPARATION_GAP;
+  const combinedZ =
+    (a.scale + b.scale) * 0.43 + MASK_SEPARATION_GAP;
+  return (
+    (deltaX * deltaX) / (combinedX * combinedX) +
+      (deltaY * deltaY) / (combinedY * combinedY) +
+      (deltaZ * deltaZ) / (combinedZ * combinedZ) <
+    1
+  );
+}
+
+function resolvePlacement(
+  placement: MaskPlacement,
+  accepted: readonly MaskPlacement[]
+) {
+  const side = placement.position.x < 0 ? -1 : 1;
+  const trials = [
+    { outward: 0, y: 0, z: 0 },
+    { outward: 0.7, y: 0.65, z: 0 },
+    { outward: 1.25, y: 0, z: 0.9 },
+    { outward: 0.45, y: 1.25, z: -0.7 },
+    { outward: 1.85, y: 0.8, z: 1.25 },
+    { outward: 1.1, y: 1.75, z: -1.1 },
+  ] as const;
+
+  for (const trial of trials) {
+    const candidate = separateFromCurtainSightline({
+      ...placement,
+      position: new Vector3(
+        placement.position.x + side * trial.outward,
+        placement.position.y + trial.y,
+        placement.position.z + trial.z
+      ),
+    });
+    if (!candidate) continue;
+    if (!accepted.some((other) => placementsOverlap(candidate, other))) {
+      return candidate;
+    }
+  }
+  return null;
+}
 
 export type MaskFieldHandle = {
   root: TransformNode;
@@ -82,6 +225,7 @@ export async function createMaskField(
   let disposed = false;
   const rows = 22;
   const modelPattern = [0, 1, 2, 3, 4, 1, 3, 0, 4, 2] as const;
+  const regularPlacements: MaskPlacement[] = [];
 
   for (let i = 0; i < rows; i += 1) {
     const t = i / Math.max(1, rows - 1);
@@ -95,23 +239,15 @@ export async function createMaskField(
         z + (side > 0 ? 0.7 : -0.4)
       );
       const variation = 0.92 + (i % 5) * 0.1 + (1 - t) * 0.2;
-      const target = new Vector3(0, getStairHeight(z) + 1.3, z + 2);
-      const mask = instantiateMask(
-        scene,
-        containers[modelIndex],
-        root,
-        `mask_${i}_${side < 0 ? "L" : "R"}`,
+      regularPlacements.push({
+        name: `mask_${i}_${side < 0 ? "L" : "R"}`,
+        modelIndex,
         position,
-        2.55 * variation,
-        target,
-        side * (0.025 + (i % 4) * 0.016)
-      );
-      instances.push({
-        root: mask,
-        baseY: mask.position.y,
-        basePitch: mask.rotation.x,
+        scale: 2.55 * variation,
+        roll: side * (0.025 + (i % 4) * 0.016),
         phase: i * 0.61 + (side > 0 ? 1.7 : 0),
-        homeTarget: target,
+        targetYOffset: 1.3,
+        targetZOffset: 2,
       });
     }
   }
@@ -125,24 +261,44 @@ export async function createMaskField(
     { x: 13, y: 20, z: 58, model: 2, scale: 4.3 },
   ] as const;
 
-  for (let i = 0; i < heroPositions.length; i += 1) {
-    const position = heroPositions[i];
-    const target = new Vector3(0, getStairHeight(position.z) + 1.4, position.z);
+  const heroPlacements: MaskPlacement[] = heroPositions.map((position, i) => ({
+    name: `heroMask_${i}`,
+    modelIndex: position.model,
+    position: new Vector3(position.x, position.y, position.z),
+    scale: position.scale,
+    roll: (position.x < 0 ? -1 : 1) * 0.035,
+    phase: 4 + i,
+    targetYOffset: 1.4,
+    targetZOffset: 0,
+  }));
+  const acceptedPlacements: MaskPlacement[] = [];
+
+  for (const placement of [...heroPlacements, ...regularPlacements]) {
+    const resolved = resolvePlacement(placement, acceptedPlacements);
+    if (resolved) acceptedPlacements.push(resolved);
+  }
+
+  for (const placement of acceptedPlacements) {
+    const target = new Vector3(
+      0,
+      getStairHeight(placement.position.z) + placement.targetYOffset,
+      placement.position.z + placement.targetZOffset
+    );
     const mask = instantiateMask(
       scene,
-      containers[position.model],
+      containers[placement.modelIndex],
       root,
-      `heroMask_${i}`,
-      new Vector3(position.x, position.y, position.z),
-      position.scale,
+      placement.name,
+      placement.position,
+      placement.scale,
       target,
-      (position.x < 0 ? -1 : 1) * 0.035
+      placement.roll
     );
     instances.push({
       root: mask,
-      baseY: position.y,
+      baseY: placement.position.y,
       basePitch: mask.rotation.x,
-      phase: 4 + i,
+      phase: placement.phase,
       homeTarget: target,
     });
   }

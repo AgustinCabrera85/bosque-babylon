@@ -48,11 +48,18 @@ export type WaterfallAudioArea = {
   volumeScale?: number;
 };
 
+export type FootstepEchoSettings = {
+  delaySeconds: number;
+  feedback: number;
+  wetVolume: number;
+};
+
 export type LevelAudioProfile = {
   backgroundTrack: string;
   ambientTrack?: string | null;
   waterfallArea?: WaterfallAudioArea | null;
   walkFootstepTrack?: string;
+  walkFootstepEcho?: FootstepEchoSettings | null;
 };
 
 export type MusicPlayerHandle = {
@@ -156,6 +163,12 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   let footstepMode: "idle" | "walk" | "run" = "idle";
   let audioContext: AudioContext | null = null;
   let sfxGain: GainNode | null = null;
+  let walkSource: MediaElementAudioSourceNode | null = null;
+  let walkDryGain: GainNode | null = null;
+  let walkEchoDelay: DelayNode | null = null;
+  let walkEchoFeedback: GainNode | null = null;
+  let walkEchoGain: GainNode | null = null;
+  let walkFootstepEcho: FootstepEchoSettings | null = null;
   let waterfallSource: MediaElementAudioSourceNode | null = null;
   let waterfallGain: GainNode | null = null;
   let waterfallArea: WaterfallAudioArea | null = null;
@@ -186,6 +199,20 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       sfxGain = audioContext.createGain();
       sfxGain.connect(audioContext.destination);
       sfxGain.gain.value = volumes.sfx;
+
+      walkSource = audioContext.createMediaElementSource(walkSfx);
+      walkDryGain = audioContext.createGain();
+      walkEchoDelay = audioContext.createDelay(0.4);
+      walkEchoFeedback = audioContext.createGain();
+      walkEchoGain = audioContext.createGain();
+      walkSource.connect(walkDryGain);
+      walkDryGain.connect(sfxGain);
+      walkSource.connect(walkEchoDelay);
+      walkEchoDelay.connect(walkEchoGain);
+      walkEchoGain.connect(sfxGain);
+      walkEchoDelay.connect(walkEchoFeedback);
+      walkEchoFeedback.connect(walkEchoDelay);
+      updateWalkFootstepMix();
 
       waterfallSource = audioContext.createMediaElementSource(waterfall);
       waterfallGain = audioContext.createGain();
@@ -220,11 +247,17 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   }
 
   function setSfxElementVolumes(volume: number) {
-    walkSfx.volume = volume * 0.58;
+    if (walkSource) {
+      // The routed walk track is scaled by walkDryGain and the shared SFX gain.
+      walkSfx.volume = 1;
+      walkSfx.muted = false;
+    } else {
+      walkSfx.volume = volume * 0.58;
+      walkSfx.muted = volume <= 0;
+    }
     runSfx.volume = volume * 0.62;
     jumpSfx.volume = volume * 0.7;
     doorSfx.volume = volume * 0.86;
-    walkSfx.muted = volume <= 0;
     runSfx.muted = volume <= 0;
     jumpSfx.muted = volume <= 0;
     doorSfx.muted = volume <= 0;
@@ -232,6 +265,39 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       audio.volume = volume;
       audio.muted = volume <= 0;
     }
+  }
+
+  function updateWalkFootstepMix() {
+    if (
+      !audioContext ||
+      !walkDryGain ||
+      !walkEchoDelay ||
+      !walkEchoFeedback ||
+      !walkEchoGain
+    ) {
+      return;
+    }
+
+    const now = audioContext.currentTime;
+    const echo = walkFootstepEcho;
+    walkDryGain.gain.setValueAtTime(0.58, now);
+    walkEchoDelay.delayTime.setValueAtTime(
+      echo ? Math.max(0.04, Math.min(0.35, echo.delaySeconds)) : 0.1,
+      now
+    );
+    walkEchoFeedback.gain.setValueAtTime(
+      echo ? Math.max(0, Math.min(0.55, echo.feedback)) : 0,
+      now
+    );
+    walkEchoGain.gain.setValueAtTime(
+      echo ? Math.max(0, Math.min(0.35, echo.wetVolume)) : 0,
+      now
+    );
+  }
+
+  function setWalkFootstepEcho(settings: FootstepEchoSettings | null) {
+    walkFootstepEcho = settings;
+    updateWalkFootstepMix();
   }
 
   function updateWaterfallVolume() {
@@ -524,6 +590,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       setWalkFootstepTrack(
         profile.walkFootstepTrack ?? DEFAULT_WALK_FOOTSTEP_TRACK
       );
+      setWalkFootstepEcho(profile.walkFootstepEcho ?? null);
       if (profile.ambientTrack !== undefined) {
         setAmbientTrack(profile.ambientTrack);
       }

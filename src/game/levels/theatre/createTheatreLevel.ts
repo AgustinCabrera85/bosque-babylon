@@ -187,6 +187,7 @@ export async function createTheatreLevel(
           ambientTrack: null,
           waterfallArea: null,
           walkFootstepTrack: THEATRE_LOCOMOTION.walkFootstepTrack,
+          walkFootstepEcho: THEATRE_LOCOMOTION.walkFootstepEcho,
         });
       },
       update,

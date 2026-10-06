@@ -14,6 +14,13 @@ type LevelManagerContext = Omit<
   "entryPoint" | "requestLevelTransition"
 >;
 
+export type LevelTransitionRequest = {
+  fromLevel: LevelId | null;
+  toLevel: LevelId;
+  entryPoint?: string;
+  load(): Promise<GameLevel>;
+};
+
 type LevelManagerOptions = {
   registry: LevelRegistry;
   context: LevelManagerContext;
@@ -21,6 +28,9 @@ type LevelManagerOptions = {
   playerStats: PlayerStatsSystem;
   musicPlayer: MusicPlayerHandle | null;
   onActiveSceneChanged?: (scene: Scene | null) => void;
+  onLevelTransitionRequested?: (
+    request: LevelTransitionRequest
+  ) => Promise<void> | void;
   onTransitionError?: (error: unknown) => void;
 };
 
@@ -71,7 +81,19 @@ export class LevelManager {
         ...this.options.context,
         entryPoint,
         requestLevelTransition: (nextLevel, nextEntryPoint) => {
-          void this.loadLevel(nextLevel, nextEntryPoint).catch((error) => {
+          const load = () => this.loadLevel(nextLevel, nextEntryPoint);
+          const transitionHandler = this.options.onLevelTransitionRequested;
+          const transitionTask = transitionHandler
+            ? Promise.resolve().then(() =>
+                transitionHandler({
+                  fromLevel: this.activeLevel?.id ?? null,
+                  toLevel: nextLevel,
+                  entryPoint: nextEntryPoint,
+                  load,
+                })
+              )
+            : load().then(() => undefined);
+          void transitionTask.catch((error) => {
             this.options.onTransitionError?.(error);
           });
         },

@@ -575,6 +575,51 @@ body.sky-eye-cinematic-active #inventoryButton {
   transition: width 180ms ease;
 }
 
+.level-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #fff;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 90ms linear,
+    visibility 0s linear 90ms;
+  will-change: opacity;
+}
+
+.level-transition-overlay.active {
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+.level-transition-overlay.active.covered {
+  opacity: 1;
+}
+
+.level-transition-overlay.active.revealing {
+  opacity: 0;
+  transition-duration: 2200ms, 0s;
+  transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1), linear;
+  transition-delay: 0s, 2200ms;
+}
+
+.level-transition-content {
+  width: min(760px, 88vw);
+  min-height: 1px;
+  pointer-events: none;
+}
+
+body.level-transition-active,
+body.level-transition-active * {
+  cursor: none !important;
+}
+
 .opening-sequence {
   position: fixed;
   inset: 0;

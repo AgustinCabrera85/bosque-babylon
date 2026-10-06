@@ -158,10 +158,17 @@ export class ShadowGrabberBehaviorSystem {
   }
 
   /** Ends every gameplay grab and retires the forest hunters for the finale. */
-  public retireAll() {
+  public retireAll(disposeControllers = false) {
     for (const behavior of this.behaviors.values()) {
       behavior.dispose();
-      behavior.controller.setEnabled(false);
+      if (disposeControllers) {
+        // These hunters cannot return after the terminal threshold. Deferred
+        // disposal removes their meshes, skeletons, materials and portal
+        // lights without concentrating all cleanup in one frame.
+        behavior.controller.dispose(true);
+      } else {
+        behavior.controller.setEnabled(false);
+      }
     }
     this.behaviors.clear();
     for (const debugView of this.debugViews.values()) debugView.dispose();

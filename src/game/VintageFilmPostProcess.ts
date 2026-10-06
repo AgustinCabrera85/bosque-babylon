@@ -115,27 +115,7 @@ vec3 applySlasherLut(vec3 color) {
   return mix(mix(shadowGrade, warmGrade, 0.72), redBias, 0.22);
 }
 
-void main(void) {
-  vec2 uv = vUV;
-
-  float tapeNoise = random(vec2(floor(uv.y * 88.0), floor(time * 9.0)));
-  float glitchBand = step(0.972, tapeNoise) * glitchIntensity;
-  float slowWave = sin(uv.y * 38.0 + time * 2.4) * 0.0012;
-  float fastWave = sin(uv.y * 420.0 + time * 18.0) * 0.00038;
-  uv.x += (slowWave + fastWave) * lineDistortion;
-  uv.x += (random(vec2(floor(time * 16.0), floor(uv.y * 45.0))) - 0.5) * glitchBand * 0.04;
-  uv = barrel(uv, 0.026 * lineDistortion);
-
-  vec2 chromaDir = uv - vec2(0.5);
-  float chromaFalloff = smoothstep(0.12, 0.82, length(chromaDir) * 1.38);
-  vec2 chromaOffset = normalize(chromaDir + vec2(0.0001)) * chromaticAberration * chromaFalloff / max(resolution.x, 1.0);
-
-  vec3 base = sampleWithEdgeBlur(uv, edgeBlur);
-  float red = texture2D(textureSampler, uv + chromaOffset).r;
-  float blue = texture2D(textureSampler, uv - chromaOffset).b;
-  vec3 color = vec3(red, base.g, blue);
-  color = mix(base, color, 0.86);
-
+vec3 applyFilmGrade(vec3 color, vec2 uv, float glitchBand) {
   color *= exposure;
   color = (color - 0.5) * contrast + 0.5;
   float gray = luma(color);
@@ -151,10 +131,54 @@ void main(void) {
   float dist = distance(vUV, vec2(0.5));
   float vignette = smoothstep(0.92 - vignetteSoftness, 0.92, dist * 1.5);
   color *= 1.0 - vignette * vignetteIntensity;
-
   color += glitchBand * vec3(0.035, -0.012, 0.02);
+  return clamp(color, 0.0, 1.0);
+}
+
+void main(void) {
+  vec2 uv = vUV;
   vec3 sourceColor = texture2D(textureSampler, vUV).rgb;
-  vec3 filteredColor = clamp(color, 0.0, 1.0);
+
+  float tapeNoise = random(vec2(floor(uv.y * 88.0), floor(time * 9.0)));
+  float glitchBand = step(0.972, tapeNoise) * glitchIntensity;
+
+  // A small sanity penalty should not pay for the eight-sample distortion
+  // path. Grain, grading and vignette remain visible with a single read.
+  if (effectIntensity < 0.3) {
+    vec3 filteredColor = applyFilmGrade(sourceColor, vUV, glitchBand);
+    gl_FragColor = vec4(mix(sourceColor, filteredColor, effectIntensity), 1.0);
+    return;
+  }
+
+  float slowWave = sin(uv.y * 38.0 + time * 2.4) * 0.0012;
+  float fastWave = sin(uv.y * 420.0 + time * 18.0) * 0.00038;
+  uv.x += (slowWave + fastWave) * lineDistortion;
+  uv.x += (random(vec2(floor(time * 16.0), floor(uv.y * 45.0))) - 0.5) * glitchBand * 0.04;
+  uv = barrel(uv, 0.026 * lineDistortion);
+
+  vec2 chromaDir = uv - vec2(0.5);
+  float chromaFalloff = smoothstep(0.12, 0.82, length(chromaDir) * 1.38);
+  vec2 chromaOffset = normalize(chromaDir + vec2(0.0001)) * chromaticAberration * chromaFalloff / max(resolution.x, 1.0);
+
+  vec3 base;
+  vec3 color;
+  if (effectIntensity < 0.65) {
+    vec2 texel = 1.0 / max(resolution, vec2(1.0));
+    float edgeMask = smoothstep(0.16, 0.72, distance(uv, vec2(0.5)) * 1.42);
+    vec2 dir = normalize(uv - vec2(0.5) + vec2(0.0001));
+    vec2 blur = dir * texel * edgeBlur * edgeMask * 6.0;
+    base = texture2D(textureSampler, uv).rgb * 0.6;
+    base += texture2D(textureSampler, uv + blur).rgb * 0.2;
+    base += texture2D(textureSampler, uv - blur).rgb * 0.2;
+    color = base;
+  } else {
+    base = sampleWithEdgeBlur(uv, edgeBlur);
+    float red = texture2D(textureSampler, uv + chromaOffset).r;
+    float blue = texture2D(textureSampler, uv - chromaOffset).b;
+    color = mix(base, vec3(red, base.g, blue), 0.86);
+  }
+
+  vec3 filteredColor = applyFilmGrade(color, uv, glitchBand);
   gl_FragColor = vec4(mix(sourceColor, filteredColor, effectIntensity), 1.0);
 }
 `;

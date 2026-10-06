@@ -5,6 +5,7 @@ import { Material } from "@babylonjs/core/Materials/material";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import { RenderTargetTexture } from "@babylonjs/core/Materials/Textures/renderTargetTexture";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
@@ -66,31 +67,69 @@ float hash21(vec2 p) {
   return fract(p.x * p.y);
 }
 
+float valueNoise(vec2 p) {
+  vec2 cell = floor(p);
+  vec2 local = fract(p);
+  local = local * local * (3.0 - 2.0 * local);
+  float a = hash21(cell);
+  float b = hash21(cell + vec2(1.0, 0.0));
+  float c = hash21(cell + vec2(0.0, 1.0));
+  float d = hash21(cell + vec2(1.0, 1.0));
+  return mix(mix(a, b, local.x), mix(c, d, local.x), local.y);
+}
+
 void main(void) {
   vec2 p = (vUV - 0.5) * 2.0;
-  float radius = length(p);
-  if (radius > 1.0) discard;
+  // Bend the aperture very slightly so it reads as a tear instead of a
+  // manufactured ellipse. The high frequencies remain almost static: the
+  // edge flickers, but never wobbles like a cartoon outline.
+  p.x += sin(p.y * 4.7 + 0.8) * 0.026;
+  p.x += sin(p.y * 11.3 - 1.1) * 0.009;
 
+  float radius = length(p);
   float angle = atan(p.y, p.x);
-  float twist = angle * 7.0 - time * 2.5 + radius * 18.0;
-  float counterTwist = -angle * 12.0 + time * 3.6 + radius * 28.0;
+  float edgeNoise = sin(angle * 7.0 + 0.4) * 0.026;
+  edgeNoise += sin(angle * 17.0 - 1.2) * 0.012;
+  edgeNoise += sin(angle * 31.0 + time * 0.14) * 0.005;
+  edgeNoise += (valueNoise(vec2(angle * 3.1, 2.7)) - 0.5) * 0.026;
+  float boundary = 0.91 + edgeNoise;
+  float edgeDistance = boundary - radius;
+
+  float interior = smoothstep(-0.012, 0.024, edgeDistance);
+  float hairline = exp(-abs(edgeDistance) * 118.0);
+  float edgeAura = exp(-abs(edgeDistance) * 25.0);
+
+  float branchWaveA = abs(sin(angle * 9.0 + radius * 19.0 + 0.7));
+  float branchWaveB = abs(sin(angle * 15.0 - radius * 28.0 - 1.4));
+  float branchA = 1.0 - smoothstep(0.0, 0.075, branchWaveA);
+  float branchB = 1.0 - smoothstep(0.0, 0.052, branchWaveB);
+  float branchBand = smoothstep(boundary - 0.22, boundary - 0.08, radius) *
+    (1.0 - smoothstep(boundary + 0.018, boundary + 0.065, radius));
+  float branches = max(branchA, branchB * 0.72) * branchBand;
+
+  if (interior < 0.002 && edgeAura < 0.025 && branches < 0.025) discard;
+
+  float normalizedRadius = radius / max(0.2, boundary);
+  float twist = angle * 7.0 - time * 2.5 + normalizedRadius * 18.0;
+  float counterTwist = -angle * 12.0 + time * 3.6 + normalizedRadius * 28.0;
   float filaments = pow(0.5 + 0.5 * sin(twist), 5.0) * 0.56;
   filaments += pow(0.5 + 0.5 * sin(counterTwist), 8.0) * 0.34;
-  float grain = hash21(floor((p + time * 0.018) * 52.0));
-  float aperture = 1.0 - smoothstep(0.84, 1.0, radius);
-  float rim = smoothstep(0.57, 0.91, radius) *
-    (1.0 - smoothstep(0.91, 1.0, radius));
-  float center = 1.0 - smoothstep(0.0, 0.78, radius);
-  float pulse = 0.9 + 0.1 * sin(time * 3.4 + radius * 12.0);
+  float grain = valueNoise(p * 36.0 + vec2(time * 0.22, -time * 0.13));
+  float center = 1.0 - smoothstep(0.02, 0.78, normalizedRadius);
+  float pulse = 0.94 + 0.06 * sin(time * 3.1 + normalizedRadius * 10.0);
 
-  vec3 color = mix(vec3(0.13, 0.42, 0.72), vec3(0.7, 0.9, 1.0), center);
-  color += vec3(0.26, 0.18, 0.62) * rim * 0.78;
-  color += vec3(0.62, 0.84, 1.0) * filaments * (0.34 + center * 0.62);
-  color += vec3(0.26, 0.55, 0.9) * grain * 0.055;
-  color *= pulse;
+  vec3 color = mix(vec3(0.055, 0.27, 0.58), vec3(0.72, 0.91, 1.0), center);
+  color += vec3(0.56, 0.82, 1.0) * filaments * (0.3 + center * 0.68);
+  color += vec3(0.2, 0.49, 0.9) * grain * 0.045;
+  color *= interior * pulse;
+  color += vec3(0.83, 0.95, 1.0) * hairline * 2.15;
+  color += vec3(0.3, 0.66, 1.0) * edgeAura * 0.34;
+  color += vec3(0.76, 0.92, 1.0) * branches * 1.42;
 
-  float alpha = aperture * (0.72 + center * 0.24 + filaments * 0.08) * reveal;
-  gl_FragColor = vec4(color * (0.72 + reveal * 0.38), alpha);
+  float interiorAlpha = interior * (0.73 + center * 0.22 + filaments * 0.07);
+  float fractureAlpha = max(hairline * 0.98, branches * 0.86);
+  float alpha = max(interiorAlpha, max(edgeAura * 0.24, fractureAlpha)) * reveal;
+  gl_FragColor = vec4(color * (0.74 + reveal * 0.34), alpha);
 }
 `;
 
@@ -158,8 +197,6 @@ export class LuminousLevelExitPortal {
   private readonly particleAnchor: Mesh;
   private readonly core: Mesh;
   private readonly coreMaterial: ShaderMaterial;
-  private readonly ring: Mesh;
-  private readonly ringMaterial: StandardMaterial;
   private readonly lightSource: Mesh;
   private readonly lightSourceMaterial: StandardMaterial;
   private readonly portalLight: PointLight;
@@ -172,6 +209,7 @@ export class LuminousLevelExitPortal {
   private readonly getPlayerPosition: () => Vector3;
   private readonly onEntered: () => void;
   private readonly camera?: Camera;
+  private readonly volumetricOccluders: readonly AbstractMesh[];
   private readonly quality: "low" | "high";
   private readonly width: number;
   private readonly height: number;
@@ -189,6 +227,7 @@ export class LuminousLevelExitPortal {
     this.getPlayerPosition = options.getPlayerPosition;
     this.onEntered = options.onEntered;
     this.camera = options.camera;
+    this.volumetricOccluders = [...new Set(options.litMeshes ?? [])];
     this.quality = options.quality ?? "high";
     this.width = options.width ?? 4.9;
     this.height = options.height ?? 6.3;
@@ -231,34 +270,6 @@ export class LuminousLevelExitPortal {
     this.core.scaling.set(this.width, this.height, 1);
     this.core.material = this.coreMaterial;
     this.configureVisualMesh(this.core, 1);
-
-    this.ringMaterial = new StandardMaterial(
-      "luminousLevelExitPortalRingMaterial",
-      scene
-    );
-    this.ringMaterial.diffuseColor = new Color3(0.08, 0.22, 0.42);
-    this.ringMaterial.emissiveColor = new Color3(0.5, 0.78, 1);
-    this.ringMaterial.specularColor = Color3.Black();
-    this.ringMaterial.disableLighting = true;
-    this.ringMaterial.alpha = 0;
-    this.ringMaterial.alphaMode = Engine.ALPHA_ADD;
-    this.ringMaterial.transparencyMode = Material.MATERIAL_ALPHABLEND;
-    this.ringMaterial.disableDepthWrite = true;
-
-    this.ring = MeshBuilder.CreateTorus(
-      "luminousLevelExitPortalRing",
-      {
-        diameter: 1,
-        thickness: 0.075,
-        tessellation: this.quality === "high" ? 72 : 40,
-      },
-      scene
-    );
-    this.ring.parent = this.root;
-    this.ring.rotation.x = Math.PI * 0.5;
-    this.ring.scaling.set(this.width * 1.08, 1, this.height * 1.08);
-    this.ring.material = this.ringMaterial;
-    this.configureVisualMesh(this.ring, 2);
 
     this.lightSourceMaterial = new StandardMaterial(
       "luminousLevelExitPortalLightSourceMaterial",
@@ -350,8 +361,6 @@ export class LuminousLevelExitPortal {
     this.root.scaling.set(openingScale * pulse, openingScale * pulse, openingScale);
     this.coreMaterial.setFloat("time", this.elapsed);
     this.coreMaterial.setFloat("reveal", this.reveal);
-    this.ringMaterial.alpha = this.reveal * (0.68 + Math.sin(this.elapsed * 4.1) * 0.08);
-    this.ring.rotation.z = this.elapsed * 0.22;
     this.lightSource.scaling.setAll(0.12 + this.reveal * 0.88);
     this.portalLight.intensity = this.reveal *
       (1.05 + Math.sin(this.elapsed * 3.1) * 0.08);
@@ -401,11 +410,9 @@ export class LuminousLevelExitPortal {
     this.smokeTexture.dispose();
     this.sparkTexture.dispose();
     this.core.dispose(false, false);
-    this.ring.dispose(false, false);
     this.lightSource.dispose(false, false);
     this.particleAnchor.dispose(false, false);
     this.coreMaterial.dispose(false, false);
-    this.ringMaterial.dispose(false, false);
     this.lightSourceMaterial.dispose(false, false);
     this.portalLight.dispose();
     this.root.dispose(false, false);
@@ -430,7 +437,7 @@ export class LuminousLevelExitPortal {
     smoke.isLocal = true;
     smoke.startPositionFunction = (_worldMatrix, positionToUpdate) => {
       const angle = Math.random() * TAU;
-      const radius = 0.49 + (Math.random() - 0.5) * 0.075;
+      const radius = 0.455 + (Math.random() - 0.5) * 0.038;
       positionToUpdate.set(
         Math.cos(angle) * this.width * radius,
         Math.sin(angle) * this.height * radius,
@@ -447,21 +454,25 @@ export class LuminousLevelExitPortal {
       );
       directionToUpdate.normalize();
     };
-    smoke.minEmitPower = 0.12;
-    smoke.maxEmitPower = 0.38;
-    smoke.minLifeTime = 1.45;
-    smoke.maxLifeTime = 2.8;
-    smoke.emitRate = this.quality === "high" ? 70 : 34;
-    smoke.minAngularSpeed = -1.4;
-    smoke.maxAngularSpeed = 1.4;
+    smoke.minEmitPower = 0.08;
+    smoke.maxEmitPower = 0.24;
+    smoke.minLifeTime = 1.1;
+    smoke.maxLifeTime = 1.9;
+    smoke.emitRate = this.quality === "high" ? 46 : 22;
+    smoke.minAngularSpeed = -0.65;
+    smoke.maxAngularSpeed = 0.65;
     smoke.gravity.set(0, 0.04, 0);
-    smoke.color1 = new Color4(0.48, 0.74, 1, 0.34);
-    smoke.color2 = new Color4(0.72, 0.88, 1, 0.22);
-    smoke.colorDead = new Color4(0.18, 0.34, 0.58, 0);
-    smoke.addSizeGradient(0, 0.26, 0.42);
-    smoke.addSizeGradient(0.42, 0.72, 1.04);
-    smoke.addSizeGradient(1, 1.2, 1.65);
-    smoke.blendMode = ParticleSystem.BLENDMODE_ADD;
+    smoke.minScaleX = 0.42;
+    smoke.maxScaleX = 0.72;
+    smoke.minScaleY = 1.2;
+    smoke.maxScaleY = 2.1;
+    smoke.color1 = new Color4(0.42, 0.7, 1, 0.16);
+    smoke.color2 = new Color4(0.7, 0.88, 1, 0.1);
+    smoke.colorDead = new Color4(0.14, 0.28, 0.5, 0);
+    smoke.addSizeGradient(0, 0.16, 0.25);
+    smoke.addSizeGradient(0.48, 0.42, 0.62);
+    smoke.addSizeGradient(1, 0.62, 0.84);
+    smoke.blendMode = ParticleSystem.BLENDMODE_STANDARD;
     smoke.renderingGroupId = 1;
     smoke.applyFog = false;
     smoke.disposeOnStop = false;
@@ -479,7 +490,7 @@ export class LuminousLevelExitPortal {
     sparks.isLocal = true;
     sparks.startPositionFunction = (_worldMatrix, positionToUpdate) => {
       const angle = Math.random() * TAU;
-      const radius = Math.sqrt(Math.random()) * 0.46;
+      const radius = 0.43 + Math.random() * 0.035;
       positionToUpdate.set(
         Math.cos(angle) * this.width * radius,
         Math.sin(angle) * this.height * radius,
@@ -496,7 +507,7 @@ export class LuminousLevelExitPortal {
     sparks.maxEmitPower = 4.4;
     sparks.minLifeTime = 0.24;
     sparks.maxLifeTime = 0.68;
-    sparks.emitRate = this.quality === "high" ? 48 : 24;
+    sparks.emitRate = this.quality === "high" ? 28 : 14;
     sparks.minSize = 0.035;
     sparks.maxSize = 0.095;
     sparks.minScaleX = 0.42;
@@ -518,10 +529,15 @@ export class LuminousLevelExitPortal {
     if (this.quality !== "high" || !this.camera || this.volumetricLight) return;
     this.volumetricLight = new VolumetricLightScatteringPostProcess(
       "luminousLevelExitPortalGodRays",
-      0.35,
+      {
+        // Keep the final composition at camera resolution. Only the occlusion
+        // pass needs to be small, otherwise Babylon upscales the whole scene.
+        postProcessRatio: 1,
+        passRatio: 0.25,
+      },
       this.camera,
       this.lightSource,
-      48,
+      8,
       undefined,
       undefined,
       false,
@@ -531,7 +547,13 @@ export class LuminousLevelExitPortal {
     this.volumetricLight.decay = 0.965;
     this.volumetricLight.weight = 0.78;
     this.volumetricLight.density = 0.88;
-    this.volumetricLight.getPass().renderParticles = false;
+    this.volumetricLight.includedMeshes.push(
+      this.lightSource,
+      ...this.volumetricOccluders.filter((mesh) => !mesh.isDisposed())
+    );
+    const pass = this.volumetricLight.getPass();
+    pass.renderParticles = false;
+    pass.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONEVERYTWOFRAMES;
   }
 
   private getPlayerCoordinates() {

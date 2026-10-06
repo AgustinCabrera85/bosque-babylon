@@ -1,5 +1,6 @@
 import "./style.css";
 import { Engine } from "@babylonjs/core/Engines/engine";
+import type { Scene } from "@babylonjs/core/scene";
 import { setupMusicPlayer } from "./game/MusicPlayer";
 import { setupPauseMenu } from "./game/PauseMenu";
 import { readStoredResolutionMode, resolveHardwareScalingLevel } from "./game/PauseVideo";
@@ -11,6 +12,7 @@ import { LevelManager } from "./game/runtime/LevelManager";
 import { LevelRegistry } from "./game/runtime/LevelRegistry";
 import type { LevelId, PerformanceTier } from "./game/runtime/LevelTypes";
 import { GameSession } from "./game/runtime/GameSession";
+import { setupLevelTransitionOverlay } from "./game/runtime/LevelTransitionOverlay";
 import { setupInputPrompts } from "./game/input/InputPrompts";
 import { setupGamepadFeedback } from "./game/input/GamepadFeedback";
 import { CursorController } from "./game/input/CursorController";
@@ -108,8 +110,52 @@ function shouldUseMobileQuality() {
   return isTouchFirstDevice() || smallScreen || memory <= 4;
 }
 
+async function calibrateAutomaticHardwareScaling(
+  scene: Scene,
+  currentScaling: number
+) {
+  if (document.visibilityState !== "visible") return currentScaling;
+
+  // Calibrate behind the loading screen after all forest states were warmed.
+  // This prevents later resolution changes from reallocating framebuffers in
+  // front of the player and ignores isolated compilation/GC spikes by using
+  // the median of several complete display intervals.
+  const samples: number[] = [];
+  scene.render();
+  let previousFrameStart = performance.now();
+  for (let frame = 0; frame < 13; frame++) {
+    await nextFrame();
+    const frameStart = performance.now();
+    if (frame >= 3) samples.push(frameStart - previousFrameStart);
+    scene.render();
+    previousFrameStart = frameStart;
+  }
+
+  const sorted = samples.sort((a, b) => a - b);
+  const medianFrameMs = sorted[Math.floor(sorted.length * 0.5)] ?? 0;
+  const calibratedScaling = medianFrameMs >= 30
+    ? 2
+    : medianFrameMs >= 22
+      ? 1.67
+      : medianFrameMs >= 18.5
+        ? 1.43
+        : currentScaling;
+  const nextScaling = Math.max(currentScaling, calibratedScaling);
+  if (nextScaling <= currentScaling + 0.01) return currentScaling;
+
+  engine.setHardwareScalingLevel(nextScaling);
+  engine.resize();
+  // Absorb framebuffer allocation and the first resized frames while the
+  // loading cover is still opaque.
+  for (let frame = 0; frame < 3; frame++) {
+    scene.render();
+    await nextFrame();
+  }
+  return nextScaling;
+}
+
 const performanceTier: PerformanceTier = shouldUseMobileQuality() ? "mobile" : "desktop";
-const automaticHardwareScaling = performanceTier === "mobile"
+let automaticHardwareScaling = performanceTier === "mobile"
   ? ((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8) <= 4 ? 2.25 : 1.8
   // 80% per axis retains the vintage image while cutting full-screen work by 36%.
   : 1.25;
@@ -170,7 +216,7 @@ async function start() {
   const pauseMenu = setupPauseMenu({
     canvas: renderCanvas,
     engine,
-    automaticHardwareScaling,
+    getAutomaticHardwareScaling: () => automaticHardwareScaling,
     input,
   });
   const itemInspector = setupItemInspector({ input });
@@ -187,6 +233,7 @@ async function start() {
     input,
     playerStats: session.playerStats,
   });
+  const levelTransitionOverlay = setupLevelTransitionOverlay();
 
   const registry = new LevelRegistry().register("forest", async () => {
     const module = await import("./game/levels/forest/createForestLevel");
@@ -196,6 +243,7 @@ async function start() {
     return module.createTheatreLevel;
   });
   let activeDebug: { dispose(): void } | null = null;
+  let portalTransitionPending = false;
   const levelManager = new LevelManager({
     registry,
     context: {
@@ -217,6 +265,43 @@ async function start() {
       if (!scene) cursorController.setCursorRequest("interaction", null);
       activeDebug?.dispose();
       activeDebug = scene ? debugBootstrap?.bootstrapDebug(scene) ?? null : null;
+    },
+    onLevelTransitionRequested: async ({ entryPoint, load }) => {
+      if (entryPoint !== "forest-exit-portal") {
+        await load();
+        return;
+      }
+      if (portalTransitionPending) return;
+      portalTransitionPending = true;
+      pauseMenu.setPaused(false);
+      inventory.close();
+      itemInspector.close();
+      hideLoading();
+
+      try {
+        await levelTransitionOverlay.cover();
+        const minimumWhiteHold = wait(2000);
+        const loaded = await load();
+        await new Promise<void>((resolve) => {
+          loaded.scene.onAfterRenderObservable.addOnce(() => resolve());
+        });
+
+        // Future narrative beat: reproduce transition audio and reveal its
+        // text here while the frame remains completely white.
+        // Loading happens behind the white frame; reveal only after both the
+        // next scene is ready and the two-second narrative window has elapsed.
+        await minimumWhiteHold;
+      } catch (error) {
+        showLoading();
+        setLoading(1, "No se pudo cambiar de nivel");
+        throw error;
+      } finally {
+        try {
+          await levelTransitionOverlay.reveal();
+        } finally {
+          portalTransitionPending = false;
+        }
+      }
     },
     onTransitionError: (error) => {
       console.error("No se pudo cambiar de nivel", error);
@@ -325,6 +410,17 @@ async function start() {
     initialLevelId === "forest" ? "initial" : "dev"
   );
   const scene = initialLevel.scene;
+  if (
+    initialLevelId === "forest" &&
+    performanceTier === "desktop" &&
+    readStoredResolutionMode() === "auto"
+  ) {
+    setLoading(0.99, "Ajustando rendimiento...");
+    automaticHardwareScaling = await calibrateAutomaticHardwareScaling(
+      scene,
+      automaticHardwareScaling
+    );
+  }
   window.addEventListener("pagehide", () => {
     window.removeEventListener(
       CHECKPOINT_RESTART_EVENT,
@@ -335,6 +431,7 @@ async function start() {
       onCharacterSelectionReturnRequested
     );
     levelManager.dispose();
+    levelTransitionOverlay.dispose();
     gamepadFeedback.dispose();
     unsubscribeCursorDevice();
     cursorController.dispose();
@@ -353,11 +450,12 @@ async function start() {
   engine.runRenderLoop(() => {
     const deltaSeconds = engine.getDeltaTime() / 1000;
     input.update(deltaSeconds);
+    const levelTransitionActive = levelTransitionOverlay.isActive;
     const modalWasOpen =
       pauseMenu.isPaused() || itemInspector.isOpen() || inventory.isOpen();
 
     let modalActionHandled = false;
-    if (input.wasPressed("cancel")) {
+    if (!levelTransitionActive && input.wasPressed("cancel")) {
       if (itemInspector.isOpen()) {
         itemInspector.close();
         modalActionHandled = true;
@@ -369,13 +467,18 @@ async function start() {
         modalActionHandled = true;
       }
     }
-    if (!modalActionHandled && input.wasPressed("pause")) {
+    if (
+      !levelTransitionActive &&
+      !modalActionHandled &&
+      input.wasPressed("pause")
+    ) {
       if (inventory.isOpen()) inventory.close();
       if (!itemInspector.isOpen()) pauseMenu.toggle();
       modalActionHandled = true;
     }
     if (
       !modalActionHandled &&
+      !levelTransitionActive &&
       input.wasPressed("inventory") &&
       !pauseMenu.isPaused() &&
       !itemInspector.isOpen()
@@ -388,6 +491,7 @@ async function start() {
     itemInspector.update(deltaSeconds);
 
     const gameplayBlocked =
+      levelTransitionActive ||
       modalWasOpen ||
       pauseMenu.isPaused() ||
       itemInspector.isOpen() ||
@@ -404,14 +508,24 @@ async function start() {
       inventory.isOpen() ||
       cinematicActive ||
       loadingActive ||
+      levelTransitionActive ||
       document.body.classList.contains("house-arrival-cinematic-active") ||
       document.body.classList.contains("character-selecting");
     cursorController.setCursorRequest("ui", menuCursorActive ? "menu" : null);
     gamepadFeedback.update(
       deltaSeconds,
-      !gameplayBlocked && !cinematicActive && !loadingActive
+      !gameplayBlocked &&
+        !cinematicActive &&
+        !loadingActive &&
+        !levelTransitionActive
     );
 
+    if (levelTransitionActive) {
+      // Once loading finishes, draw the next scene behind the opaque white
+      // frame so its first visible frame is already complete.
+      levelManager.render();
+      return;
+    }
     if (gameplayBlocked) return;
     levelManager.update(deltaSeconds);
     levelManager.render();

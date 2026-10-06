@@ -42,8 +42,6 @@ uniform float smokeTurbulence;
 uniform float stateChaos;
 uniform float statePull;
 uniform float deathProgress;
-uniform vec3 spectralTint;
-uniform float spectralTintStrength;
 
 varying vec3 vLocalPosition;
 varying vec3 vLocalNormal;
@@ -95,6 +93,8 @@ uniform float portalIntensity;
 uniform float stateChaos;
 uniform float statePull;
 uniform float deathProgress;
+uniform vec3 spectralTint;
+uniform float spectralTintStrength;
 
 varying vec3 vLocalPosition;
 varying vec3 vLocalNormal;

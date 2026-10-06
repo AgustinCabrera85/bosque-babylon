@@ -221,6 +221,10 @@ const START_FOREST_CLOSURE_Z = -18;
 const END_HOUSE_MODEL_SCALE = 1.55;
 const END_HOUSE_RESERVE_WIDTH = 122;
 const END_HOUSE_RESERVE_DEPTH = 150;
+// The house GLB is loaded and shader-warmed with the rest of the level, but
+// its heavy geometry should not be submitted from the beginning of the forest.
+const END_HOUSE_VISUAL_ACTIVATION_RADIUS = 230;
+const END_HOUSE_VISUAL_DEACTIVATION_RADIUS = 260;
 const INTERACTION_RAY_LENGTH = 4.25;
 const FIRST_NOTE_SEGMENT_ID = 1;
 const FIRST_MATCHBOX_SEGMENT_ID = FIRST_NOTE_SEGMENT_ID;
@@ -341,6 +345,8 @@ export class Segments {
   private endHouseMeshes: AbstractMesh[] = [];
   private endHouseBrazierFire: BrazierProceduralFireHandle | null = null;
   private endHouseBounds: WorldBounds | null = null;
+  private endHouseVisualRoot: AbstractMesh | null = null;
+  private endHouseVisualsActive = true;
   private hermanoMayor: HermanoMayorHandle | null = null;
   private hermanoMayorAxe: HermanoMayorAxeHandle | null = null;
   private worldObjectInspectionHandler: WorldObjectInspectionHandler | null = null;
@@ -796,7 +802,25 @@ export class Segments {
       this.cleanup(grassNeeded, plantNeeded, objectNeeded, candleNeeded);
     }
 
+    this.updateEndHouseVisualActivation(playerPosition);
     this.updateCandleLightTargets(playerPosition);
+  }
+
+  private updateEndHouseVisualActivation(playerPosition: Vector3) {
+    const root = this.endHouseVisualRoot;
+    const bounds = this.endHouseBounds;
+    if (!root || !bounds) return;
+
+    const dx = this.axisDistance(playerPosition.x, bounds.min.x, bounds.max.x);
+    const dz = this.axisDistance(playerPosition.z, bounds.min.z, bounds.max.z);
+    const radius = this.endHouseVisualsActive
+      ? END_HOUSE_VISUAL_DEACTIVATION_RADIUS
+      : END_HOUSE_VISUAL_ACTIVATION_RADIUS;
+    const shouldBeActive = dx * dx + dz * dz <= radius * radius;
+    if (shouldBeActive === this.endHouseVisualsActive) return;
+
+    this.endHouseVisualsActive = shouldBeActive;
+    root.setEnabled(shouldBeActive);
   }
 
   updateIsometricOccluders(playerPosition: Vector3, enabled: boolean) {
@@ -1946,6 +1970,7 @@ export class Segments {
     }
 
     root.name = "endHouseRoot";
+    this.endHouseVisualRoot = root;
     root.scaling.setAll(scale);
     root.rotation.y = Math.PI;
     root.position.set(0, this.terrain.getHeightAt(0, targetFrontZ), targetFrontZ);
@@ -1954,7 +1979,6 @@ export class Segments {
     for (const mesh of res.meshes) {
       mesh.isPickable = false;
       mesh.receiveShadows = true;
-      mesh.alwaysSelectAsActiveMesh = true;
       mesh.computeWorldMatrix(true);
     }
     this.endHouseMeshes = res.meshes.filter((mesh) => mesh.getTotalVertices() > 0);
@@ -2109,7 +2133,6 @@ export class Segments {
     for (const mesh of res.meshes) {
       mesh.isPickable = false;
       mesh.receiveShadows = true;
-      mesh.alwaysSelectAsActiveMesh = true;
       mesh.computeWorldMatrix(true);
     }
 
@@ -2361,7 +2384,6 @@ export class Segments {
     for (const mesh of res.meshes) {
       mesh.isPickable = false;
       mesh.receiveShadows = true;
-      mesh.alwaysSelectAsActiveMesh = true;
       mesh.computeWorldMatrix(true);
     }
 
@@ -2538,7 +2560,6 @@ export class Segments {
     for (const mesh of res.meshes) {
       mesh.isPickable = false;
       mesh.receiveShadows = true;
-      mesh.alwaysSelectAsActiveMesh = true;
       mesh.computeWorldMatrix(true);
     }
 

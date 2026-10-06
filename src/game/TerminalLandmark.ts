@@ -49,7 +49,15 @@ const CAVE_LIGHT_FADE_RADIUS = 48;
 const TERMINAL_LIGHT_INTENSITY_RESPONSE = 3.4;
 const TERMINAL_LIGHT_ENABLE_INTENSITY = 0.015;
 const TERMINAL_LIGHT_DISABLE_INTENSITY = 0.006;
-const WATERFALL_PARTICLE_ACTIVATION_RADIUS = 118;
+const WATERFALL_PARTICLE_ACTIVATION_RADIUS = 64;
+const WATER_REFRACTION_REFRESH_RATE = 2;
+const WATER_REFLECTION_REFRESH_RATE = 4;
+// Terminal assets remain resident and are exercised during the hidden warmup,
+// while their scene graph and water passes stay dormant in the early forest.
+const TERMINAL_VISUAL_ACTIVATION_RADIUS = 240;
+const TERMINAL_VISUAL_DEACTIVATION_RADIUS = 270;
+const WATER_RENDER_TARGET_ACTIVATION_RADIUS = 125;
+const WATER_RENDER_TARGET_DEACTIVATION_RADIUS = 150;
 // The visible water extends beneath the opaque shore so its mesh boundary can
 // never appear as a cut-off plate. Gameplay uses the smaller wet extent.
 const LAGOON_LOGICAL_EXTENT = 1.08;
@@ -102,6 +110,7 @@ export type TerminalLandmarkHandle = {
   fluidWaterfall: FluidWaterfallController | null;
   passageAnchor: TerminalPassageAnchor;
   update: (deltaTime: number, playerPosition?: Vector3) => void;
+  setCinematicEffectsPaused: (paused: boolean) => void;
   blockers: readonly TerminalCollisionBlocker[];
   generationExclusion: TerminalCollisionBlocker;
 };
@@ -349,6 +358,15 @@ export class TerminalLandmarkGenerator {
   private waterfallDropletBurst: WaterfallDropletBurst | null = null;
   private waterfallParticleImpactPoint: Vector3 | null = null;
   private waterfallParticlesActive = false;
+  private cinematicEffectsPaused = false;
+  private lagoonWaterMaterial: WaterMaterial | null = null;
+  private terminalRoot: TransformNode | null = null;
+  private terminalActivationPoint: Vector3 | null = null;
+  private waterActivationPoint: Vector3 | null = null;
+  private terminalVisualsActive = true;
+  private waterRenderTargetsInRange = true;
+  private waterRenderTargetsActive = true;
+  private resumeFluidWaterfallAfterCinematic = false;
   private animationTime = 0;
   private fluidWaterfall: FluidWaterfallController | null = null;
 
@@ -367,6 +385,17 @@ export class TerminalLandmarkGenerator {
 
   generateWaterfallLagoonEnd(config: TerminalLandmarkConfig): TerminalLandmarkHandle {
     const root = new TransformNode("terminalWaterfallLagoonRoot", this.scene);
+    this.terminalRoot = root;
+    this.terminalActivationPoint = new Vector3(
+      config.lagoonCenterX,
+      config.waterLevel,
+      config.transitionStartZ
+    );
+    this.waterActivationPoint = new Vector3(
+      config.lagoonCenterX,
+      config.waterLevel,
+      config.lagoonCenterZ
+    );
     const random = mulberry32(config.seed);
 
     applyTerminalLagoonRockMaterial(this.scene, this.terrain.mesh, config);
@@ -461,7 +490,8 @@ export class TerminalLandmarkGenerator {
       config,
       activeImpactPoint
     );
-    const waterRenderMeshes = [
+    this.lagoonWaterMaterial = lagoonWaterMaterial;
+    const lagoonLitMeshes = [
       ...waterfallLayers,
       waterfallHeadwater,
       waterfallFoam,
@@ -469,6 +499,12 @@ export class TerminalLandmarkGenerator {
       ...nearbyVegetationMeshes,
       ...caveCandles.meshes,
     ];
+    // Reflections only need the larger opaque silhouettes. Transparent
+    // waterfall, foam, vegetation and flames were being rendered two extra
+    // times per update and contributed most of the lake overdraw.
+    const waterRenderMeshes = nearbyRockMeshes.filter(
+      (_mesh, index) => index % 2 === 0
+    );
     this.configureLagoonRenderLists(lagoonWaterMaterial, lagoon, waterRenderMeshes);
     lagoon.material = lagoonWaterMaterial;
 
@@ -501,7 +537,7 @@ export class TerminalLandmarkGenerator {
       underwaterLight,
       waterfallImpactLight,
       lagoon,
-      waterRenderMeshes
+      lagoonLitMeshes
     );
     this.limitCaveCandleLights(caveCandles.lights, [
       this.terrain.mesh,
@@ -523,6 +559,8 @@ export class TerminalLandmarkGenerator {
       fluidWaterfall: this.fluidWaterfall,
       passageAnchor,
       update: (deltaTime, playerPosition) => this.updateAnimation(deltaTime, playerPosition),
+      setCinematicEffectsPaused: (paused) =>
+        this.setCinematicEffectsPaused(paused),
       blockers: createTerminalBlockers(config),
       generationExclusion: {
         x: config.lagoonCenterX,
@@ -622,7 +660,6 @@ export class TerminalLandmarkGenerator {
 
     lagoon.position.set(config.lagoonCenterX, config.waterLevel, config.lagoonCenterZ);
     lagoon.isPickable = false;
-    lagoon.alwaysSelectAsActiveMesh = true;
     lagoon.setParent(root);
     setGameMaterial(lagoon, "water", this.scene, { applyVisual: false });
     return lagoon;
@@ -763,15 +800,11 @@ export class TerminalLandmarkGenerator {
     }
 
     if (material.refractionTexture) {
-      // The refraction contains the animated swimmer, so it must not alternate
-      // with stale poses between frames.
-      material.refractionTexture.refreshRate =
-        RenderTargetTexture.REFRESHRATE_RENDER_ONEVERYFRAME;
+      material.refractionTexture.refreshRate = WATER_REFRACTION_REFRESH_RATE;
       material.refractionTexture.setRenderingAutoClearDepthStencil(1, false);
     }
     if (material.reflectionTexture) {
-      material.reflectionTexture.refreshRate =
-        RenderTargetTexture.REFRESHRATE_RENDER_ONEVERYTWOFRAMES;
+      material.reflectionTexture.refreshRate = WATER_REFLECTION_REFRESH_RATE;
       material.reflectionTexture.setRenderingAutoClearDepthStencil(1, false);
     }
   }
@@ -910,7 +943,9 @@ export class TerminalLandmarkGenerator {
   }
 
   private createPassageAnchor(config: TerminalLandmarkConfig): TerminalPassageAnchor {
-    const passageZ = config.waterfallZ + 2.4;
+    // Keep the threshold in front of the rear terrain ramp. Farther back the
+    // walkable height rises sharply and lifts the avatar before the transition.
+    const passageZ = config.waterfallZ + 1;
     return {
       position: new Vector3(
         config.lagoonCenterX,
@@ -2027,12 +2062,27 @@ export class TerminalLandmarkGenerator {
   }
 
   private updateAnimation(deltaTime: number, playerPosition?: Vector3) {
+    const terminalVisualsActive = this.updateTerminalVisualActivation(playerPosition);
+    this.updateWaterRenderTargetActivation(playerPosition);
+    this.updateLagoonLightActivation(deltaTime, playerPosition);
+
+    if (!terminalVisualsActive) {
+      // Ensure independent fluid/particle systems release their render targets
+      // even though the authored terminal hierarchy itself is disabled.
+      if (!this.cinematicEffectsPaused) {
+        this.fluidWaterfall?.update(deltaTime, playerPosition);
+      }
+      this.updateWaterfallParticleActivation(playerPosition);
+      return;
+    }
+
     this.animationTime += Math.max(0, Math.min(deltaTime, 0.1));
     for (const material of this.animatedMaterials) {
       material.setFloat("time", this.animationTime);
     }
-    this.updateLagoonLightActivation(deltaTime, playerPosition);
-    this.fluidWaterfall?.update(deltaTime, playerPosition);
+    if (!this.cinematicEffectsPaused) {
+      this.fluidWaterfall?.update(deltaTime, playerPosition);
+    }
     for (const entry of this.flickeringLights) {
       const { baseIntensity, phase } = entry;
       const flicker =
@@ -2049,6 +2099,62 @@ export class TerminalLandmarkGenerator {
     }
     if (this.updateWaterfallParticleActivation(playerPosition)) {
       this.updateWaterfallDropletBursts();
+    }
+  }
+
+  private updateTerminalVisualActivation(playerPosition?: Vector3) {
+    const root = this.terminalRoot;
+    const anchor = this.terminalActivationPoint;
+    if (!root || !anchor || !playerPosition) return true;
+
+    const radius = this.terminalVisualsActive
+      ? TERMINAL_VISUAL_DEACTIVATION_RADIUS
+      : TERMINAL_VISUAL_ACTIVATION_RADIUS;
+    const dx = playerPosition.x - anchor.x;
+    const dz = playerPosition.z - anchor.z;
+    const shouldBeActive = dx * dx + dz * dz <= radius * radius;
+    if (shouldBeActive !== this.terminalVisualsActive) {
+      this.terminalVisualsActive = shouldBeActive;
+      root.setEnabled(shouldBeActive);
+    }
+    return shouldBeActive;
+  }
+
+  private updateWaterRenderTargetActivation(playerPosition?: Vector3) {
+    const anchor = this.waterActivationPoint;
+    let inRange = true;
+    if (anchor && playerPosition) {
+      const radius = this.waterRenderTargetsInRange
+        ? WATER_RENDER_TARGET_DEACTIVATION_RADIUS
+        : WATER_RENDER_TARGET_ACTIVATION_RADIUS;
+      const dx = playerPosition.x - anchor.x;
+      const dz = playerPosition.z - anchor.z;
+      inRange = dx * dx + dz * dz <= radius * radius;
+    }
+    this.waterRenderTargetsInRange = inRange;
+    this.setWaterRenderTargetsActive(
+      inRange && this.terminalVisualsActive && !this.cinematicEffectsPaused
+    );
+  }
+
+  private setWaterRenderTargetsActive(active: boolean) {
+    if (active === this.waterRenderTargetsActive) return;
+    this.waterRenderTargetsActive = active;
+
+    const material = this.lagoonWaterMaterial;
+    const refraction = material?.refractionTexture;
+    const reflection = material?.reflectionTexture;
+    if (refraction) {
+      refraction.refreshRate = active
+        ? WATER_REFRACTION_REFRESH_RATE
+        : RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
+      if (active) refraction.resetRefreshCounter();
+    }
+    if (reflection) {
+      reflection.refreshRate = active
+        ? WATER_REFLECTION_REFRESH_RATE
+        : RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
+      if (active) reflection.resetRefreshCounter();
     }
   }
 
@@ -2117,10 +2223,13 @@ export class TerminalLandmarkGenerator {
   private updateWaterfallParticleActivation(playerPosition?: Vector3) {
     const impactPoint = this.waterfallParticleImpactPoint;
     const shouldBeActive =
-      !playerPosition ||
-      !impactPoint ||
-      Vector3.DistanceSquared(playerPosition, impactPoint) <=
-        WATERFALL_PARTICLE_ACTIVATION_RADIUS * WATERFALL_PARTICLE_ACTIVATION_RADIUS;
+      !this.cinematicEffectsPaused &&
+      (
+        !playerPosition ||
+        !impactPoint ||
+        Vector3.DistanceSquared(playerPosition, impactPoint) <=
+          WATERFALL_PARTICLE_ACTIVATION_RADIUS * WATERFALL_PARTICLE_ACTIVATION_RADIUS
+      );
     if (shouldBeActive === this.waterfallParticlesActive) return shouldBeActive;
 
     this.waterfallParticlesActive = shouldBeActive;
@@ -2145,6 +2254,32 @@ export class TerminalLandmarkGenerator {
       );
     }
     return shouldBeActive;
+  }
+
+  private setCinematicEffectsPaused(paused: boolean) {
+    if (this.cinematicEffectsPaused === paused) return;
+    this.cinematicEffectsPaused = paused;
+
+    this.setWaterRenderTargetsActive(
+      !paused && this.terminalVisualsActive && this.waterRenderTargetsInRange
+    );
+
+    if (paused) {
+      this.resumeFluidWaterfallAfterCinematic =
+        this.fluidWaterfall?.isEnabled ?? false;
+      this.fluidWaterfall?.setEnabled(false);
+      if (this.waterfallParticlesActive) {
+        this.waterfallParticlesActive = false;
+        for (const mesh of this.waterfallOverlayMeshes) mesh.setEnabled(false);
+        for (const system of this.waterfallParticleSystems) {
+          system.stop();
+          system.reset();
+        }
+      }
+    } else if (this.resumeFluidWaterfallAfterCinematic) {
+      this.fluidWaterfall?.setEnabled(true);
+      this.resumeFluidWaterfallAfterCinematic = false;
+    }
   }
 
   private updateWaterfallDropletBursts() {

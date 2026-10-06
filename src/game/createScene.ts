@@ -20,7 +20,6 @@ import { PlantLibrary } from "./PlantLibrary";
 import { InteractSystem } from "./InteractSystem";
 import { setupMobileControls } from "./MobileControls";
 import { createDirectionIndicator } from "./DirectionIndicator";
-import { createRainSystem } from "./Rain";
 import { createFireflies } from "./Fireflies";
 import { createEndTorches } from "./Torches";
 import { createVintageFilmPostProcess, fridayThe13thVintagePreset } from "./VintageFilmPostProcess";
@@ -147,7 +146,6 @@ export type QualityProfile = {
   photoDomeResolution: number;
   shadowMapSize: number;
   shadowBlurKernel: number;
-  rainDrops: number;
   segmentBehind: number;
   segmentAhead: number;
   objectSegmentBehind: number;
@@ -176,11 +174,10 @@ export const desktopQuality: QualityProfile = {
   photoDomeResolution: 96,
   shadowMapSize: 512,
   shadowBlurKernel: 8,
-  rainDrops: 500,
   segmentBehind: 1,
   segmentAhead: 2,
   objectSegmentBehind: 1,
-  objectSegmentAhead: 4,
+  objectSegmentAhead: 3,
   plantSegmentBehind: 1,
   plantSegmentAhead: 5,
   treeCount: 60,
@@ -205,7 +202,6 @@ export const mobileQuality: QualityProfile = {
   photoDomeResolution: 48,
   shadowMapSize: 0,
   shadowBlurKernel: 0,
-  rainDrops: 120,
   segmentBehind: 0,
   segmentAhead: 1,
   objectSegmentBehind: 0,
@@ -886,7 +882,9 @@ scene.onBeforeRenderObservable.add(() => {
     getTargetPosition: () => player.position,
   });
   for (const mesh of skyEye.meshes) {
-    terminalLandmark.lagoonWaterMaterial.addToRenderList(mesh);
+    const reflectionList =
+      terminalLandmark.lagoonWaterMaterial.reflectionTexture?.renderList;
+    if (reflectionList && !reflectionList.includes(mesh)) reflectionList.push(mesh);
   }
   const skyEyeEncounter = new TerminalSkyEyeEncounter({
     player,
@@ -1156,7 +1154,6 @@ scene.onBeforeRenderObservable.add(() => {
   // =========================
   // Lluvia
   // =========================
-  createRainSystem(scene, terrain, quality.rainDrops);
   createFireflies(scene, terrain, () => player.position, quality.fireflyCount);
 
   onProgress(0.91, "Precargando segmentos...");
@@ -1461,6 +1458,7 @@ scene.onBeforeRenderObservable.add(() => {
           : FOREST_START_CHECKPOINT_ENTRY_POINT
       ),
   });
+  let terminalHuntersRetired = false;
   const endHouseBounds = segments.getEndHouseBounds();
   const hermanoMayorNavigationProbe = Vector3.Zero();
   const hermanoMayorNeckTarget = Vector3.Zero();
@@ -1633,12 +1631,14 @@ scene.onBeforeRenderObservable.add(() => {
           interactSystem.clearMessage();
           hints.set(null);
           hermanoMayorBehavior?.beginAbductionCinematic();
-          shadowGrabberBehaviorSystem.retireAll();
+          shadowGrabberBehaviorSystem.retireAll(true);
+          terminalLandmark.setCinematicEffectsPaused(true);
           player.clearEnemyGrabStruggles();
           setHermanoMayorGrabHapticsActive(false);
           hermanoMayorLightTarget = null;
         },
         onComplete: () => {
+          terminalLandmark.setCinematicEffectsPaused(false);
           levelExitPortal.activate();
         },
       });
@@ -1654,7 +1654,10 @@ scene.onBeforeRenderObservable.add(() => {
     const detail = (event as CustomEvent<{ id?: string }>).detail;
     if (detail?.id !== skyEye.id) return;
     const cinematicStarted = skyEyeDefeatCinematic?.start() ?? false;
-    if (!cinematicStarted) levelExitPortal.activate();
+    if (!cinematicStarted) {
+      terminalLandmark.setCinematicEffectsPaused(false);
+      levelExitPortal.activate();
+    }
   };
   window.addEventListener("bosque:enemy-death", onTerminalEnemyDeath);
   scene.onDisposeObservable.addOnce(() => {
@@ -1873,6 +1876,13 @@ scene.onBeforeRenderObservable.add(() => {
       0.78
     );
     player.update(dt, playerWorld);
+    if (
+      !terminalHuntersRetired &&
+      player.position.z >= terminalConfig.transitionStartZ - 4
+    ) {
+      terminalHuntersRetired = true;
+      shadowGrabberBehaviorSystem.retireAll(true);
+    }
     if (
       !forestKeyCheckpointReached &&
       player.position.z >= forestKeyCheckpoint.z - 1.2

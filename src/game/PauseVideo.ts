@@ -9,7 +9,7 @@ type StoredVideoSettings = {
 
 type PauseVideoOptions = {
   engine: Engine;
-  automaticHardwareScaling: number;
+  getAutomaticHardwareScaling: () => number;
   input: InputManager;
   signal: AbortSignal;
   onChanged?: (message: string) => void;
@@ -68,7 +68,7 @@ function getEffectiveScalePercent(engine: Engine) {
 
 export function setupPauseVideo({
   engine,
-  automaticHardwareScaling,
+  getAutomaticHardwareScaling,
   input,
   signal,
   onChanged,
@@ -115,7 +115,10 @@ export function setupPauseVideo({
 
   const applyResolutionMode = (nextMode: ResolutionMode, announce = true) => {
     resolutionMode = nextMode;
-    const hardwareScaling = resolveHardwareScalingLevel(nextMode, automaticHardwareScaling);
+    const hardwareScaling = resolveHardwareScalingLevel(
+      nextMode,
+      getAutomaticHardwareScaling()
+    );
     engine.setHardwareScalingLevel(hardwareScaling);
     storeResolutionMode(nextMode);
     renderResolution();

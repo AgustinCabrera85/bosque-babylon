@@ -431,6 +431,7 @@ export class SkyEyeDefeatCinematic {
   private actorWidth = 1.2;
   private actorGroundOffset = 0;
   private disposed = false;
+  private handsDisposed = false;
 
   public constructor(scene: Scene, options: SkyEyeDefeatCinematicOptions) {
     this.player = options.player;
@@ -641,8 +642,7 @@ export class SkyEyeDefeatCinematic {
         .onBeforeAnimationsObservable.remove(this.beforeAnimationsObserver);
       this.beforeAnimationsObserver = null;
     }
-    for (const arm of this.arms) arm.dispose();
-    this.hands.length = 0;
+    this.disposeHands(false);
     this.portalFx.dispose();
     this.portalVortex.dispose();
     this.portalLight.dispose();
@@ -1465,7 +1465,7 @@ export class SkyEyeDefeatCinematic {
     this.currentState = "complete";
     this.restoreActorPose();
     this.actor.root.setEnabled(false);
-    for (const hand of this.hands) hand.controller.setEnabled(false);
+    this.disposeHands(true);
     this.portalFx.setFormationProgress(0, 0);
     this.portalFx.setOwnerEnabled(false);
     this.portalVortex.reset();
@@ -1481,6 +1481,14 @@ export class SkyEyeDefeatCinematic {
         detail: { state: "complete" },
       })
     );
+  }
+
+  private disposeHands(deferResourceDisposal: boolean) {
+    if (this.handsDisposed) return;
+    this.handsDisposed = true;
+    for (const arm of this.arms) arm.dispose(deferResourceDisposal);
+    this.arms.length = 0;
+    this.hands.length = 0;
   }
 
   private resolveActorGroundOffset() {

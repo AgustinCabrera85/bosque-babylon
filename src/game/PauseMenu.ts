@@ -7,7 +7,7 @@ import { GamepadMenuNavigator } from "./GamepadMenuNavigator";
 type PauseMenuOptions = {
   canvas: HTMLCanvasElement;
   engine: Engine;
-  automaticHardwareScaling: number;
+  getAutomaticHardwareScaling: () => number;
   input: InputManager;
 };
 
@@ -28,7 +28,7 @@ function isPauseTab(value: string | undefined): value is PauseTab {
 export function setupPauseMenu({
   canvas,
   engine,
-  automaticHardwareScaling,
+  getAutomaticHardwareScaling,
   input,
 }: PauseMenuOptions): PauseMenuHandle {
   const menu = document.getElementById("pauseMenu");
@@ -73,7 +73,7 @@ export function setupPauseMenu({
   });
   const video = setupPauseVideo({
     engine,
-    automaticHardwareScaling,
+    getAutomaticHardwareScaling,
     input,
     signal,
     onChanged: setStatus,

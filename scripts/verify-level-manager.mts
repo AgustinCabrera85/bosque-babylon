@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { LevelManager } from "../src/game/runtime/LevelManager";
 import { LevelRegistry } from "../src/game/runtime/LevelRegistry";
-import type { GameLevel, LevelId } from "../src/game/runtime/LevelTypes";
+import type {
+  GameLevel,
+  LevelCreateContext,
+  LevelId,
+} from "../src/game/runtime/LevelTypes";
 import {
   HERMANO_MAYOR_FOREST_CROSSING_TUNING,
   HermanoMayorForestCrossingCinematic,
@@ -89,6 +93,51 @@ manager.dispose();
 manager.dispose();
 assert.equal(disposedByLevel.get("forest"), 2);
 assert.equal(scenes.filter((scene) => !scene.isDisposed).length, 0);
+
+let requestPortalTransition!: LevelCreateContext["requestLevelTransition"];
+let finishPortalTransition!: () => void;
+const portalTransitionFinished = new Promise<void>((resolve) => {
+  finishPortalTransition = resolve;
+});
+const portalTransitionOrder: string[] = [];
+const portalRegistry = new LevelRegistry();
+portalRegistry.register("forest", async () => async (context) => {
+  requestPortalTransition = context.requestLevelTransition;
+  return createLevel("forest");
+});
+portalRegistry.register("theatre", async () => async () => createLevel("theatre"));
+const portalManager = new LevelManager({
+  registry: portalRegistry,
+  context: {
+    engine: { scenes } as never,
+    canvas: {} as never,
+    input: { reset() {} } as never,
+    selectedCharacter: "lautaro" as never,
+    inventory: {} as never,
+    playerStats: { save() {}, resetForLevel() {} } as never,
+    musicPlayer: null,
+    performanceTier: "desktop",
+    onProgress() {},
+  },
+  input: { reset() {} } as never,
+  playerStats: { save() {}, resetForLevel() {} } as never,
+  musicPlayer: null,
+  async onLevelTransitionRequested(request) {
+    assert.equal(request.fromLevel, "forest");
+    assert.equal(request.toLevel, "theatre");
+    assert.equal(request.entryPoint, "forest-exit-portal");
+    portalTransitionOrder.push("covered");
+    await request.load();
+    portalTransitionOrder.push("revealed");
+    finishPortalTransition();
+  },
+});
+await portalManager.loadLevel("forest");
+requestPortalTransition("theatre", "forest-exit-portal");
+await portalTransitionFinished;
+assert.equal(portalManager.currentLevelId, "theatre");
+assert.deepEqual(portalTransitionOrder, ["covered", "revealed"]);
+portalManager.dispose();
 
 let releaseFactory!: () => void;
 const pendingFactory = new Promise<void>((resolve) => { releaseFactory = resolve; });

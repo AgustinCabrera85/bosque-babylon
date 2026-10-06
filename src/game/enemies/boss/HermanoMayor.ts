@@ -109,7 +109,6 @@ export async function loadHermanoMayor(
   for (const mesh of meshes) {
     mesh.isPickable = false;
     mesh.receiveShadows = true;
-    mesh.alwaysSelectAsActiveMesh = true;
     patchHermanoMayorMaterial(mesh.material);
   }
 

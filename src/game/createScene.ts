@@ -85,6 +85,10 @@ import {
 import { loadInitialForestEnemies } from "./levels/ForestEnemySpawns";
 import { HouseArrivalCinematic } from "./levels/HouseArrivalCinematic";
 import { TerminalSkyEyeEncounter } from "./levels/TerminalSkyEyeEncounter";
+import {
+  SkyEyeDefeatCinematic,
+  createSkyEyeDefeatCinematic,
+} from "./levels/SkyEyeDefeatCinematic";
 import { BlackSmokeWrapSystem } from "./BlackSmokeWrapSystem";
 import type { CursorController } from "./input/CursorController";
 import type { InputManager } from "./input/InputManager";
@@ -98,6 +102,7 @@ import { HermanoMayorGrabHud } from "./enemies/boss/HermanoMayorGrabHud";
 import { HermanoMayorAxeDodgeHud } from "./enemies/boss/HermanoMayorAxeDodgeHud";
 import { HermanoMayorAxePickupCinematic } from "./enemies/boss/HermanoMayorAxePickupCinematic";
 import { HermanoMayorForestCrossingCinematic } from "./levels/HermanoMayorForestCrossingCinematic";
+import { LuminousLevelExitPortal } from "./levels/LuminousLevelExitPortal";
 import { renderActionPrompt } from "./input/InputPrompts";
 import type { GameAction } from "./input/InputActions";
 import { setHermanoMayorGrabHapticsActive } from "./input/GamepadFeedback";
@@ -133,6 +138,7 @@ export const FOREST_START_CHECKPOINT_ENTRY_POINT = "checkpoint:forest-start";
 export type ForestSceneRuntimeOptions = {
   entryPoint?: string;
   onPlayerDeathChoice?: (choice: PlayerDeathChoice, entryPoint: string) => void;
+  onLevelExit?: () => void;
 };
 export type QualityProfile = {
   name: "desktop" | "mobile";
@@ -844,6 +850,24 @@ scene.onBeforeRenderObservable.add(() => {
     }
   ).generateWaterfallLagoonEnd(terminalConfig);
   terminalLandmark.waterfall.computeWorldMatrix(true);
+  const levelExitPortalPosition = terminalLandmark.passageAnchor.position.clone();
+  levelExitPortalPosition.y += 1.7;
+  const levelExitPortal = new LuminousLevelExitPortal(scene, {
+    position: levelExitPortalPosition,
+    forward: terminalLandmark.passageAnchor.direction,
+    getPlayerPosition: () => player.position,
+    onEntered: () => runtimeOptions.onLevelExit?.(),
+    camera: player.camera,
+    quality: quality.name === "desktop" ? "high" : "low",
+    litMeshes: [
+      terrain.mesh,
+      terminalLandmark.waterfall,
+      ...terminalLandmark.waterfallLayers,
+      ...player.getAvatarMeshes(),
+    ],
+  });
+  scene.metadata.levelExitPortal = levelExitPortal;
+  scene.onDisposeObservable.addOnce(() => levelExitPortal.dispose());
   const waterfallTopY =
     terminalLandmark.waterfall.getBoundingInfo().boundingBox.maximumWorld.y;
   // The scaled eye extends about five units below its pivot. One extra unit
@@ -870,6 +894,7 @@ scene.onBeforeRenderObservable.add(() => {
     waterSurface: terminalLandmark.waterSurface,
     hoverPosition: skyEyeHoverPosition,
   });
+  let skyEyeDefeatCinematic: SkyEyeDefeatCinematic | null = null;
   const enemyHealthHud = new EnemyHealthHud(skyEye.id);
   scene.metadata.skyEyeEncounter = skyEyeEncounter;
   scene.onDisposeObservable.addOnce(() => skyEyeEncounter.dispose());
@@ -877,8 +902,13 @@ scene.onBeforeRenderObservable.add(() => {
   if (import.meta.env.DEV) {
     const skyEyeDebug = {
       getSnapshot: () => skyEyeEncounter.getDebugSnapshot(),
+      getDefeatSnapshot: () =>
+        skyEyeDefeatCinematic?.getDebugSnapshot() ?? null,
       startPresentation: () => skyEyeEncounter.startPresentation(),
       finishPresentation: () => skyEyeEncounter.finishPresentation(),
+      startDefeatCinematic: () => skyEyeDefeatCinematic?.start() ?? false,
+      activateLevelExitPortal: () => levelExitPortal.activate(),
+      getLevelExitPortalSnapshot: () => levelExitPortal.getDebugSnapshot(),
     };
     const debugGlobal = globalThis as typeof globalThis & {
       __bosqueSkyEyeDebug?: typeof skyEyeDebug;
@@ -1574,8 +1604,62 @@ scene.onBeforeRenderObservable.add(() => {
         hermanoMayorBehavior.stun();
       },
     };
+
+    const abductionStageZ = terminalConfig.transitionStartZ - 2.25;
+    const abductionStagePosition = new Vector3(
+      terminalConfig.lagoonCenterX +
+        Math.min(19, terminalConfig.lagoonRadiusX * 0.56),
+      0,
+      abductionStageZ
+    );
+    try {
+      skyEyeDefeatCinematic = await createSkyEyeDefeatCinematic(scene, {
+        player,
+        actor: hermanoMayor,
+        enemyManager,
+        smokeSystem: blackSmokeWrapSystem,
+        portalQuality: quality.name === "desktop" ? "high" : "low",
+        eyePosition: () => skyEye.root.position,
+        stagePosition: abductionStagePosition,
+        // Stage the abduction in the open dry corridor to the right of the
+        // house. The portal sits behind the actor toward the lagoon, while the
+        // camera stays on the house side and avoids the rocky shoreline.
+        stageForward: new Vector3(0, 0, 1),
+        getGroundHeight: (x, z) =>
+          player.getWalkableSurfaceHeight(playerWorld, x, z),
+        onStart: () => {
+          attackSystem.cancelCharge();
+          playerStats.cancelLightAbsorption("controls-locked");
+          interactSystem.clearMessage();
+          hints.set(null);
+          hermanoMayorBehavior?.beginAbductionCinematic();
+          shadowGrabberBehaviorSystem.retireAll();
+          player.clearEnemyGrabStruggles();
+          setHermanoMayorGrabHapticsActive(false);
+          hermanoMayorLightTarget = null;
+        },
+        onComplete: () => {
+          levelExitPortal.activate();
+        },
+      });
+      scene.metadata.skyEyeDefeatCinematic = skyEyeDefeatCinematic;
+    } catch (error) {
+      console.warn(
+        "[createScene] No se pudo preparar la cinematica final del Ojo.",
+        error
+      );
+    }
   }
+  const onTerminalEnemyDeath = (event: Event) => {
+    const detail = (event as CustomEvent<{ id?: string }>).detail;
+    if (detail?.id !== skyEye.id) return;
+    const cinematicStarted = skyEyeDefeatCinematic?.start() ?? false;
+    if (!cinematicStarted) levelExitPortal.activate();
+  };
+  window.addEventListener("bosque:enemy-death", onTerminalEnemyDeath);
   scene.onDisposeObservable.addOnce(() => {
+    window.removeEventListener("bosque:enemy-death", onTerminalEnemyDeath);
+    skyEyeDefeatCinematic?.dispose();
     hermanoMayorForestCrossingCinematic?.dispose();
     hermanoMayorContactShadow?.dispose();
     hermanoMayorBehavior?.dispose();
@@ -1795,12 +1879,21 @@ scene.onBeforeRenderObservable.add(() => {
     ) {
       forestKeyCheckpointReached = true;
     }
-    if (!hermanoMayorForestCrossingCinematic?.isActive) {
+    if (
+      !hermanoMayorForestCrossingCinematic?.isActive &&
+      !skyEyeDefeatCinematic?.isActive
+    ) {
       hermanoMayorBehavior?.update(dt);
     }
-    hermanoMayorAxeCinematic?.update(dt);
+    if (!skyEyeDefeatCinematic?.isActive) {
+      hermanoMayorAxeCinematic?.update(dt);
+    }
     skyEyeEncounter.update(dt);
-    shadowGrabberBehaviorSystem.update(dt);
+    skyEyeDefeatCinematic?.update(dt);
+    levelExitPortal.update(dt);
+    if (!skyEyeDefeatCinematic?.isActive) {
+      shadowGrabberBehaviorSystem.update(dt);
+    }
     enemyManager.update(dt);
     attackSystem.update(dt);
     enemyHealthHud.update(

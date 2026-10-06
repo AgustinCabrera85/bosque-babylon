@@ -69,6 +69,11 @@ import { SkyEyeController } from "../src/game/enemies/skyEye/SkyEyeController.ts
 import { getSkyEyePortalDeathProgress } from "../src/game/enemies/skyEye/SkyEyeFxController.ts";
 import { getSkyEyePresentationProgress } from "../src/game/levels/TerminalSkyEyeEncounter.ts";
 import {
+  SKY_EYE_DEFEAT_CINEMATIC_TIMING,
+  SkyEyeDefeatCinematic,
+  sampleSkyEyeDefeatCinematic,
+} from "../src/game/levels/SkyEyeDefeatCinematic.ts";
+import {
   ShadowGrabberBehavior,
   ShadowGrabberBehaviorState,
   type ShadowGrabberGameplayEvent,
@@ -102,6 +107,16 @@ class TestAudio extends EventTarget {
 Object.assign(globalThis, {
   window: new EventTarget(),
   Audio: TestAudio,
+  document: {
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    body: {
+      classList: {
+        add: () => {},
+        remove: () => {},
+      },
+    },
+  },
 });
 
 class TestEnemy extends BaseEnemyController {
@@ -1086,6 +1101,15 @@ async function verify() {
     recoveryRoot.position.x >= 2,
     "the boss must resume progress toward the player after replanning"
   );
+  assert.equal(recoveryBehavior.beginAbductionCinematic(), true);
+  assert.equal(recoveryBehavior.currentState, "abducted");
+  const positionBeforeAbductionUpdate = recoveryRoot.position.clone();
+  recoveryBehavior.update(0.5);
+  assert.deepEqual(
+    recoveryRoot.position.asArray(),
+    positionBeforeAbductionUpdate.asArray(),
+    "the finale must permanently release AI movement ownership"
+  );
   recoveryBehavior.dispose();
 
   const grabberRoot = {
@@ -1457,6 +1481,126 @@ async function verify() {
   assert.equal(getSkyEyePortalDeathProgress(1, 0), 0.28);
   assert.equal(getSkyEyePortalDeathProgress(1, 0.5), 0.64);
   assert.equal(getSkyEyePortalDeathProgress(1, 1), 1);
+  const defeatStart = sampleSkyEyeDefeatCinematic(0);
+  const defeatWalking = sampleSkyEyeDefeatCinematic(
+    SKY_EYE_DEFEAT_CINEMATIC_TIMING.portalOpenStartSeconds
+  );
+  const defeatWalkComplete = sampleSkyEyeDefeatCinematic(
+    SKY_EYE_DEFEAT_CINEMATIC_TIMING.actorWalkEndSeconds
+  );
+  const defeatPortalOpen = sampleSkyEyeDefeatCinematic(
+    SKY_EYE_DEFEAT_CINEMATIC_TIMING.portalOpenStartSeconds +
+      SKY_EYE_DEFEAT_CINEMATIC_TIMING.portalOpenDurationSeconds
+  );
+  const defeatDragging = sampleSkyEyeDefeatCinematic(
+    SKY_EYE_DEFEAT_CINEMATIC_TIMING.dragStartSeconds +
+      SKY_EYE_DEFEAT_CINEMATIC_TIMING.dragDurationSeconds
+  );
+  const defeatFallen = sampleSkyEyeDefeatCinematic(
+    SKY_EYE_DEFEAT_CINEMATIC_TIMING.fallStartSeconds +
+      SKY_EYE_DEFEAT_CINEMATIC_TIMING.fallDurationSeconds
+  );
+  const defeatLifted = sampleSkyEyeDefeatCinematic(
+    SKY_EYE_DEFEAT_CINEMATIC_TIMING.dragStartSeconds +
+      SKY_EYE_DEFEAT_CINEMATIC_TIMING.dragDurationSeconds * 0.9
+  );
+  const defeatHandsRetracted = sampleSkyEyeDefeatCinematic(
+    SKY_EYE_DEFEAT_CINEMATIC_TIMING.handsRetractStartSeconds +
+      SKY_EYE_DEFEAT_CINEMATIC_TIMING.handsRetractDurationSeconds
+  );
+  const defeatPortalClosed = sampleSkyEyeDefeatCinematic(
+    SKY_EYE_DEFEAT_CINEMATIC_TIMING.portalCloseStartSeconds +
+      SKY_EYE_DEFEAT_CINEMATIC_TIMING.portalCloseDurationSeconds
+  );
+  assert.equal(defeatStart.portalProgress, 0);
+  assert.equal(defeatStart.walkProgress, 0);
+  assert.equal(defeatStart.handsProgress, 0);
+  assert.equal(defeatWalking.walkProgress > 0, true);
+  assert.equal(defeatWalkComplete.walkProgress, 1);
+  assert.equal(
+    SKY_EYE_DEFEAT_CINEMATIC_TIMING.portalOpenStartSeconds >
+      SKY_EYE_DEFEAT_CINEMATIC_TIMING.actorWalkStartSeconds,
+    true
+  );
+  assert.equal(defeatPortalOpen.portalProgress, 1);
+  assert.equal(defeatPortalOpen.handsProgress > 0, true);
+  assert.equal(defeatFallen.fallProgress, 1);
+  assert.equal(defeatFallen.dragProgress > 0, true);
+  assert.equal(defeatLifted.liftProgress, 1);
+  assert.equal(defeatDragging.dragProgress, 1);
+  assert.equal(defeatDragging.portalProgress > 0, true);
+  assert.equal(defeatHandsRetracted.handsRetractionProgress, 1);
+  assert.equal(
+    defeatHandsRetracted.portalProgress,
+    1,
+    "the portal remains fully formed until every hand has disappeared"
+  );
+  assert.equal(
+    SKY_EYE_DEFEAT_CINEMATIC_TIMING.portalCloseStartSeconds >
+      SKY_EYE_DEFEAT_CINEMATIC_TIMING.handsRetractStartSeconds +
+        SKY_EYE_DEFEAT_CINEMATIC_TIMING.handsRetractDurationSeconds,
+    true
+  );
+  assert.equal(defeatPortalClosed.portalProgress, 0);
+  assert.equal(defeatPortalClosed.closeProgress, 1);
+  assert.equal(
+    sampleSkyEyeDefeatCinematic(
+      SKY_EYE_DEFEAT_CINEMATIC_TIMING.completeSeconds
+    ).complete,
+    true
+  );
+  let defeatVolumeSmokeOptions: Record<string, unknown> | null = null;
+  const defeatPresentation = new SkyEyeDefeatCinematic(scene, {
+    player: {} as never,
+    actor: {} as never,
+    arms: [],
+    eyePosition: () => Vector3.Zero(),
+    stagePosition: Vector3.Zero(),
+    stageForward: new Vector3(0, 0, -1),
+    getGroundHeight: () => 0,
+    smokeSystem: {
+      attach: (_target: unknown, options: Record<string, unknown>) => {
+        defeatVolumeSmokeOptions = options;
+        return {
+          setEnabled: () => {},
+          setEmissionMultiplier: () => {},
+          dispose: () => {},
+        };
+      },
+    } as never,
+    portalQuality: "low",
+  } as never);
+  const defeatPortalBackdrop = scene.getMeshByName(
+    "skyEyeDefeatPortalVoidDisc"
+  );
+  const defeatPortalOpacity = scene.getMeshByName(
+    "skyEyeDefeatPortalOpacityDisc"
+  );
+  assert.ok(defeatPortalOpacity);
+  assert.equal(defeatPortalOpacity.material?.alpha, 1);
+  assert.equal(defeatPortalOpacity.material?.disableDepthWrite, false);
+  assert.equal(defeatPortalOpacity.material?.forceDepthWrite, true);
+  assert.ok(defeatPortalBackdrop);
+  assert.equal(defeatPortalBackdrop.material?.disableDepthWrite, false);
+  assert.equal(defeatPortalBackdrop.material?.forceDepthWrite, true);
+  assert.ok(
+    scene.getMeshByName("skyEyeDefeatPortalRoot:smokeTorus"),
+    "the original Shadow Grabber smoke crown remains present"
+  );
+  assert.ok(
+    scene.getMeshByName("skyEyeDefeatPortalBorderSmokeAnchor"),
+    "the animated Babylon smoke layer keeps a dedicated portal-border emitter"
+  );
+  assert.equal(
+    scene.meshes.filter((mesh) =>
+      mesh.name.startsWith("skyEyeDefeatPortalLightning_")
+    ).length,
+    12,
+    "low quality keeps five primary lightning bolts plus seven thin branches"
+  );
+  assert.equal(defeatVolumeSmokeOptions?.enabled, false);
+  assert.equal(defeatVolumeSmokeOptions?.orbitSpeed, -2.85);
+  defeatPresentation.dispose();
 
   const minor = createEnemy("minor", 1.5);
   await minor.initialize();
@@ -1682,7 +1826,7 @@ async function verify() {
   lateHud.dispose();
 
   console.log(
-    "Enemy combat: collision-stall recovery, player-first pursuit, visible 2.5m table-radius axe pickup, exact axe grip, range-guaranteed axe strike, red blade halo, animated player blood hit, 2.5s cooldown, sanity-scaled action dodge, reusable player hit/dodge/death reactions, portal swallow timing, dynamic grab escape, 40% cap, candle hunting, 2/18 hits, gray-to-ash death and SVG HUD OK"
+    "Enemy combat: collision-stall recovery, player-first pursuit, visible 2.5m table-radius axe pickup, exact axe grip, range-guaranteed axe strike, red blade halo, animated player blood hit, 2.5s cooldown, sanity-scaled action dodge, reusable player hit/dodge/death reactions, portal swallow timing, thirteen-hand joint-tracked Sky Eye finale, dynamic grab escape, 40% cap, candle hunting, 2/18 hits, gray-to-ash death and SVG HUD OK"
   );
 }
 

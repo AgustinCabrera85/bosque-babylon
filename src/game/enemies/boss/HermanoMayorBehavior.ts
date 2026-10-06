@@ -29,6 +29,7 @@ export type HermanoMayorBehaviorState =
   | "waiting"
   | "following"
   | "retreating"
+  | "abducted"
   | "watching"
   | "picking-up-axe"
   | "stunned"
@@ -105,6 +106,7 @@ export class HermanoMayorBehavior {
   private nearbyUnseenCooldown = 0;
   private axeCinematicActive = false;
   private retreatingAfterPlayerDeath = false;
+  private removedByFinalCinematic = false;
   private readonly retreatTarget = Vector3.Zero();
   private readonly axeApproachTarget = Vector3.Zero();
   private readonly axeWalkableApproachTarget = Vector3.Zero();
@@ -177,6 +179,7 @@ export class HermanoMayorBehavior {
 
   public update(deltaSeconds: number) {
     const dt = Math.max(0, Math.min(deltaSeconds, 0.05));
+    if (this.removedByFinalCinematic) return;
     const player = this.options.playerPosition();
     const dx = player.x - this.actor.root.position.x;
     const dz = player.z - this.actor.root.position.z;
@@ -315,7 +318,9 @@ export class HermanoMayorBehavior {
 
   /** Ends combat immediately and sends the boss back toward the house. */
   public beginRetreatAfterPlayerDeath() {
-    if (this.retreatingAfterPlayerDeath) return false;
+    if (this.retreatingAfterPlayerDeath || this.removedByFinalCinematic) {
+      return false;
+    }
     this.retreatingAfterPlayerDeath = true;
     this.engaged = false;
     this.stunRemaining = 0;
@@ -334,6 +339,31 @@ export class HermanoMayorBehavior {
     // before the lethal frame.
     this.locomotion = "idle";
     this.enterState("retreating");
+    return true;
+  }
+
+  /** Permanently releases combat ownership for the lake finale cinematic. */
+  public beginAbductionCinematic() {
+    if (this.removedByFinalCinematic) return false;
+    this.removedByFinalCinematic = true;
+    this.retreatingAfterPlayerDeath = false;
+    this.engaged = false;
+    this.stunRemaining = 0;
+    this.grabAttack.interrupt("player-unavailable");
+    this.actor.setNeckGrabPose(null, true);
+    this.axeAttack.interrupt();
+    if (this.actor.getAxePickupState() === "picking-up") {
+      this.actor.cancelAxePickup();
+      this.finishAxeCinematic(false);
+      this.armed = this.actor.hasAxe;
+    }
+    this.actor.setLookTargetProvider(null);
+    this.navigation.clear();
+    this.locomotion = "idle";
+    this.enterState("abducted");
+    this.audio.setBreathing("idle");
+    this.audio.setAudibility(0);
+    this.audio.update(0);
     return true;
   }
 

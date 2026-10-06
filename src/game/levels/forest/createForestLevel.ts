@@ -10,6 +10,7 @@ export async function createForestLevel(
 ): Promise<GameLevel> {
   const quality =
     context.performanceTier === "mobile" ? mobileQuality : desktopQuality;
+  let exitTransitionRequested = false;
   const handle = await createScene(
     context.engine,
     context.canvas,
@@ -30,6 +31,14 @@ export async function createForestLevel(
           return;
         }
         requestCharacterSelectionReturn();
+      },
+      onLevelExit: () => {
+        if (exitTransitionRequested) return;
+        exitTransitionRequested = true;
+        // Do not dispose the forest scene from inside its render callback.
+        queueMicrotask(() => {
+          context.requestLevelTransition("theatre", "forest-exit-portal");
+        });
       },
     }
   );

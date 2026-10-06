@@ -157,6 +157,17 @@ export class ShadowGrabberBehaviorSystem {
     }
   }
 
+  /** Ends every gameplay grab and retires the forest hunters for the finale. */
+  public retireAll() {
+    for (const behavior of this.behaviors.values()) {
+      behavior.dispose();
+      behavior.controller.setEnabled(false);
+    }
+    this.behaviors.clear();
+    for (const debugView of this.debugViews.values()) debugView.dispose();
+    this.debugViews.clear();
+  }
+
   public dispose() {
     if (this.disposed) return;
     this.disposed = true;

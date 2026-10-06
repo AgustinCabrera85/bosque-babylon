@@ -42,6 +42,8 @@ uniform float smokeTurbulence;
 uniform float stateChaos;
 uniform float statePull;
 uniform float deathProgress;
+uniform vec3 spectralTint;
+uniform float spectralTintStrength;
 
 varying vec3 vLocalPosition;
 varying vec3 vLocalNormal;
@@ -215,6 +217,12 @@ void main(void) {
   color += vec3(0.014, 0.016, 0.026) *
     (broad * 0.12 + foldHighlight * 0.16);
   color += vec3(0.055, 0.11, 0.31) * fragmentEdge * (0.3 + death * 0.7);
+  float spectralEnergy = max(max(color.r, color.g), color.b);
+  color = mix(
+    color,
+    spectralTint * spectralEnergy,
+    clamp(spectralTintStrength, 0.0, 1.0)
+  );
 
   if (alpha < 0.018) discard;
   gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.92));
@@ -265,6 +273,8 @@ uniform float statePull;
 uniform float lightPulse;
 uniform float flarePulse;
 uniform float deathProgress;
+uniform vec3 spectralTint;
+uniform float spectralTintStrength;
 
 varying vec2 vUV;
 
@@ -515,6 +525,12 @@ void main(void) {
   color += arcPeak * electricCore * (0.24 + lightPulse * 0.14);
   color += originPeak * fragmentEdge * (0.48 + death * 0.72);
   color += arcPeak * shockRing * 0.82;
+  float spectralEnergy = max(max(color.r, color.g), color.b);
+  color = mix(
+    color,
+    spectralTint * spectralEnergy,
+    clamp(spectralTintStrength, 0.0, 1.0)
+  );
 
   if (alpha < 0.008) discard;
   gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.96));
@@ -805,6 +821,9 @@ export class ShadowGrabberFxController {
   }
 
   private applyShaderUniforms() {
+    const [tintRed, tintGreen, tintBlue] = this.config.spectralTint;
+    const spectralTint = new Color3(tintRed, tintGreen, tintBlue);
+    const spectralTintStrength = clamp01(this.config.spectralTintStrength);
     this.smokeShader.setFloat("time", this.elapsed);
     this.smokeShader.setFloat("spawnProgress", this.smokeSpawnProgressValue);
     this.smokeShader.setFloat("deathProgress", this.deathProgressValue);
@@ -837,6 +856,8 @@ export class ShadowGrabberFxController {
     this.smokeShader.setFloat("portalIntensity", clamp01(this.config.portalIntensity));
     this.smokeShader.setFloat("stateChaos", this.getStateChaos());
     this.smokeShader.setFloat("statePull", this.getStatePull());
+    this.smokeShader.setColor3("spectralTint", spectralTint);
+    this.smokeShader.setFloat("spectralTintStrength", spectralTintStrength);
 
     this.coreShader.setFloat("time", this.elapsed);
     this.coreShader.setFloat("spawnProgress", this.coreSpawnProgressValue);
@@ -896,6 +917,8 @@ export class ShadowGrabberFxController {
     this.coreShader.setFloat("statePull", this.getStatePull());
     this.coreShader.setFloat("lightPulse", 0);
     this.coreShader.setFloat("flarePulse", 0);
+    this.coreShader.setColor3("spectralTint", spectralTint);
+    this.coreShader.setFloat("spectralTintStrength", spectralTintStrength);
     this.applyFormationState(0);
   }
 
@@ -1061,6 +1084,8 @@ export class ShadowGrabberFxController {
           "stateChaos",
           "statePull",
           "deathProgress",
+          "spectralTint",
+          "spectralTintStrength",
         ],
         defines: this.quality === "high" ? ["#define HIGH_QUALITY"] : [],
         needAlphaBlending: true,
@@ -1107,6 +1132,8 @@ export class ShadowGrabberFxController {
           "lightPulse",
           "flarePulse",
           "deathProgress",
+          "spectralTint",
+          "spectralTintStrength",
         ],
         defines: this.quality === "high" ? ["#define HIGH_QUALITY"] : [],
         needAlphaBlending: true,
@@ -1207,6 +1234,31 @@ export class ShadowGrabberFxController {
     light.position.x += Math.max(depth * 0.9, diameter * 0.1);
     light.diffuse = new Color3(0.075, 0.085, 0.135);
     light.specular = new Color3(0.012, 0.016, 0.028);
+    const tintStrength = clamp01(this.config.spectralTintStrength);
+    if (tintStrength > 0) {
+      const [red, green, blue] = this.config.spectralTint;
+      const tint = new Color3(red, green, blue);
+      const diffuseEnergy = Math.max(
+        light.diffuse.r,
+        light.diffuse.g,
+        light.diffuse.b
+      );
+      const specularEnergy = Math.max(
+        light.specular.r,
+        light.specular.g,
+        light.specular.b
+      );
+      light.diffuse = Color3.Lerp(
+        light.diffuse,
+        tint.scale(diffuseEnergy),
+        tintStrength
+      );
+      light.specular = Color3.Lerp(
+        light.specular,
+        tint.scale(specularEnergy),
+        tintStrength
+      );
+    }
     light.intensity = 0;
     light.range = Math.max(0.5, this.config.lightRange);
     light.radius = Math.max(0.02, diameter * 0.045);

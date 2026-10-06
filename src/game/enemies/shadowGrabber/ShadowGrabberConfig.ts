@@ -50,6 +50,10 @@ export interface ShadowGrabberPortalMaterialConfig
 /** Runtime-only artistic controls for the procedural portal shader. */
 export interface ShadowGrabberPortalFxConfig {
   spawnDuration: number;
+  /** Optional spectral recolor that preserves the authored smoke and filament pattern. */
+  spectralTint: readonly [number, number, number];
+  /** 0 keeps the native blue-black palette; 1 fully applies spectralTint. */
+  spectralTintStrength: number;
   /** Geometry multiplier applied only to the electric portal disc. */
   coreDiscScale: number;
   /** Geometry multiplier applied only to the smoke torus. */
@@ -231,6 +235,8 @@ export const DEFAULT_SHADOW_GRABBER_CONFIG: Readonly<ShadowGrabberConfig> = {
   portalDepthScale: 0.25,
   portalFx: {
     spawnDuration: 1.65,
+    spectralTint: [1, 1, 1],
+    spectralTintStrength: 0,
     // Let the electric plate project past more of the smoke rim so its blue
     // origin remains legible from the gameplay camera.
     coreDiscScale: 1.78,

@@ -8,6 +8,7 @@ import {
   HermanoMayorForestCrossingCinematic,
   hasReachedForestCrossingTrigger,
 } from "../src/game/levels/HermanoMayorForestCrossingCinematic";
+import { hasCrossedLuminousLevelExitPortal } from "../src/game/levels/LuminousLevelExitPortal";
 
 type FakeScene = {
   isDisposed: boolean;
@@ -172,6 +173,27 @@ assert.equal(hasReachedForestCrossingTrigger(pickupZ, pickupZ - 8), false);
 assert.ok(crossingTuning.crossingStartX > 0);
 assert.ok(crossingTuning.crossingEndX < 0);
 assert.ok(crossingTuning.crossingForwardOffset >= 22);
+
+assert.equal(
+  hasCrossedLuminousLevelExitPortal(-0.8, 0.3, 0, 0, 4.9, 6.3),
+  true
+);
+assert.equal(
+  hasCrossedLuminousLevelExitPortal(-0.02, 0.01, 0, 0, 4.9, 6.3),
+  true
+);
+assert.equal(
+  hasCrossedLuminousLevelExitPortal(-0.8, 0.3, 2.5, 0, 4.9, 6.3),
+  false
+);
+assert.equal(
+  hasCrossedLuminousLevelExitPortal(-0.8, 0.3, 0, 3.2, 4.9, 6.3),
+  false
+);
+assert.equal(
+  hasCrossedLuminousLevelExitPortal(0.2, 0.5, 0, 0, 4.9, 6.3),
+  false
+);
 
 const listeners = new Map<string, Set<(event: { detail?: unknown }) => void>>();
 const bodyClasses = new Set<string>();

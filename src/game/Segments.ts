@@ -12,6 +12,7 @@ import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { Light } from "@babylonjs/core/Lights/light";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight";
@@ -26,6 +27,7 @@ import {
   type BrazierProceduralFireHandle,
 } from "./BrazierProceduralFire";
 import { createPhotoCard } from "./PhotoCard";
+import { SAFE_MAX_SIMULTANEOUS_LIGHTS } from "../materials";
 import { createCollectibleNote } from "./CollectibleNotes";
 import { createCollectibleMatchbox } from "./CollectibleMatches";
 import {
@@ -41,6 +43,10 @@ import {
   createHermanoMayorAxeHandle,
   type HermanoMayorAxeHandle,
 } from "./enemies/boss/HermanoMayorAxe";
+import {
+  createHouseTelevisionStatic,
+  type HouseTelevisionStaticHandle,
+} from "./HouseTelevisionStatic";
 
 import type { TerrainHandle } from "./Terrain";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
@@ -158,6 +164,17 @@ type FireVisualDimensions = {
   extinguishable?: boolean;
 };
 
+type HouseTorchLightEntry = {
+  light: PointLight | SpotLight;
+  activationPosition: Vector3;
+  baseIntensity: number;
+  phase: number;
+  targetInfluence: number;
+  currentInfluence: number;
+  apertureInfluence?: () => number;
+  playerAdaptive?: boolean;
+};
+
 export type CandleGameplayLight = {
   id: string;
   position: Vector3;
@@ -185,8 +202,6 @@ type CandleLightPoolEntry = {
 const CANDLES_PER_SIDE = 3;
 const CANDLE_PATH_X = 5.75;
 const CANDLE_MODEL_SCALE = 0.12;
-const HOUSE_CANDLE_HEIGHT_SCALE = 0.25;
-const HOUSE_CANDLE_DIAMETER_SCALE = 0.10;
 const CANDLE_GROUND_SINK = 0.015;
 const CANDLE_RESERVE_RADIUS = 1.35;
 const CANDLE_COLLISION_RADIUS = 0.55;
@@ -202,7 +217,6 @@ const CANDLE_LIGHT_FULL_INFLUENCE_RADIUS = 7;
 const CANDLE_LIGHT_FADE_RADIUS = 28;
 const CANDLE_LIGHT_INTENSITY_RESPONSE = 2.8;
 const CANDLE_LIGHT_POSITION_RESPONSE = 3.6;
-const CANDLE_LIGHT_ENABLE_INTENSITY = 0.015;
 const CANDLE_LIGHT_DISABLE_INTENSITY = 0.006;
 const STREAM_TREE_LOD: 0 | 1 | 2 = 1;
 const PLAYER_WORLD_COLLISION_RADIUS = 1.0;
@@ -219,12 +233,22 @@ const CANDLE_FLAME_WICK_TIP_INSET = 1.35;
 const START_BLOCKER_Z = -9.5;
 const START_FOREST_CLOSURE_Z = -18;
 const END_HOUSE_MODEL_SCALE = 1.55;
+const END_HOUSE_TV_PATH = "/assets/models/house/";
+const END_HOUSE_TV_FILE = "vintage_tv.glb";
+const END_HOUSE_TV_SIZE_MULTIPLIER = 1.08;
 const END_HOUSE_RESERVE_WIDTH = 122;
 const END_HOUSE_RESERVE_DEPTH = 150;
-// The house GLB is loaded and shader-warmed with the rest of the level, but
-// its heavy geometry should not be submitted from the beginning of the forest.
-const END_HOUSE_VISUAL_ACTIVATION_RADIUS = 230;
-const END_HOUSE_VISUAL_DEACTIVATION_RADIUS = 260;
+// The house stays resident after preload. Only the TV's CPU animation is
+// distance-gated, with hysteresis so it cannot chatter at the boundary.
+const END_HOUSE_EFFECT_ACTIVATION_RADIUS = 230;
+const END_HOUSE_EFFECT_DEACTIVATION_RADIUS = 260;
+const END_HOUSE_TORCH_FULL_INFLUENCE_RADIUS = 54;
+const END_HOUSE_TORCH_FADE_RADIUS = 98;
+const END_HOUSE_TORCH_INTENSITY_RESPONSE = 3.2;
+const END_HOUSE_TORCH_WINDOW_INTENSITY = 0.92;
+const END_HOUSE_TORCH_WINDOW_BOUNCE_INTENSITY = 0.68;
+const END_HOUSE_TORCH_DOOR_INTENSITY = 2.15;
+const END_HOUSE_PLAYER_EXTERIOR_TORCH_INTENSITY = 2.45;
 const INTERACTION_RAY_LENGTH = 4.25;
 const FIRST_NOTE_SEGMENT_ID = 1;
 const FIRST_MATCHBOX_SEGMENT_ID = FIRST_NOTE_SEGMENT_ID;
@@ -343,10 +367,20 @@ export class Segments {
   private firstPathNotePosition: Vector3 | null = null;
   private endHouseCheckpoint: Vector3 | null = null;
   private endHouseMeshes: AbstractMesh[] = [];
+  private endHouseTorchFacadeMeshes: AbstractMesh[] = [];
   private endHouseBrazierFire: BrazierProceduralFireHandle | null = null;
   private endHouseBounds: WorldBounds | null = null;
-  private endHouseVisualRoot: AbstractMesh | null = null;
-  private endHouseVisualsActive = true;
+  private endHouseTelevision: HouseTelevisionStaticHandle | null = null;
+  private endHouseLocalLights: Light[] = [];
+  private endHouseTorchLights: HouseTorchLightEntry[] = [];
+  private endHouseIngressLights: Light[] = [];
+  private endHouseTorchSourcePositions: Vector3[] = [];
+  private endHousePlayerAdaptiveLight: PointLight | null = null;
+  private endHouseWindowLightAnchor: Vector3 | null = null;
+  private endHouseDoorLightAnchor: Vector3 | null = null;
+  private endHouseDoorOpenAmount = 0;
+  private endHouseTorchLightingRegistered = false;
+  private endHouseEffectsActive = true;
   private hermanoMayor: HermanoMayorHandle | null = null;
   private hermanoMayorAxe: HermanoMayorAxeHandle | null = null;
   private worldObjectInspectionHandler: WorldObjectInspectionHandler | null = null;
@@ -387,6 +421,83 @@ export class Segments {
 
   getEndHouseMeshes(): readonly AbstractMesh[] {
     return this.endHouseMeshes;
+  }
+
+  getEndHouseTorchFacadeMeshes(): readonly AbstractMesh[] {
+    return this.endHouseTorchFacadeMeshes;
+  }
+
+  /**
+   * Registers the already-loaded avatar once with the authored house lights.
+   * One dedicated light replaces the wall-penetrating end-torch lights and
+   * blends from warm exterior torchlight to TV/window/door light indoors.
+   */
+  registerEndHousePlayerLightReceivers(meshes: readonly AbstractMesh[]) {
+    const receivers = meshes.filter(
+      (mesh) => !mesh.isDisposed() && mesh.getTotalVertices() > 0
+    );
+    if (receivers.length === 0) return;
+
+    this.ensureHouseLightReceiverCapacity(receivers);
+
+    if (!this.endHousePlayerAdaptiveLight) {
+      const sources = this.endHouseTorchSourcePositions;
+      if (sources.length === 0) return;
+      const position = sources
+        .reduce((sum, source) => sum.add(source), Vector3.Zero())
+        .scale(1 / sources.length);
+      const light = new PointLight(
+        "endHousePlayerAdaptiveFill",
+        position,
+        this.scene
+      );
+      light.diffuse = new Color3(1.0, 0.46, 0.15);
+      light.specular = new Color3(0.24, 0.08, 0.018);
+      light.intensity = 0;
+      light.range = 30;
+      light.falloffType = Light.FALLOFF_STANDARD;
+      light.renderPriority = 10;
+      light.includedOnlyMeshes.push(...receivers);
+      this.endHousePlayerAdaptiveLight = light;
+      this.endHouseTorchLights.push({
+        light,
+        activationPosition: position.clone(),
+        baseIntensity: END_HOUSE_PLAYER_EXTERIOR_TORCH_INTENSITY,
+        phase: 1.47,
+        targetInfluence: 0,
+        currentInfluence: 0,
+        playerAdaptive: true,
+      });
+      return;
+    }
+
+    const included = new Set(
+      this.endHousePlayerAdaptiveLight.includedOnlyMeshes
+    );
+    for (const mesh of receivers) {
+      if (included.has(mesh)) continue;
+      included.add(mesh);
+      this.endHousePlayerAdaptiveLight.includedOnlyMeshes.push(mesh);
+    }
+  }
+
+  /**
+   * Keeps the two moving candle lights out of authored areas that have their
+   * own local lighting. The lights themselves stay registered so crossing a
+   * streaming boundary cannot invalidate those meshes' shader variants.
+   */
+  excludeMeshesFromPathCandleLights(meshes: readonly AbstractMesh[]) {
+    const receivers = meshes.filter(
+      (mesh) => !mesh.isDisposed() && mesh.getTotalVertices() > 0
+    );
+    for (const { light } of this.candleLightPool) {
+      const excluded = new Set(light.excludedMeshes);
+      for (const mesh of receivers) {
+        if (excluded.has(mesh)) continue;
+        excluded.add(mesh);
+        light.excludedMeshes.push(mesh);
+      }
+    }
   }
 
   getHermanoMayor() {
@@ -495,6 +606,7 @@ export class Segments {
   }
 
   prepareLightingForPosition(playerPosition: Vector3) {
+    this.updateEndHouseTorchLightTargets(playerPosition, true);
     this.updateCandleLightTargets(playerPosition);
     for (const pool of this.candleLightPool) {
       pool.currentIntensity = pool.targetIntensity;
@@ -502,15 +614,14 @@ export class Segments {
       pool.light.intensity = pool.currentIntensity;
       pool.light.range = pool.currentRange;
 
-      const shouldEnable = pool.currentIntensity >= CANDLE_LIGHT_ENABLE_INTENSITY;
-      if (shouldEnable) {
+      const hasVisibleInfluence = pool.currentIntensity > CANDLE_LIGHT_DISABLE_INTENSITY;
+      if (hasVisibleInfluence) {
         pool.light.position.copyFrom(pool.targetPosition);
         pool.initialized = true;
       } else {
         pool.light.intensity = 0;
         pool.initialized = false;
       }
-      if (pool.light.isEnabled() !== shouldEnable) pool.light.setEnabled(shouldEnable);
     }
   }
 
@@ -802,25 +913,29 @@ export class Segments {
       this.cleanup(grassNeeded, plantNeeded, objectNeeded, candleNeeded);
     }
 
-    this.updateEndHouseVisualActivation(playerPosition);
+    this.updateEndHouseEffectsActivation(playerPosition);
+    this.updateEndHouseTorchLightTargets(playerPosition);
     this.updateCandleLightTargets(playerPosition);
   }
 
-  private updateEndHouseVisualActivation(playerPosition: Vector3) {
-    const root = this.endHouseVisualRoot;
+  private updateEndHouseEffectsActivation(playerPosition: Vector3) {
     const bounds = this.endHouseBounds;
-    if (!root || !bounds) return;
+    if (!bounds) return;
 
     const dx = this.axisDistance(playerPosition.x, bounds.min.x, bounds.max.x);
     const dz = this.axisDistance(playerPosition.z, bounds.min.z, bounds.max.z);
-    const radius = this.endHouseVisualsActive
-      ? END_HOUSE_VISUAL_DEACTIVATION_RADIUS
-      : END_HOUSE_VISUAL_ACTIVATION_RADIUS;
+    const radius = this.endHouseEffectsActive
+      ? END_HOUSE_EFFECT_DEACTIVATION_RADIUS
+      : END_HOUSE_EFFECT_ACTIVATION_RADIUS;
     const shouldBeActive = dx * dx + dz * dz <= radius * radius;
-    if (shouldBeActive === this.endHouseVisualsActive) return;
+    if (shouldBeActive === this.endHouseEffectsActive) return;
 
-    this.endHouseVisualsActive = shouldBeActive;
-    root.setEnabled(shouldBeActive);
+    this.endHouseEffectsActive = shouldBeActive;
+    // Keep the already-loaded house and its light registered in the scene.
+    // Toggling either at this boundary rebuilds active-mesh/light lists and can
+    // invalidate material variants. Only pause the cheap TV animation and drive
+    // its existing light to zero, which does not change shader membership.
+    this.endHouseTelevision?.setActive(shouldBeActive);
   }
 
   updateIsometricOccluders(playerPosition: Vector3, enabled: boolean) {
@@ -1318,7 +1433,6 @@ export class Segments {
       light.intensity = 0;
       light.range = CANDLE_LIGHT_RANGE;
       light.renderPriority = CANDLE_LIGHT_RENDER_PRIORITY;
-      light.setEnabled(false);
 
       this.candleLightPool.push({
         side,
@@ -1836,18 +1950,11 @@ export class Segments {
         pool.light.range = pool.currentRange;
 
         if (
-          pool.light.isEnabled() &&
           pool.targetIntensity <= CANDLE_LIGHT_DISABLE_INTENSITY &&
           pool.currentIntensity <= CANDLE_LIGHT_DISABLE_INTENSITY
         ) {
           pool.light.intensity = 0;
-          pool.light.setEnabled(false);
           pool.initialized = false;
-        } else if (
-          !pool.light.isEnabled() &&
-          pool.targetIntensity >= CANDLE_LIGHT_ENABLE_INTENSITY
-        ) {
-          pool.light.setEnabled(true);
         }
       }
     });
@@ -1905,12 +2012,6 @@ export class Segments {
       pool.targetIntensity =
         (weightedIntensity / totalWeight) * clamp(combinedInfluence, 0, 1);
       pool.targetRange = weightedRange / totalWeight;
-      if (
-        !pool.light.isEnabled() &&
-        pool.targetIntensity >= CANDLE_LIGHT_ENABLE_INTENSITY
-      ) {
-        pool.light.setEnabled(true);
-      }
     }
   }
 
@@ -1970,7 +2071,6 @@ export class Segments {
     }
 
     root.name = "endHouseRoot";
-    this.endHouseVisualRoot = root;
     root.scaling.setAll(scale);
     root.rotation.y = Math.PI;
     root.position.set(0, this.terrain.getHeightAt(0, targetFrontZ), targetFrontZ);
@@ -2024,15 +2124,541 @@ export class Segments {
     this.createHouseColliders(finalBounds);
     this.createHouseMeshColliders(res.meshes);
     this.createHouseFrontRailingColliders(res.meshes);
+    const televisionLightPosition = await this.replaceEndHouseTelevision(res.meshes);
+    this.createHouseTorchAccentLighting(res.meshes, finalBounds);
+    this.excludeHouseSurfacesFromOutdoorCandleLights(this.endHouseMeshes);
     this.createHouseInteriorColliders(res.meshes);
     this.registerHouseRockingChair(res.meshes);
     this.createHouseDoor(res.meshes, finalBounds);
-    const candlePosition = this.createHouseCandle(finalBounds);
     await Promise.all([
-      createPhotoCard(this.scene, finalBounds, { candlePosition }),
+      createPhotoCard(this.scene, finalBounds, { lightPosition: televisionLightPosition }),
       this.loadEndHouseBackyardProps(finalBounds, lagoonFrontZ),
       this.loadEndHouseHermanoMayor(res.meshes),
     ]);
+  }
+
+  private async replaceEndHouseTelevision(houseMeshes: AbstractMesh[]) {
+    const original = houseMeshes.find((mesh) =>
+      mesh.name.toLowerCase().includes("televisionretro")
+    );
+    if (!original) {
+      console.warn(
+        "[Segments] No se pudo reemplazar la TV: falta televisionRetro en la casa."
+      );
+      return null;
+    }
+
+    original.computeWorldMatrix(true);
+    const originalMeshes = [original, ...original.getChildMeshes(false)];
+    const originalBounds = this.getHierarchyBounds(originalMeshes);
+    if (!originalBounds) return null;
+
+    let replacementRoot: TransformNode | null = null;
+    try {
+      const replacement = await SceneLoader.ImportMeshAsync(
+        null,
+        END_HOUSE_TV_PATH,
+        END_HOUSE_TV_FILE,
+        this.scene
+      );
+      replacementRoot = new TransformNode("endHouseVintageTvRoot", this.scene);
+
+      const gltfRoot = replacement.meshes.find(
+        (mesh) => mesh.name === "__root__" && mesh.getTotalVertices() === 0
+      );
+      if (gltfRoot) {
+        for (const child of gltfRoot.getChildren()) child.parent = replacementRoot;
+        gltfRoot.dispose(false);
+      } else {
+        for (const node of [
+          ...replacement.meshes,
+          ...replacement.transformNodes,
+        ]) {
+          if (node.parent === null) node.parent = replacementRoot;
+        }
+      }
+
+      const renderableMeshes = replacement.meshes.filter(
+        (mesh) => !mesh.isDisposed() && mesh.getTotalVertices() > 0
+      );
+      if (renderableMeshes.length === 0) {
+        throw new Error("El GLB de la TV no contiene geometria renderizable.");
+      }
+
+      const originalWorldScale = new Vector3();
+      const originalWorldRotation = new Quaternion();
+      const originalWorldPosition = new Vector3();
+      original
+        .getWorldMatrix()
+        .decompose(
+          originalWorldScale,
+          originalWorldRotation,
+          originalWorldPosition
+        );
+      replacementRoot.rotationQuaternion = originalWorldRotation;
+
+      for (const mesh of renderableMeshes) {
+        mesh.name = `endHouseVintageTv_${mesh.name}`;
+        mesh.isPickable = false;
+        mesh.receiveShadows = true;
+        mesh.computeWorldMatrix(true);
+      }
+
+      const unscaledBounds = this.getHierarchyBounds(renderableMeshes);
+      if (!unscaledBounds) {
+        throw new Error("No se pudieron calcular los limites de la TV nueva.");
+      }
+
+      const originalLongestSide = Math.max(
+        originalBounds.max.x - originalBounds.min.x,
+        originalBounds.max.y - originalBounds.min.y,
+        originalBounds.max.z - originalBounds.min.z
+      );
+      const replacementLongestSide = Math.max(
+        unscaledBounds.max.x - unscaledBounds.min.x,
+        unscaledBounds.max.y - unscaledBounds.min.y,
+        unscaledBounds.max.z - unscaledBounds.min.z
+      );
+      const fittedScale =
+        (originalLongestSide * END_HOUSE_TV_SIZE_MULTIPLIER) /
+        Math.max(0.001, replacementLongestSide);
+      replacementRoot.scaling.setAll(fittedScale);
+      replacementRoot.computeWorldMatrix(true);
+      for (const mesh of renderableMeshes) mesh.computeWorldMatrix(true);
+
+      const scaledBounds = this.getHierarchyBounds(renderableMeshes);
+      if (!scaledBounds) {
+        throw new Error("No se pudo ajustar la TV nueva al espacio existente.");
+      }
+
+      const originalCenterX = (originalBounds.min.x + originalBounds.max.x) * 0.5;
+      const originalCenterZ = (originalBounds.min.z + originalBounds.max.z) * 0.5;
+      const replacementCenterX = (scaledBounds.min.x + scaledBounds.max.x) * 0.5;
+      const replacementCenterZ = (scaledBounds.min.z + scaledBounds.max.z) * 0.5;
+      replacementRoot.position.set(
+        originalCenterX - replacementCenterX,
+        originalBounds.min.y - scaledBounds.min.y,
+        originalCenterZ - replacementCenterZ
+      );
+      replacementRoot.computeWorldMatrix(true);
+      for (const mesh of renderableMeshes) mesh.computeWorldMatrix(true);
+
+      const finalBounds = this.getHierarchyBounds(renderableMeshes);
+      if (!finalBounds) {
+        throw new Error("No se pudieron validar los limites finales de la TV.");
+      }
+
+      const screen = renderableMeshes.find((mesh) =>
+        mesh.name.toLowerCase().includes("screen")
+      );
+      const body = renderableMeshes.find((mesh) => mesh !== screen) ?? screen;
+      if (!screen || !body) {
+        throw new Error("La TV nueva no contiene una malla de pantalla independiente.");
+      }
+      const television = createHouseTelevisionStatic(this.scene, screen, body);
+      this.endHouseTelevision = television;
+      this.endHouseLocalLights.push(television.light);
+
+      this.staticBoxColliders.push({
+        x: (finalBounds.min.x + finalBounds.max.x) * 0.5,
+        z: (finalBounds.min.z + finalBounds.max.z) * 0.5,
+        width: Math.max(0.3, finalBounds.max.x - finalBounds.min.x),
+        depth: Math.max(0.3, finalBounds.max.z - finalBounds.min.z),
+        rotation: 0,
+        active: true,
+        kind: "prop",
+      });
+
+      original.metadata ??= {};
+      original.metadata.skipHouseInteriorCollider = true;
+      original.setEnabled(false);
+      this.endHouseMeshes = this.endHouseMeshes.filter(
+        (mesh) => !originalMeshes.includes(mesh)
+      );
+      this.endHouseMeshes.push(...renderableMeshes);
+      this.addEndHouseLocalLightReceivers(
+        this.getHouseInteriorLightReceivers(this.endHouseMeshes)
+      );
+      television.setActive(this.endHouseEffectsActive);
+      return television.lightPosition;
+    } catch (error) {
+      const televisionLight = this.endHouseTelevision?.light ?? null;
+      televisionLight?.dispose();
+      if (televisionLight) {
+        this.endHouseLocalLights = this.endHouseLocalLights.filter(
+          (light) => light !== televisionLight
+        );
+      }
+      this.endHouseTelevision = null;
+      replacementRoot?.dispose(false);
+      console.warn("[Segments] No se pudo cargar la TV vintage de reemplazo.", error);
+      return null;
+    }
+  }
+
+  private excludeHouseSurfacesFromOutdoorCandleLights(meshes: readonly AbstractMesh[]) {
+    this.excludeMeshesFromPathCandleLights(meshes);
+  }
+
+  private createHouseTorchAccentLighting(
+    houseMeshes: readonly AbstractMesh[],
+    houseBounds: { min: Vector3; max: Vector3 }
+  ) {
+    if (this.endHouseTorchLights.length > 0) return;
+
+    const exteriorTorchParts = [
+      "housefront",
+      "woodenhousebench",
+      "curtains",
+      "door",
+      "roof",
+    ];
+    const facadeMeshes = houseMeshes.filter(
+      (mesh) => {
+        if (mesh.isDisposed() || mesh.getTotalVertices() <= 0) return false;
+        return exteriorTorchParts.some((partName) =>
+          this.meshBelongsToHousePart(mesh, partName)
+        );
+      }
+    );
+    if (facadeMeshes.length === 0) return;
+    this.endHouseTorchFacadeMeshes = facadeMeshes;
+    this.ensureHouseLightReceiverCapacity(facadeMeshes);
+
+    const centerX = (houseBounds.min.x + houseBounds.max.x) * 0.5;
+    const frontZ = houseBounds.min.z;
+    const torchOffsetX = Math.min(
+      6.4,
+      Math.max(2.8, (houseBounds.max.x - houseBounds.min.x) * 0.38)
+    );
+    const facadeLightPositions = [-1, 1].map((side) => {
+      const x = centerX + side * torchOffsetX;
+      return new Vector3(
+        x,
+        this.terrain.getHeightAt(x, frontZ - 7.6) + 2.25,
+        frontZ - 7.6
+      );
+    });
+    this.endHouseTorchSourcePositions = facadeLightPositions.map((position) =>
+      position.clone()
+    );
+
+    const windowAnchor =
+      houseMeshes.find((mesh) => mesh.name.toLowerCase() === "curtains") ??
+      houseMeshes.find((mesh) => mesh.name.toLowerCase() === "windows");
+    const windowBounds = this.getMeshBounds(windowAnchor);
+    if (windowBounds) {
+      const windowCenter = windowBounds.min.add(windowBounds.max).scale(0.5);
+      const wallCandidates = [
+        {
+          distance: Math.abs(windowCenter.z - houseBounds.min.z),
+          outward: new Vector3(0, 0, -1),
+          sourceWallName: "housefront",
+        },
+        {
+          distance: Math.abs(windowCenter.z - houseBounds.max.z),
+          outward: new Vector3(0, 0, 1),
+          sourceWallName: "houseback",
+        },
+        {
+          distance: Math.abs(windowCenter.x - houseBounds.min.x),
+          outward: new Vector3(-1, 0, 0),
+          sourceWallName: "houseleft",
+        },
+        {
+          distance: Math.abs(windowCenter.x - houseBounds.max.x),
+          outward: new Vector3(1, 0, 0),
+          sourceWallName: "houseright",
+        },
+      ].sort((a, b) => a.distance - b.distance);
+      const sourceWall = wallCandidates[0];
+      const inward = sourceWall.outward.scale(-1);
+      const spillPosition = windowCenter.add(sourceWall.outward.scale(0.22));
+      const spillDirection = new Vector3(inward.x, -0.16, inward.z).normalize();
+      const interiorReceivers = this.getHouseInteriorLightReceivers(
+        this.endHouseMeshes,
+        [sourceWall.sourceWallName]
+      );
+      this.ensureHouseLightReceiverCapacity(interiorReceivers);
+
+      const spill = new SpotLight(
+        "endHouseTorchWindowSpill",
+        spillPosition,
+        spillDirection,
+        Math.PI * 0.4,
+        1.8,
+        this.scene
+      );
+      spill.diffuse = new Color3(1.0, 0.38, 0.12);
+      spill.specular = new Color3(0.12, 0.035, 0.008);
+      spill.intensity = 0;
+      spill.range = 10.5;
+      spill.renderPriority = 9;
+      spill.projectionTexture = this.createHouseApertureProjectionTexture(
+        "endHouseWindowSpillProjection",
+        0.23,
+        0.36,
+        0.52
+      );
+      spill.projectionTextureLightNear = 0.1;
+      spill.projectionTextureLightFar = spill.range;
+      spill.projectionTextureUpDirection = Vector3.Up();
+      spill.includedOnlyMeshes.push(...interiorReceivers);
+      this.endHouseIngressLights.push(spill);
+      this.endHouseTorchLights.push({
+        light: spill,
+        activationPosition: facadeLightPositions[0]
+          .add(facadeLightPositions[1])
+          .scale(0.5),
+        baseIntensity: END_HOUSE_TORCH_WINDOW_INTENSITY,
+        phase: 0.93,
+        targetInfluence: 0,
+        currentInfluence: 0,
+      });
+
+      // The cone provides the directional window shape; this short-range fill
+      // represents the warm light bouncing after it crosses the aperture, so
+      // furniture and moving actors do not remain black outside the cone axis.
+      const bouncePosition = windowCenter
+        .add(inward.scale(0.9))
+        .add(new Vector3(0, -0.12, 0));
+      this.endHouseWindowLightAnchor = bouncePosition.clone();
+      const bounce = new PointLight(
+        "endHouseTorchWindowBounce",
+        bouncePosition,
+        this.scene
+      );
+      bounce.diffuse = new Color3(1.0, 0.34, 0.1);
+      bounce.specular = new Color3(0.08, 0.022, 0.005);
+      bounce.intensity = 0;
+      bounce.range = 9.5;
+      bounce.falloffType = Light.FALLOFF_STANDARD;
+      bounce.renderPriority = 10;
+      bounce.includedOnlyMeshes.push(...interiorReceivers);
+      this.endHouseIngressLights.push(bounce);
+      this.endHouseTorchLights.push({
+        light: bounce,
+        activationPosition: facadeLightPositions[0]
+          .add(facadeLightPositions[1])
+          .scale(0.5),
+        baseIntensity: END_HOUSE_TORCH_WINDOW_BOUNCE_INTENSITY,
+        phase: 1.81,
+        targetInfluence: 0,
+        currentInfluence: 0,
+      });
+    }
+
+    this.registerHouseTorchLightingAnimation();
+  }
+
+  private createHouseApertureProjectionTexture(
+    name: string,
+    halfWidthRatio: number,
+    halfHeightRatio: number,
+    centerDividerStrength: number
+  ) {
+    const size = 96;
+    const texture = new DynamicTexture(
+      name,
+      { width: size, height: size },
+      this.scene,
+      false
+    );
+    const context = texture.getContext() as CanvasRenderingContext2D;
+    const image = context.createImageData(size, size);
+
+    // Projection lights use RGB as their mask, so the area outside the
+    // window aperture must be opaque black rather than only transparent.
+    for (let y = 0; y < size; y++) {
+      const ny = (y + 0.5 - size * 0.5) / (size * halfHeightRatio);
+      for (let x = 0; x < size; x++) {
+        const nx = (x + 0.5 - size * 0.5) / (size * halfWidthRatio);
+        const edgeDistance = Math.max(Math.abs(nx), Math.abs(ny));
+        const aperture = 1 - smoothstep(0.72, 1, edgeDistance);
+        const centerBar = smoothstep(0.025, 0.12, Math.abs(nx));
+        const fabricVariation =
+          0.94 +
+          Math.sin(x * 0.39 + y * 0.07) * 0.025 +
+          Math.sin(y * 0.21) * 0.018;
+        const divider =
+          1 - centerDividerStrength * (1 - centerBar);
+        const brightness = aperture * divider * fabricVariation;
+        const offset = (y * size + x) * 4;
+        image.data[offset] = Math.round(255 * brightness);
+        image.data[offset + 1] = Math.round(238 * brightness);
+        image.data[offset + 2] = Math.round(205 * brightness);
+        image.data[offset + 3] = 255;
+      }
+    }
+
+    context.putImageData(image, 0, 0);
+    texture.update(false);
+    texture.wrapU = Texture.CLAMP_ADDRESSMODE;
+    texture.wrapV = Texture.CLAMP_ADDRESSMODE;
+    texture.gammaSpace = true;
+    return texture;
+  }
+
+  private registerHouseTorchLightingAnimation() {
+    if (this.endHouseTorchLightingRegistered) return;
+    this.endHouseTorchLightingRegistered = true;
+
+    let time = 0;
+    this.scene.onBeforeRenderObservable.add(() => {
+      const deltaTime = Math.max(
+        0,
+        Math.min(this.scene.getEngine().getDeltaTime() * 0.001, 0.1)
+      );
+      const blend =
+        1 - Math.exp(-END_HOUSE_TORCH_INTENSITY_RESPONSE * deltaTime);
+      time += deltaTime;
+
+      for (const entry of this.endHouseTorchLights) {
+        const apertureInfluence = entry.apertureInfluence?.() ?? 1;
+        const desiredInfluence = entry.targetInfluence * apertureInfluence;
+        entry.currentInfluence +=
+          (desiredInfluence - entry.currentInfluence) * blend;
+        const flicker =
+          Math.sin(time * 10.7 + entry.phase) * 0.055 +
+          Math.sin(time * 19.3 + entry.phase * 0.67) * 0.025;
+        entry.light.intensity = Math.max(
+          0,
+          entry.baseIntensity * (1 + flicker) * entry.currentInfluence
+        );
+      }
+    });
+  }
+
+  private updateEndHouseTorchLightTargets(
+    playerPosition: Vector3,
+    immediate = false
+  ) {
+    for (const entry of this.endHouseTorchLights) {
+      const dx = playerPosition.x - entry.activationPosition.x;
+      const dz = playerPosition.z - entry.activationPosition.z;
+      const distance = Math.hypot(dx, dz);
+      entry.targetInfluence =
+        1 -
+        smoothstep(
+          END_HOUSE_TORCH_FULL_INFLUENCE_RADIUS,
+          END_HOUSE_TORCH_FADE_RADIUS,
+          distance
+        );
+      if (entry.playerAdaptive && entry.light instanceof PointLight) {
+        const exteriorInfluence = this.getEndHousePlayerExteriorInfluence(
+          playerPosition
+        );
+        const interiorInfluence = 1 - exteriorInfluence;
+        const doorInfluence = smoothstep(
+          0.06,
+          0.72,
+          this.endHouseDoorOpenAmount
+        );
+        entry.targetInfluence =
+          entry.targetInfluence * exteriorInfluence +
+          interiorInfluence * (0.9 + doorInfluence * 0.18);
+        this.updateEndHousePlayerLightPresentation(
+          entry.light,
+          entry.activationPosition,
+          interiorInfluence,
+          doorInfluence
+        );
+      }
+      if (!immediate) continue;
+      entry.currentInfluence =
+        entry.targetInfluence * (entry.apertureInfluence?.() ?? 1);
+      entry.light.intensity = entry.baseIntensity * entry.currentInfluence;
+    }
+  }
+
+  private getEndHousePlayerExteriorInfluence(playerPosition: Vector3) {
+    const bounds = this.endHouseBounds;
+    if (!bounds) return 1;
+    const withinHouseWidth =
+      playerPosition.x >= bounds.min.x - 0.35 &&
+      playerPosition.x <= bounds.max.x + 0.35;
+    if (!withinHouseWidth) return 1;
+    // The model bounds include the roof overhang and porch. Using min.z made
+    // the avatar switch to the TV presentation before entering the cabin.
+    // Keep the exterior torch response through the porch and only blend after
+    // the avatar's centre has crossed the actual door plane.
+    const doorPlaneZ = this.endHouseCheckpoint?.z ?? bounds.min.z;
+    return (
+      1 -
+      smoothstep(
+        doorPlaneZ + 0.05,
+        doorPlaneZ + 1.25,
+        playerPosition.z
+      )
+    );
+  }
+
+  private updateEndHousePlayerLightPresentation(
+    light: PointLight | SpotLight,
+    exteriorPosition: Vector3,
+    interiorInfluence: number,
+    doorInfluence: number
+  ) {
+    const televisionPosition =
+      this.endHouseTelevision?.lightPosition ??
+      this.endHouseWindowLightAnchor ??
+      exteriorPosition;
+    const windowPosition = this.endHouseWindowLightAnchor ?? televisionPosition;
+    let interiorX = televisionPosition.x +
+      (windowPosition.x - televisionPosition.x) * 0.26;
+    let interiorY = televisionPosition.y +
+      (windowPosition.y - televisionPosition.y) * 0.26;
+    let interiorZ = televisionPosition.z +
+      (windowPosition.z - televisionPosition.z) * 0.26;
+    const doorPosition = this.endHouseDoorLightAnchor;
+    if (doorPosition) {
+      const doorBlend = doorInfluence * 0.48;
+      interiorX += (doorPosition.x - interiorX) * doorBlend;
+      interiorY += (doorPosition.y - interiorY) * doorBlend;
+      interiorZ += (doorPosition.z - interiorZ) * doorBlend;
+    }
+    light.position.set(
+      exteriorPosition.x +
+        (interiorX - exteriorPosition.x) * interiorInfluence,
+      exteriorPosition.y +
+        (interiorY - exteriorPosition.y) * interiorInfluence,
+      exteriorPosition.z +
+        (interiorZ - exteriorPosition.z) * interiorInfluence
+    );
+
+    const warmR = 1.0;
+    const warmG = 0.46;
+    const warmB = 0.15;
+    const televisionR = 0.5;
+    const televisionG = 0.68;
+    const televisionB = 0.92;
+    const interiorWarmMix = 0.22 + doorInfluence * 0.5;
+    const interiorR = televisionR +
+      (warmR - televisionR) * interiorWarmMix;
+    const interiorG = televisionG +
+      (warmG - televisionG) * interiorWarmMix;
+    const interiorB = televisionB +
+      (warmB - televisionB) * interiorWarmMix;
+    light.diffuse.set(
+      warmR + (interiorR - warmR) * interiorInfluence,
+      warmG + (interiorG - warmG) * interiorInfluence,
+      warmB + (interiorB - warmB) * interiorInfluence
+    );
+  }
+
+  private addEndHouseIngressLightReceivers(meshes: readonly AbstractMesh[]) {
+    const receivers = meshes.filter(
+      (mesh) => !mesh.isDisposed() && mesh.getTotalVertices() > 0
+    );
+    this.ensureHouseLightReceiverCapacity(receivers);
+    for (const light of this.endHouseIngressLights) {
+      const included = new Set(light.includedOnlyMeshes);
+      for (const mesh of receivers) {
+        if (included.has(mesh)) continue;
+        included.add(mesh);
+        light.includedOnlyMeshes.push(mesh);
+      }
+    }
   }
 
   private async loadEndHouseHermanoMayor(houseMeshes: AbstractMesh[]) {
@@ -2066,8 +2692,50 @@ export class Segments {
         facingTarget: doorCenter,
       });
       this.endHouseMeshes.push(...this.hermanoMayor.meshes);
+      this.addEndHouseLocalLightReceivers(this.hermanoMayor.meshes);
+      this.addEndHouseIngressLightReceivers(this.hermanoMayor.meshes);
     } catch (error) {
       console.warn("[Segments] No se pudo cargar al Hermano Mayor.", error);
+    }
+  }
+
+  private addEndHouseLocalLightReceivers(meshes: readonly AbstractMesh[]) {
+    const receivers = meshes.filter(
+      (mesh) => !mesh.isDisposed() && mesh.getTotalVertices() > 0
+    );
+    if (receivers.length === 0) return;
+    this.ensureHouseLightReceiverCapacity(receivers);
+
+    for (const light of this.endHouseLocalLights) {
+      const included = new Set(light.includedOnlyMeshes);
+      for (const mesh of receivers) {
+        if (included.has(mesh)) continue;
+        included.add(mesh);
+        light.includedOnlyMeshes.push(mesh);
+      }
+    }
+  }
+
+  private ensureHouseLightReceiverCapacity(meshes: readonly AbstractMesh[]) {
+    const visited = new Set<BabylonMaterial>();
+    const visit = (material: BabylonMaterial | null) => {
+      if (!material || visited.has(material)) return;
+      visited.add(material);
+      const lightAware = material as BabylonMaterial & {
+        maxSimultaneousLights?: number;
+        subMaterials?: Array<BabylonMaterial | null>;
+      };
+      if (typeof lightAware.maxSimultaneousLights === "number") {
+        lightAware.maxSimultaneousLights = SAFE_MAX_SIMULTANEOUS_LIGHTS;
+      }
+      for (const subMaterial of lightAware.subMaterials ?? []) {
+        visit(subMaterial);
+      }
+    };
+
+    for (const mesh of meshes) {
+      if (mesh.metadata?.isTelevisionStaticScreen) continue;
+      visit(mesh.material);
     }
   }
 
@@ -2681,45 +3349,6 @@ export class Segments {
     );
   }
 
-  private createHouseCandle(bounds: { min: Vector3; max: Vector3 }) {
-    if (!this.candleTemplate || !this.candleFireMaterial || !this.candleGlowMaterial || !this.candleFloorGlowMaterial) {
-      return null;
-    }
-
-    const width = bounds.max.x - bounds.min.x;
-    const depth = bounds.max.z - bounds.min.z;
-    const x = (bounds.min.x + bounds.max.x) * 0.5 - Math.min(1.6, width * 0.16);
-    const z = bounds.min.z + depth * 0.56;
-    const floorY = bounds.min.y + 0.08;
-    const root = this.instantiateCandle(
-      "endHouseCandle",
-      new Vector3(HOUSE_CANDLE_DIAMETER_SCALE, HOUSE_CANDLE_HEIGHT_SCALE, HOUSE_CANDLE_DIAMETER_SCALE)
-    );
-
-    root.position.set(
-      x,
-      floorY - this.candleTemplate.baseOffsetY * HOUSE_CANDLE_HEIGHT_SCALE,
-      z
-    );
-    root.rotation.y = Math.PI * 0.22;
-
-    const flameY =
-      root.position.y +
-      this.candleTemplate.topOffsetY * HOUSE_CANDLE_HEIGHT_SCALE -
-      CANDLE_FLAME_WICK_TIP_INSET * HOUSE_CANDLE_HEIGHT_SCALE;
-    this.createCandleFire(
-      "endHouseCandleFlame",
-      new Vector3(x, flameY, z),
-      root.rotation.y,
-      HOUSE_CANDLE_DIAMETER_SCALE,
-      1.15,
-      14,
-      0
-    );
-
-    return new Vector3(x, floorY, z);
-  }
-
   private patchHouseMaterials(meshes: AbstractMesh[]) {
     const patchedSolid = new Set<BabylonMaterial>();
     const patchedAlpha = new Set<BabylonMaterial>();
@@ -2870,6 +3499,99 @@ export class Segments {
     };
   }
 
+  private meshBelongsToHousePart(mesh: AbstractMesh, partName: string) {
+    const name = mesh.name.toLowerCase();
+    const normalizedPartName = partName.toLowerCase();
+    return (
+      name === normalizedPartName ||
+      name.startsWith(`${normalizedPartName}_primitive`)
+    );
+  }
+
+  private getHouseInteriorLightReceivers(
+    meshes: readonly AbstractMesh[],
+    additionalExcludedParts: readonly string[] = []
+  ) {
+    const exteriorOnlyParts = [
+      "housefront",
+      "door",
+      "windows",
+      "curtains",
+      "roof",
+      "woodenhousebench",
+      ...additionalExcludedParts,
+    ];
+    return meshes.filter(
+      (mesh) =>
+        !mesh.isDisposed() &&
+        mesh.getTotalVertices() > 0 &&
+        !exteriorOnlyParts.some((partName) =>
+          this.meshBelongsToHousePart(mesh, partName)
+        )
+    );
+  }
+
+  private createHouseDoorIngressLighting(
+    doorCenterX: number,
+    doorCenterY: number,
+    doorCenterZ: number
+  ) {
+    const interiorReceivers = this.getHouseInteriorLightReceivers(
+      this.endHouseMeshes
+    );
+    if (interiorReceivers.length === 0) return;
+    this.ensureHouseLightReceiverCapacity(interiorReceivers);
+
+    const position = new Vector3(
+      doorCenterX,
+      doorCenterY + 0.18,
+      doorCenterZ - 0.24
+    );
+    this.endHouseDoorLightAnchor = position.clone();
+    const direction = new Vector3(0, -0.13, 1).normalize();
+    const spill = new SpotLight(
+      "endHouseTorchDoorIngress",
+      position,
+      direction,
+      Math.PI * 0.44,
+      1.55,
+      this.scene
+    );
+    spill.diffuse = new Color3(1.0, 0.4, 0.12);
+    spill.specular = new Color3(0.12, 0.035, 0.007);
+    spill.intensity = 0;
+    spill.range = 15;
+    spill.renderPriority = 10;
+    spill.projectionTexture = this.createHouseApertureProjectionTexture(
+      "endHouseDoorIngressProjection",
+      0.32,
+      0.42,
+      0
+    );
+    spill.projectionTextureLightNear = 0.1;
+    spill.projectionTextureLightFar = spill.range;
+    spill.projectionTextureUpDirection = Vector3.Up();
+    spill.includedOnlyMeshes.push(...interiorReceivers);
+    this.endHouseIngressLights.push(spill);
+
+    const activationPosition =
+      this.endHouseTorchSourcePositions.length > 0
+        ? this.endHouseTorchSourcePositions
+            .reduce((sum, source) => sum.add(source), Vector3.Zero())
+            .scale(1 / this.endHouseTorchSourcePositions.length)
+        : position.clone();
+    this.endHouseTorchLights.push({
+      light: spill,
+      activationPosition,
+      baseIntensity: END_HOUSE_TORCH_DOOR_INTENSITY,
+      phase: 2.63,
+      targetInfluence: 0,
+      currentInfluence: 0,
+      apertureInfluence: () =>
+        smoothstep(0.06, 0.72, this.endHouseDoorOpenAmount),
+    });
+  }
+
   private createDoorLamp(doorCenterX: number, doorCenterZ: number, doorTopY: number) {
     const lampPosition = new Vector3(doorCenterX, doorTopY + 0.34, doorCenterZ - 0.28);
 
@@ -2911,11 +3633,20 @@ export class Segments {
     bulb.material = bulbMat;
     bulb.isPickable = false;
 
+    const lampReceivers = [...new Set([
+      ...this.endHouseMeshes,
+      backPlate,
+      cap,
+      bulb,
+    ])].filter((mesh) => !mesh.isDisposed());
+
     const glow = new PointLight("endHouseDoorLampGlow", bulb.position.clone(), this.scene);
     glow.diffuse = new Color3(1.0, 0.62, 0.28);
     glow.specular = new Color3(1.0, 0.58, 0.25);
-    glow.intensity = 0.75;
-    glow.range = 5.5;
+    glow.intensity = 1.35;
+    glow.range = 7.2;
+    glow.renderPriority = 12;
+    glow.includedOnlyMeshes.push(...lampReceivers);
 
     const cone = new SpotLight(
       "endHouseDoorLampSpot",
@@ -2927,8 +3658,11 @@ export class Segments {
     );
     cone.diffuse = new Color3(1.0, 0.58, 0.24);
     cone.specular = new Color3(1.0, 0.48, 0.18);
-    cone.intensity = 3.1;
-    cone.range = 8.5;
+    cone.intensity = 3.8;
+    cone.range = 9.5;
+    cone.renderPriority = 11;
+    cone.includedOnlyMeshes.push(...lampReceivers);
+    this.endHouseLocalLights.push(glow, cone);
   }
 
   private isInNoSpawnZone(x: number, z: number, margin = 0) {
@@ -3119,6 +3853,7 @@ export class Segments {
 
   private createHouseInteriorColliders(meshes: AbstractMesh[]) {
     for (const mesh of meshes) {
+      if (mesh.metadata?.skipHouseInteriorCollider) continue;
       const hierarchyName = `${mesh.name} ${mesh.parent?.name ?? ""}`.toLowerCase();
       if (
         !END_HOUSE_INTERIOR_COLLIDER_NAMES.some((part) =>
@@ -3364,6 +4099,7 @@ export class Segments {
       const dt = this.scene.getEngine().getDeltaTime() / 1000;
       const speed = 3.5;
       amount += (target - amount) * Math.min(1, dt * speed);
+      this.endHouseDoorOpenAmount = amount;
       const angle = -amount * Math.PI * 0.55;
 
       if (!doorMesh) return;
@@ -3447,6 +4183,11 @@ export class Segments {
 
       },
     };
+    this.createHouseDoorIngressLighting(
+      doorCenterX,
+      doorCenterY,
+      doorCenterZ
+    );
     this.createDoorLamp(
       doorCenterX,
       doorCenterZ,
@@ -3522,7 +4263,9 @@ export class Segments {
 
     // camino
     const pathHalf = 4;
-    const minX = pathHalf + 2;
+    // Let the existing grass enter the path's translucent shoulder. This
+    // breaks the artificial bare strip without adding any new instances.
+    const minX = pathHalf + 0.75;
 
     // ✅ NO hardcodear: viene del Terrain
     const wallStart = this.terrain.mountainStart;              // donde arranca la ladera

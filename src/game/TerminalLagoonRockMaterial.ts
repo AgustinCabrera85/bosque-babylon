@@ -6,6 +6,7 @@ import { ShaderLanguage } from "@babylonjs/core/Materials/shaderLanguage";
 import type { UniformBuffer } from "@babylonjs/core/Materials/uniformBuffer";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
+import { FOREST_GROUND_TERRAIN_MATERIAL_NAME } from "./ForestGroundMaterial";
 
 export type TerminalLagoonRockRegion = {
   seed: number;
@@ -417,12 +418,18 @@ export function applyTerminalLagoonRockMaterial(
   const baseMaterial = terrainMesh.material;
   if (!(baseMaterial instanceof PBRMaterial)) return null;
 
-  const lagoonTerrainMaterial = baseMaterial.clone(
-    "terminalLagoonTerrainMaterial"
-  );
+  // Forest terrain is already isolated from the shared logical grass
+  // material. Keep that instance so its dry/vegetated plugin remains active
+  // and layer the terminal rock response above it.
+  const lagoonTerrainMaterial =
+    baseMaterial.name === FOREST_GROUND_TERRAIN_MATERIAL_NAME
+      ? baseMaterial
+      : baseMaterial.clone("terminalLagoonTerrainMaterial");
   if (!lagoonTerrainMaterial) return null;
 
-  terrainMesh.material = lagoonTerrainMaterial;
+  if (lagoonTerrainMaterial !== baseMaterial) {
+    terrainMesh.material = lagoonTerrainMaterial;
+  }
   new TerminalLagoonRockMaterialPlugin(lagoonTerrainMaterial, region);
   lagoonTerrainMaterial.markAsDirty(PBRMaterial.AllDirtyFlag);
   scene.markAllMaterialsAsDirty(PBRMaterial.AllDirtyFlag);

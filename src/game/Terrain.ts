@@ -3,6 +3,10 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Scene } from "@babylonjs/core/scene";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { setGameMaterial } from "../materials";
+import {
+  applyForestGroundMaterial,
+  type ForestGroundMaterialRegion,
+} from "./ForestGroundMaterial";
 
 // ✅ Vite assets (IMPORTADOS)
 
@@ -58,6 +62,7 @@ export function createTerrain(
     playableHalfWidth?: number; // límite de movimiento (antes de montaña)
     flatAreas?: FlatArea[];
     heightModifiers?: readonly TerrainHeightModifier[];
+    forestGroundRegion?: ForestGroundMaterialRegion;
   }
 ): TerrainHandle {
   const size = opts.size;
@@ -165,6 +170,7 @@ export function createTerrain(
 
   // Shared PBR material retains the dark night tint and Babylon fog support.
   setGameMaterial(mesh, "grass", scene);
+  applyForestGroundMaterial(scene, mesh, opts.forestGroundRegion);
 
   // ======= HeightAt (bilinear) =======
   function applyFlatAreas(x: number, z: number, h: number) {

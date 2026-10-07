@@ -40,14 +40,12 @@ import type { WaterSurfaceInfo } from "./WaterSurface";
 
 export const DEFAULT_END_HOUSE_SEGMENT = 8;
 export const DEFAULT_WORLD_SEGMENT_LENGTH = 70;
-// Local lights share the terrain's finite shader-light budget. They must only
-// enter that budget once they are close enough to contribute; enabling the
-// cave lights from more than 100 m away used to evict the brazier/base lights
-// well before their short ranges could illuminate anything.
+// Local lights share a finite shader-light budget. Their receiver lists are
+// intentionally narrow and stable; distance changes intensity only, avoiding
+// light-list reshuffles and shader recompiles at the house/lagoon boundary.
 const CAVE_LIGHT_FULL_INFLUENCE_RADIUS = 24;
 const CAVE_LIGHT_FADE_RADIUS = 48;
 const TERMINAL_LIGHT_INTENSITY_RESPONSE = 3.4;
-const TERMINAL_LIGHT_ENABLE_INTENSITY = 0.015;
 const TERMINAL_LIGHT_DISABLE_INTENSITY = 0.006;
 const WATERFALL_PARTICLE_ACTIVATION_RADIUS = 64;
 const WATER_REFRACTION_REFRESH_RATE = 2;
@@ -399,7 +397,6 @@ export class TerminalLandmarkGenerator {
     const random = mulberry32(config.seed);
 
     applyTerminalLagoonRockMaterial(this.scene, this.terrain.mesh, config);
-    this.createFadingTrail(root, config, random);
     const lagoon = this.createLagoon(root, config);
     lagoon.computeWorldMatrix(true);
     const waterSurface: WaterSurfaceInfo = {
@@ -485,19 +482,16 @@ export class TerminalLandmarkGenerator {
       waterfallMetrics,
       random
     );
-    const nearbyVegetationMeshes = this.populateWetVegetation(root, config, random);
+    this.populateWetVegetation(root, config, random);
     const lagoonWaterMaterial = this.createLagoonWaterMaterial(
       config,
       activeImpactPoint
     );
     this.lagoonWaterMaterial = lagoonWaterMaterial;
-    const lagoonLitMeshes = [
+    const waterfallLightMeshes = [
       ...waterfallLayers,
       waterfallHeadwater,
       waterfallFoam,
-      ...nearbyRockMeshes,
-      ...nearbyVegetationMeshes,
-      ...caveCandles.meshes,
     ];
     // Reflections only need the larger opaque silhouettes. Transparent
     // waterfall, foam, vegetation and flames were being rendered two extra
@@ -508,9 +502,8 @@ export class TerminalLandmarkGenerator {
     this.configureLagoonRenderLists(lagoonWaterMaterial, lagoon, waterRenderMeshes);
     lagoon.material = lagoonWaterMaterial;
 
-    const underwaterLight = this.createUnderwaterLight(root, config);
+    const underwaterLight = this.createUnderwaterLight(config);
     const waterfallImpactLight = this.createWaterfallImpactLight(
-      root,
       activeImpactPoint
     );
     this.lagoonLights.push(
@@ -531,16 +524,13 @@ export class TerminalLandmarkGenerator {
     );
     underwaterLight.intensity = 0;
     waterfallImpactLight.intensity = 0;
-    underwaterLight.setEnabled(false);
-    waterfallImpactLight.setEnabled(false);
     this.limitLagoonLights(
       underwaterLight,
       waterfallImpactLight,
       lagoon,
-      lagoonLitMeshes
+      waterfallLightMeshes
     );
     this.limitCaveCandleLights(caveCandles.lights, [
-      this.terrain.mesh,
       ...caveRockMeshes,
       ...caveCandles.meshes,
     ]);
@@ -569,40 +559,6 @@ export class TerminalLandmarkGenerator {
         depth: config.backCliffZ - config.transitionStartZ + 64,
       },
     };
-  }
-
-  private createFadingTrail(
-    root: TransformNode,
-    config: TerminalLandmarkConfig,
-    random: () => number
-  ) {
-    const shoreZ = config.lagoonCenterZ - config.lagoonRadiusZ * 0.86;
-    const patchCount = 9;
-
-    for (let index = 0; index < patchCount; index++) {
-      const t = index / Math.max(1, patchCount - 1);
-      const z = lerp(config.transitionStartZ, shoreZ, t) + (random() - 0.5) * 1.8;
-      const x = (random() - 0.5) * lerp(1.2, 4.8, t);
-      const patch = MeshBuilder.CreateDisc(
-        `terminalTrailPatch_${index}`,
-        { radius: 1, tessellation: 18, sideOrientation: Mesh.DOUBLESIDE },
-        this.scene
-      );
-      const width = lerp(3.1, 0.7, t) * (0.82 + random() * 0.35);
-      const depth = lerp(2.8, 1.15, t) * (0.8 + random() * 0.4);
-      patch.scaling.set(width, depth, 1);
-      patch.rotation.x = Math.PI * 0.5;
-      patch.rotation.z = (random() - 0.5) * 0.35;
-      patch.position.set(x, this.terrain.getHeightAt(x, z) + 0.045, z);
-      patch.isPickable = false;
-      patch.receiveShadows = true;
-      patch.setParent(root);
-      setGameMaterial(patch, "soil", this.scene, { applyVisual: false });
-      // These authored transition decals used to expose the untextured soil
-      // material over the new rock terrain. Reuse the terrain material so its
-      // world-space sampling remains continuous across their circular edges.
-      patch.material = this.terrain.mesh.material;
-    }
   }
 
   private createLagoon(root: TransformNode, config: TerminalLandmarkConfig) {
@@ -809,27 +765,27 @@ export class TerminalLandmarkGenerator {
     }
   }
 
-  private createUnderwaterLight(root: TransformNode, config: TerminalLandmarkConfig) {
+  private createUnderwaterLight(config: TerminalLandmarkConfig) {
     const light = new PointLight(
       "lagoonUnderwaterLight",
       new Vector3(
         config.lagoonCenterX,
-        config.waterLevel - 1.4,
-        config.lagoonCenterZ + config.lagoonRadiusZ * 0.18
+        config.waterLevel - 2.0,
+        config.lagoonCenterZ
       ),
       this.scene
     );
     light.diffuse = new Color3(0.08, 0.29, 0.31);
     light.specular = new Color3(0.05, 0.18, 0.2);
     light.intensity = 0.82;
-    light.range = 50;
+    // Reach the submerged basin without washing the dry shore in cyan.
+    light.range = 42;
     light.falloffType = Light.FALLOFF_STANDARD;
     light.renderPriority = 4;
-    light.parent = root;
     return light;
   }
 
-  private createWaterfallImpactLight(root: TransformNode, impactPoint: Vector3) {
+  private createWaterfallImpactLight(impactPoint: Vector3) {
     const light = new PointLight(
       "lagoonWaterfallImpactLight",
       impactPoint.add(new Vector3(0, 0.57, 0)),
@@ -841,7 +797,6 @@ export class TerminalLandmarkGenerator {
     light.range = 22;
     light.falloffType = Light.FALLOFF_STANDARD;
     light.renderPriority = 3;
-    light.parent = root;
     return light;
   }
 
@@ -849,14 +804,17 @@ export class TerminalLandmarkGenerator {
     underwaterLight: PointLight,
     impactLight: PointLight,
     lagoon: Mesh,
-    nearbyMeshes: readonly AbstractMesh[]
+    waterfallMeshes: readonly AbstractMesh[]
   ) {
     const terrainMesh = this.terrain.mesh as AbstractMesh;
-    const litMeshes = [...new Set([lagoon, terrainMesh, ...nearbyMeshes])].filter(
+    const underwaterMeshes = [...new Set([lagoon, terrainMesh])].filter(
       (mesh) => !mesh.isDisposed()
     );
-    underwaterLight.includedOnlyMeshes.push(...litMeshes);
-    impactLight.includedOnlyMeshes.push(...litMeshes);
+    const impactMeshes = [...new Set([lagoon, ...waterfallMeshes])].filter(
+      (mesh) => !mesh.isDisposed()
+    );
+    underwaterLight.includedOnlyMeshes.push(...underwaterMeshes);
+    impactLight.includedOnlyMeshes.push(...impactMeshes);
   }
 
   private limitCaveCandleLights(
@@ -1908,8 +1866,6 @@ export class TerminalLandmarkGenerator {
       light.range = 24;
       light.falloffType = Light.FALLOFF_STANDARD;
       light.renderPriority = 9;
-      light.parent = root;
-      light.setEnabled(false);
       lights.push(light);
       this.flickeringLights.push({
         light,
@@ -2115,6 +2071,8 @@ export class TerminalLandmarkGenerator {
     const shouldBeActive = dx * dx + dz * dz <= radius * radius;
     if (shouldBeActive !== this.terminalVisualsActive) {
       this.terminalVisualsActive = shouldBeActive;
+      // Lights live outside this hierarchy so culling the heavy geometry does
+      // not alter light membership or trigger shader recompilation.
       root.setEnabled(shouldBeActive);
     }
     return shouldBeActive;
@@ -2200,23 +2158,14 @@ export class TerminalLandmarkGenerator {
     entry.currentIntensity +=
       (targetIntensity - entry.currentIntensity) * blend;
 
-    if (
-      !entry.light.isEnabled() &&
-      targetIntensity >= TERMINAL_LIGHT_ENABLE_INTENSITY
-    ) {
-      entry.light.setEnabled(true);
-    }
-
     entry.light.intensity = entry.currentIntensity;
 
     if (
-      entry.light.isEnabled() &&
       targetIntensity <= TERMINAL_LIGHT_DISABLE_INTENSITY &&
       entry.currentIntensity <= TERMINAL_LIGHT_DISABLE_INTENSITY
     ) {
       entry.currentIntensity = 0;
       entry.light.intensity = 0;
-      entry.light.setEnabled(false);
     }
   }
 

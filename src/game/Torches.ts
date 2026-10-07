@@ -33,6 +33,7 @@ const CANDLE_FLAME_TEXTURE_URL = "/assets/models/textures/fire/candle_flame.png"
 const END_TORCH_LIGHT_FULL_INFLUENCE_RADIUS = 54;
 const END_TORCH_LIGHT_FADE_RADIUS = 98;
 const END_TORCH_LIGHT_INTENSITY_RESPONSE = 3.2;
+const END_TORCH_FACADE_LIGHT_INTENSITY = 1.15;
 
 export type EndTorchesHandle = {
   update: (playerPosition: Vector3) => void;
@@ -40,8 +41,10 @@ export type EndTorchesHandle = {
 };
 
 export type EndTorchesOptions = {
-  /** Meshes that can actually receive the short-range entrance lights. */
+  /** Environment meshes that receive the full entrance-torch intensity. */
   includedOnlyMeshes?: readonly AbstractMesh[];
+  /** House-front meshes that receive an independently attenuated copy. */
+  facadeMeshes?: readonly AbstractMesh[];
 };
 
 function createFireTextureSet(scene: Scene) {
@@ -419,6 +422,7 @@ export async function createEndTorches(
     phase: number;
     targetInfluence: number;
     currentInfluence: number;
+    receiverGroup: "environment" | "facade";
   }[] = [];
   const torchMeshes: AbstractMesh[] = [];
 
@@ -466,18 +470,48 @@ export async function createEndTorches(
       phase: i * 2.19,
       targetInfluence: 0,
       currentInfluence: 0,
+      receiverGroup: "environment",
     });
+
+    if ((options.facadeMeshes?.length ?? 0) > 0) {
+      const facadeLight = new PointLight(
+        `endTorchFacadeLight_${i}`,
+        light.position.clone(),
+        scene
+      );
+      facadeLight.diffuse = new Color3(1.0, 0.46, 0.15);
+      facadeLight.specular = new Color3(0.42, 0.16, 0.045);
+      facadeLight.intensity = 0;
+      facadeLight.range = light.range;
+      facadeLight.falloffType = Light.FALLOFF_STANDARD;
+      facadeLight.renderPriority = 10;
+      lights.push({
+        light: facadeLight,
+        baseIntensity: END_TORCH_FACADE_LIGHT_INTENSITY,
+        phase: i * 2.19,
+        targetInfluence: 0,
+        currentInfluence: 0,
+        receiverGroup: "facade",
+      });
+    }
   }
 
   // Restrict the receivers, then leave light membership stable for the whole
   // run. Distance only changes intensity, so arrival cannot invalidate the
   // house, forest and lagoon shader variants at once.
-  const litMeshes = [...new Set([
+  const environmentMeshes = [...new Set([
     terrain.mesh as AbstractMesh,
     ...(options.includedOnlyMeshes ?? []),
     ...torchMeshes,
   ])].filter((mesh) => !mesh.isDisposed());
-  for (const { light } of lights) light.includedOnlyMeshes.push(...litMeshes);
+  const facadeMeshes = [...new Set(options.facadeMeshes ?? [])].filter(
+    (mesh) => !mesh.isDisposed()
+  );
+  for (const { light, receiverGroup } of lights) {
+    light.includedOnlyMeshes.push(
+      ...(receiverGroup === "facade" ? facadeMeshes : environmentMeshes)
+    );
+  }
 
   let t = 0;
   scene.onBeforeRenderObservable.add(() => {

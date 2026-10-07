@@ -29,7 +29,7 @@ export type PhotoCardConfig = {
   name: string;
   scale: number;
   floorOffsetY: number;
-  candleOffset: Vector3;
+  lightOffset: Vector3;
   fallbackHouseFraction: { x: number; z: number };
   rotationY: number;
   interactionSize: { width: number; height: number; depth: number };
@@ -39,7 +39,7 @@ export type PhotoCardConfig = {
 };
 
 type CreatePhotoCardOptions = Partial<PhotoCardConfig> & {
-  candlePosition?: Vector3 | null;
+  lightPosition?: Vector3 | null;
 };
 
 type MaterialWithSubMaterials = BabylonMaterial & {
@@ -53,7 +53,7 @@ const DEFAULT_PHOTO_CARD_CONFIG: PhotoCardConfig = {
   name: "endHousePhotoCard",
   scale: 0.08,
   floorOffsetY: 0.105,
-  candleOffset: new Vector3(3.15, 0, -2.35),
+  lightOffset: new Vector3(3.15, 0, -2.35),
   fallbackHouseFraction: { x: 0.43, z: 0.5 },
   rotationY: Math.PI * -0.14,
   interactionSize: { width: 1.85, height: 0.85, depth: 1.85 },
@@ -66,7 +66,7 @@ export const PHOTO_CARD_INSPECTABLE_ITEM = {
   id: "photo-card",
   name: "Foto",
   typeLabel: "Recuerdo",
-  description: "Una foto encontrada en el suelo de la casa, cerca de la vela.",
+  description: "Una foto encontrada en el suelo de la casa, cerca de la televisión.",
   modelRootPath: DEFAULT_PHOTO_CARD_CONFIG.modelRootPath,
   modelFileName: DEFAULT_PHOTO_CARD_CONFIG.modelFileName,
   texturePath: DEFAULT_PHOTO_CARD_CONFIG.photoTexturePath,
@@ -102,7 +102,7 @@ export async function createPhotoCard(
   applyPhotoCardMaterials(scene, res.meshes, asset(config.photoTexturePath));
   preparePhotoCardMeshes(res.meshes);
 
-  const position = resolvePhotoCardPosition(houseBounds, config, options.candlePosition);
+  const position = resolvePhotoCardPosition(houseBounds, config, options.lightPosition);
   root.position.copyFrom(position);
   root.rotation.y = config.rotationY;
   root.scaling.setAll(config.scale);
@@ -180,7 +180,7 @@ export async function createPhotoCard(
 function resolvePhotoCardPosition(
   houseBounds: PhotoCardBounds,
   config: PhotoCardConfig,
-  candlePosition?: Vector3 | null
+  lightPosition?: Vector3 | null
 ) {
   const width = houseBounds.max.x - houseBounds.min.x;
   const depth = houseBounds.max.z - houseBounds.min.z;
@@ -190,13 +190,13 @@ function resolvePhotoCardPosition(
     houseBounds.min.y,
     houseBounds.min.z + depth * config.fallbackHouseFraction.z
   );
-  const anchor = candlePosition ?? fallback;
+  const anchor = lightPosition ?? fallback;
   const xMargin = Math.min(2.2, Math.max(1.0, width * 0.1));
   const zMargin = Math.min(2.4, Math.max(1.2, depth * 0.1));
-  const preferredX = candlePosition
+  const preferredX = lightPosition
     ? centerX + Math.min(2.35, width * 0.2)
-    : anchor.x + config.candleOffset.x;
-  const preferredZ = anchor.z + config.candleOffset.z;
+    : anchor.x + config.lightOffset.x;
+  const preferredZ = anchor.z + config.lightOffset.z;
 
   return new Vector3(
     clamp(preferredX, houseBounds.min.x + xMargin, houseBounds.max.x - xMargin),

@@ -230,29 +230,75 @@ function createPathMesh(
   startZ = -terrain.size / 2,
   endZ = terrain.size / 2
 ) {
-  const width = 9;
-  const halfWidth = width / 2;
   const length = endZ - startZ;
-  const cols = 4;
+  // The visible ribbon extends beyond the gameplay path only to feather its
+  // texture into the grass terrain. Navigation still uses ForestPlayerWorld's
+  // unchanged path bounds.
+  const featherHalfWidth = 5.7;
+  const cols = 12;
+  const rowCount = Math.max(rows, Math.ceil(length / 6));
 
   const positions: number[] = [];
   const indices: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
+  const colors: number[] = [];
 
-  for (let iz = 0; iz <= rows; iz++) {
-    const z = startZ + (iz / rows) * length;
+  const smoothstep01 = (value: number) => {
+    const t = Math.max(0, Math.min(1, value));
+    return t * t * (3 - 2 * t);
+  };
+  const smoothstep = (edge0: number, edge1: number, value: number) =>
+    smoothstep01((value - edge0) / Math.max(0.0001, edge1 - edge0));
+
+  for (let iz = 0; iz <= rowCount; iz++) {
+    const rowT = iz / rowCount;
+    const z = startZ + rowT * length;
+    const centerX =
+      Math.sin(z * 0.031 + 0.8) * 0.13 +
+      Math.sin(z * 0.083 - 1.7) * 0.07;
+    const leftHalfWidth = Math.max(
+      4.85,
+      featherHalfWidth +
+        Math.sin(z * 0.057 + 1.4) * 0.34 +
+        Math.sin(z * 0.019 - 0.6) * 0.18
+    );
+    const rightHalfWidth = Math.max(
+      4.85,
+      featherHalfWidth +
+        Math.sin(z * 0.061 - 0.9) * 0.31 +
+        Math.sin(z * 0.023 + 2.1) * 0.2
+    );
 
     for (let ix = 0; ix <= cols; ix++) {
-      const x = -halfWidth + (ix / cols) * width;
-      const y = terrain.getHeightAt(x, z) + 0.08;
+      const across = -1 + (ix / cols) * 2;
+      const x =
+        centerX +
+        (across < 0 ? across * leftHalfWidth : across * rightHalfWidth);
+      const y = terrain.getHeightAt(x, z) + 0.065;
+
+      // Opaque compacted soil in the centre, followed by a broad shoulder that
+      // exposes the grass material below instead of ending in a straight line.
+      const edgeAlpha =
+        1 - smoothstep(0.63, 1, Math.abs(across));
+
+      // Each side recedes before the centre and receives a small deterministic
+      // offset. The last metres therefore dissolve into an irregular rounded
+      // tip rather than exposing the rectangular end of the mesh.
+      const tipSetback =
+        Math.pow(Math.abs(across), 1.45) * 3.2 +
+        Math.sin(across * 9.1 + endZ * 0.037) * 0.28 * Math.abs(across);
+      const localEndZ = endZ - tipSetback;
+      const endAlpha = 1 - smoothstep(localEndZ - 15, localEndZ, z);
+      const alpha = edgeAlpha * endAlpha;
 
       positions.push(x, y, z);
       uvs.push(ix / cols, (z - startZ) / length);
+      colors.push(1, 1, 1, alpha);
     }
   }
 
-  for (let iz = 0; iz < rows; iz++) {
+  for (let iz = 0; iz < rowCount; iz++) {
     for (let ix = 0; ix < cols; ix++) {
       const a = iz * (cols + 1) + ix;
       const b = a + 1;
@@ -270,11 +316,14 @@ function createPathMesh(
   vertexData.indices = indices;
   vertexData.normals = normals;
   vertexData.uvs = uvs;
+  vertexData.colors = colors;
   vertexData.applyToMesh(path);
 
   path.isPickable = false;
   path.receiveShadows = true;
   path.alwaysSelectAsActiveMesh = true;
+  path.useVertexColors = true;
+  path.hasVertexAlpha = true;
 
   return path;
 }
@@ -391,6 +440,13 @@ const terrain = createTerrain(scene, {
   mountainHeight: 34,   // un poco más alto
   playableHalfWidth: 52, // antes de montaña
   heightModifiers: [createTerminalTerrainModifier(terminalConfig)],
+  // Fade the forest-floor pack out before the authored lagoon transition.
+  // From transitionStartZ onward only the terminal terrain response defines
+  // the lake segment.
+  forestGroundRegion: {
+    fadeOutStartZ: terminalConfig.transitionStartZ - 12,
+    fadeOutEndZ: terminalConfig.transitionStartZ,
+  },
 });
 const playerWorld = new ForestPlayerWorld(terrain, {
   pathHalfWidth: 4.5,
@@ -804,6 +860,7 @@ scene.onBeforeRenderObservable.add(() => {
     enemyManager.preload(SHADOW_GRABBER_TYPE),
     enemyManager.preload(SKY_EYE_TYPE),
   ]);
+  segments.registerEndHousePlayerLightReceivers(player.getAvatarMeshes());
   const forestKeyCheckpoint = segments.getForestKeyCheckpoint();
   let forestKeyCheckpointReached =
     runtimeOptions.entryPoint === FOREST_KEY_CHECKPOINT_ENTRY_POINT;
@@ -845,6 +902,9 @@ scene.onBeforeRenderObservable.add(() => {
         segments.instantiateCandleAsset(name, scale),
     }
   ).generateWaterfallLagoonEnd(terminalConfig);
+  segments.excludeMeshesFromPathCandleLights(
+    terminalLandmark.root.getChildMeshes(false)
+  );
   terminalLandmark.waterfall.computeWorldMatrix(true);
   const levelExitPortalPosition = terminalLandmark.passageAnchor.position.clone();
   levelExitPortalPosition.y += 1.7;
@@ -1031,12 +1091,11 @@ scene.onBeforeRenderObservable.add(() => {
   segments.reserveNoSpawnZone(terminalLandmark.generationExclusion);
   terminalLandmark.blockers.forEach((blocker) => segments.addStaticWorldBlocker(blocker));
   const endTorches = await createEndTorches(scene, terrain, {
-    includedOnlyMeshes: [
-      path,
-      ...segments.getEndHouseMeshes(),
-      ...terminalLandmark.root.getChildMeshes(false),
-      ...player.getAvatarMeshes(),
-    ],
+    includedOnlyMeshes: [path],
+    // The facade has its own attenuated copies of the same two torch lights.
+    // This keeps the ground readable without overexposing the porch wood,
+    // curtains, door or roof, and still prevents light leaking indoors.
+    facadeMeshes: segments.getEndHouseTorchFacadeMeshes(),
   });
   createDirectionIndicator(scene, terrain, {
     camera: player.camera,

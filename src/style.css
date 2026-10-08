@@ -3324,6 +3324,11 @@ body.inventory-open #hud {
     display: none;
   }
 
+  body.mobile-controls-enabled #hermanoMayorGrabHud {
+    bottom: calc(env(safe-area-inset-bottom) + clamp(184px, 29vw, 300px));
+    width: min(440px, calc(100vw - 28px));
+  }
+
   #hint {
     bottom: calc(env(safe-area-inset-bottom) + clamp(176px, 27vw, 286px));
     max-width: calc(100vw - 48px);
@@ -3552,6 +3557,41 @@ body.inventory-open #hud {
 
   #attackHud {
     width: min(145px, calc(100vw - 24px));
+  }
+
+  body.mobile-controls-enabled #hermanoMayorGrabHud {
+    left: calc(max(18px, env(safe-area-inset-left)) + clamp(128px, 40vw, 156px) + 14px);
+    right: calc(max(6px, env(safe-area-inset-right)) + clamp(210px, 32vw, 340px) + 14px);
+    bottom: max(14px, env(safe-area-inset-bottom));
+    width: auto;
+    padding: 10px 13px 9px;
+    transform: translateY(18px) scale(.96);
+  }
+
+  body.mobile-controls-enabled #hermanoMayorGrabHud.active {
+    transform: translateY(0) scale(1);
+  }
+
+  body.mobile-controls-enabled #hermanoMayorGrabHud .hermano-grab-title {
+    margin-bottom: 5px;
+    font-size: 14px;
+  }
+
+  body.mobile-controls-enabled #hermanoMayorGrabHud .hermano-grab-track {
+    height: 11px;
+  }
+
+  body.mobile-controls-enabled #hermanoMayorGrabHud .hermano-grab-prompt {
+    flex-wrap: wrap;
+    gap: 3px 5px;
+    margin-top: 6px;
+    font-size: 10px;
+    line-height: 1.15;
+  }
+
+  body.mobile-controls-enabled #hermanoMayorGrabPercent {
+    min-width: 42px;
+    margin-left: 0;
   }
 }
 

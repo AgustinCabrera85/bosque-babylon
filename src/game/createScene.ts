@@ -860,7 +860,11 @@ scene.onBeforeRenderObservable.add(() => {
     enemyManager.preload(SHADOW_GRABBER_TYPE),
     enemyManager.preload(SKY_EYE_TYPE),
   ]);
-  segments.registerEndHousePlayerLightReceivers(player.getAvatarMeshes());
+  const hermanoMayor = segments.getHermanoMayor();
+  segments.registerEndHouseActorLightReceivers([
+    ...player.getAvatarMeshes(),
+    ...(hermanoMayor?.meshes ?? []),
+  ]);
   const forestKeyCheckpoint = segments.getForestKeyCheckpoint();
   let forestKeyCheckpointReached =
     runtimeOptions.entryPoint === FOREST_KEY_CHECKPOINT_ENTRY_POINT;
@@ -1096,6 +1100,26 @@ scene.onBeforeRenderObservable.add(() => {
     // This keeps the ground readable without overexposing the porch wood,
     // curtains, door or roof, and still prevents light leaking indoors.
     facadeMeshes: segments.getEndHouseTorchFacadeMeshes(),
+    actorReceivers: [
+      {
+        id: "player",
+        meshes: player.getAvatarMeshes(),
+        getPosition: () => player.position,
+        getExteriorInfluence: (position) =>
+          segments.getEndHouseExteriorInfluence(position),
+      },
+      ...(hermanoMayor
+        ? [
+            {
+              id: "hermanoMayor",
+              meshes: hermanoMayor.meshes,
+              getPosition: () => hermanoMayor.root.position,
+              getExteriorInfluence: (position: Vector3) =>
+                segments.getEndHouseExteriorInfluence(position),
+            },
+          ]
+        : []),
+    ],
   });
   createDirectionIndicator(scene, terrain, {
     camera: player.camera,
@@ -1452,7 +1476,6 @@ scene.onBeforeRenderObservable.add(() => {
     );
     return !hit?.hit || hit.distance >= distance - 0.35;
   };
-  const hermanoMayor = segments.getHermanoMayor();
   const hermanoMayorContactShadow = hermanoMayor
     ? new CharacterContactShadow(
         scene,
@@ -1920,14 +1943,11 @@ scene.onBeforeRenderObservable.add(() => {
     interactSystem.update(dt);
     houseArrivalCinematic.update(dt);
     hermanoMayorForestCrossingCinematic?.update(dt);
-    // During the reveal, upload the already-preassembled final streaming window
-    // before the player crosses the boundary that used to expose the hitch.
-    segments.update(
-      player.position,
-      houseArrivalCinematic.shouldPrepareHouseSegment
-        ? DEFAULT_END_HOUSE_SEGMENT
-        : undefined
-    );
+    // Keep visibility anchored to the player's real segment. The whole finite
+    // route (including the house window) was prewarmed behind the loading
+    // overlay; forcing the active segment ahead here used to clean up the
+    // forest immediately behind the camera and caused a one-step pop-in/out.
+    segments.update(player.position);
     // From the house onward, close cameras are part of the level design: they
     // avoid the expensive distant lake view and preserve underwater searching.
     player.setIsometricViewAllowed(

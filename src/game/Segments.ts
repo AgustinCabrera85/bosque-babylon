@@ -17,6 +17,7 @@ import { Light } from "@babylonjs/core/Lights/light";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { configureLocalDracoDecoder } from "./runtime/DracoDecoderConfig";
 
 import { mulberry32 } from "../utils/seed";
 import { createCandleFireMaterial, createGlowMaterial } from "./Torches";
@@ -56,6 +57,8 @@ import type { PlantLibrary } from "./PlantLibrary";
 import type { RockLibrary } from "./RockLibrary";
 import type { ThoughtMessageInput } from "./ThoughtMessages";
 import type { InventoryHandle } from "./Inventory";
+
+configureLocalDracoDecoder();
 
 type Collider = {
   x: number;
@@ -191,6 +194,7 @@ export type CandleLightSegmentHit = {
 type CandleLightPoolEntry = {
   side: -1 | 1;
   light: PointLight;
+  actorLight: PointLight;
   targetPosition: Vector3;
   targetIntensity: number;
   targetRange: number;
@@ -211,6 +215,11 @@ const CANDLE_FLAME_WIDTH = 0.34;
 const CANDLE_FLAME_HEIGHT = 0.68;
 const SEGMENT_CANDLE_FADE_SECONDS = 0.85;
 const CANDLE_LIGHT_RENDER_PRIORITY = 8;
+// Actor materials also receive several stable house lights. A dedicated copy
+// keeps the nearby path candles inside their eight-light shader budget without
+// changing which lights illuminate the terrain or rebuilding membership while
+// the Hermano Mayor moves between authored areas.
+const CANDLE_ACTOR_LIGHT_RENDER_PRIORITY = 16;
 const CANDLE_LIGHT_BASE_INTENSITY = 1.35;
 const CANDLE_LIGHT_RANGE = 18;
 const CANDLE_LIGHT_FULL_INFLUENCE_RADIUS = 7;
@@ -277,6 +286,10 @@ const BRAZIER_FIRE_HEIGHT_RATIO = 1.04;
 const BRAZIER_FIRE_LOG_HEIGHT_RATIO = 0.3;
 const BRAZIER_FIRE_LIGHT_INTENSITY = 3.2;
 const BRAZIER_FIRE_LIGHT_RANGE = 26;
+// A dedicated actor-only fill keeps the brazier represented in the limited
+// character light budget even when the shared path-candle pool is reordered.
+const BRAZIER_ACTOR_LIGHT_INTENSITY = 2.4;
+const BRAZIER_ACTOR_LIGHT_RANGE = 26;
 const END_HOUSE_INTERIOR_COLLIDER_NAMES = [
   "televisionretro",
   "woodenbed",
@@ -357,6 +370,7 @@ export class Segments {
   private candleLights: CandleFlameEntry[] = [];
   private candleLightsById = new Map<string, CandleFlameEntry>();
   private candleLightPool: CandleLightPoolEntry[] = [];
+  private pathCandleActorLightReceivers = new Set<AbstractMesh>();
   private activeObjectSegments = new Set<number>();
   private isometricOccluderRoots = new Set<TransformNode>();
   private isometricOccluderBaseVisibility = new Map<AbstractMesh, number>();
@@ -369,6 +383,8 @@ export class Segments {
   private endHouseMeshes: AbstractMesh[] = [];
   private endHouseTorchFacadeMeshes: AbstractMesh[] = [];
   private endHouseBrazierFire: BrazierProceduralFireHandle | null = null;
+  private endHouseBrazierActorLight: PointLight | null = null;
+  private endHouseBrazierActorLightReceivers = new Set<AbstractMesh>();
   private endHouseBounds: WorldBounds | null = null;
   private endHouseTelevision: HouseTelevisionStaticHandle | null = null;
   private endHouseLocalLights: Light[] = [];
@@ -428,17 +444,20 @@ export class Segments {
   }
 
   /**
-   * Registers the already-loaded avatar once with the authored house lights.
-   * One dedicated light replaces the wall-penetrating end-torch lights and
-   * blends from warm exterior torchlight to TV/window/door light indoors.
+   * Registers the already-loaded player and Hermano Mayor once with the stable
+   * actor-light set. Dedicated lights preserve candles, end torches and the
+   * brazier inside their limited shader budget while the house lights remain
+   * registered for the interior presentation.
    */
-  registerEndHousePlayerLightReceivers(meshes: readonly AbstractMesh[]) {
+  registerEndHouseActorLightReceivers(meshes: readonly AbstractMesh[]) {
     const receivers = meshes.filter(
       (mesh) => !mesh.isDisposed() && mesh.getTotalVertices() > 0
     );
     if (receivers.length === 0) return;
 
     this.ensureHouseLightReceiverCapacity(receivers);
+    this.addPathCandleActorLightReceivers(receivers);
+    this.addEndHouseBrazierActorLightReceivers(receivers);
 
     if (!this.endHousePlayerAdaptiveLight) {
       const sources = this.endHouseTorchSourcePositions;
@@ -773,7 +792,7 @@ export class Segments {
   // =========================
   // UPDATE
   // =========================
-  update(playerPositionOrZ: Vector3 | number, minimumActiveSegment?: number): void {
+  update(playerPositionOrZ: Vector3 | number): void {
     const playerPosition =
       typeof playerPositionOrZ === "number"
         ? new Vector3(0, 0, playerPositionOrZ)
@@ -798,13 +817,12 @@ export class Segments {
       this.cfg.maxGeneratedSegment === undefined
         ? playerSegment
         : Math.min(playerSegment, this.cfg.maxGeneratedSegment);
-    const boundedMinimumSegment =
-      minimumActiveSegment === undefined
-        ? boundedPlayerSegment
-        : this.cfg.maxGeneratedSegment === undefined
-          ? Math.floor(minimumActiveSegment)
-          : Math.min(Math.floor(minimumActiveSegment), this.cfg.maxGeneratedSegment);
-    const currentSeg = Math.max(boundedPlayerSegment, boundedMinimumSegment);
+    // Visibility must always follow the player's real segment. Advancing this
+    // value to "prepare" a future area also advances the cleanup window and can
+    // disable the segment directly under/behind the camera in a single frame.
+    // The finite route is already built by prewarmAll(), including the final
+    // house window, so no visual streaming state needs to be forced ahead.
+    const currentSeg = boundedPlayerSegment;
     const segmentChanged = this.lastSegment !== currentSeg;
 
     const grassNeeded = this.segmentRange(currentSeg, this.cfg.behind, this.cfg.ahead);
@@ -1434,9 +1452,29 @@ export class Segments {
       light.range = CANDLE_LIGHT_RANGE;
       light.renderPriority = CANDLE_LIGHT_RENDER_PRIORITY;
 
+      const actorLight = new PointLight(
+        `pathCandleActorLight_${side < 0 ? "left" : "right"}`,
+        light.position.clone(),
+        this.scene
+      );
+      actorLight.falloffType = Light.FALLOFF_STANDARD;
+      actorLight.diffuse = light.diffuse.clone();
+      actorLight.specular = light.specular.clone();
+      actorLight.intensity = 0;
+      actorLight.range = CANDLE_LIGHT_RANGE;
+      actorLight.renderPriority = CANDLE_ACTOR_LIGHT_RENDER_PRIORITY;
+
+      const actorReceivers = [...this.pathCandleActorLightReceivers].filter(
+        (mesh) => !mesh.isDisposed() && mesh.getTotalVertices() > 0
+      );
+      light.excludedMeshes.push(...actorReceivers);
+      actorLight.includedOnlyMeshes.push(...actorReceivers);
+      actorLight.setEnabled(actorReceivers.length > 0);
+
       this.candleLightPool.push({
         side,
         light,
+        actorLight,
         targetPosition: light.position.clone(),
         targetIntensity: 0,
         targetRange: CANDLE_LIGHT_RANGE,
@@ -1948,14 +1986,27 @@ export class Segments {
           Math.sin(t * 18.7 + pool.side * 0.83) * 0.012;
         pool.light.intensity = Math.max(0, pool.currentIntensity * (1 + poolFlicker));
         pool.light.range = pool.currentRange;
+        pool.actorLight.position.copyFrom(pool.light.position);
+        pool.actorLight.intensity = pool.light.intensity;
+        pool.actorLight.range = pool.currentRange;
 
         if (
           pool.targetIntensity <= CANDLE_LIGHT_DISABLE_INTENSITY &&
           pool.currentIntensity <= CANDLE_LIGHT_DISABLE_INTENSITY
         ) {
           pool.light.intensity = 0;
+          pool.actorLight.intensity = 0;
           pool.initialized = false;
         }
+      }
+
+      const brazierActorLight = this.endHouseBrazierActorLight;
+      if (brazierActorLight?.isEnabled()) {
+        const brazierFlicker =
+          Math.sin(t * 10.9 + 2.43) * 0.055 +
+          Math.sin(t * 21.7 + 0.84) * 0.025;
+        brazierActorLight.intensity =
+          BRAZIER_ACTOR_LIGHT_INTENSITY * (1 + brazierFlicker);
       }
     });
   }
@@ -2057,7 +2108,7 @@ export class Segments {
     const res = await SceneLoader.ImportMeshAsync(
       null,
       "/assets/models/house/",
-      "wooden_house.glb",
+      "wooden_house-selective-simplify-instance-draco.glb",
       this.scene
     );
 
@@ -2152,6 +2203,7 @@ export class Segments {
     const originalMeshes = [original, ...original.getChildMeshes(false)];
     const originalBounds = this.getHierarchyBounds(originalMeshes);
     if (!originalBounds) return null;
+    original.setEnabled(false);
 
     let replacementRoot: TransformNode | null = null;
     try {
@@ -2271,7 +2323,6 @@ export class Segments {
 
       original.metadata ??= {};
       original.metadata.skipHouseInteriorCollider = true;
-      original.setEnabled(false);
       this.endHouseMeshes = this.endHouseMeshes.filter(
         (mesh) => !originalMeshes.includes(mesh)
       );
@@ -2545,7 +2596,7 @@ export class Segments {
           distance
         );
       if (entry.playerAdaptive && entry.light instanceof PointLight) {
-        const exteriorInfluence = this.getEndHousePlayerExteriorInfluence(
+        const exteriorInfluence = this.getEndHouseExteriorInfluence(
           playerPosition
         );
         const interiorInfluence = 1 - exteriorInfluence;
@@ -2554,8 +2605,10 @@ export class Segments {
           0.72,
           this.endHouseDoorOpenAmount
         );
+        // The real end-torch lights now own the exterior actor response. This
+        // adaptive fill is reserved for TV/window/door light after crossing
+        // the threshold, avoiding a doubled warm contribution on the porch.
         entry.targetInfluence =
-          entry.targetInfluence * exteriorInfluence +
           interiorInfluence * (0.9 + doorInfluence * 0.18);
         this.updateEndHousePlayerLightPresentation(
           entry.light,
@@ -2571,7 +2624,7 @@ export class Segments {
     }
   }
 
-  private getEndHousePlayerExteriorInfluence(playerPosition: Vector3) {
+  getEndHouseExteriorInfluence(playerPosition: Vector3) {
     const bounds = this.endHouseBounds;
     if (!bounds) return 1;
     const withinHouseWidth =
@@ -2580,17 +2633,22 @@ export class Segments {
     if (!withinHouseWidth) return 1;
     // The model bounds include the roof overhang and porch. Using min.z made
     // the avatar switch to the TV presentation before entering the cabin.
-    // Keep the exterior torch response through the porch and only blend after
-    // the avatar's centre has crossed the actual door plane.
+    // Keep the exterior torch response through the porch, blend to the TV only
+    // inside the cabin, then return to exterior lighting through the rear exit.
     const doorPlaneZ = this.endHouseCheckpoint?.z ?? bounds.min.z;
-    return (
+    const frontExteriorInfluence =
       1 -
       smoothstep(
         doorPlaneZ + 0.05,
         doorPlaneZ + 1.25,
         playerPosition.z
-      )
+      );
+    const rearExteriorInfluence = smoothstep(
+      bounds.max.z - 1.25,
+      bounds.max.z + 0.25,
+      playerPosition.z
     );
+    return Math.max(frontExteriorInfluence, rearExteriorInfluence);
   }
 
   private updateEndHousePlayerLightPresentation(
@@ -2694,6 +2752,7 @@ export class Segments {
       this.endHouseMeshes.push(...this.hermanoMayor.meshes);
       this.addEndHouseLocalLightReceivers(this.hermanoMayor.meshes);
       this.addEndHouseIngressLightReceivers(this.hermanoMayor.meshes);
+      this.addEndHouseBrazierActorLightReceivers(this.hermanoMayor.meshes);
     } catch (error) {
       console.warn("[Segments] No se pudo cargar al Hermano Mayor.", error);
     }
@@ -2713,6 +2772,60 @@ export class Segments {
         included.add(mesh);
         light.includedOnlyMeshes.push(mesh);
       }
+    }
+  }
+
+  private addEndHouseBrazierActorLightReceivers(
+    meshes: readonly AbstractMesh[]
+  ) {
+    const receivers = meshes.filter(
+      (mesh) => !mesh.isDisposed() && mesh.getTotalVertices() > 0
+    );
+    if (receivers.length === 0) return;
+
+    this.ensureHouseLightReceiverCapacity(receivers);
+    for (const mesh of receivers) {
+      this.endHouseBrazierActorLightReceivers.add(mesh);
+    }
+
+    const light = this.endHouseBrazierActorLight;
+    if (!light) return;
+    const included = new Set(light.includedOnlyMeshes);
+    for (const mesh of receivers) {
+      if (included.has(mesh)) continue;
+      included.add(mesh);
+      light.includedOnlyMeshes.push(mesh);
+    }
+    light.setEnabled(light.includedOnlyMeshes.length > 0);
+  }
+
+  private addPathCandleActorLightReceivers(
+    meshes: readonly AbstractMesh[]
+  ) {
+    const receivers = meshes.filter(
+      (mesh) => !mesh.isDisposed() && mesh.getTotalVertices() > 0
+    );
+    if (receivers.length === 0) return;
+
+    this.ensureHouseLightReceiverCapacity(receivers);
+    for (const mesh of receivers) {
+      this.pathCandleActorLightReceivers.add(mesh);
+    }
+
+    for (const { light, actorLight } of this.candleLightPool) {
+      const excluded = new Set(light.excludedMeshes);
+      const included = new Set(actorLight.includedOnlyMeshes);
+      for (const mesh of receivers) {
+        if (!excluded.has(mesh)) {
+          excluded.add(mesh);
+          light.excludedMeshes.push(mesh);
+        }
+        if (!included.has(mesh)) {
+          included.add(mesh);
+          actorLight.includedOnlyMeshes.push(mesh);
+        }
+      }
+      actorLight.setEnabled(actorLight.includedOnlyMeshes.length > 0);
     }
   }
 
@@ -3342,11 +3455,42 @@ export class Segments {
       intensity: 1,
     });
 
+    this.createEndHouseBrazierActorLight(
+      new Vector3(
+        centerX,
+        flameBaseY + diameter * BRAZIER_FIRE_HEIGHT_RATIO * 0.42,
+        centerZ
+      )
+    );
+
     this.endHouseMeshes.push(
       ...existingFireMeshes,
       ...this.endHouseBrazierFire.meshes,
       fire.floorGlow
     );
+  }
+
+  private createEndHouseBrazierActorLight(position: Vector3) {
+    this.endHouseBrazierActorLight?.dispose();
+
+    const light = new PointLight(
+      "endHouseBrazierActorLight",
+      position,
+      this.scene
+    );
+    light.diffuse = new Color3(1.0, 0.36, 0.075);
+    light.specular = new Color3(0.24, 0.065, 0.012);
+    light.intensity = BRAZIER_ACTOR_LIGHT_INTENSITY;
+    light.range = BRAZIER_ACTOR_LIGHT_RANGE;
+    light.radius = 0.7;
+    light.falloffType = Light.FALLOFF_STANDARD;
+    // Stay ahead of the TV/local fills in the eight-light character budget.
+    light.renderPriority = 14;
+    light.includedOnlyMeshes.push(
+      ...this.endHouseBrazierActorLightReceivers
+    );
+    light.setEnabled(light.includedOnlyMeshes.length > 0);
+    this.endHouseBrazierActorLight = light;
   }
 
   private patchHouseMaterials(meshes: AbstractMesh[]) {

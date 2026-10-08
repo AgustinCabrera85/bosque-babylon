@@ -34,10 +34,18 @@ const END_TORCH_LIGHT_FULL_INFLUENCE_RADIUS = 54;
 const END_TORCH_LIGHT_FADE_RADIUS = 98;
 const END_TORCH_LIGHT_INTENSITY_RESPONSE = 3.2;
 const END_TORCH_FACADE_LIGHT_INTENSITY = 1.15;
+const END_TORCH_ACTOR_LIGHT_RENDER_PRIORITY = 15;
 
 export type EndTorchesHandle = {
   update: (playerPosition: Vector3) => void;
   safeLightPositions: readonly Vector3[];
+};
+
+export type EndTorchActorReceiver = {
+  id: string;
+  meshes: readonly AbstractMesh[];
+  getPosition: () => Vector3;
+  getExteriorInfluence?: (position: Vector3) => number;
 };
 
 export type EndTorchesOptions = {
@@ -45,6 +53,8 @@ export type EndTorchesOptions = {
   includedOnlyMeshes?: readonly AbstractMesh[];
   /** House-front meshes that receive an independently attenuated copy. */
   facadeMeshes?: readonly AbstractMesh[];
+  /** Moving actors that need stable, high-priority copies of both torch lights. */
+  actorReceivers?: readonly EndTorchActorReceiver[];
 };
 
 function createFireTextureSet(scene: Scene) {
@@ -416,13 +426,22 @@ export async function createEndTorches(
   ];
   const fireMaterial = createFireMaterial(scene);
   const glowMaterial = createGlowMaterial(scene);
+  const actorReceivers = (options.actorReceivers ?? [])
+    .map((receiver) => ({
+      ...receiver,
+      meshes: [...new Set(receiver.meshes)].filter(
+        (mesh) => !mesh.isDisposed() && mesh.getTotalVertices() > 0
+      ),
+    }))
+    .filter((receiver) => receiver.meshes.length > 0);
   const lights: {
     light: PointLight;
     baseIntensity: number;
     phase: number;
     targetInfluence: number;
     currentInfluence: number;
-    receiverGroup: "environment" | "facade";
+    receiverGroup: "environment" | "facade" | "actor";
+    actorReceiver?: EndTorchActorReceiver;
   }[] = [];
   const torchMeshes: AbstractMesh[] = [];
 
@@ -473,6 +492,29 @@ export async function createEndTorches(
       receiverGroup: "environment",
     });
 
+    for (const actorReceiver of actorReceivers) {
+      const actorLight = new PointLight(
+        `endTorchActorLight_${actorReceiver.id}_${i}`,
+        light.position.clone(),
+        scene
+      );
+      actorLight.diffuse = light.diffuse.clone();
+      actorLight.specular = light.specular.clone();
+      actorLight.intensity = 0;
+      actorLight.range = light.range;
+      actorLight.falloffType = Light.FALLOFF_STANDARD;
+      actorLight.renderPriority = END_TORCH_ACTOR_LIGHT_RENDER_PRIORITY;
+      lights.push({
+        light: actorLight,
+        baseIntensity,
+        phase: i * 2.19,
+        targetInfluence: 0,
+        currentInfluence: 0,
+        receiverGroup: "actor",
+        actorReceiver,
+      });
+    }
+
     if ((options.facadeMeshes?.length ?? 0) > 0) {
       const facadeLight = new PointLight(
         `endTorchFacadeLight_${i}`,
@@ -507,10 +549,14 @@ export async function createEndTorches(
   const facadeMeshes = [...new Set(options.facadeMeshes ?? [])].filter(
     (mesh) => !mesh.isDisposed()
   );
-  for (const { light, receiverGroup } of lights) {
-    light.includedOnlyMeshes.push(
-      ...(receiverGroup === "facade" ? facadeMeshes : environmentMeshes)
-    );
+  for (const { light, receiverGroup, actorReceiver } of lights) {
+    const receivers =
+      receiverGroup === "facade"
+        ? facadeMeshes
+        : receiverGroup === "actor"
+          ? actorReceiver?.meshes ?? []
+          : environmentMeshes;
+    light.includedOnlyMeshes.push(...receivers);
   }
 
   let t = 0;
@@ -545,14 +591,24 @@ export async function createEndTorches(
     update(playerPosition) {
       for (const entry of lights) {
         const { light } = entry;
-        const distance = Vector3.Distance(playerPosition, light.position);
-        entry.targetInfluence =
+        const influencePosition =
+          entry.actorReceiver?.getPosition() ?? playerPosition;
+        const distance = Vector3.Distance(influencePosition, light.position);
+        const distanceInfluence =
           1 -
           smoothstep(
             END_TORCH_LIGHT_FULL_INFLUENCE_RADIUS,
             END_TORCH_LIGHT_FADE_RADIUS,
             distance
           );
+        const exteriorInfluence = Math.max(
+          0,
+          Math.min(
+            1,
+            entry.actorReceiver?.getExteriorInfluence?.(influencePosition) ?? 1
+          )
+        );
+        entry.targetInfluence = distanceInfluence * exteriorInfluence;
       }
     },
   };

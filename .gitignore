@@ -10,8 +10,15 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+/build/
 *.tsbuildinfo
 *.local
+
+# Local GLB optimization pipeline and review workspace
+/scripts/assets/
+/dev/asset-review/
+/src/dev/asset-review/
+/docs/GLTF_ASSET_PIPELINE.md
 
 # Editor directories and files
 .vscode/*

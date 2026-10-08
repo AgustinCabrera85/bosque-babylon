@@ -13,9 +13,12 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Scene } from "@babylonjs/core/scene";
 import { asset } from "../../../utils/asset";
 import type { PerformanceTier } from "../../runtime/LevelTypes";
+import { configureLocalDracoDecoder } from "../../runtime/DracoDecoderConfig";
 
 const CHAIR_ROOT_URL = "assets/models/theatre/";
-const CHAIR_FILE = "silla-teatro.glb";
+const CHAIR_FILE = "silla-teatro-simplify-draco.glb";
+
+configureLocalDracoDecoder();
 
 export const THEATRE_AUDIENCE_CONFIG = {
   stageBackZ: -16.9,

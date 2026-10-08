@@ -6,6 +6,8 @@ import sharp from "sharp";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(SCRIPT_DIR, "..");
+const LOCAL_SOURCE_ASSETS = path.join(ROOT, "local-assets", "sources");
+const SOURCE_MODELS = path.join(LOCAL_SOURCE_ASSETS, "models");
 const PUBLIC_ASSETS = path.join(ROOT, "public", "assets");
 const MODELS = path.join(PUBLIC_ASSETS, "models");
 const SHARED_TEXTURES = path.join(MODELS, "vegetation", "shared-runtime");
@@ -18,18 +20,18 @@ const sharedTextureSizes = new Map();
 const glbs = [
   ...["tree_00", "tree_01", "tree_02", "tree_03", "tree_04", "tree_05", "tree_07"].map(
     (name) => ({
-      source: path.join(MODELS, "vegetation", `${name}.glb`),
+      source: path.join(SOURCE_MODELS, "vegetation", `${name}.glb`),
       output: path.join(MODELS, "vegetation", `${name}_runtime.glb`),
     })
   ),
   ...["rock_01", "rock_02", "rock_03", "rock_04", "rock_05", "rock_06"].map(
     (name) => ({
-      source: path.join(MODELS, "vegetation", `${name}.glb`),
+      source: path.join(SOURCE_MODELS, "vegetation", `${name}.glb`),
       output: path.join(MODELS, "vegetation", `${name}_runtime.glb`),
     })
   ),
   {
-    source: path.join(MODELS, "blockers", "tree_08.glb"),
+    source: path.join(SOURCE_MODELS, "blockers", "tree_08.glb"),
     // Babylon rejects parent-directory image URIs inside glTF for security.
     // Keep the runtime blocker beside the vegetation GLBs so it can reuse the
     // exact same shared bark URLs without a second GPU texture allocation.
@@ -169,7 +171,7 @@ async function externalizeEmbeddedImages(source, output) {
 }
 
 async function optimizeSky() {
-  const source = path.join(PUBLIC_ASSETS, "hdr", "forest_night_8k.jpg");
+  const source = path.join(LOCAL_SOURCE_ASSETS, "hdr", "forest_night_8k.jpg");
   const output = path.join(PUBLIC_ASSETS, "hdr", "forest_night_4k.jpg");
   await sharp(source)
     .resize(4096, 2048, { fit: "fill", kernel: sharp.kernel.lanczos3 })

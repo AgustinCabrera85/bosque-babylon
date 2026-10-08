@@ -20,7 +20,7 @@ type SliderBinding = {
 };
 
 type GameSfxEvent = CustomEvent<{
-  name?: "jump" | "walk" | "run" | "door";
+  name?: "jump" | "walk" | "run" | "door" | "axe-impact";
   active?: boolean;
 }>;
 
@@ -57,6 +57,8 @@ export type FootstepEchoSettings = {
 export type LevelAudioProfile = {
   backgroundTrack: string;
   ambientTrack?: string | null;
+  ambientVolumeScale?: number;
+  ambientReplayDelaySeconds?: number;
   waterfallArea?: WaterfallAudioArea | null;
   walkFootstepTrack?: string;
   walkFootstepEcho?: FootstepEchoSettings | null;
@@ -133,6 +135,9 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   const runSfx = new Audio(asset("assets/audio/sfx/Footsteps_crunching_running.mp3"));
   const jumpSfx = new Audio(asset("assets/audio/sfx/jump_on_road.mp3"));
   const doorSfx = new Audio(asset("assets/audio/sfx/HouseInTheWoods-DoorOpen.mp3"));
+  const axeImpactSfx = new Audio(
+    asset("assets/audio/sfx/enemies/HermanoMayor_axe_impact.mp3")
+  );
   const cinematicSfx = {
     housePresentation: new Audio(
       asset("assets/audio/sfx/cinematics/bosque/wooden-house-presentation.m4a")
@@ -150,6 +155,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   runSfx.preload = "auto";
   jumpSfx.preload = "auto";
   doorSfx.preload = "auto";
+  axeImpactSfx.preload = "auto";
   for (const audio of Object.values(cinematicSfx)) {
     audio.loop = false;
     audio.preload = "auto";
@@ -159,6 +165,9 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   let playbackUnlocked = false;
   let skyEyeMusicActive = false;
   let ambientStarted = false;
+  let ambientVolumeScale = 1;
+  let ambientReplayDelaySeconds = 0;
+  let ambientReplayTimer: number | null = null;
   let waterfallStarted = false;
   let footstepMode: "idle" | "walk" | "run" = "idle";
   let audioContext: AudioContext | null = null;
@@ -258,9 +267,11 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     runSfx.volume = volume * 0.62;
     jumpSfx.volume = volume * 0.7;
     doorSfx.volume = volume * 0.86;
+    axeImpactSfx.volume = volume;
     runSfx.muted = volume <= 0;
     jumpSfx.muted = volume <= 0;
     doorSfx.muted = volume <= 0;
+    axeImpactSfx.muted = volume <= 0;
     for (const audio of Object.values(cinematicSfx)) {
       audio.volume = volume;
       audio.muted = volume <= 0;
@@ -331,6 +342,46 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     audio.currentTime = 0;
   }
 
+  function clearAmbientReplayTimer() {
+    if (ambientReplayTimer === null) return;
+    window.clearTimeout(ambientReplayTimer);
+    ambientReplayTimer = null;
+  }
+
+  function setAmbientPlaybackProfile(volumeScale = 1, replayDelaySeconds = 0) {
+    ambientVolumeScale = Number.isFinite(volumeScale)
+      ? Math.max(0, volumeScale)
+      : 1;
+    ambientReplayDelaySeconds = Number.isFinite(replayDelaySeconds)
+      ? Math.max(0, replayDelaySeconds)
+      : 0;
+    ambient.loop = ambientReplayDelaySeconds <= 0;
+    clearAmbientReplayTimer();
+  }
+
+  function scheduleAmbientReplay() {
+    ambientStarted = false;
+    if (
+      disposed ||
+      !playbackUnlocked ||
+      !currentAmbientTrack ||
+      ambientReplayDelaySeconds <= 0
+    ) {
+      return;
+    }
+
+    clearAmbientReplayTimer();
+    ambientReplayTimer = window.setTimeout(() => {
+      ambientReplayTimer = null;
+      if (disposed || !playbackUnlocked || !currentAmbientTrack) return;
+      ambientStarted = true;
+      void ambient.play().catch((error) => {
+        ambientStarted = false;
+        console.warn("[MusicPlayer] Ambient playback was blocked until the next user gesture.", error);
+      });
+    }, ambientReplayDelaySeconds * 1000);
+  }
+
   function setFootstepMode(mode: "idle" | "walk" | "run") {
     if (footstepMode === mode) return;
     footstepMode = mode;
@@ -352,14 +403,21 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     if (resumeWalking && playbackUnlocked) void playLoop(walkSfx);
   }
 
-  function playGameSfx(name: "jump" | "walk" | "run" | "door") {
+  function playGameSfx(
+    name: "jump" | "walk" | "run" | "door" | "axe-impact"
+  ) {
     if (volumes.sfx <= 0) return;
     if (name === "walk" || name === "run") {
       setFootstepMode(name);
       return;
     }
 
-    const oneShot = name === "door" ? doorSfx : jumpSfx;
+    const oneShot =
+      name === "door"
+        ? doorSfx
+        : name === "axe-impact"
+          ? axeImpactSfx
+          : jumpSfx;
     oneShot.pause();
     oneShot.currentTime = 0;
     void playLoop(oneShot);
@@ -393,7 +451,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       }
     }
 
-    if (currentAmbientTrack && !ambientStarted) {
+    if (currentAmbientTrack && !ambientStarted && ambientReplayTimer === null) {
       ambientStarted = true;
       playbackRequests.push(ambient.play().catch((error) => {
         ambientStarted = false;
@@ -424,6 +482,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
 
   function setAmbientTrack(path: string | null) {
     if (path === currentAmbientTrack) return;
+    clearAmbientReplayTimer();
     stopLoop(ambient);
     ambientStarted = false;
     currentAmbientTrack = path;
@@ -445,6 +504,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   }
 
   function prepareForLevelTransition() {
+    clearAmbientReplayTimer();
     setFootstepMode("idle");
     skyEyeMusicActive = false;
     stopLoop(skyEyeMusic);
@@ -472,7 +532,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     }
 
     if (channel === "ambient") {
-      ambient.volume = next * 0.65;
+      ambient.volume = clamp01(next * 0.65 * ambientVolumeScale);
       ambient.muted = next <= 0;
       updateWaterfallVolume();
       if (save) localStorage.setItem(AMBIENT_VOLUME_KEY, String(next));
@@ -573,6 +633,8 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     }
   }, { signal });
 
+  ambient.addEventListener("ended", scheduleAmbientReplay, { signal });
+
   const startOnGesture = () => void start();
   window.addEventListener("pointerdown", startOnGesture, { passive: true, signal });
   window.addEventListener("keydown", startOnGesture, { signal });
@@ -587,6 +649,10 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     getSfxVolume: () => volumes.sfx,
     configureLevelAudio(profile) {
       setBackgroundTrack(profile.backgroundTrack);
+      setAmbientPlaybackProfile(
+        profile.ambientVolumeScale,
+        profile.ambientReplayDelaySeconds
+      );
       setWalkFootstepTrack(
         profile.walkFootstepTrack ?? DEFAULT_WALK_FOOTSTEP_TRACK
       );

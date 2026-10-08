@@ -51,6 +51,8 @@ export async function createForestLevel(
       context.musicPlayer?.configureLevelAudio({
         backgroundTrack: "assets/audio/music/Echoes_in_the_Dark_ingame.mp3",
         ambientTrack: "assets/audio/ambience/Gentle_cricket_chirp.mp3",
+        ambientVolumeScale: 0.8,
+        ambientReplayDelaySeconds: 8,
       });
     },
     playOpeningSequence: handle.playOpeningSequence,

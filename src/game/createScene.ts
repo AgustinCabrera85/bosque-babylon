@@ -1625,6 +1625,9 @@ scene.onBeforeRenderObservable.add(() => {
           );
         },
         onAxeDamage: (fractionOfMaxHealth) => {
+          window.dispatchEvent(
+            new CustomEvent("bosque:sfx", { detail: { name: "axe-impact" } })
+          );
           attackSystem.cancelCharge();
           playerHitBloodVfx.play();
           playerStats.takeDamage(

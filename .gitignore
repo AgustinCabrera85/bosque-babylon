@@ -20,6 +20,9 @@ dist-ssr
 /src/dev/asset-review/
 /docs/GLTF_ASSET_PIPELINE.md
 
+# Immutable source and legacy assets kept locally, outside the Vite public bundle
+/local-assets/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

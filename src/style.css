@@ -356,16 +356,16 @@ body.character-selecting #renderCanvas {
     place-items: stretch center;
     overflow: hidden;
     padding:
-      calc(8px + env(safe-area-inset-top))
-      max(8px, env(safe-area-inset-right))
-      calc(8px + env(safe-area-inset-bottom))
-      max(8px, env(safe-area-inset-left));
+      calc(8px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))
+      max(8px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)))
+      calc(8px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+      max(8px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
   }
 
   .character-selection-shell {
     width: 100%;
-    height: calc(100vh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    height: calc(100vh - 16px - var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) - var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+    height: calc(100dvh - 16px - var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) - var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
     min-height: 0;
     max-height: 100%;
     gap: clamp(8px, 1.6dvh, 14px);
@@ -459,15 +459,15 @@ body.character-selecting #renderCanvas {
        (max-width: 700px) and (max-height: 560px) {
   .character-selection {
     padding:
-      calc(5px + env(safe-area-inset-top))
-      max(7px, env(safe-area-inset-right))
-      calc(5px + env(safe-area-inset-bottom))
-      max(7px, env(safe-area-inset-left));
+      calc(5px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))
+      max(7px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)))
+      calc(5px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+      max(7px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
   }
 
   .character-selection-shell {
-    height: calc(100vh - 10px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    height: calc(100dvh - 10px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    height: calc(100vh - 10px - var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) - var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+    height: calc(100dvh - 10px - var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) - var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
     gap: 6px;
   }
 
@@ -572,7 +572,7 @@ body.character-selecting #renderCanvas {
 }
 
 .boss-enemy-health-hud {
-  top: max(17px, env(safe-area-inset-top));
+  top: max(17px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   left: 50%;
   width: min(650px, calc(100vw - 360px));
   aspect-ratio: 1280 / 260;
@@ -1611,7 +1611,7 @@ body.attack-aiming #reticle::after {
 
 @media (max-width: 720px), (pointer: coarse) {
   .thought-messages {
-    bottom: calc(env(safe-area-inset-bottom) + clamp(184px, 29vw, 300px));
+    bottom: calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + clamp(184px, 29vw, 300px));
     width: min(620px, calc(100vw - 32px));
   }
 
@@ -3225,8 +3225,8 @@ body.inventory-open #hud {
 
 #mobileActionHud {
   position: absolute;
-  right: max(6px, env(safe-area-inset-right));
-  bottom: max(6px, env(safe-area-inset-bottom));
+  right: max(6px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
+  bottom: max(6px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   z-index: 2;
   width: clamp(210px, 32vw, 340px);
   aspect-ratio: 1320 / 1061;
@@ -3252,8 +3252,8 @@ body.inventory-open #hud {
 
 .stick {
   position: absolute;
-  left: max(18px, env(safe-area-inset-left));
-  bottom: max(22px, env(safe-area-inset-bottom));
+  left: max(18px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+  bottom: max(22px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   width: clamp(128px, 40vw, 156px);
   aspect-ratio: 1;
   border: 1px solid rgba(229, 239, 231, 0.24);
@@ -3403,7 +3403,7 @@ body.inventory-open #hud {
 
 @media (max-width: 720px), (pointer: coarse) {
   .boss-enemy-health-hud {
-    top: calc(env(safe-area-inset-top) + 150px);
+    top: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 150px);
     width: min(340px, calc(100vw - 32px));
     aspect-ratio: auto;
     display: flex;
@@ -3428,17 +3428,17 @@ body.inventory-open #hud {
   }
 
   .minor-enemy-health-hud {
-    top: calc(env(safe-area-inset-top) + 150px);
+    top: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 150px);
   }
 
   #viewControls {
-    right: 12px;
-    top: 12px;
+    right: max(12px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
+    top: calc(12px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   }
 
   #inventoryButton {
-    left: 12px;
-    top: 12px;
+    left: max(12px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+    top: calc(12px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   }
 
   #help {
@@ -3446,28 +3446,28 @@ body.inventory-open #hud {
   }
 
   body.mobile-controls-enabled #hermanoMayorGrabHud {
-    bottom: calc(env(safe-area-inset-bottom) + clamp(184px, 29vw, 300px));
+    bottom: calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + clamp(184px, 29vw, 300px));
     width: min(440px, calc(100vw - 28px));
   }
 
   #hint {
-    bottom: calc(env(safe-area-inset-bottom) + clamp(176px, 27vw, 286px));
+    bottom: calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + clamp(176px, 27vw, 286px));
     max-width: calc(100vw - 48px);
   }
 
   #attackHud {
-    right: 12px;
+    right: max(12px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
     bottom: max(8px, min(
-      calc(env(safe-area-inset-bottom) + clamp(176px, 27vw, 286px)),
-      calc(100dvh - env(safe-area-inset-top) - 112px)
+      calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + clamp(176px, 27vw, 286px)),
+      calc(100dvh - var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) - 112px)
     ));
     width: min(155px, calc(100vw - 24px));
     aspect-ratio: 208 / 68;
   }
 
   #playerStatusHud {
-    left: 12px;
-    top: 68px;
+    left: max(12px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+    top: calc(68px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
     bottom: auto;
     width: min(210px, 56vw);
     aspect-ratio: 300 / 112;
@@ -3653,7 +3653,7 @@ body.inventory-open #hud {
 
 @media (max-width: 720px) and (orientation: landscape), (pointer: coarse) and (orientation: landscape) {
   .boss-enemy-health-hud {
-    top: calc(env(safe-area-inset-top) + 58px);
+    top: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 58px);
     width: min(380px, calc(100vw - 330px));
   }
 
@@ -3672,7 +3672,7 @@ body.inventory-open #hud {
   }
 
   #playerStatusHud {
-    top: calc(env(safe-area-inset-top) + 58px);
+    top: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 58px);
     width: min(155px, 23vw);
   }
 
@@ -3681,9 +3681,9 @@ body.inventory-open #hud {
   }
 
   body.mobile-controls-enabled #hermanoMayorGrabHud {
-    left: calc(max(18px, env(safe-area-inset-left)) + clamp(128px, 40vw, 156px) + 14px);
-    right: calc(max(6px, env(safe-area-inset-right)) + clamp(210px, 32vw, 340px) + 14px);
-    bottom: max(14px, env(safe-area-inset-bottom));
+    left: calc(max(18px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px))) + clamp(128px, 40vw, 156px) + 14px);
+    right: calc(max(6px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px))) + clamp(210px, 32vw, 340px) + 14px);
+    bottom: max(14px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
     width: auto;
     padding: 10px 13px 9px;
     transform: translateY(18px) scale(.96);
@@ -3732,10 +3732,10 @@ body.inventory-open #hud {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     padding:
-      calc(16px + env(safe-area-inset-top))
-      calc(14px + env(safe-area-inset-right))
-      calc(14px + env(safe-area-inset-bottom))
-      calc(14px + env(safe-area-inset-left));
+      calc(16px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))
+      calc(14px + var(--safe-area-inset-right, env(safe-area-inset-right, 0px)))
+      calc(14px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+      calc(14px + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
     border-left: none;
     border-right: none;
     border-radius: 0;
@@ -3744,9 +3744,9 @@ body.inventory-open #hud {
 
   .inventory-panel::before {
     inset:
-      calc(9px + env(safe-area-inset-top))
+      calc(9px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))
       9px
-      calc(9px + env(safe-area-inset-bottom));
+      calc(9px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
 
   .inventory-header {
@@ -3888,10 +3888,10 @@ body.inventory-open #hud {
     grid-template-rows: minmax(0, 1fr) auto;
     gap: 10px;
     padding:
-      calc(16px + env(safe-area-inset-top))
-      calc(14px + env(safe-area-inset-right))
-      calc(14px + env(safe-area-inset-bottom))
-      calc(14px + env(safe-area-inset-left));
+      calc(16px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))
+      calc(14px + var(--safe-area-inset-right, env(safe-area-inset-right, 0px)))
+      calc(14px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+      calc(14px + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
     border-left: none;
     border-right: none;
     border-radius: 0;
@@ -3900,9 +3900,9 @@ body.inventory-open #hud {
 
   .item-inspector-panel::before {
     inset:
-      calc(9px + env(safe-area-inset-top))
+      calc(9px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))
       9px
-      calc(9px + env(safe-area-inset-bottom));
+      calc(9px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
 
   .item-inspector-view {
@@ -3975,10 +3975,10 @@ body.inventory-open #hud {
   .inventory-panel,
   .item-inspector-panel {
     padding:
-      calc(12px + env(safe-area-inset-top))
-      calc(14px + env(safe-area-inset-right))
-      calc(12px + env(safe-area-inset-bottom))
-      calc(14px + env(safe-area-inset-left));
+      calc(12px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))
+      calc(14px + var(--safe-area-inset-right, env(safe-area-inset-right, 0px)))
+      calc(12px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+      calc(14px + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
   }
 
   .inventory-header {
@@ -4045,26 +4045,26 @@ body.inventory-open #hud {
     height: 100dvh;
     max-height: none;
     padding:
-      calc(12px + env(safe-area-inset-top))
-      max(12px, env(safe-area-inset-right))
-      calc(10px + env(safe-area-inset-bottom))
-      max(12px, env(safe-area-inset-left));
+      calc(12px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))
+      max(12px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)))
+      calc(10px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+      max(12px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
     border: 0;
     border-radius: 0;
   }
 
   #pauseMenu .menu-panel::before,
   #pauseMenu .menu-panel::after {
-    left: max(10px, env(safe-area-inset-left));
-    right: max(10px, env(safe-area-inset-right));
+    left: max(10px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+    right: max(10px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
   }
 
   #pauseMenu .menu-panel::before {
-    top: calc(5px + env(safe-area-inset-top));
+    top: calc(5px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   }
 
   #pauseMenu .menu-panel::after {
-    bottom: calc(5px + env(safe-area-inset-bottom));
+    bottom: calc(5px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
 
   #pauseMenu .corner {
@@ -4163,7 +4163,7 @@ body.inventory-open #hud {
     position: absolute;
     z-index: 4;
     left: 50%;
-    bottom: calc(68px + env(safe-area-inset-bottom));
+    bottom: calc(68px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
     width: max-content;
     max-width: calc(100% - 32px);
     min-height: 0;
@@ -4331,10 +4331,10 @@ body.inventory-open #hud {
        (pointer: coarse) and (max-height: 540px) and (orientation: landscape) {
   #pauseMenu .menu-panel {
     padding:
-      calc(8px + env(safe-area-inset-top))
-      max(10px, env(safe-area-inset-right))
-      calc(8px + env(safe-area-inset-bottom))
-      max(10px, env(safe-area-inset-left));
+      calc(8px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))
+      max(10px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)))
+      calc(8px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+      max(10px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
   }
 
   #pauseMenu .menu-header {
@@ -4394,7 +4394,7 @@ body.inventory-open #hud {
   }
 
   #pauseMenu .pause-status {
-    bottom: calc(10px + env(safe-area-inset-bottom));
+    bottom: calc(10px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
 
   #pauseMenu .setting-row {

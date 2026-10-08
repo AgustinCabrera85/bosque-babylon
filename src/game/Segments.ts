@@ -1031,6 +1031,18 @@ export class Segments {
     this.isometricOccluderRoots.add(root);
   }
 
+  private freezeStaticHierarchy(root: TransformNode) {
+    root.computeWorldMatrix(true);
+    root.freezeWorldMatrix();
+
+    for (const mesh of root.getChildMeshes(false)) {
+      // Tree foliage uses a Y billboard and must keep following the camera.
+      if (mesh.billboardMode !== Mesh.BILLBOARDMODE_NONE) continue;
+      mesh.computeWorldMatrix(true);
+      mesh.freezeWorldMatrix();
+    }
+  }
+
   private unregisterIsometricOccluder(root: TransformNode) {
     this.isometricOccluderRoots.delete(root);
     for (const mesh of root.getChildMeshes(false)) {
@@ -1624,7 +1636,7 @@ export class Segments {
       );
       tree.scaling.setAll(placement.scale);
       tree.rotation.y = placement.rot;
-      tree.freezeWorldMatrix();
+      this.freezeStaticHierarchy(tree);
       this.registerIsometricOccluder(tree);
     });
   }
@@ -4656,7 +4668,7 @@ export class Segments {
 
       this.colliders.push({ x, z, radius, segmentId, kind: "tree" });
 
-      tree.freezeWorldMatrix();
+      this.freezeStaticHierarchy(tree);
       this.registerIsometricOccluder(tree);
       instances.push(tree);
     }
@@ -4696,6 +4708,7 @@ export class Segments {
       r.scaling.setAll(scale);
       r.rotation.y = rng() * Math.PI * 2;
 
+      this.freezeStaticHierarchy(r);
       instances.push(r);
     }
 

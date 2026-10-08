@@ -3,7 +3,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
-import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Material } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -17,6 +17,28 @@ type TreeTemplate = {
   foliageMeshes: Mesh[];
   collisionRadius: number;
 };
+
+const TREE_RUNTIME_FILES = [
+  "tree_00",
+  "tree_01",
+  "tree_02",
+  "tree_03",
+  "tree_04",
+  "tree_05",
+  // tree_06.glb is the same fallen trunk as tree_08.glb; tree_08 is reserved for the start blocker.
+  "tree_07",
+] as const;
+
+function selectTreeRuntimeFiles(
+  maxTemplates: number,
+  optimizedGeometry: boolean
+): string[] {
+  const count = Number.isFinite(maxTemplates)
+    ? Math.max(0, Math.floor(maxTemplates))
+    : TREE_RUNTIME_FILES.length;
+  const suffix = optimizedGeometry ? "_mobile.glb" : "_runtime.glb";
+  return TREE_RUNTIME_FILES.slice(0, count).map((name) => `${name}${suffix}`);
+}
 
 function clamp(x: number, min: number, max: number) {
   return Math.max(min, Math.min(max, x));
@@ -159,19 +181,12 @@ export class TreeLibrary {
    */
   constructor(private ultraFoliage: boolean = true) {}
 
-  async load(scene: Scene, maxTemplates = Number.POSITIVE_INFINITY) {
-    const files = [
-      "tree_00_runtime.glb",
-      "tree_01_runtime.glb",
-      "tree_02_runtime.glb",
-      "tree_03_runtime.glb",
-      "tree_04_runtime.glb",
-      "tree_05_runtime.glb",
-      // tree_06.glb es el mismo tronco caido que tree_08.glb; se reserva solo para el bloqueo inicial.
-      "tree_07_runtime.glb",
-    ];
-
-for (const file of files.slice(0, maxTemplates)) {
+  async load(
+    scene: Scene,
+    maxTemplates = Number.POSITIVE_INFINITY,
+    optimizedGeometry = false
+  ) {
+for (const file of selectTreeRuntimeFiles(maxTemplates, optimizedGeometry)) {
   try {
     const res = await SceneLoader.ImportMeshAsync(
       null,
@@ -258,6 +273,7 @@ for (const file of files.slice(0, maxTemplates)) {
       inst.setEnabled(true);
       inst.isPickable = false;
       inst.receiveShadows = lod === 0;
+      inst.cullingStrategy = AbstractMesh.CULLINGSTRATEGY_BOUNDINGSPHERE_ONLY;
 
       inst.position.copyFrom(src.position);
       if (src.rotationQuaternion) inst.rotationQuaternion = src.rotationQuaternion.clone();
@@ -276,6 +292,7 @@ for (const file of files.slice(0, maxTemplates)) {
         inst.setEnabled(true);
         inst.isPickable = false;
         inst.receiveShadows = lod === 0;
+        inst.cullingStrategy = AbstractMesh.CULLINGSTRATEGY_BOUNDINGSPHERE_ONLY;
 
         inst.position.copyFrom(src.position);
         if (src.rotationQuaternion) inst.rotationQuaternion = src.rotationQuaternion.clone();

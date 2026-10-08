@@ -653,8 +653,8 @@ const playerWorld = new ForestPlayerWorld(terrain, {
 // 🔦 FLASHLIGHT (SpotLight)
 // =========================
 const FLASHLIGHT_BASE_INTENSITY = 4.4;
-const FLASHLIGHT_FILL_BASE_INTENSITY = 0.68;
-const FLASHLIGHT_REACH_BASE_INTENSITY = 0.78;
+const FLASHLIGHT_FILL_BASE_INTENSITY = 1.65;
+const FLASHLIGHT_REACH_BASE_INTENSITY = 1.0;
 const FLASHLIGHT_PRIMARY_RENDER_PRIORITY = 30;
 const FLASHLIGHT_FILL_RENDER_PRIORITY = 29;
 const initialLook = player.getFlashlightRay();
@@ -682,15 +682,15 @@ const flashlightFill = new SpotLight(
   "flashlightFill",
   initialLook.origin.clone(),
   initialLook.direction.clone(),
-  Math.PI / 2.45,
+  Math.PI / 1.8,
   1,
   scene
 );
 
 flashlightFill.falloffType = Light.FALLOFF_GLTF;
-flashlightFill.innerAngle = Math.PI / 9.5;
+flashlightFill.innerAngle = Math.PI / 2;
 flashlightFill.intensity = FLASHLIGHT_FILL_BASE_INTENSITY;
-flashlightFill.range = 42;
+flashlightFill.range = 48;
 flashlightFill.renderPriority = FLASHLIGHT_FILL_RENDER_PRIORITY;
 flashlightFill.diffuse = new Color3(0.82, 0.74, 0.58);
 flashlightFill.specular = new Color3(0, 0, 0);
@@ -699,7 +699,7 @@ const flashlightReach = new SpotLight(
   "flashlightReach",
   initialLook.origin.clone(),
   initialLook.direction.clone(),
-  Math.PI / 2.2,
+  Math.PI / 1.9,
   1,
   scene
 );
@@ -815,9 +815,18 @@ scene.onBeforeRenderObservable.add(() => {
   const rockLibrary = new RockLibrary();
 
   onProgress(0.45, "Cargando arboles y rocas...");
+  const useOptimizedEnvironmentGeometry = quality.name === "mobile";
   await Promise.all([
-    treeLibrary.load(scene, quality.treeTemplateLimit),
-    rockLibrary.load(scene, quality.rockTemplateLimit),
+    treeLibrary.load(
+      scene,
+      quality.treeTemplateLimit,
+      useOptimizedEnvironmentGeometry
+    ),
+    rockLibrary.load(
+      scene,
+      quality.rockTemplateLimit,
+      useOptimizedEnvironmentGeometry
+    ),
   ]);
   onProgress(0.72, "Cargando vegetacion...");
   await Promise.all([

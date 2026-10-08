@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#050708" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>Bosque Babylon</title>
   </head>
   <body class="character-selecting">
@@ -270,7 +274,16 @@
           <div class="settings-grid settings-grid-single">
             <section class="settings-section" aria-labelledby="audioSettingsTitle">
               <h2 id="audioSettingsTitle" class="section-title">Audio</h2>
+              <p id="masterVolumeDescription" class="audio-settings-copy">
+                El volumen general escala la mezcla sin alterar el balance entre canales.
+              </p>
               <div class="settings">
+                <div class="setting-row master-volume-row">
+                  <label class="setting-label" for="masterVolume">General</label>
+                  <input id="masterVolume" type="range" min="0" max="100" step="1" value="100" aria-describedby="masterVolumeDescription" />
+                  <span class="value" id="masterValue">100%</span>
+                </div>
+
                 <div class="setting-row">
                   <label class="setting-label" for="musicVolume">Musica</label>
                   <input id="musicVolume" type="range" min="0" max="100" step="1" value="70" />

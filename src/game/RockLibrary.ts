@@ -3,7 +3,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
-import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Material } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -15,6 +15,26 @@ type RockTemplate = {
   meshes: Mesh[];
   collisionRadius: number;
 };
+
+const ROCK_RUNTIME_FILES = [
+  "rock_01",
+  "rock_02",
+  "rock_03",
+  "rock_04",
+  "rock_05",
+  "rock_06",
+] as const;
+
+function selectRockRuntimeFiles(
+  maxTemplates: number,
+  optimizedGeometry: boolean
+): string[] {
+  const count = Number.isFinite(maxTemplates)
+    ? Math.max(0, Math.floor(maxTemplates))
+    : ROCK_RUNTIME_FILES.length;
+  const suffix = optimizedGeometry ? "_mobile.glb" : "_runtime.glb";
+  return ROCK_RUNTIME_FILES.slice(0, count).map((name) => `${name}${suffix}`);
+}
 
 function clamp(x: number, min: number, max: number) {
   return Math.max(min, Math.min(max, x));
@@ -42,17 +62,12 @@ function collisionRadiusForMeshes(meshes: Mesh[]) {
 export class RockLibrary {
   private templates: RockTemplate[] = [];
 
-  async load(scene: Scene, maxTemplates = Number.POSITIVE_INFINITY) {
-    const files = [
-      "rock_01_runtime.glb",
-      "rock_02_runtime.glb",
-      "rock_03_runtime.glb",
-      "rock_04_runtime.glb",
-      "rock_05_runtime.glb",
-      "rock_06_runtime.glb",
-    ];
-
-    for (const file of files.slice(0, maxTemplates)) {
+  async load(
+    scene: Scene,
+    maxTemplates = Number.POSITIVE_INFINITY,
+    optimizedGeometry = false
+  ) {
+    for (const file of selectRockRuntimeFiles(maxTemplates, optimizedGeometry)) {
       try {
         const res = await SceneLoader.ImportMeshAsync(
           null,
@@ -130,6 +145,7 @@ export class RockLibrary {
       const inst = src.createInstance(`${instanceName}_${src.name}`);
       inst.setEnabled(true);
       inst.isPickable = false;
+      inst.cullingStrategy = AbstractMesh.CULLINGSTRATEGY_BOUNDINGSPHERE_ONLY;
       inst.position.copyFrom(src.position);
 
       if (src.rotationQuaternion) {

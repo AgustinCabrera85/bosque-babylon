@@ -1,8 +1,10 @@
 import { asset } from "../utils/asset";
 
+const MASTER_VOLUME_KEY = "bosque.masterVolume";
 const MUSIC_VOLUME_KEY = "bosque.musicVolume";
 const AMBIENT_VOLUME_KEY = "bosque.ambientVolume";
 const SFX_VOLUME_KEY = "bosque.sfxVolume";
+const DEFAULT_MASTER_VOLUME = 1;
 const DEFAULT_MUSIC_VOLUME = 0.7;
 const DEFAULT_AMBIENT_VOLUME = 0.85;
 const DEFAULT_SFX_VOLUME = 0.8;
@@ -105,11 +107,12 @@ function renderBinding(binding: SliderBinding | null, volume: number) {
 
 export function setupMusicPlayer(): MusicPlayerHandle | null {
   const pauseMenu = document.getElementById("pauseMenu");
+  const masterSlider = getSlider("masterVolume", "masterValue");
   const musicSlider = getSlider("musicVolume", "musicValue");
   const ambientSlider = getSlider("ambientVolume", "ambientValue");
   const sfxSlider = getSlider("sfxVolume", "sfxValue");
 
-  if (!musicSlider || !ambientSlider || !sfxSlider) return null;
+  if (!masterSlider || !musicSlider || !ambientSlider || !sfxSlider) return null;
 
   let currentBackgroundTrack = "assets/audio/music/Echoes_in_the_Dark_ingame.mp3";
   let currentAmbientTrack: string | null = "assets/audio/ambience/Gentle_cricket_chirp.mp3";
@@ -186,17 +189,23 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   const abortController = new AbortController();
   const signal = abortController.signal;
 
+  let masterVolume = readSavedVolume(MASTER_VOLUME_KEY, DEFAULT_MASTER_VOLUME);
   const volumes: Record<VolumeChannel, number> = {
     music: readSavedVolume(MUSIC_VOLUME_KEY, DEFAULT_MUSIC_VOLUME),
     ambient: readSavedVolume(AMBIENT_VOLUME_KEY, DEFAULT_AMBIENT_VOLUME),
     sfx: readSavedVolume(SFX_VOLUME_KEY, DEFAULT_SFX_VOLUME),
   };
 
+  function getEffectiveVolume(channel: VolumeChannel) {
+    return clamp01(masterVolume * volumes[channel]);
+  }
+
   function renderMusic(volume: number) {
     renderBinding(musicSlider, volume);
   }
 
   function renderAll() {
+    renderBinding(masterSlider, masterVolume);
     renderMusic(volumes.music);
     renderBinding(ambientSlider, volumes.ambient);
     renderBinding(sfxSlider, volumes.sfx);
@@ -207,7 +216,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       audioContext = new AudioContext();
       sfxGain = audioContext.createGain();
       sfxGain.connect(audioContext.destination);
-      sfxGain.gain.value = volumes.sfx;
+      sfxGain.gain.value = getEffectiveVolume("sfx");
 
       walkSource = audioContext.createMediaElementSource(walkSfx);
       walkDryGain = audioContext.createGain();
@@ -222,6 +231,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       walkEchoDelay.connect(walkEchoFeedback);
       walkEchoFeedback.connect(walkEchoDelay);
       updateWalkFootstepMix();
+      setSfxElementVolumes(getEffectiveVolume("sfx"));
 
       waterfallSource = audioContext.createMediaElementSource(waterfall);
       waterfallGain = audioContext.createGain();
@@ -314,7 +324,9 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   function updateWaterfallVolume() {
     const requestedVolumeScale = waterfallArea?.volumeScale ?? 0.72;
     const volumeScale = Number.isFinite(requestedVolumeScale) ? requestedVolumeScale : 0.72;
-    const volume = clamp01(volumes.ambient * volumeScale * waterfallProximity);
+    const volume = clamp01(
+      getEffectiveVolume("ambient") * volumeScale * waterfallProximity
+    );
     if (audioContext && waterfallGain) {
       waterfallGain.gain.setTargetAtTime(
         volume * WATERFALL_GAIN_COMPENSATION,
@@ -406,11 +418,11 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   function playGameSfx(
     name: "jump" | "walk" | "run" | "door" | "axe-impact"
   ) {
-    if (volumes.sfx <= 0) return;
     if (name === "walk" || name === "run") {
       setFootstepMode(name);
       return;
     }
+    if (getEffectiveVolume("sfx") <= 0) return;
 
     const oneShot =
       name === "door"
@@ -426,7 +438,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   function playCinematicSfx(audio: HTMLAudioElement, label: string) {
     audio.pause();
     audio.currentTime = 0;
-    if (volumes.sfx <= 0) return;
+    if (getEffectiveVolume("sfx") <= 0) return;
     void audio.play().catch((error) => {
       console.warn(`[MusicPlayer] Cinematic SFX '${label}' was blocked.`, error);
     });
@@ -523,28 +535,42 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
     volumes[channel] = next;
 
     if (channel === "music") {
-      music.volume = next;
-      music.muted = next <= 0;
-      skyEyeMusic.volume = next;
-      skyEyeMusic.muted = next <= 0;
+      const effectiveVolume = getEffectiveVolume("music");
+      music.volume = effectiveVolume;
+      music.muted = effectiveVolume <= 0;
+      skyEyeMusic.volume = effectiveVolume;
+      skyEyeMusic.muted = effectiveVolume <= 0;
       if (save) localStorage.setItem(MUSIC_VOLUME_KEY, String(next));
       renderMusic(next);
     }
 
     if (channel === "ambient") {
-      ambient.volume = clamp01(next * 0.65 * ambientVolumeScale);
-      ambient.muted = next <= 0;
+      const effectiveVolume = clamp01(
+        getEffectiveVolume("ambient") * 0.65 * ambientVolumeScale
+      );
+      ambient.volume = effectiveVolume;
+      ambient.muted = effectiveVolume <= 0;
       updateWaterfallVolume();
       if (save) localStorage.setItem(AMBIENT_VOLUME_KEY, String(next));
       renderBinding(ambientSlider, next);
     }
 
     if (channel === "sfx") {
-      if (sfxGain) sfxGain.gain.value = next;
-      setSfxElementVolumes(next);
+      const effectiveVolume = getEffectiveVolume("sfx");
+      if (sfxGain) sfxGain.gain.value = effectiveVolume;
+      setSfxElementVolumes(effectiveVolume);
       if (save) localStorage.setItem(SFX_VOLUME_KEY, String(next));
       renderBinding(sfxSlider, next);
     }
+  }
+
+  function setMasterVolume(volume: number, save = true) {
+    masterVolume = clamp01(volume);
+    setVolume("music", volumes.music, false);
+    setVolume("ambient", volumes.ambient, false);
+    setVolume("sfx", volumes.sfx, false);
+    if (save) localStorage.setItem(MASTER_VOLUME_KEY, String(masterVolume));
+    renderBinding(masterSlider, masterVolume);
   }
 
   function bindSlider(binding: SliderBinding | null, channel: VolumeChannel, previewSfx = false) {
@@ -557,6 +583,13 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       if (previewSfx) playUiSfx();
     }, { signal });
   }
+
+  masterSlider.slider.addEventListener("input", () => {
+    setMasterVolume(Number(masterSlider.slider.value) / 100);
+    void start();
+  }, { signal });
+
+  masterSlider.slider.addEventListener("change", playUiSfx, { signal });
 
   pauseMenu?.addEventListener("pointerdown", (event) => event.stopPropagation(), { signal });
   pauseMenu?.addEventListener("click", (event) => event.stopPropagation(), { signal });
@@ -643,10 +676,11 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   setVolume("music", volumes.music, false);
   setVolume("ambient", volumes.ambient, false);
   setVolume("sfx", volumes.sfx, false);
+  setMasterVolume(masterVolume, false);
   renderAll();
 
   return {
-    getSfxVolume: () => volumes.sfx,
+    getSfxVolume: () => getEffectiveVolume("sfx"),
     configureLevelAudio(profile) {
       setBackgroundTrack(profile.backgroundTrack);
       setAmbientPlaybackProfile(

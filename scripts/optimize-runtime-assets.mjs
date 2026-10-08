@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import sharp from "sharp";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(SCRIPT_DIR, "..");
@@ -16,6 +16,37 @@ const GLB_MAGIC = 0x46546c67;
 const JSON_CHUNK = 0x4e4f534a;
 const BIN_CHUNK = 0x004e4942;
 const sharedTextureSizes = new Map();
+let mobileGeometryTools = null;
+
+const MOBILE_SIMPLIFICATION = {
+  tree: { ratio: 0.45, error: 0.005 },
+  rock: { ratio: 0.45, error: 0.005 },
+};
+
+async function loadMobileGeometryTools() {
+  if (mobileGeometryTools) return mobileGeometryTools;
+
+  const [{ NodeIO }, { ALL_EXTENSIONS }, transforms, meshoptimizer] = await Promise.all([
+    import("@gltf-transform/core"),
+    import("@gltf-transform/extensions"),
+    import("@gltf-transform/functions"),
+    import("meshoptimizer"),
+  ]);
+  await Promise.all([
+    meshoptimizer.MeshoptEncoder.ready,
+    meshoptimizer.MeshoptSimplifier.ready,
+  ]);
+
+  mobileGeometryTools = {
+    io: new NodeIO().registerExtensions(ALL_EXTENSIONS),
+    reorder: transforms.reorder,
+    simplify: transforms.simplify,
+    weld: transforms.weld,
+    encoder: meshoptimizer.MeshoptEncoder,
+    simplifier: meshoptimizer.MeshoptSimplifier,
+  };
+  return mobileGeometryTools;
+}
 
 const glbs = [
   ...["tree_00", "tree_01", "tree_02", "tree_03", "tree_04", "tree_05", "tree_07"].map(
@@ -108,16 +139,15 @@ function buildGlb(json, binary) {
   return output;
 }
 
-async function externalizeEmbeddedImages(source, output) {
-  const sourceData = await readFile(source);
-  const { json, binary } = parseGlb(sourceData, source);
+async function externalizeEmbeddedImagesFromData(sourceData, sourceLabel, output) {
+  const { json, binary } = parseGlb(sourceData, sourceLabel);
   const imageBufferViews = new Set();
 
   for (const image of json.images ?? []) {
     if (image.bufferView === undefined) continue;
     const view = json.bufferViews[image.bufferView];
     if (!view || (view.buffer ?? 0) !== 0) {
-      throw new Error(`${source} contains an unsupported image buffer`);
+      throw new Error(`${sourceLabel} contains an unsupported image buffer`);
     }
 
     const start = view.byteOffset ?? 0;
@@ -144,7 +174,7 @@ async function externalizeEmbeddedImages(source, output) {
   for (let oldIndex = 0; oldIndex < (json.bufferViews ?? []).length; oldIndex++) {
     if (imageBufferViews.has(oldIndex)) continue;
     const sourceView = json.bufferViews[oldIndex];
-    if ((sourceView.buffer ?? 0) !== 0) throw new Error(`${source} uses multiple buffers`);
+    if ((sourceView.buffer ?? 0) !== 0) throw new Error(`${sourceLabel} uses multiple buffers`);
 
     const alignedOffset = align4(binaryLength);
     if (alignedOffset > binaryLength) binaryParts.push(Buffer.alloc(alignedOffset - binaryLength));
@@ -170,27 +200,75 @@ async function externalizeEmbeddedImages(source, output) {
   };
 }
 
+async function externalizeEmbeddedImages(source, output) {
+  return externalizeEmbeddedImagesFromData(await readFile(source), source, output);
+}
+
+async function createMobileGeometry(source) {
+  const tools = await loadMobileGeometryTools();
+  const document = await tools.io.read(source);
+  const preset = path.basename(source).startsWith("tree_")
+    ? MOBILE_SIMPLIFICATION.tree
+    : MOBILE_SIMPLIFICATION.rock;
+
+  await document.transform(
+    tools.weld(),
+    tools.simplify({
+      simplifier: tools.simplifier,
+      ratio: preset.ratio,
+      error: preset.error,
+      // Preserve foliage-card boundaries and the contour of individual rocks.
+      lockBorder: true,
+    }),
+    tools.reorder({ encoder: tools.encoder, target: "performance" })
+  );
+
+  return Buffer.from(await tools.io.writeBinary(document));
+}
+
 async function optimizeSky() {
   const source = path.join(LOCAL_SOURCE_ASSETS, "hdr", "forest_night_8k.jpg");
   const output = path.join(PUBLIC_ASSETS, "hdr", "forest_night_4k.jpg");
-  await sharp(source)
-    .resize(4096, 2048, { fit: "fill", kernel: sharp.kernel.lanczos3 })
-    .jpeg({ quality: 92, chromaSubsampling: "4:4:4", mozjpeg: true })
-    .toFile(output);
+  const skyScript = path.join(SCRIPT_DIR, "optimize-runtime-sky.mjs");
+  await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [skyScript, source, output], {
+      stdio: "inherit",
+      windowsHide: true,
+    });
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Sky optimization failed with exit code ${code}`));
+    });
+  });
   return output;
 }
 
 await mkdir(SHARED_TEXTURES, { recursive: true });
+// Run image processing before the geometry pipeline allocates large source GLBs.
+await optimizeSky();
 let sourceBytes = 0;
 let outputBytes = 0;
+let mobileOutputBytes = 0;
 for (const glb of glbs) {
   const result = await externalizeEmbeddedImages(glb.source, glb.output);
   sourceBytes += result.sourceBytes;
   outputBytes += result.outputBytes;
+
+  if (path.basename(glb.source) !== "tree_08.glb") {
+    const mobileOutput = glb.output.replace(/_runtime\.glb$/, "_mobile.glb");
+    const mobileData = await createMobileGeometry(glb.source);
+    const mobileResult = await externalizeEmbeddedImagesFromData(
+      mobileData,
+      `${glb.source} (mobile)`,
+      mobileOutput
+    );
+    mobileOutputBytes += mobileResult.outputBytes;
+  }
 }
-await optimizeSky();
 
 const sharedTextureBytes = [...sharedTextureSizes.values()].reduce((sum, value) => sum + value, 0);
 const saved = (sourceBytes - outputBytes - sharedTextureBytes) / 1024 / 1024;
 console.log(`Runtime GLBs generated; shared payload is ${saved.toFixed(1)} MiB smaller.`);
+console.log(`Mobile tree and rock geometry generated (${(mobileOutputBytes / 1024 / 1024).toFixed(1)} MiB).`);
 console.log("Shared image bytes remain identical to the source assets; the 8K sky has a 4K runtime copy.");

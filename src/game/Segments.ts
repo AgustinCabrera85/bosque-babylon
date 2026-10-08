@@ -395,6 +395,7 @@ export class Segments {
   private endHouseWindowLightAnchor: Vector3 | null = null;
   private endHouseDoorLightAnchor: Vector3 | null = null;
   private endHouseDoorOpenAmount = 0;
+  private hermanoMayorReleasedFromHouse = false;
   private endHouseTorchLightingRegistered = false;
   private endHouseEffectsActive = true;
   private hermanoMayor: HermanoMayorHandle | null = null;
@@ -437,6 +438,10 @@ export class Segments {
 
   getEndHouseMeshes(): readonly AbstractMesh[] {
     return this.endHouseMeshes;
+  }
+
+  hasReleasedHermanoMayorFromHouse() {
+    return this.hermanoMayorReleasedFromHouse;
   }
 
   getEndHouseTorchFacadeMeshes(): readonly AbstractMesh[] {
@@ -4293,6 +4298,7 @@ export class Segments {
             open = true;
             target = 1;
             collider.active = false;
+            this.hermanoMayorReleasedFromHouse = true;
             openDelayTimer = null;
             window.dispatchEvent(
               new CustomEvent("bosque:sfx", { detail: { name: "door" } })

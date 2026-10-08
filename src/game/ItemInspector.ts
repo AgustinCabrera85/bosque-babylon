@@ -12,7 +12,8 @@ import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { asset } from "../utils/asset";
 import { applyPhotoCardMaterials } from "./PhotoCard";
 import type { InputManager } from "./input/InputManager";
-import { renderActionPrompt } from "./input/InputPrompts";
+import { mouseIconPresentation } from "./input/InputBindingLabels";
+import { renderActionPrompt, renderBindingPrompt } from "./input/InputPrompts";
 
 export type InspectableItem = {
   id: string;
@@ -422,8 +423,22 @@ function renderInspectorControls(
     return;
   }
 
-  addText(mode === "model" ? "Arrastrar para rotar" : "Arrastrar para desplazar");
-  addText("Rueda para acercar o alejar");
+  const addMousePrompt = (
+    icon: "mouse_drag" | "mouse_wheel",
+    label: string,
+    copy: string
+  ) => {
+    const row = document.createElement("div");
+    row.className = "item-inspector-control-row";
+    renderBindingPrompt(row, [mouseIconPresentation(icon, label)], copy);
+    dom.controls.appendChild(row);
+  };
+  addMousePrompt(
+    "mouse_drag",
+    "Arrastrar",
+    mode === "model" ? "Rotar objeto" : "Desplazar imagen"
+  );
+  addMousePrompt("mouse_wheel", "Rueda", "Acercar / alejar");
   addText("Guardar para cerrar");
 }
 

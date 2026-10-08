@@ -28,8 +28,9 @@ import { TouchInput } from "./TouchInput";
 import {
   detectControllerFamily,
   formatGamepadBindingPresentation,
-  formatKeyboardBinding,
+  formatKeyboardBindingPresentation,
   formatKeyboardMovement,
+  formatKeyboardMovementPresentations,
   type InputBindingPresentation,
 } from "./InputBindingLabels";
 
@@ -215,7 +216,7 @@ export class InputManager {
     if (device === "touch") return [];
     if (device === "keyboardMouse") {
       return (this.keyboardMouseBindings.actions[action] ?? [])
-        .map((binding) => ({ label: formatKeyboardBinding(binding) }));
+        .map(formatKeyboardBindingPresentation);
     }
 
     const gamepad = this.getActiveGamepad();
@@ -236,6 +237,13 @@ export class InputManager {
     return movement.x === 0 && movement.y === 1
       ? "Stick izquierdo / Cruceta"
       : `Ejes ${movement.x} / ${movement.y}`;
+  }
+
+  public getMovementBindingPresentations(
+    device: InputDeviceType = this.activeDevice
+  ): readonly InputBindingPresentation[] {
+    if (device !== "keyboardMouse") return [];
+    return formatKeyboardMovementPresentations(this.keyboardMouseBindings.movement);
   }
 
   public onActiveDeviceChanged(listener: ActiveDeviceListener) {

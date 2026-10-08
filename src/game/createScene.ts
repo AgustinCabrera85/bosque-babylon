@@ -955,6 +955,7 @@ scene.onBeforeRenderObservable.add(() => {
     eye: skyEye,
     waterSurface: terminalLandmark.waterSurface,
     hoverPosition: skyEyeHoverPosition,
+    canStart: () => segments.hasReleasedHermanoMayorFromHouse(),
   });
   let skyEyeDefeatCinematic: SkyEyeDefeatCinematic | null = null;
   const enemyHealthHud = new EnemyHealthHud(skyEye.id);

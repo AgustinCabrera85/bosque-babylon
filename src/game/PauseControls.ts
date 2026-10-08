@@ -5,8 +5,10 @@ import {
   CONTROLLER_FAMILY_LABELS,
   detectControllerFamily,
   formatGamepadBindingPresentation,
-  formatKeyboardBinding,
+  formatKeyboardBindingPresentation,
   formatKeyboardMovement,
+  formatKeyboardMovementPresentations,
+  mouseIconPresentation,
   readConnectedGamepads,
   type InputBindingPresentation,
 } from "./input/InputBindingLabels";
@@ -88,7 +90,13 @@ export function setupPauseControls({
       value.textContent = binding;
     } else {
       value.className = "control-mapping-bindings";
-      for (const [index, presentation] of binding.entries()) {
+      const uniqueBindings = binding.filter((presentation, index) =>
+        binding.findIndex((candidate) =>
+          candidate.label === presentation.label &&
+          candidate.iconPath === presentation.iconPath
+        ) === index
+      );
+      for (const [index, presentation] of uniqueBindings.entries()) {
         if (index > 0) {
           const separator = document.createElement("span");
           separator.textContent = "/";
@@ -97,6 +105,9 @@ export function setupPauseControls({
         if (presentation.iconPath) {
           const icon = document.createElement("img");
           icon.className = "input-button-icon control-mapping-icon";
+          if (presentation.iconKind) {
+            icon.classList.add(`${presentation.iconKind}-icon`);
+          }
           icon.src = asset(presentation.iconPath);
           icon.alt = presentation.label;
           icon.title = presentation.label;
@@ -196,14 +207,20 @@ export function setupPauseControls({
     if (mappingTitle) mappingTitle.textContent = "Distribución de teclado";
     if (mappingDevice) mappingDevice.textContent = "Teclado y ratón";
     const bindings = input.exportBindings().keyboardMouse;
-    addMapping("Moverse", formatKeyboardMovement(bindings.movement));
-    addMapping("Cámara", "Movimiento del ratón");
+    const movementPresentations = formatKeyboardMovementPresentations(bindings.movement);
+    addMapping(
+      "Moverse",
+      movementPresentations.length
+        ? movementPresentations
+        : formatKeyboardMovement(bindings.movement)
+    );
+    addMapping("Cámara", [mouseIconPresentation("mouse", "Movimiento del ratón")]);
     for (const action of ACTION_ORDER) {
       const actionBindings = bindings.actions[action];
       if (!actionBindings?.length) continue;
       addMapping(
         ACTION_LABELS[action] ?? action,
-        [...new Set(actionBindings.map(formatKeyboardBinding))].join(" / ")
+        actionBindings.map(formatKeyboardBindingPresentation)
       );
     }
   };

@@ -4,13 +4,13 @@ import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { Material as BabylonMaterial } from "@babylonjs/core/Materials/material";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import type { LinesMesh } from "@babylonjs/core/Meshes/linesMesh";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { SolidParticleSystem } from "@babylonjs/core/Particles/solidParticleSystem";
 import type { Scene } from "@babylonjs/core/scene";
 import type { PlayerController } from "./PlayerController";
 import type { PlayerStatsSystem } from "./PlayerStatsSystem";
@@ -33,8 +33,13 @@ const AIM_ASSIST_MAX_DISTANCE = 130;
 const FREE_AIM_CONVERGENCE_DISTANCE = 120;
 const TRAJECTORY_POINT_COUNT = 41;
 const TRAJECTORY_STEP_SECONDS = 0.1;
-const TRAJECTORY_TARGET_COLOR = new Color3(0.42, 0.95, 1);
-const TRAJECTORY_FREE_COLOR = new Color3(0.62, 0.78, 1);
+const TRAJECTORY_DOT_COUNT = 30;
+const TRAJECTORY_DOT_DIAMETER = 0.052;
+const TRAJECTORY_BODY_FADE_INNER_RADIUS = 0.38;
+const TRAJECTORY_BODY_FADE_OUTER_RADIUS = 1.08;
+const TRAJECTORY_BODY_MIN_OPACITY = 0.12;
+const TRAJECTORY_TARGET_COLOR = new Color3(1, 0.83, 0.47);
+const TRAJECTORY_FREE_COLOR = new Color3(0.9, 0.62, 0.28);
 
 // Visual-only tuning. The shell stays close to the core so it reads as a
 // membrane instead of a second, blue sphere.
@@ -359,7 +364,9 @@ function smoothstep01(value: number) {
 
 export class PlayerAttackSystem {
   private readonly dom: AttackDom;
-  private readonly trajectory: LinesMesh;
+  private readonly trajectory: Mesh;
+  private readonly trajectoryParticles: SolidParticleSystem;
+  private readonly trajectoryMaterial: StandardMaterial;
   private readonly trajectoryEnd: Mesh;
   private readonly trajectoryEndMaterial: StandardMaterial;
   private readonly heldOrb: HeldLightOrb;
@@ -384,6 +391,7 @@ export class PlayerAttackSystem {
   private messageTimer = 0;
   private renderedAmmo = -1;
   private disposed = false;
+  private readonly trajectoryBodyCenter = Vector3.Zero();
 
   public constructor(
     private readonly scene: Scene,
@@ -399,42 +407,87 @@ export class PlayerAttackSystem {
     };
     this.message = this.getIdleMessage();
 
-    const trajectoryPoints = Array.from(
-      { length: TRAJECTORY_POINT_COUNT },
-      () => Vector3.Zero()
+    this.trajectoryParticles = new SolidParticleSystem(
+      "playerAttackTrajectoryParticles",
+      scene,
+      { updatable: true, isPickable: false, computeBoundingBox: true }
     );
-    this.trajectory = MeshBuilder.CreateDashedLines(
-      "playerAttackTrajectory",
+    const trajectoryDotTemplate = MeshBuilder.CreateSphere(
+      "playerAttackTrajectoryDotTemplate",
+      { diameter: TRAJECTORY_DOT_DIAMETER, segments: 4 },
+      scene
+    );
+    this.trajectoryParticles.addShape(trajectoryDotTemplate, TRAJECTORY_DOT_COUNT);
+    this.trajectory = this.trajectoryParticles.buildMesh();
+    trajectoryDotTemplate.dispose(false, false);
+    this.trajectoryParticles.computeParticleRotation = false;
+    this.trajectoryParticles.computeParticleColor = true;
+    this.trajectoryParticles.computeParticleTexture = false;
+    for (const particle of this.trajectoryParticles.particles) {
+      particle.scaling.setAll(0);
+      particle.color = new Color4(
+        TRAJECTORY_FREE_COLOR.r,
+        TRAJECTORY_FREE_COLOR.g,
+        TRAJECTORY_FREE_COLOR.b,
+        0
+      );
+    }
+    this.trajectoryParticles.setParticles();
+
+    this.trajectoryMaterial = new StandardMaterial(
+      "playerAttackTrajectoryMaterial",
+      scene
+    );
+    this.trajectoryMaterial.diffuseColor.setAll(1);
+    this.trajectoryMaterial.emissiveColor.setAll(1);
+    this.trajectoryMaterial.specularColor.setAll(0);
+    this.trajectoryMaterial.alpha = 1;
+    this.trajectoryMaterial.disableLighting = true;
+    this.trajectoryMaterial.backFaceCulling = false;
+    this.trajectoryMaterial.transparencyMode =
+      BabylonMaterial.MATERIAL_ALPHABLEND;
+    this.trajectoryMaterial.disableDepthWrite = true;
+    this.trajectory.material = this.trajectoryMaterial;
+    this.trajectory.isPickable = false;
+    this.trajectory.alwaysSelectAsActiveMesh = true;
+    this.trajectory.useVertexColors = true;
+    this.trajectory.hasVertexAlpha = true;
+    this.trajectory.renderingGroupId = LIGHT_ORB_RENDERING_GROUP;
+    this.trajectory.setEnabled(false);
+
+    const trajectoryEndPath = Array.from({ length: 25 }, (_, index) => {
+      const angle = (index / 24) * Math.PI * 2;
+      return new Vector3(Math.cos(angle) * 0.17, Math.sin(angle) * 0.17, 0);
+    });
+    this.trajectoryEnd = MeshBuilder.CreateTube(
+      "playerAttackTrajectoryEnd",
       {
-        points: trajectoryPoints,
-        dashNb: 26,
-        dashSize: 2.4,
-        gapSize: 1.35,
-        updatable: true,
+        path: trajectoryEndPath,
+        radius: 0.014,
+        tessellation: 6,
+        cap: Mesh.NO_CAP,
+        sideOrientation: Mesh.DOUBLESIDE,
       },
       scene
     );
-    this.trajectory.color = new Color3(0.56, 0.86, 1);
-    this.trajectory.alpha = 0.72;
-    this.trajectory.isPickable = false;
-    this.trajectory.alwaysSelectAsActiveMesh = true;
-    this.trajectory.renderingGroupId = 2;
-    this.trajectory.setEnabled(false);
-
-    this.trajectoryEndMaterial = this.createLightMaterial(
+    this.trajectoryEndMaterial = new StandardMaterial(
       "playerAttackTrajectoryEndMaterial",
-      new Color3(0.4, 0.82, 1),
-      0.58
-    );
-    this.trajectoryEnd = MeshBuilder.CreateSphere(
-      "playerAttackTrajectoryEnd",
-      { diameter: 0.36, segments: 10 },
       scene
     );
+    this.trajectoryEndMaterial.diffuseColor.copyFrom(TRAJECTORY_FREE_COLOR);
+    this.trajectoryEndMaterial.emissiveColor.copyFrom(TRAJECTORY_FREE_COLOR);
+    this.trajectoryEndMaterial.specularColor.setAll(0);
+    this.trajectoryEndMaterial.alpha = 0.42;
+    this.trajectoryEndMaterial.disableLighting = true;
+    this.trajectoryEndMaterial.backFaceCulling = false;
+    this.trajectoryEndMaterial.transparencyMode =
+      BabylonMaterial.MATERIAL_ALPHABLEND;
+    this.trajectoryEndMaterial.disableDepthWrite = true;
     this.trajectoryEnd.material = this.trajectoryEndMaterial;
+    this.trajectoryEnd.billboardMode = Mesh.BILLBOARDMODE_ALL;
     this.trajectoryEnd.isPickable = false;
     this.trajectoryEnd.alwaysSelectAsActiveMesh = true;
-    this.trajectoryEnd.renderingGroupId = 2;
+    this.trajectoryEnd.renderingGroupId = LIGHT_ORB_RENDERING_GROUP;
     this.trajectoryEnd.setEnabled(false);
     this.heldOrb = this.createHeldLightOrb();
     this.impactLight = this.createImpactLight();
@@ -590,7 +643,8 @@ export class PlayerAttackSystem {
     this.projectiles.length = 0;
     for (const burst of this.impactBursts) this.disposeImpactBurst(burst);
     this.impactBursts.length = 0;
-    this.trajectory.dispose(false, false);
+    this.trajectoryParticles.dispose();
+    this.trajectoryMaterial.dispose();
     this.trajectoryEnd.dispose(false, false);
     this.trajectoryEndMaterial.dispose();
     this.heldOrb.root.dispose(false, false);
@@ -720,19 +774,20 @@ export class PlayerAttackSystem {
     const points = this.predictTrajectory(aim);
     const finalPoint = points[points.length - 1];
 
-    MeshBuilder.CreateDashedLines(
-      "playerAttackTrajectory",
-      { points, dashNb: 26, dashSize: 2.4, gapSize: 1.35, instance: this.trajectory },
-      this.scene
-    );
-    this.trajectory.color.copyFrom(
-      aim.target ? TRAJECTORY_TARGET_COLOR : TRAJECTORY_FREE_COLOR
-    );
-    this.trajectory.alpha = 0.7 + charge * 0.28;
+    const guideColor = aim.target ? TRAJECTORY_TARGET_COLOR : TRAJECTORY_FREE_COLOR;
+    this.updateTrajectoryBodyCenter();
+    this.updateTrajectoryDots(points, guideColor, charge);
     this.trajectory.setEnabled(true);
-    this.trajectoryEnd.position.copyFrom(finalPoint);
-    this.trajectoryEnd.scaling.setAll(0.9 + charge * 0.7);
-    this.trajectoryEndMaterial.alpha = 0.68 + charge * 0.3;
+    const markerOffset = this.player.camera.globalPosition.subtract(finalPoint);
+    if (markerOffset.lengthSquared() > 0.000001) {
+      markerOffset.normalize().scaleInPlace(0.06);
+    }
+    this.trajectoryEnd.position.copyFrom(finalPoint).addInPlace(markerOffset);
+    this.trajectoryEnd.scaling.setAll(0.88 + charge * 0.16);
+    this.trajectoryEndMaterial.diffuseColor.copyFrom(guideColor);
+    this.trajectoryEndMaterial.emissiveColor.copyFrom(guideColor);
+    const markerBodyOpacity = this.getTrajectoryBodyOpacity(finalPoint);
+    this.trajectoryEndMaterial.alpha = (0.34 + charge * 0.1) * markerBodyOpacity;
     this.trajectoryEnd.setEnabled(true);
     this.message = aim.target ? `Objetivo: ${aim.target.type}` : "Trayectoria libre";
   }
@@ -741,26 +796,71 @@ export class PlayerAttackSystem {
     const points: Vector3[] = [aim.origin.clone()];
     const velocity = aim.direction.scale(aim.speed);
     let position = aim.origin.clone();
-    let ended = false;
-
     for (let index = 1; index < TRAJECTORY_POINT_COUNT; index++) {
-      if (!ended) {
-        const previous = position;
-        velocity.y -= PROJECTILE_GRAVITY * TRAJECTORY_STEP_SECONDS;
-        position = position.add(velocity.scale(TRAJECTORY_STEP_SECONDS));
-        const enemyHit = this.findEnemySegmentHit(previous, position);
-        const worldHit = this.findWorldSegmentHit(previous, position);
-        if (enemyHit && (!worldHit || enemyHit.fraction <= worldHit.fraction)) {
-          position = enemyHit.point;
-          ended = true;
-        } else if (worldHit) {
-          position = worldHit.point;
-          ended = true;
-        }
+      const previous = position;
+      velocity.y -= PROJECTILE_GRAVITY * TRAJECTORY_STEP_SECONDS;
+      position = position.add(velocity.scale(TRAJECTORY_STEP_SECONDS));
+      const enemyHit = this.findEnemySegmentHit(previous, position);
+      const worldHit = this.findWorldSegmentHit(previous, position);
+      let ended = false;
+      if (enemyHit && (!worldHit || enemyHit.fraction <= worldHit.fraction)) {
+        position = enemyHit.point;
+        ended = true;
+      } else if (worldHit) {
+        position = worldHit.point;
+        ended = true;
       }
       points.push(position.clone());
+      if (ended) break;
     }
     return points;
+  }
+
+  private updateTrajectoryDots(points: Vector3[], color: Color3, charge: number) {
+    const lastPointIndex = points.length - 1;
+    const cameraPosition = this.player.camera.globalPosition;
+    const baseOpacity = 0.3 + charge * 0.08;
+
+    for (let index = 0; index < TRAJECTORY_DOT_COUNT; index++) {
+      const particle = this.trajectoryParticles.particles[index];
+      const progress = (index + 1) / (TRAJECTORY_DOT_COUNT + 1);
+      const pointIndex = progress * lastPointIndex;
+      const lowerIndex = Math.floor(pointIndex);
+      const upperIndex = Math.min(lastPointIndex, lowerIndex + 1);
+      Vector3.LerpToRef(
+        points[lowerIndex],
+        points[upperIndex],
+        pointIndex - lowerIndex,
+        particle.position
+      );
+      const cameraDistance = Vector3.Distance(cameraPosition, particle.position);
+      const distanceScale = 0.86 + Math.min(0.46, cameraDistance * 0.008);
+      particle.scaling.setAll(distanceScale * (0.95 + charge * 0.06));
+      const originFade = 0.35 + smoothstep01((progress - 0.02) / 0.2) * 0.65;
+      particle.color?.set(
+        color.r,
+        color.g,
+        color.b,
+        baseOpacity * originFade * this.getTrajectoryBodyOpacity(particle.position)
+      );
+    }
+
+    this.trajectoryParticles.setParticles();
+  }
+
+  private updateTrajectoryBodyCenter() {
+    this.trajectoryBodyCenter.copyFrom(this.player.root.getAbsolutePosition());
+    this.trajectoryBodyCenter.y -= this.player.getCollisionHeight() * 0.48;
+  }
+
+  private getTrajectoryBodyOpacity(position: Vector3) {
+    const distanceFromBody = Vector3.Distance(position, this.trajectoryBodyCenter);
+    const fade = smoothstep01(
+      (distanceFromBody - TRAJECTORY_BODY_FADE_INNER_RADIUS) /
+        (TRAJECTORY_BODY_FADE_OUTER_RADIUS - TRAJECTORY_BODY_FADE_INNER_RADIUS)
+    );
+    return TRAJECTORY_BODY_MIN_OPACITY +
+      (1 - TRAJECTORY_BODY_MIN_OPACITY) * fade;
   }
 
   private hideTrajectory() {
@@ -1395,18 +1495,6 @@ export class PlayerAttackSystem {
     material.backFaceCulling = false;
     material.disableDepthWrite = true;
     material.needDepthPrePass = false;
-  }
-
-  private createLightMaterial(name: string, color: Color3, alpha: number) {
-    const material = new StandardMaterial(name, this.scene);
-    material.diffuseColor.copyFrom(color);
-    material.emissiveColor.copyFrom(color);
-    material.specularColor.setAll(0);
-    material.alpha = alpha;
-    material.disableLighting = true;
-    material.backFaceCulling = false;
-    material.transparencyMode = BabylonMaterial.MATERIAL_ALPHABLEND;
-    return material;
   }
 
   private disposeProjectile(projectile: LightProjectile) {

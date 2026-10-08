@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Mouse Left Click">
+  <title>Mouse Left Click</title>
+  <path d="M64 15 C46 15 33 28 33 46 v36 c0 19 14 33 31 33 s31-14 31-33 V46 C95 28 82 15 64 15z" fill="#17110C" fill-opacity="0.94" stroke="#C58A3D" stroke-width="7" stroke-linejoin="round"/>
+  <line x1="64" y1="15" x2="64" y2="55" stroke="#C58A3D" stroke-width="5"/>
+  <path d="M40 22 C49 17 57 15 64 15 v40 H40 C40 43 40 28 40 22z" fill="#F1D7A0" fill-opacity="1"/>
+  <path d="M88 22 C79 17 71 15 64 15 v40 h24 C88 43 88 28 88 22z" fill="none" fill-opacity="1"/>
+  <rect x="57" y="23" width="14" height="20" rx="5" fill="none"/>
+</svg>

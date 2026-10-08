@@ -756,16 +756,47 @@ body.level-transition-active * {
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.68));
 }
 
+.input-button-icon.keyboard-key-icon {
+  width: 36px;
+  height: 36px;
+}
+
+.input-button-icon.keyboard-combo-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.input-button-icon.mouse-icon {
+  width: 36px;
+  height: 36px;
+}
+
+#help .input-button-icon.keyboard-key-icon {
+  width: 30px;
+  height: 30px;
+}
+
+#help .input-button-icon.keyboard-combo-icon {
+  width: 42px;
+  height: 42px;
+}
+
+#help .input-button-icon.mouse-icon {
+  width: 30px;
+  height: 30px;
+}
+
 #reticle {
   position: absolute;
   left: var(--reticle-x, 50%);
   top: var(--reticle-y, 50%);
   width: 8px;
   height: 8px;
-  transform: translate(-50%, -50%);
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.55);
-  box-shadow: 0 0 10px rgba(255,255,255,0.15);
+  transform: translate(-50%, -50%) rotate(45deg);
+  border-radius: 2px;
+  border: 1px solid rgba(213, 174, 101, 0.68);
+  background: rgba(43, 25, 12, 0.16);
+  box-shadow: 0 0 9px rgba(197, 138, 61, 0.18);
   opacity: 0.65;
   transition:
     left 180ms ease,
@@ -775,24 +806,47 @@ body.level-transition-active * {
     opacity 120ms ease;
 }
 
+#reticle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #f1d7a0;
+  box-shadow: 0 0 5px rgba(225, 175, 97, 0.55);
+  opacity: 0.55;
+}
+
 body.attack-aiming #reticle {
-  width: 15px;
-  height: 15px;
-  border-color: rgba(128, 225, 255, 0.95);
+  width: 14px;
+  height: 14px;
+  border-color: rgba(241, 215, 160, 0.96);
+  background: rgba(93, 54, 20, 0.22);
   box-shadow:
-    0 0 8px rgba(112, 220, 255, 0.9),
-    0 0 22px rgba(72, 145, 255, 0.55);
+    0 0 7px rgba(225, 175, 97, 0.72),
+    0 0 18px rgba(197, 138, 61, 0.36);
+  opacity: 1;
+}
+
+body.attack-aiming #reticle::after {
+  box-shadow:
+    0 0 5px rgba(241, 215, 160, 0.88),
+    0 0 9px rgba(225, 175, 97, 0.52);
   opacity: 1;
 }
 
 @media (pointer: fine) {
   body.desktop-orb-mode:not(.attack-aiming) #reticle {
-    width: 12px;
-    height: 12px;
-    border-color: rgba(146, 225, 246, 0.86);
+    width: 11px;
+    height: 11px;
+    border-color: rgba(213, 174, 101, 0.88);
+    background: rgba(70, 39, 16, 0.18);
     box-shadow:
-      0 0 7px rgba(112, 220, 255, 0.68),
-      0 0 17px rgba(72, 145, 255, 0.32);
+      0 0 6px rgba(225, 175, 97, 0.52),
+      0 0 14px rgba(197, 138, 61, 0.26);
     opacity: 0.92;
   }
 }
@@ -2207,6 +2261,14 @@ body.inventory-open #hud {
   box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.45);
 }
 
+.keyboard-glyph img {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.66));
+}
+
 .gamepad-glyph {
   border-radius: 24px 24px 12px 12px;
   font-size: 10px;
@@ -2327,6 +2389,21 @@ body.inventory-open #hud {
 .control-mapping-icon {
   width: 26px;
   height: 26px;
+}
+
+.control-mapping-icon.keyboard-key-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.control-mapping-icon.keyboard-combo-icon {
+  width: 54px;
+  height: 54px;
+}
+
+.control-mapping-icon.mouse-icon {
+  width: 40px;
+  height: 40px;
 }
 
 .settings {

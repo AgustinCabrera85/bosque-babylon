@@ -1,6 +1,10 @@
 import type { GameAction } from "./InputActions";
 import type { InputManager } from "./InputManager";
-import { CONTROLLER_FAMILY_LABELS, detectControllerFamily } from "./InputBindingLabels";
+import {
+  CONTROLLER_FAMILY_LABELS,
+  detectControllerFamily,
+  mouseIconPresentation,
+} from "./InputBindingLabels";
 import type { InputBindingPresentation } from "./InputBindingLabels";
 import { asset } from "../../utils/asset";
 
@@ -10,7 +14,8 @@ export type InputPromptsHandle = {
 
 type HelpEntry =
   | { text: string }
-  | { action: GameAction; copy: string };
+  | { action: GameAction; copy: string }
+  | { bindings: readonly InputBindingPresentation[]; copy: string };
 
 function uniquePresentations(presentations: readonly InputBindingPresentation[]) {
   return presentations.filter((presentation, index) =>
@@ -35,6 +40,9 @@ function appendBindingPresentations(
     if (presentation.iconPath) {
       const icon = document.createElement("img");
       icon.className = "input-button-icon";
+      if (presentation.iconKind) {
+        icon.classList.add(`${presentation.iconKind}-icon`);
+      }
       icon.src = asset(presentation.iconPath);
       icon.alt = presentation.label;
       icon.title = presentation.label;
@@ -72,9 +80,17 @@ export function renderActionPrompt(
     return;
   }
 
+  renderBindingPrompt(target, input.getActionBindingPresentations(action), copy);
+}
+
+export function renderBindingPrompt(
+  target: HTMLElement,
+  presentations: readonly InputBindingPresentation[],
+  copy: string
+) {
+  target.replaceChildren();
   const binding = document.createElement("span");
   binding.className = "input-binding-token";
-  const presentations = input.getActionBindingPresentations(action);
   if (presentations.length) appendBindingPresentations(binding, presentations);
   else binding.textContent = copy;
 
@@ -106,9 +122,12 @@ function appendHelpLine(
       continue;
     }
 
+    const presentations = "action" in entry
+      ? input.getActionBindingPresentations(entry.action)
+      : entry.bindings;
     const prompt = document.createElement("span");
     prompt.className = "input-prompt-entry";
-    appendBindingPresentations(prompt, input.getActionBindingPresentations(entry.action));
+    appendBindingPresentations(prompt, presentations);
     const copy = document.createElement("span");
     copy.textContent = entry.copy;
     prompt.appendChild(copy);
@@ -142,7 +161,10 @@ export function setupInputPrompts(input: InputManager): InputPromptsHandle {
 
     if (device === "keyboardMouse") {
       help.style.display = document.pointerLockElement ? "none" : "block";
-      appendHelpLine(help, input, [{ text: "Click para entrar" }]);
+      appendHelpLine(help, input, [{
+        bindings: [mouseIconPresentation("mouse_left_click", "Clic izquierdo")],
+        copy: "entrar",
+      }]);
     } else {
       help.style.display = "block";
       const gamepad = input.getActiveGamepad();
@@ -152,6 +174,10 @@ export function setupInputPrompts(input: InputManager): InputPromptsHandle {
 
     const actionEntry = (action: GameAction, copy: string): HelpEntry | null =>
       input.getActionBindingPresentations(action).length ? { action, copy } : null;
+    const movementBindings = input.getMovementBindingPresentations();
+    const movementEntry: HelpEntry = movementBindings.length
+      ? { bindings: movementBindings, copy: "mover" }
+      : { text: `${input.getMovementBindingLabel()} mover` };
     const utility = [
       actionEntry("changeCamera", "cámara"),
       actionEntry("toggleFlashlight", "linterna"),
@@ -159,7 +185,7 @@ export function setupInputPrompts(input: InputManager): InputPromptsHandle {
       actionEntry("pause", "pausa"),
     ].filter((entry): entry is HelpEntry => !!entry);
     const gameplay = [
-      { text: `${input.getMovementBindingLabel()} mover` },
+      movementEntry,
       actionEntry("run", "correr"),
       actionEntry("jump", "saltar/bucear"),
       actionEntry("interact", "interactuar"),

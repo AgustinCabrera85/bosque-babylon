@@ -5,6 +5,29 @@ export type GamepadIconVariant = "color" | "mono";
 export type InputBindingPresentation = {
   label: string;
   iconPath?: string;
+  iconKind?: "keyboard-key" | "keyboard-combo" | "mouse";
+};
+
+const KEYBOARD_ICON_ROOT = "assets/ui/keyboard_icons_svg/accent";
+const MOUSE_ICON_ROOT = "assets/ui/mouse_icons_svg/accent";
+export type MouseIconName =
+  | "mouse"
+  | "mouse_left_click"
+  | "mouse_middle_click"
+  | "mouse_right_click"
+  | "mouse_both_click"
+  | "mouse_drag"
+  | "mouse_wheel";
+const KEYBOARD_KEY_ICON_NAMES: Readonly<Record<string, string>> = {
+  ShiftLeft: "key_shift",
+  ShiftRight: "key_shift",
+  Space: "key_space",
+  KeyE: "key_e",
+  KeyF: "key_f",
+  KeyI: "key_i",
+  KeyQ: "key_q",
+  KeyV: "key_v",
+  Escape: "key_esc",
 };
 
 export const CONTROLLER_FAMILY_LABELS: Record<ControllerFamily, string> = {
@@ -131,6 +154,46 @@ export function formatKeyboardBinding(binding: KeyboardMouseActionBinding) {
     : mouseButtonLabel(binding.button);
 }
 
+export function formatKeyboardBindingPresentation(
+  binding: KeyboardMouseActionBinding
+): InputBindingPresentation {
+  const label = formatKeyboardBinding(binding);
+  if (binding.type === "key") {
+    const iconName = KEYBOARD_KEY_ICON_NAMES[binding.code];
+    return iconName
+      ? {
+          label,
+          iconPath: `${KEYBOARD_ICON_ROOT}/${iconName}.svg`,
+          iconKind: "keyboard-key",
+        }
+      : { label };
+  }
+
+  const buttons = new Set([binding.button, ...(binding.requiresButtons ?? [])]);
+  if (buttons.has(0) && buttons.has(2)) {
+    return mouseIconPresentation("mouse_both_click", label);
+  }
+  const iconName = binding.button === 0
+    ? "mouse_left_click"
+    : binding.button === 1
+      ? "mouse_middle_click"
+      : binding.button === 2
+        ? "mouse_right_click"
+        : null;
+  return iconName ? mouseIconPresentation(iconName, label) : { label };
+}
+
+export function mouseIconPresentation(
+  iconName: MouseIconName,
+  label: string
+): InputBindingPresentation {
+  return {
+    label,
+    iconPath: `${MOUSE_ICON_ROOT}/${iconName}.svg`,
+    iconKind: "mouse",
+  };
+}
+
 export function formatGamepadBinding(
   binding: GamepadBinding,
   family: ControllerFamily,
@@ -172,4 +235,38 @@ export function formatKeyboardMovement(bindings: {
       .map(keyCodeLabel)
       .join(" / ")
   ).filter(Boolean).join(" · ");
+}
+
+export function formatKeyboardMovementPresentations(bindings: {
+  left: readonly string[];
+  right: readonly string[];
+  forward: readonly string[];
+  backward: readonly string[];
+}): InputBindingPresentation[] {
+  const presentations: InputBindingPresentation[] = [];
+  if (
+    bindings.forward.includes("KeyW") &&
+    bindings.left.includes("KeyA") &&
+    bindings.backward.includes("KeyS") &&
+    bindings.right.includes("KeyD")
+  ) {
+    presentations.push({
+      label: "WASD",
+      iconPath: `${KEYBOARD_ICON_ROOT}/combo_wasd.svg`,
+      iconKind: "keyboard-combo",
+    });
+  }
+  if (
+    bindings.forward.includes("ArrowUp") &&
+    bindings.left.includes("ArrowLeft") &&
+    bindings.backward.includes("ArrowDown") &&
+    bindings.right.includes("ArrowRight")
+  ) {
+    presentations.push({
+      label: "Flechas",
+      iconPath: `${KEYBOARD_ICON_ROOT}/combo_arrows.svg`,
+      iconKind: "keyboard-combo",
+    });
+  }
+  return presentations;
 }

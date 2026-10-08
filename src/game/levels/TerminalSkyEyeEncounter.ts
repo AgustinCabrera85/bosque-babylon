@@ -18,6 +18,7 @@ export type TerminalSkyEyeEncounterOptions = {
   eye: SkyEyeController;
   waterSurface: WaterSurfaceInfo;
   hoverPosition: Vector3;
+  canStart: () => boolean;
   triggerMargin?: number;
   presentationSeconds?: number;
 };
@@ -55,6 +56,7 @@ export class TerminalSkyEyeEncounter {
   private readonly eye: SkyEyeController;
   private readonly waterSurface: WaterSurfaceInfo;
   private readonly hoverPosition: Vector3;
+  private readonly canStart: () => boolean;
   private readonly triggerMargin: number;
   private readonly presentationSeconds: number;
   private currentState: TerminalSkyEyeEncounterState = "dormant";
@@ -66,6 +68,7 @@ export class TerminalSkyEyeEncounter {
     this.eye = options.eye;
     this.waterSurface = options.waterSurface;
     this.hoverPosition = options.hoverPosition.clone();
+    this.canStart = options.canStart;
     this.triggerMargin = options.triggerMargin ?? 1.25;
     this.presentationSeconds = Math.max(
       0.1,
@@ -83,6 +86,7 @@ export class TerminalSkyEyeEncounter {
   public update(deltaTimeSeconds: number) {
     if (this.currentState === "dormant") {
       if (
+        this.canStart() &&
         !this.player.isOpeningSequenceActive &&
         !this.player.isCinematicSequenceActive &&
         isPointInsideWaterSurface(
@@ -105,6 +109,7 @@ export class TerminalSkyEyeEncounter {
 
   public startPresentation() {
     if (this.currentState !== "dormant") return false;
+    if (!this.canStart()) return false;
     if (!this.player.beginCinematicSequence()) return false;
 
     this.currentState = "presenting";

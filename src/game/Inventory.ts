@@ -51,6 +51,7 @@ export function setupInventory({ inspectItem, input }: InventoryOptions): Invent
   let selectedId: string | null = null;
   let currentFilter = "all";
   let open = false;
+  const pickupInspectionTimers = new Set<number>();
   const abortController = new AbortController();
   const signal = abortController.signal;
   const navigator = new GamepadMenuNavigator({
@@ -114,6 +115,14 @@ export function setupInventory({ inspectItem, input }: InventoryOptions): Invent
       selectedId = item.id;
     }
     render();
+    if (item.inspectOnPickup) {
+      const delaySeconds = Math.max(0, item.pickupInspectionDelaySeconds ?? 0.65);
+      const timer = window.setTimeout(() => {
+        pickupInspectionTimers.delete(timer);
+        if (!signal.aborted) inspectItem(item);
+      }, delaySeconds * 1000);
+      pickupInspectionTimers.add(timer);
+    }
   };
 
   const setItemCount = (item: InspectableItem, count: number) => {
@@ -173,6 +182,8 @@ export function setupInventory({ inspectItem, input }: InventoryOptions): Invent
     dispose: () => {
       close();
       abortController.abort();
+      for (const timer of pickupInspectionTimers) window.clearTimeout(timer);
+      pickupInspectionTimers.clear();
       dom.button.remove();
       dom.overlay.remove();
     },

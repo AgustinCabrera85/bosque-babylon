@@ -26,6 +26,7 @@ import {
 } from "./WaterSurface";
 import { LAUTARO_VISUAL_SCALE } from "./CharacterPresentation";
 import type { InputManager } from "./input/InputManager";
+import { ITEM_INSPECTOR_OPENED_EVENT } from "./ItemInspector";
 import {
   ProceduralGrabStruggleController,
   type ProceduralGrabStruggleDebugPoseMask,
@@ -150,6 +151,7 @@ const STANDING_UP_BLEND_TIME = 0.18;
 const GRAB_LOOK_HALF_FOV_COSINE = Math.cos((65 * Math.PI) / 180);
 const GRAB_LOOK_TARGET_HYSTERESIS = 0.12;
 const THROW_ACTION_MOVEMENT_LOCK_SECONDS = 1.15;
+const THROW_UPPER_BODY_BLEND_TIME = 0.12;
 const THROW_CHARGE_REFERENCE_FRAMES: Record<
   CharacterId,
   {
@@ -165,11 +167,21 @@ const THROW_CHARGE_REFERENCE_FRAMES: Record<
 const CENTER_AIM_VIEWPORT_POSITION = { x: 0.5, y: 0.5 } as const;
 const THIRD_PERSON_AIM_VIEWPORT_POSITION = { x: 0.43, y: 0.46 } as const;
 const AIM_UNPROJECT_WORLD = Matrix.Identity();
-const PICKUP_ACTION_SPEED_RATIO = 1.35;
+const PICKUP_ACTION_SPEED_RATIO = 1.5;
+const PICKUP_TO_LOCOMOTION_BLEND_TIME = 0.3;
 const DOOR_OPEN_MOVEMENT_LOCK_SECONDS = 1.7;
 const THIRD_PERSON_FLASHLIGHT_PITCH_MIN = -0.58;
 const THIRD_PERSON_FLASHLIGHT_PITCH_MAX = 0.68;
 const FIRST_PERSON_CAMERA_HEIGHT_MULTIPLIER = 2;
+
+function isThrowUpperBodyTarget(targetName: string) {
+  const normalized = targetName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return (
+    normalized.endsWith("spine1") ||
+    normalized.endsWith("spine2") ||
+    /right(shoulder|arm|forearm|hand)/.test(normalized)
+  );
+}
 const PLAYER_CAMERA_FOV = 0.9;
 const NECK_GRAB_CAMERA_DISTANCE = 3.45;
 const NECK_GRAB_CAMERA_HEIGHT = 0.38;
@@ -271,6 +283,7 @@ export class PlayerController {
   private throwHandMiddleBone: Bone | null = null;
   private readonly throwHandMiddlePosition = Vector3.Zero();
   private animations = new Map<string, AnimationGroup>();
+  private throwUpperBodyAnimation: AnimationGroup | null = null;
   private currentAnimation: string | null = null;
   private fadeFromAnimation: AnimationGroup | null = null;
   private fadeToAnimation: AnimationGroup | null = null;
@@ -298,6 +311,8 @@ export class PlayerController {
   private readonly neckGrabCameraBlendedPosition = Vector3.Zero();
   private readonly neckGrabCameraBlendedTarget = Vector3.Zero();
   private actionPlaying = false;
+  private pickupActionGroup: AnimationGroup | null = null;
+  private locomotionBlendTimeOverride: number | null = null;
   private chargedThrowAction: {
     group: AnimationGroup;
     holdFrame: number;
@@ -306,6 +321,8 @@ export class PlayerController {
     released: boolean;
     launched: boolean;
     launch: (() => void) | null;
+    blendWeight: number;
+    finishing: boolean;
   } | null = null;
   private openingAnimationPending = false;
   private openingSequenceActive = false;
@@ -384,9 +401,12 @@ export class PlayerController {
     const onPause = () => {
       this.updateMovementSfx("idle");
     };
+    const onItemInspectorOpened = () => this.settlePickupActionBehindInspector();
     window.addEventListener("bosque:pause", onPause);
+    window.addEventListener(ITEM_INSPECTOR_OPENED_EVENT, onItemInspectorOpened);
     scene.onDisposeObservable.addOnce(() => {
       window.removeEventListener("bosque:pause", onPause);
+      window.removeEventListener(ITEM_INSPECTOR_OPENED_EVENT, onItemInspectorOpened);
     });
   }
 
@@ -607,6 +627,7 @@ export class PlayerController {
       if (!REGISTERED_CHARACTER_ANIMATIONS.has(group.name)) continue;
       this.animations.set(group.name, group);
     }
+    this.throwUpperBodyAnimation = this.createThrowUpperBodyAnimation();
     this.grabStruggleController?.dispose();
     this.grabStruggleController = new ProceduralGrabStruggleController(
       this.scene,
@@ -778,13 +799,17 @@ export class PlayerController {
       this.controlsLocked ||
       this.neckGrabRestrained ||
       this.actionPlaying ||
+      this.chargedThrowAction ||
       this.waterLocomotionStateValue !== "grounded"
     ) {
       return false;
     }
 
-    const group = this.playAction("throwObject");
+    const group = this.throwUpperBodyAnimation;
     if (!group) return false;
+    group.stop(true);
+    this.setAnimationWeight(group, 0);
+    group.start(false);
     const frameSpan = group.to - group.from;
     const chargeReference = THROW_CHARGE_REFERENCE_FRAMES[this.character];
     const holdNormalizedFrame =
@@ -801,6 +826,8 @@ export class PlayerController {
       released: false,
       launched: false,
       launch: null,
+      blendWeight: 0,
+      finishing: false,
     };
     return true;
   }
@@ -822,13 +849,9 @@ export class PlayerController {
     const state = this.chargedThrowAction;
     if (!state) return;
     this.chargedThrowAction = null;
-    const wasCurrentAction = this.currentAnimation === state.group.name;
     state.group.stop(true);
-    if (wasCurrentAction) {
-      this.actionPlaying = false;
-      this.currentAnimation = null;
-      this.resumeIdleOrWaterAnimation();
-    }
+    this.setAnimationWeight(state.group, 0);
+    this.updateThrowBaseAnimationWeights(0);
   }
 
   /** Keeps input responsive while a grab briefly slows and tugs the character. */
@@ -1302,7 +1325,8 @@ export class PlayerController {
       }
       if (inputActive && this.input.wasPressed("waterAction")) this.waterActionQueued = true;
     }
-    this.updateChargedThrowAction();
+    this.updateChargedThrowAction(dt);
+    this.updatePickupActionTransition();
     this.updateIsometricCameraAnchorBlend(dt);
 
     if (this.enemyGrabPressureTimer > 0) {
@@ -2755,19 +2779,20 @@ export class PlayerController {
 
   private updateAvatarAnimation(moveX: number, moveY: number, running: boolean) {
     if (!this.animations.size || this.actionPlaying) return;
+    const blendTime = this.takeLocomotionBlendTime();
 
     if (this.waterLocomotionStateValue === "swimming") {
-      this.playAnimation("swimming", true);
+      this.playAnimation("swimming", true, blendTime);
       return;
     }
 
     if (this.waterLocomotionStateValue === "treadingWater") {
-      this.playAnimation("treadingWater", true);
+      this.playAnimation("treadingWater", true, blendTime);
       return;
     }
 
     if (!this.grounded) {
-      this.playAnimation("jump", false);
+      this.playAnimation("jump", false, blendTime);
       return;
     }
 
@@ -2777,24 +2802,63 @@ export class PlayerController {
 
     if (moving) {
       if (moveY < -0.12 && absY >= absX) {
-        this.playAnimation("walkBackward", true);
+        this.playAnimation("walkBackward", true, blendTime);
         return;
       }
 
       if (absX > 0.12) {
         if (moveX < 0) {
-          this.playAnimation(running ? "strafeLeftRun" : "strafeLeftWalk", true);
+          this.playAnimation(
+            running ? "strafeLeftRun" : "strafeLeftWalk",
+            true,
+            blendTime
+          );
         } else {
-          this.playAnimation(running ? "strafeRightRun" : "strafeRightWalk", true);
+          this.playAnimation(
+            running ? "strafeRightRun" : "strafeRightWalk",
+            true,
+            blendTime
+          );
         }
         return;
       }
 
-      this.playAnimation(running ? "run" : "walk", true);
+      this.playAnimation(running ? "run" : "walk", true, blendTime);
       return;
     }
 
-    this.playAnimation("idle", true);
+    this.playAnimation("idle", true, blendTime);
+  }
+
+  private createThrowUpperBodyAnimation() {
+    const source = this.animations.get(CHARACTER_ANIMATIONS.throwObject);
+    if (!source) return null;
+
+    const overlay = source.clone(
+      `${source.name} Upper Body`,
+      undefined,
+      true,
+      true
+    );
+    for (const targeted of [...overlay.targetedAnimations]) {
+      const targetName = targeted.target?.name;
+      const targetProperty = targeted.animation.targetProperty;
+      const isRotation =
+        targetProperty === "rotationQuaternion" || targetProperty === "rotation";
+      if (
+        typeof targetName !== "string" ||
+        !isThrowUpperBodyTarget(targetName) ||
+        !isRotation
+      ) {
+        overlay.removeTargetedAnimation(targeted.animation);
+      }
+    }
+    if (!overlay.targetedAnimations.length) {
+      overlay.dispose();
+      return null;
+    }
+
+    return overlay;
   }
 
   private playAction(
@@ -2810,6 +2874,7 @@ export class PlayerController {
       this.actionPlaying = false;
       return null;
     }
+    if (name === "pickUpItem") this.pickupActionGroup = group;
 
     group.onAnimationGroupEndObservable.addOnce(() => {
       const chargedThrow = this.chargedThrowAction;
@@ -2818,6 +2883,13 @@ export class PlayerController {
         this.chargedThrowAction = null;
       }
       if (this.currentAnimation !== group.name) return;
+      if (name === "pickUpItem") {
+        this.pickupActionGroup = null;
+        this.actionPlaying = false;
+        this.currentAnimation = null;
+        this.resumeIdleOrWaterAnimation();
+        return;
+      }
       this.actionPlaying = false;
       this.currentAnimation = null;
       this.resumeIdleOrWaterAnimation();
@@ -2825,9 +2897,85 @@ export class PlayerController {
     return group;
   }
 
-  private updateChargedThrowAction() {
+  private updatePickupActionTransition() {
+    const group = this.pickupActionGroup;
+    if (
+      !group ||
+      this.currentAnimation !== group.name ||
+      !group.isPlaying
+    ) {
+      return;
+    }
+
+    const frameSpan = Math.max(0, group.to - group.from);
+    const durationSeconds = this.getAnimationDurationSeconds(group);
+    if (frameSpan <= 0 || durationSeconds <= 0) return;
+
+    const blendLeadTime = Math.min(
+      PICKUP_TO_LOCOMOTION_BLEND_TIME + MAX_SIMULATION_DELTA_SECONDS,
+      durationSeconds * 0.45
+    );
+    const blendTime = Math.min(
+      PICKUP_TO_LOCOMOTION_BLEND_TIME,
+      blendLeadTime
+    );
+    const blendStartFrame =
+      group.to - frameSpan * (blendLeadTime / durationSeconds);
+    if (group.getCurrentFrame() < blendStartFrame) return;
+
+    // Release locomotion while the pickup clip is still alive so Babylon can
+    // actually crossfade its final pose into idle, walk, or run.
+    this.pickupActionGroup = null;
+    this.actionPlaying = false;
+    this.locomotionBlendTimeOverride = blendTime;
+  }
+
+  private settlePickupActionBehindInspector() {
+    const pickupGroup = this.animations.get(CHARACTER_ANIMATIONS.pickUpItem);
+    if (
+      !pickupGroup ||
+      (this.currentAnimation !== pickupGroup.name &&
+        this.fadeFromAnimation !== pickupGroup &&
+        this.pickupActionGroup !== pickupGroup)
+    ) {
+      return;
+    }
+
+    this.pickupActionGroup = null;
+    this.actionPlaying = false;
+    this.locomotionBlendTimeOverride = null;
+    // The inspector covers this hard settle. On close the avatar is already
+    // fully idle, with no pickup fade left to resume.
+    this.fadeFromAnimation?.stop();
+    if (this.fadeToAnimation !== this.fadeFromAnimation) {
+      this.fadeToAnimation?.stop();
+    }
+    this.fadeFromAnimation = null;
+    this.fadeToAnimation = null;
+    this.fadeElapsed = 0;
+    pickupGroup.stop();
+    this.currentAnimation = null;
+    this.playAnimation("idle", true);
+    this.updateMovementSfx("idle");
+  }
+
+  private updateChargedThrowAction(dt: number) {
     const state = this.chargedThrowAction;
     if (!state) return;
+
+    const blendStep = dt / THROW_UPPER_BODY_BLEND_TIME;
+    state.blendWeight = state.finishing
+      ? Math.max(0, state.blendWeight - blendStep)
+      : Math.min(1, state.blendWeight + blendStep);
+    this.setAnimationWeight(state.group, state.blendWeight);
+    this.updateThrowBaseAnimationWeights(state.blendWeight);
+    if (state.finishing) {
+      if (state.blendWeight > 0) return;
+      state.group.stop(true);
+      if (this.chargedThrowAction === state) this.chargedThrowAction = null;
+      return;
+    }
+
     const currentFrame = state.group.getCurrentFrame();
 
     if (!state.released && state.group.isPlaying && currentFrame >= state.holdFrame) {
@@ -2862,21 +3010,24 @@ export class PlayerController {
     this.launchChargedThrowProjectile(state);
     state.group.goToFrame(state.endFrame, true);
     state.group.pause();
-    this.chargedThrowAction = null;
-    if (this.currentAnimation !== state.group.name) return;
-
-    // Blend out at the authored recovery pose instead of waiting for the long
-    // remainder of the source clip. This also releases movement immediately.
-    this.actionPlaying = false;
-    this.resumeIdleOrWaterAnimation();
+    // The additive torso layer fades away while the locomotion group keeps
+    // running, so the arms recover into the current idle/walk/run pose.
+    state.finishing = true;
   }
 
   private resumeIdleOrWaterAnimation() {
     if (this.waterLocomotionStateValue === "grounded") {
-      this.playAnimation("idle", true);
+      this.playAnimation("idle", true, this.takeLocomotionBlendTime());
       return;
     }
     this.updateAvatarAnimation(0, 0, false);
+  }
+
+  private takeLocomotionBlendTime() {
+    const blendTime =
+      this.locomotionBlendTimeOverride ?? ANIMATION_BLEND_TIME;
+    this.locomotionBlendTimeOverride = null;
+    return blendTime;
   }
 
   private playAnimation(
@@ -2898,8 +3049,7 @@ export class PlayerController {
     }
 
     next.reset();
-    next.speedRatio = speedRatio;
-    next.start(loop);
+    next.start(loop, speedRatio);
     this.setAnimationWeight(next, previous && previous !== next ? 0 : 1);
 
     if (previous && previous !== next && previous.isStarted) {
@@ -2939,6 +3089,30 @@ export class PlayerController {
   private setAnimationWeight(group: AnimationGroup, weight: number) {
     group.weight = weight;
     group.setWeightForAllAnimatables(weight);
+    if (group !== this.throwUpperBodyAnimation) {
+      const throwBlendWeight = this.chargedThrowAction?.blendWeight ?? 0;
+      this.setThrowTargetWeights(group, weight * (1 - throwBlendWeight));
+    }
+  }
+
+  private updateThrowBaseAnimationWeights(throwBlendWeight: number) {
+    const baseWeightScale = 1 - throwBlendWeight;
+    for (const group of this.animations.values()) {
+      if (!group.isStarted) continue;
+      this.setThrowTargetWeights(group, group.weight * baseWeightScale);
+    }
+  }
+
+  private setThrowTargetWeights(group: AnimationGroup, weight: number) {
+    for (const animatable of group.animatables) {
+      const targetName = animatable.target?.name;
+      if (
+        typeof targetName === "string" &&
+        isThrowUpperBodyTarget(targetName)
+      ) {
+        animatable.weight = weight;
+      }
+    }
   }
 }
 

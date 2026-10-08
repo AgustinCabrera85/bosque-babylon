@@ -19,6 +19,8 @@ export type InspectableItem = {
   name: string;
   typeLabel: string;
   description: string;
+  inspectOnPickup?: boolean;
+  pickupInspectionDelaySeconds?: number;
   inspectMode?: "model" | "image";
   modelRootPath?: string;
   modelFileName?: string;
@@ -28,6 +30,8 @@ export type InspectableItem = {
   modelScale?: number;
   cameraRadius?: number;
 };
+
+export const ITEM_INSPECTOR_OPENED_EVENT = "bosque:item-inspector:opened";
 
 type InspectItemEvent = CustomEvent<InspectableItem>;
 
@@ -105,6 +109,7 @@ export function setupItemInspector({ input }: ItemInspectorOptions): ItemInspect
       }
     );
     open = true;
+    window.dispatchEvent(new CustomEvent(ITEM_INSPECTOR_OPENED_EVENT));
   };
 
   dom.closeButton.addEventListener("click", close, { signal });

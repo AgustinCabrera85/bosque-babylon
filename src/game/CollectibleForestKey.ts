@@ -20,6 +20,8 @@ export const FOREST_KEY_INVENTORY_ITEM: InspectableItem = {
   typeLabel: "Llave",
   description:
     "Una llave antigua marcada por el bosque. Parece corresponder a la puerta de la casa.",
+  inspectOnPickup: true,
+  pickupInspectionDelaySeconds: 0.65,
   inspectMode: "model",
   modelRootPath: FOREST_KEY_MODEL_ROOT,
   modelFileName: FOREST_KEY_MODEL_FILE,

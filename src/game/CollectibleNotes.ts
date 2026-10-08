@@ -92,6 +92,8 @@ export function createCollectibleNote(scene: Scene, config: CollectibleNoteConfi
         name: config.name,
         typeLabel: "Nota",
         description: config.description,
+        inspectOnPickup: true,
+        pickupInspectionDelaySeconds: config.inspectionDelaySeconds ?? 0.75,
         inspectMode: "image",
         contentImagePath: config.contentImagePath,
         inventoryIconPath: config.worldTexturePath,
@@ -102,14 +104,6 @@ export function createCollectibleNote(scene: Scene, config: CollectibleNoteConfi
           detail: inventoryItem,
         })
       );
-      window.setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent("bosque:inspect-item", {
-            detail: inventoryItem,
-          })
-        );
-      }, (config.inspectionDelaySeconds ?? 0.75) * 1000);
-
       return {
         message: getInventoryPickupMessage(inventoryItem),
         actionType: "note",

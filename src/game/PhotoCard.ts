@@ -66,6 +66,8 @@ export const PHOTO_CARD_INSPECTABLE_ITEM = {
   id: "photo-card",
   name: "Foto",
   typeLabel: "Recuerdo",
+  inspectOnPickup: true,
+  pickupInspectionDelaySeconds: DEFAULT_PHOTO_CARD_CONFIG.inspectionDelaySeconds,
   description: "Una foto encontrada en el suelo de la casa, cerca de la televisión.",
   modelRootPath: DEFAULT_PHOTO_CARD_CONFIG.modelRootPath,
   modelFileName: DEFAULT_PHOTO_CARD_CONFIG.modelFileName,
@@ -155,14 +157,6 @@ export async function createPhotoCard(
           detail: inventoryItem,
         })
       );
-      window.setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent("bosque:inspect-item", {
-            detail: inventoryItem,
-          })
-        );
-      }, config.inspectionDelaySeconds * 1000);
-
       return {
         message: getInventoryPickupMessage(inventoryItem),
         actionType: "photo",

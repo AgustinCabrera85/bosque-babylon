@@ -3,13 +3,11 @@ import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
-import { Material as BabylonMaterial } from "@babylonjs/core/Materials/material";
-import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { Scene } from "@babylonjs/core/scene";
+import { patchCharacterMaterial } from "./CharacterPresentation";
 import type { CharacterId } from "./PlayerController";
 import type { InputDeviceType } from "./input/InputActions";
 import type { InputManager } from "./input/InputManager";
@@ -296,7 +294,7 @@ function mountCharacterPreview(
         mesh.visibility = 1;
         (mesh as any).hasVertexAlpha = false;
         (mesh as any).alphaIndex = 0;
-        patchPreviewMaterial(mesh.material);
+        patchCharacterMaterial(mesh.material, character);
       }
 
       const idleAnimation = result.animationGroups.find((group) => /idle/i.test(group.name));
@@ -316,32 +314,4 @@ function mountCharacterPreview(
     scene.dispose();
     engine.dispose();
   };
-}
-
-function patchPreviewMaterial(material: BabylonMaterial | null) {
-  if (!material) return;
-
-  const materials: BabylonMaterial[] = (material as any).subMaterials?.length
-    ? (material as any).subMaterials
-    : [material];
-
-  for (const mat of materials) {
-    if (!mat) continue;
-    mat.alpha = 1;
-    mat.alphaMode = BabylonMaterial.MATERIAL_OPAQUE;
-    mat.transparencyMode = BabylonMaterial.MATERIAL_OPAQUE;
-    mat.backFaceCulling = false;
-    (mat as any).forceDepthWrite = true;
-    (mat as any).needDepthPrePass = false;
-
-    if (mat instanceof PBRMaterial) {
-      mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
-      mat.useAlphaFromAlbedoTexture = false;
-      mat.metallic = Math.min(mat.metallic ?? 0, 0.15);
-      mat.roughness = Math.max(mat.roughness ?? 0.65, 0.55);
-      mat.environmentIntensity = Math.min(mat.environmentIntensity ?? 0.35, 0.35);
-    } else if (mat instanceof StandardMaterial) {
-      mat.useAlphaFromDiffuseTexture = false;
-    }
-  }
 }

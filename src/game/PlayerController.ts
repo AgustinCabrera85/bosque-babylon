@@ -8,9 +8,6 @@ import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Bone } from "@babylonjs/core/Bones/bone";
-import { Material as BabylonMaterial } from "@babylonjs/core/Materials/material";
-import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { PlayerWorldQuery } from "./PlayerWorldQuery";
 import {
@@ -24,7 +21,10 @@ import {
   type WaterSurfaceInfo,
   type WaterSurfaceRegistry,
 } from "./WaterSurface";
-import { LAUTARO_VISUAL_SCALE } from "./CharacterPresentation";
+import {
+  LAUTARO_VISUAL_SCALE,
+  patchCharacterMaterial,
+} from "./CharacterPresentation";
 import type { InputManager } from "./input/InputManager";
 import { ITEM_INSPECTOR_OPENED_EVENT } from "./ItemInspector";
 import {
@@ -227,10 +227,6 @@ const SWIMMING_CAMERA_BLEND_SPEED = 4.5;
 const CAMERA_TERRAIN_CLEARANCE = 0.4;
 const CAMERA_TERRAIN_SAMPLE_SPACING = 0.45;
 const CAMERA_TERRAIN_MAX_SAMPLES = 24;
-const SOFIA_MATERIAL_ROUGHNESS = 0.92;
-const SOFIA_SPECULAR_INTENSITY = 0.24;
-const SOFIA_ENVIRONMENT_INTENSITY = 0.14;
-const SOFIA_DIELECTRIC_F0_FACTOR = 0.65;
 const OPENING_CAMERA_LOCAL_POSITION = new Vector3(0, 8.2, -8.4);
 const OPENING_CAMERA_MIN_DESCENT_SECONDS = 2.8;
 const OPENING_CAMERA_MAX_DESCENT_SECONDS = 12;
@@ -618,7 +614,7 @@ export class PlayerController {
       mesh.visibility = 1;
       (mesh as any).hasVertexAlpha = false;
       (mesh as any).alphaIndex = 0;
-      this.patchAvatarMaterial(mesh.material);
+      patchCharacterMaterial(mesh.material, this.character);
     }
 
     this.animations.clear();
@@ -2644,51 +2640,6 @@ export class PlayerController {
     z = this.root.position.z
   ) {
     return world.getWalkableSurfaceHeight(x, z);
-  }
-
-  private patchAvatarMaterial(material: BabylonMaterial | null) {
-    if (!material) return;
-
-    const materials: BabylonMaterial[] = (material as any).subMaterials?.length
-      ? (material as any).subMaterials
-      : [material];
-
-    for (const mat of materials) {
-      if (!mat) continue;
-      mat.alpha = 1;
-      mat.alphaMode = BabylonMaterial.MATERIAL_OPAQUE;
-      mat.transparencyMode = BabylonMaterial.MATERIAL_OPAQUE;
-      mat.backFaceCulling = false;
-      (mat as any).forceDepthWrite = true;
-      (mat as any).needDepthPrePass = false;
-
-      if (mat instanceof PBRMaterial) {
-        mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
-        mat.useAlphaFromAlbedoTexture = false;
-        if (this.character === "sofia") {
-          // Sofia's GLB exports a metallic-only image in the combined
-          // metallic/roughness slot and its roughness image as KHR specular.
-          // Used as-is, the almost-black green channel makes the whole avatar
-          // glossy. Prefer a stable dielectric response while retaining the
-          // authored albedo and normal detail.
-          mat.metallicTexture = null;
-          mat.metallicReflectanceTexture = null;
-          mat.reflectanceTexture = null;
-          mat.microSurfaceTexture = null;
-          mat.metallic = 0;
-          mat.roughness = SOFIA_MATERIAL_ROUGHNESS;
-          mat.specularIntensity = SOFIA_SPECULAR_INTENSITY;
-          mat.environmentIntensity = SOFIA_ENVIRONMENT_INTENSITY;
-          mat.metallicF0Factor = SOFIA_DIELECTRIC_F0_FACTOR;
-        } else {
-          mat.metallic = Math.min(mat.metallic ?? 0, 0.15);
-          mat.roughness = Math.max(mat.roughness ?? 0.65, 0.55);
-          mat.environmentIntensity = Math.min(mat.environmentIntensity ?? 0.35, 0.35);
-        }
-      } else if (mat instanceof StandardMaterial) {
-        mat.useAlphaFromDiffuseTexture = false;
-      }
-    }
   }
 
   private getAvatarBounds() {

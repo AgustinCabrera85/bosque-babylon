@@ -1066,9 +1066,42 @@ export class Segments {
     bodyMinY?: number,
     bodyMaxY?: number
   ) {
+    return this.isCollidingWithWorld(
+      x,
+      z,
+      additionalClearance,
+      bodyMinY,
+      bodyMaxY,
+      false
+    );
+  }
+
+  /** Checks prewarmed object colliders too, even while their segment is hidden. */
+  isSpawnAreaBlocked(x: number, z: number, additionalClearance = 0) {
+    return this.isCollidingWithWorld(
+      x,
+      z,
+      additionalClearance,
+      undefined,
+      undefined,
+      true
+    );
+  }
+
+  private isCollidingWithWorld(
+    x: number,
+    z: number,
+    additionalClearance: number,
+    bodyMinY: number | undefined,
+    bodyMaxY: number | undefined,
+    includeInactiveObjectSegments: boolean
+  ) {
     const clearance = Math.max(0, additionalClearance);
     for (const c of this.colliders) {
-      if (!this.activeObjectSegments.has(c.segmentId)) continue;
+      if (
+        !includeInactiveObjectSegments &&
+        !this.activeObjectSegments.has(c.segmentId)
+      ) continue;
       const dx = x - c.x;
       const dz = z - c.z;
       if (

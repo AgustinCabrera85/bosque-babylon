@@ -69,6 +69,10 @@ import { SkyEyeController } from "../src/game/enemies/skyEye/SkyEyeController.ts
 import { getSkyEyePortalDeathProgress } from "../src/game/enemies/skyEye/SkyEyeFxController.ts";
 import { getSkyEyePresentationProgress } from "../src/game/levels/TerminalSkyEyeEncounter.ts";
 import {
+  createInitialForestEnemySpawns,
+  getInitialForestEnemyNoSpawnZones,
+} from "../src/game/levels/ForestEnemySpawns.ts";
+import {
   SKY_EYE_DEFEAT_CINEMATIC_TIMING,
   SkyEyeDefeatCinematic,
   sampleSkyEyeDefeatCinematic,
@@ -190,6 +194,35 @@ function hit(enemy: BaseEnemyController, damage = 1) {
 }
 
 async function verify() {
+  const authoredGrabberSpawns = createInitialForestEnemySpawns({
+    getGroundHeight: () => 2,
+  });
+  const grabberNoSpawnZones = getInitialForestEnemyNoSpawnZones();
+  assert.equal(authoredGrabberSpawns.length, 4);
+  assert.equal(grabberNoSpawnZones.length, authoredGrabberSpawns.length);
+  authoredGrabberSpawns.forEach(({ position }, index) => {
+    const zone = grabberNoSpawnZones[index];
+    assert.ok(Math.abs(position.x - zone.x) <= zone.width * 0.5);
+    assert.ok(Math.abs(position.z - zone.z) <= zone.depth * 0.5);
+  });
+
+  const blockedAnchor = authoredGrabberSpawns[0].position;
+  const relocatedGrabberSpawn = createInitialForestEnemySpawns({
+    getGroundHeight: (x, z) => x * 0.01 + z * 0.001,
+    isBlocked: (x, z) =>
+      Math.hypot(x - blockedAnchor.x, z - blockedAnchor.z) < 2,
+  })[0].position;
+  assert.notDeepEqual(
+    [relocatedGrabberSpawn.x, relocatedGrabberSpawn.z],
+    [blockedAnchor.x, blockedAnchor.z],
+    "a blocked Shadow Grabber anchor must move to a nearby clear point"
+  );
+  assert.ok(Math.abs(relocatedGrabberSpawn.x) >= 8, "spawn fallback stays off the path");
+  assert.equal(
+    relocatedGrabberSpawn.y,
+    relocatedGrabberSpawn.x * 0.01 + relocatedGrabberSpawn.z * 0.001
+  );
+
   const axeRoot = new TransformNode("test-axe-root", scene);
   axeRoot.position.set(4, 1, 9);
   const axeMesh = MeshBuilder.CreateBox(

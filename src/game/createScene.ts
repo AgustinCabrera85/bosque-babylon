@@ -81,7 +81,10 @@ import {
   registerShadowGrabber,
   spawnSkyEye,
 } from "./enemies";
-import { loadInitialForestEnemies } from "./levels/ForestEnemySpawns";
+import {
+  getInitialForestEnemyNoSpawnZones,
+  loadInitialForestEnemies,
+} from "./levels/ForestEnemySpawns";
 import { HouseArrivalCinematic } from "./levels/HouseArrivalCinematic";
 import { TerminalSkyEyeEncounter } from "./levels/TerminalSkyEyeEncounter";
 import {
@@ -856,6 +859,9 @@ scene.onBeforeRenderObservable.add(() => {
     plantFarCount: quality.plantFarCount,
     brazierFireQuality: quality.name === "mobile" ? "low" : "high",
   }, inventory);
+  for (const zone of getInitialForestEnemyNoSpawnZones()) {
+    segments.reserveNoSpawnZone(zone);
+  }
   playerWorld.setSegments(segments);
 
   onProgress(0.86, "Cargando casa...");
@@ -1322,6 +1328,8 @@ scene.onBeforeRenderObservable.add(() => {
   });
   await loadInitialForestEnemies(enemyManager, shadowGrabberBehaviorSystem, {
     getGroundHeight: (x, z) => player.getWalkableSurfaceHeight(playerWorld, x, z),
+    isBlocked: (x, z, additionalClearance) =>
+      segments.isSpawnAreaBlocked(x, z, additionalClearance),
   });
   scene.metadata.shadowGrabberBehaviorSystem = shadowGrabberBehaviorSystem;
   if (import.meta.env.DEV) {

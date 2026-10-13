@@ -10,6 +10,22 @@ import { WaterMaterial } from "@babylonjs/materials/water/waterMaterial";
 
 const WATER_NORMAL_PATH = "/assets/textures/sanctuary/river_normals_512.png";
 
+// WaterMaterial's vertex shader uses waveCount / 2 as its spatial frequency
+// and advances its own time in units of elapsed seconds / 100. The two moving
+// normal-map samples provide smaller-scale detail without another water mesh.
+const REFLECTIVE_WAVES = {
+  amplitude: 0.10,
+  phaseSpeed: 65,
+  largeWaveCount: 0.28,
+  mediumNormalTiling: 240,
+  normalWaveLength: 0.72,
+  normalStrength: 0.20,
+  normalDrift: 7,
+  directionX: 0.75,
+  directionZ: 0.40,
+  reflectionTint: 0.65,
+} as const;
+
 export type SanctuaryWaterQuality = "reflective" | "lightweight";
 export interface SanctuaryWaterHandle {
   material: Material;
@@ -19,11 +35,21 @@ export interface SanctuaryWaterHandle {
   update(seconds: number): void;
 }
 
-// Time-scaled analytic height is used ONLY for raft bobbing. Babylon WaterMaterial
-// computes the displayed waves separately; this is not exact hydrodynamic buoyancy.
+// The lightweight shader stays flat and keeps its original gentle raft motion.
 function sampleGentleSwell(x: number, z: number, seconds: number) {
   return 0.085 * Math.sin(x * 0.035 + z * 0.019 - seconds * 0.67) +
          0.045 * Math.sin(x * 0.067 - z * 0.041 - seconds * 0.49);
+}
+
+// Mirrors the dominant terms of Babylon's WaterMaterial vertex displacement.
+// Its internal clock is independent of the level clock, so this is deliberately
+// an approximation, not exact physical buoyancy.
+function sampleReflectiveSwell(x: number, z: number, seconds: number) {
+  const spatialFrequency = REFLECTIVE_WAVES.largeWaveCount * 0.5;
+  const phase = seconds * REFLECTIVE_WAVES.phaseSpeed * 0.01;
+  const xWave = Math.sin(x * spatialFrequency + phase) * REFLECTIVE_WAVES.directionX;
+  const zWave = Math.cos(z * spatialFrequency + phase) * REFLECTIVE_WAVES.directionZ;
+  return Math.abs(xWave + zWave) * REFLECTIVE_WAVES.amplitude * 5;
 }
 
 /** Default desktop renderer: actual water reflection/refraction RTTs and normal-driven ripples. */
@@ -33,25 +59,26 @@ export function createSanctuaryWater(scene: Scene, mobile: boolean): SanctuaryWa
     const bump = new Texture(WATER_NORMAL_PATH, scene, true, false);
     // The lake mesh spans kilometres: tile the normal map to keep near-boat
     // waves at human scale instead of stretching a single bump across it.
-    bump.uScale = 80;
-    bump.vScale = 80;
+    bump.uScale = REFLECTIVE_WAVES.mediumNormalTiling;
+    bump.vScale = REFLECTIVE_WAVES.mediumNormalTiling;
     material.bumpTexture = bump;
-    material.bumpHeight = 0.17;
+    material.bumpHeight = REFLECTIVE_WAVES.normalStrength;
     material.bumpAffectsReflection = true;
     material.bumpSuperimpose = true;
-    material.windForce = 1.5;
-    material.windDirection = new Vector2(0.7, 0.3);
-    material.waveHeight = 0.16;
-    material.waveSpeed = 0.17;
-    material.waveLength = 0.65;
-    material.waveCount = 7;
+    material.windForce = REFLECTIVE_WAVES.normalDrift;
+    material.windDirection = new Vector2(REFLECTIVE_WAVES.directionX, REFLECTIVE_WAVES.directionZ);
+    material.useWorldCoordinatesForWaveDeformation = true;
+    material.waveHeight = REFLECTIVE_WAVES.amplitude;
+    material.waveSpeed = REFLECTIVE_WAVES.phaseSpeed;
+    material.waveLength = REFLECTIVE_WAVES.normalWaveLength;
+    material.waveCount = REFLECTIVE_WAVES.largeWaveCount;
     material.waterColor = new Color3(0.18, 0.007, 0.016);
     material.waterColor2 = new Color3(0.085, 0.003, 0.010);
     material.colorBlendFactor = 0.58;
-    material.colorBlendFactor2 = 0.72;
+    material.colorBlendFactor2 = REFLECTIVE_WAVES.reflectionTint;
     material.fresnelSeparate = true;
-    material.specularColor = new Color3(0.75, 0.22, 0.20);
-    material.specularPower = 70;
+    material.specularColor = new Color3(0.65, 0.16, 0.15);
+    material.specularPower = 60;
     material.backFaceCulling = false;
     return {
       material,
@@ -63,7 +90,7 @@ export function createSanctuaryWater(scene: Scene, mobile: boolean): SanctuaryWa
           if (!mesh.isDisposed()) material.addToRenderList(mesh);
         }
       },
-      sampleHeight: sampleGentleSwell,
+      sampleHeight: sampleReflectiveSwell,
       update() { /* WaterMaterial advances its internal time through the Babylon engine. */ },
     };
   }

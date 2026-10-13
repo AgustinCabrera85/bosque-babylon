@@ -1,6 +1,8 @@
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -59,6 +61,49 @@ function createShadowHand(scene: Scene, x: number, z: number, scale: number, sha
   }
 }
 
+// One continuous ground: 10-unit cells along the whole raft route and wider
+// cells in the distant mist. The outer rim still reaches the old 5000x5000
+// footprint; there are no overlapping water planes or per-frame mesh updates.
+function createAdaptiveWaterGround(scene: Scene): Mesh {
+  const xs = [-2500, -1800, -1300, -900, -650, -470, -350, -280, -250];
+  for (let x = -240; x <= 240; x += 10) xs.push(x);
+  xs.push(250, 280, 350, 470, 650, 900, 1300, 1800, 2500);
+
+  // Local Z is shifted +320 below, just like the original ground.
+  const zs = [-2500, -1900, -1450, -1150, -950, -850, -780];
+  for (let z = -770; z <= 1010; z += 10) zs.push(z);
+  zs.push(1020, 1040, 1080, 1150, 1250, 1400, 1650, 2000, 2500);
+
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  for (const z of zs) {
+    for (const x of xs) {
+      positions.push(x, 0, z);
+      normals.push(0, 1, 0);
+      uvs.push((x + 2500) / 5000, (z + 2500) / 5000);
+    }
+  }
+  for (let row = 0; row < zs.length - 1; row++) {
+    for (let column = 0; column < xs.length - 1; column++) {
+      const a = row * xs.length + column;
+      const b = a + 1;
+      const c = a + xs.length;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+  const water = new Mesh("sanctuaryRedWater", scene);
+  const vertices = new VertexData();
+  vertices.positions = positions;
+  vertices.normals = normals;
+  vertices.uvs = uvs;
+  vertices.indices = indices;
+  vertices.applyToMesh(water);
+  return water;
+}
+
 export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgress, mobile: boolean): SanctuaryGeometry {
   const params = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
   const skyTest = params?.get("sanctuaryClouds");
@@ -84,7 +129,9 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
   haloMat.alpha = .16;
   haloMat.disableLighting = true;
   haloMat.backFaceCulling = false;
-  const redWater = MeshBuilder.CreateGround("sanctuaryRedWater", { width: 5000, height: 5000, subdivisions: mobile ? 2 : 96 }, scene);
+  const redWater = water.quality === "lightweight"
+    ? MeshBuilder.CreateGround("sanctuaryRedWater", { width: 5000, height: 5000, subdivisions: 2 }, scene)
+    : createAdaptiveWaterGround(scene);
   redWater.position.z = 320;
   redWater.position.y = CFG.riverY;
   redWater.material = water.material;

@@ -8,6 +8,9 @@ import type { SubMesh } from "@babylonjs/core/Meshes/subMesh";
 import type { Scene } from "@babylonjs/core/scene";
 
 const ASSET_BASE = "/assets/textures/sanctuary/";
+const ORIGINAL_ALBEDO = `${ASSET_BASE}stone_monolith_albedo_1024.webp`;
+
+type SanctuaryStoneVariant = "original" | "megalithic";
 
 type HeightFogSettings = {
   fogStartHeight: number;
@@ -83,16 +86,34 @@ color.rgb = mix(color.rgb, sanctuarySky, sanctuaryFade);
 }
 
 /** Ancient grey lithic monoliths: no glowing red seams baked into the stone. */
-export function createSanctuaryStoneMaterials(scene: Scene, mobile: boolean, heightFogEnabled = true) {
-  const makeStone = (name: string, tileU: number, tileV: number, tone: number, normalStrength: number) => {
+export function createSanctuaryStoneMaterials(scene: Scene, mobile: boolean, heightFogEnabled = true,
+  variant: SanctuaryStoneVariant = "megalithic") {
+  const makeStone = (name: string, tileU: number, tileV: number, tone: number, normalStrength: number,
+    megalithic?: { albedo: string; tileU: number; tileV: number; tone: number }) => {
     const mat = new StandardMaterial(name, scene);
-    const texture = new Texture(`${ASSET_BASE}stone_monolith_albedo_1024.webp`, scene, true, false);
-    texture.uScale = tileU;
-    texture.vScale = tileV;
-    mat.diffuseTexture = texture;
+    // Keep a visible, previously shipped texture bound until the new one is ready.
+    // A missing WebP therefore cannot leave the stone without an albedo.
+    const original = new Texture(ORIGINAL_ALBEDO, scene, true, false);
+    original.uScale = tileU;
+    original.vScale = tileV;
+    mat.diffuseTexture = original;
+    const useMegalithic = variant === "megalithic" && megalithic !== undefined;
     mat.diffuseColor = new Color3(tone, tone * 1.01, tone * 1.04);
     mat.specularColor = new Color3(0.038, 0.038, 0.039);
     mat.specularPower = 15;
+    if (useMegalithic) {
+      const candidate = new Texture(`${ASSET_BASE}${megalithic.albedo}`, scene, true, false);
+      candidate.uScale = megalithic.tileU;
+      candidate.vScale = megalithic.tileV;
+      const applyMegalithic = () => {
+        if (!candidate.isReady()) return;
+        mat.diffuseTexture = candidate;
+        mat.diffuseColor = new Color3(megalithic.tone, megalithic.tone * 1.01, megalithic.tone * 1.04);
+        original.dispose();
+      };
+      if (candidate.isReady()) applyMegalithic();
+      else candidate.onLoadObservable.addOnce(applyMegalithic);
+    }
     if (!mobile && normalStrength > 0) {
       const normal = new Texture(`${ASSET_BASE}stone_monolith_normal_1024.webp`, scene, true, false);
       normal.uScale = tileU;
@@ -103,7 +124,20 @@ export function createSanctuaryStoneMaterials(scene: Scene, mobile: boolean, hei
     return mat;
   };
   const pillar = makeStone("sanctuaryMonolithicStone", 1.5, 3.0, .62, .23);
-  const wall = makeStone("sanctuaryInfiniteStoneWall", 7.0, 12.0, .40, .0);
+  const wall = makeStone("sanctuaryInfiniteStoneWall", 7.0, 12.0, .40, .0, {
+    albedo: "sanctuary_wall_megalithic_basecolor_1024.webp",
+    tileU: .85, tileV: 1.1, tone: .68,
+  });
+  const stairs = makeStone("sanctuarySolidStoneSteps", 2.0, 2.0, .46, .0, {
+    albedo: "sanctuary_stairs_eroded_basecolor_1024.webp",
+    tileU: 1, tileV: 1, tone: .74,
+  });
+  const parapet = variant === "megalithic"
+    ? makeStone("sanctuaryMegalithicParapets", 2.0, 2.0, .46, .0, {
+      albedo: "sanctuary_parapet_blocks_basecolor_1024.webp",
+      tileU: .5, tileV: .7, tone: .74,
+    })
+    : stairs;
   // Same near-field appearance as sanctuaryObsidan, isolated from hands, gate and doors.
   const upperStructure = new StandardMaterial("sanctuaryUpperStructure", scene);
   upperStructure.diffuseColor = new Color3(.017, .018, .022);
@@ -126,7 +160,8 @@ export function createSanctuaryStoneMaterials(scene: Scene, mobile: boolean, hei
     pillar,
     wall,
     upperStructure,
-    stairs: makeStone("sanctuarySolidStoneSteps", 2.0, 2.0, .46, .0),
+    stairs,
+    parapet,
     setPillarHeightFog(mesh: AbstractMesh, height: number) {
       const fog = mesh.material === pillar ? pillarFog
         : mesh.material === upperStructure ? upperStructureFog : null;

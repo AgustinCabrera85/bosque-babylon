@@ -6,9 +6,12 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { MaterialPluginBase } from "@babylonjs/core/Materials/materialPluginBase";
+import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import type { Scene } from "@babylonjs/core/scene";
-import { SANCTUARY_CONFIG as CFG, SANCTUARY_STOPS, type SanctuaryPillarId, type SanctuaryProgress } from "./SanctuaryLayout";
+import { SANCTUARY_CONFIG as CFG, SANCTUARY_ASCENT as ASCENT, SANCTUARY_STOPS,
+  sanctuaryFlightStartZ, type SanctuaryPillarId, type SanctuaryProgress } from "./SanctuaryLayout";
 import { createSanctuaryWater } from "./SanctuaryWater";
 import { createSanctuaryClouds, type SanctuaryCloudMode } from "./SanctuaryClouds";
 import { createSanctuaryStoneMaterials } from "./SanctuaryStone";
@@ -39,6 +42,117 @@ function slab(scene: Scene, name: string, width: number, height: number, depth: 
   if (parent) mesh.parent = parent;
   mesh.isPickable = false;
   return mesh;
+}
+
+// Shared world-space UVs prevent all 360 treads from repeating the same image.
+// Only texture coordinates change; stair geometry and collisions remain intact.
+function alignStairStoneUvs(mesh: Mesh) {
+  const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+  const normals = mesh.getVerticesData(VertexBuffer.NormalKind);
+  const uvs = mesh.getVerticesData(VertexBuffer.UVKind);
+  if (!positions || !normals || !uvs) return;
+  const stoneSpan = 56;
+  for (let vertex = 0; vertex < positions.length / 3; vertex++) {
+    const x = positions[vertex * 3] + mesh.position.x;
+    const y = positions[vertex * 3 + 1] + mesh.position.y;
+    const z = positions[vertex * 3 + 2] + mesh.position.z;
+    const nx = Math.abs(normals[vertex * 3]);
+    const ny = Math.abs(normals[vertex * 3 + 1]);
+    uvs[vertex * 2] = (nx > .5 ? z : x) / stoneSpan;
+    uvs[vertex * 2 + 1] = (ny > .5 ? z : y) / stoneSpan;
+  }
+  mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+}
+
+// Screen-door coverage lets the existing moving sky show through the distant
+// stone without turning the entire wall into a transparent, depth-sorted mesh.
+class SanctuaryLateralBrumePlugin extends MaterialPluginBase {
+  constructor(material: StandardMaterial) {
+    super(material, "SanctuaryLateralBrume", 210);
+    this._enable(true);
+  }
+
+  getCustomCode(shaderType: string) {
+    if (shaderType !== "fragment") return null;
+    return {
+      CUSTOM_FRAGMENT_BEFORE_FOG: `
+#ifdef FOG
+float sanctuaryLateralDistance = abs(vPositionW.x);
+if (sanctuaryLateralDistance > 2900.0) {
+  float sanctuaryLateralMist = smoothstep(2900.0, 7800.0, sanctuaryLateralDistance);
+  float sanctuaryMistDither = fract(52.9829189 * fract(
+    0.06711056 * gl_FragCoord.x + 0.00583715 * gl_FragCoord.y));
+  if (sanctuaryMistDither < sanctuaryLateralMist) discard;
+}
+#endif
+`,
+    };
+  }
+}
+
+function createStairParapets(scene: Scene, material: StandardMaterial, foundationY: number) {
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  type Corner = [number, number, number];
+  const face = (a: Corner, b: Corner, c: Corner, d: Corner) => {
+    const first = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const second = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const normal = [
+      first[1] * second[2] - first[2] * second[1],
+      first[2] * second[0] - first[0] * second[2],
+      first[0] * second[1] - first[1] * second[0],
+    ];
+    const length = Math.hypot(...normal);
+    const start = positions.length / 3;
+    for (const corner of [a, b, c, d]) {
+      positions.push(...corner);
+      normals.push(normal[0] / length, normal[1] / length, normal[2] / length);
+    }
+    const u = Math.hypot(...first) / 24;
+    const v = Math.hypot(d[0] - a[0], d[1] - a[1], d[2] - a[2]) / 24;
+    uvs.push(0, 0, u, 0, u, v, 0, v);
+    indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+  };
+  // Extrude one continuous closed profile per side. Internal caps at every rest
+  // used to coincide and could read as dark gaps instead of solid stone.
+  const profile: Array<[number, number]> = [[ASCENT.stairStartZ, ASCENT.lowerY + 12]];
+  for (let flight = 0; flight < ASCENT.flights; flight++) {
+    const endZ = sanctuaryFlightStartZ(flight) + ASCENT.stepsPerFlight * ASCENT.treadDepth;
+    const topY = ASCENT.lowerY + (flight + 1) * ASCENT.stepsPerFlight * ASCENT.riserHeight + 12;
+    profile.push([endZ, topY]);
+    if (flight < ASCENT.flights - 1) profile.push([endZ + ASCENT.landingDepth, topY]);
+  }
+  for (const side of [-1, 1]) {
+    const x0 = side < 0 ? -ASCENT.stairWidth / 2 - 24 : ASCENT.stairWidth / 2;
+    const x1 = x0 + 24;
+    for (let segment = 0; segment < profile.length - 1; segment++) {
+      const [z0, top0] = profile[segment];
+      const [z1, top1] = profile[segment + 1];
+      face([x0, top0, z0], [x0, top1, z1], [x1, top1, z1], [x1, top0, z0]);
+      face([x0, foundationY, z0], [x0, foundationY, z1], [x0, top1, z1], [x0, top0, z0]);
+      face([x1, foundationY, z1], [x1, foundationY, z0], [x1, top0, z0], [x1, top1, z1]);
+    }
+    const [frontZ, frontTop] = profile[0];
+    const [backZ, backTop] = profile[profile.length - 1];
+    face([x0, foundationY, frontZ], [x0, frontTop, frontZ],
+      [x1, frontTop, frontZ], [x1, foundationY, frontZ]);
+    face([x1, foundationY, backZ], [x1, backTop, backZ],
+      [x0, backTop, backZ], [x0, foundationY, backZ]);
+    face([x0, foundationY, frontZ], [x1, foundationY, frontZ],
+      [x1, foundationY, backZ], [x0, foundationY, backZ]);
+  }
+  const parapets = new Mesh("sanctuaryStairStoneParapets", scene);
+  const vertices = new VertexData();
+  vertices.positions = positions;
+  vertices.normals = normals;
+  vertices.uvs = uvs;
+  vertices.indices = indices;
+  vertices.applyToMesh(parapets);
+  parapets.material = material;
+  parapets.isPickable = false;
+  parapets.receiveShadows = false;
 }
 
 function createShadowHand(scene: Scene, x: number, z: number, scale: number, shadow: StandardMaterial) {
@@ -114,7 +228,9 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
   });
   // The local smoke sheets remain a complementary low-altitude effect.
   const atmosphere = createSanctuaryAtmosphere(scene, mobile, clouds.mode === "volumetric" ? 0.43 : clouds.mode === "off" ? 0 : 1);
-  const stone = createSanctuaryStoneMaterials(scene, mobile, params?.get("sanctuaryHeightFog") !== "off");
+  const stoneVariant = params?.get("sanctuaryStone") === "original" ? "original" : "megalithic";
+  const stone = createSanctuaryStoneMaterials(scene, mobile,
+    params?.get("sanctuaryHeightFog") !== "off", stoneVariant);
   const reflectors: AbstractMesh[] = [];
   const water = createSanctuaryWater(scene, mobile || params?.get("sanctuaryWater") === "lite");
   const black = mat(scene, "sanctuaryObsidan", new Color3(.017,.018,.022));
@@ -122,6 +238,7 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
   const upperStructure = stone.upperStructure;
   const wallMat = stone.wall;
   const stairsMat = stone.stairs;
+  new SanctuaryLateralBrumePlugin(wallMat);
   const wood = mat(scene, "sanctuaryBoatWood", new Color3(.087,.052,.05));
   const ember = mat(scene, "sanctuaryPortalEmber", new Color3(.42,.045,.031), new Color3(.32,.037,.024));
   const gold = mat(scene, "sanctuaryCagedLight", new Color3(.95,.68,.38), new Color3(.9,.64,.35));
@@ -139,27 +256,132 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
   redWater.isPickable = false;
 
   // Top of wall is geometrically thousands of metres high and swallowed by red atmosphere.
-  const wallWidth = 6500;
+  const wallHalfWidth = 24000;
   const gap = CFG.gateWidth;
-  const sideWidth = (wallWidth - gap) / 2;
   const wallHeight = 9000;
-  reflectors.push(slab(scene, "wallInfiniteLeft", sideWidth, wallHeight, 105, [-(gap + sideWidth) / 2, wallHeight / 2 - 8, CFG.gateWallZ], wallMat));
-  reflectors.push(slab(scene, "wallInfiniteRight", sideWidth, wallHeight, 105, [(gap + sideWidth) / 2, wallHeight / 2 - 8, CFG.gateWallZ], wallMat));
-  // An opening cut in the mass, not an artificial rectangular light decal stuck on a solid wall.
-  reflectors.push(slab(scene, "wallGateLintel", gap + 4, wallHeight - 240, 105, [0, (wallHeight + 240) / 2 - 8, CFG.gateWallZ], wallMat));
-  reflectors.push(slab(scene, "gateRedVoid", gap - 13, 180, 2, [0, 90, CFG.gateWallZ + 49], ember));
+  const wallBottom = -8;
+  const wallTop = wallBottom + wallHeight;
+  const portalTop = ASCENT.upperY + ASCENT.portalHeight;
+  // Beyond the accessible route, the long stone wings dissolve into the sky
+  // before the camera can clip them; there are no return or rear walls.
+  // Stone modules retain their texture scale, then merge to keep two wall draw calls.
+  for (const side of [-1, 1]) {
+    const modules: Mesh[] = [];
+    for (let segment = 0; segment < 8; segment++) {
+      const inner = gap / 2 + (wallHalfWidth - gap / 2) * segment / 8;
+      const outer = gap / 2 + (wallHalfWidth - gap / 2) * (segment + 1) / 8;
+      modules.push(slab(scene, `wallStoneModule_${side}_${segment}`, outer - inner, wallHeight,
+        ASCENT.wallDepth, [side * (inner + outer) / 2, wallHeight / 2 + wallBottom, CFG.gateWallZ], wallMat));
+    }
+    const mergedWall = Mesh.MergeMeshes(modules, true, true);
+    if (mergedWall) {
+      mergedWall.name = side < 0 ? "wallInfiniteLeft" : "wallInfiniteRight";
+      mergedWall.material = wallMat;
+      mergedWall.isPickable = false;
+      reflectors.push(mergedWall);
+    } else {
+      reflectors.push(...modules);
+    }
+  }
+  // Fill the former ground-level opening; its top is the walkable floor inside the elevated gate.
+  reflectors.push(slab(scene, "wallGateLower", gap + 4, ASCENT.upperY - wallBottom, ASCENT.wallDepth,
+    [0, (ASCENT.upperY + wallBottom) / 2, CFG.gateWallZ], wallMat));
+  reflectors.push(slab(scene, "wallGateLintel", gap + 4, wallTop - portalTop, ASCENT.wallDepth,
+    [0, (wallTop + portalTop) / 2, CFG.gateWallZ], wallMat));
+  reflectors.push(slab(scene, "gateRedVoid", gap - 13, ASCENT.portalHeight, 2,
+    [0, ASCENT.upperY + ASCENT.portalHeight / 2, CFG.gateWallZ + ASCENT.wallDepth / 2 - 3.5], ember));
   for (const x of [-gap / 2, gap / 2]) {
-    slab(scene, "gateJaw", 12, 225, 120, [x, 105, CFG.gateWallZ - 5], black);
+    slab(scene, "gateJaw", 12, ASCENT.portalHeight, ASCENT.wallDepth,
+      [x, ASCENT.upperY + ASCENT.portalHeight / 2, CFG.gateWallZ], black);
   }
 
-  // Stairway unobstructed from the water, central composition pointing to the gate.
-  slab(scene, "mainStairFoundation", 123, 5, 385, [0, 0.5, 1378], stairsMat);
-  for (let i = 0; i < 28; i++) {
-    const rise = i * .66;
-    const step = slab(scene, `stair_${i}`, 112 - i * .08, rise + 1.5, 12,
-      [0, (rise + 1.5) / 2, 1220 + i * 12.4], stairsMat);
-    step.receiveShadows = false;
+  // Four steep flights and three level rests, all merged into one static stone draw call.
+  const stairParts: Mesh[] = [];
+  const foundationY = CFG.riverY - 1;
+  const baseTopY = ASCENT.upperY - 22;
+  const baseFrontZ = ASCENT.stairEndZ - 14;
+  const baseBackZ = ASCENT.wallFrontZ + 10;
+  const baseSegments: Mesh[] = [];
+  baseSegments.push(slab(scene, "sanctuaryWallBaseCenter", 3000,
+    baseTopY - foundationY, baseBackZ - baseFrontZ,
+    [0, (baseTopY + foundationY) / 2, (baseFrontZ + baseBackZ) / 2], stairsMat));
+  for (const side of [-1, 1]) {
+    for (let segment = 0; segment < 8; segment++) {
+      const inner = 1500 + segment * 3000;
+      const outer = Math.min(wallHalfWidth, inner + 3000);
+      baseSegments.push(slab(scene, `sanctuaryWallBase_${side}_${segment}`, outer - inner,
+        baseTopY - foundationY, baseBackZ - baseFrontZ,
+        [side * (inner + outer) / 2, (baseTopY + foundationY) / 2,
+          (baseFrontZ + baseBackZ) / 2], stairsMat));
+    }
   }
+  const mergedBase = Mesh.MergeMeshes(baseSegments, true, true);
+  if (mergedBase) {
+    mergedBase.name = "sanctuaryContinuousWallBase";
+    mergedBase.material = stairsMat;
+    mergedBase.isPickable = false;
+    mergedBase.receiveShadows = false;
+  }
+  const stairBlock = (name: string, width: number, startZ: number, endZ: number, topY: number) => {
+    const part = slab(scene, name, width, topY - foundationY, endZ - startZ,
+      [0, (topY + foundationY) / 2, (startZ + endZ) / 2], stairsMat);
+    if (stoneVariant === "megalithic") alignStairStoneUvs(part);
+    part.receiveShadows = false;
+    stairParts.push(part);
+  };
+  stairBlock("sanctuaryLowerPlatform", ASCENT.platformWidth,
+    ASCENT.lowerPlatformStartZ, ASCENT.stairStartZ, ASCENT.lowerY);
+  for (let flight = 0; flight < ASCENT.flights; flight++) {
+    const flightStart = sanctuaryFlightStartZ(flight);
+    for (let step = 0; step < ASCENT.stepsPerFlight; step++) {
+      const index = flight * ASCENT.stepsPerFlight + step;
+      const startZ = flightStart + step * ASCENT.treadDepth;
+      stairBlock(`sanctuaryStair_${index}`, ASCENT.stairWidth, startZ,
+        startZ + ASCENT.treadDepth, ASCENT.lowerY + (index + 1) * ASCENT.riserHeight);
+    }
+    if (flight < ASCENT.flights - 1) {
+      const landingStart = flightStart + ASCENT.stepsPerFlight * ASCENT.treadDepth;
+      stairBlock(`sanctuaryStairRest_${flight}`, ASCENT.platformWidth, landingStart,
+        landingStart + ASCENT.landingDepth,
+        ASCENT.lowerY + (flight + 1) * ASCENT.stepsPerFlight * ASCENT.riserHeight);
+    }
+  }
+  stairBlock("sanctuaryUpperPlatform", ASCENT.platformWidth,
+    ASCENT.stairEndZ, ASCENT.wallFrontZ, ASCENT.upperY);
+  const mergedStairs = Mesh.MergeMeshes(stairParts, true, true);
+  if (mergedStairs) {
+    mergedStairs.name = "sanctuaryMonumentalStairway";
+    mergedStairs.material = stairsMat;
+    mergedStairs.isPickable = false;
+    mergedStairs.receiveShadows = false;
+  }
+  // The upper stone tier continues with the wall; no exposed end at x=+/-450.
+  // It rests on the continuous lower base and leaves the central stair landing clear.
+  const halfPlatform = ASCENT.platformWidth / 2;
+  for (const side of [-1, 1]) {
+    const wingParts: Mesh[] = [];
+    for (let segment = 0; segment < 8; segment++) {
+      const inner = halfPlatform + (wallHalfWidth - halfPlatform) * segment / 8;
+      const outer = halfPlatform + (wallHalfWidth - halfPlatform) * (segment + 1) / 8;
+      const part = slab(scene, `sanctuaryUpperPlinth_${side}_${segment}`, outer - inner,
+        ASCENT.upperY - baseTopY, ASCENT.wallFrontZ - ASCENT.stairEndZ,
+        [side * (inner + outer) / 2, (ASCENT.upperY + baseTopY) / 2,
+          (ASCENT.stairEndZ + ASCENT.wallFrontZ) / 2], stairsMat);
+      part.receiveShadows = false;
+      wingParts.push(part);
+    }
+    const mergedWing = Mesh.MergeMeshes(wingParts, true, true);
+    if (mergedWing) {
+      mergedWing.name = side < 0 ? "sanctuaryUpperPlinthLeft" : "sanctuaryUpperPlinthRight";
+      mergedWing.material = stairsMat;
+      mergedWing.isPickable = false;
+      mergedWing.receiveShadows = false;
+    }
+  }
+  createStairParapets(scene, stone.parapet, foundationY);
+  // Future narrow cascades: x=-590..-530 and +530..+590, in front of the
+  // stepped stone facade, with open water before baseFrontZ for their impact.
+  // No cascade geometry or water changes belong to this phase.
 
   // Sparse monumental rectangular pillars: each contains a story level, topped with a trapped orb.
   const orbs = new Map<SanctuaryPillarId, OrbVisual>();

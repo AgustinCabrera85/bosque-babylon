@@ -12,7 +12,10 @@ import { createSanctuaryGeometry } from "./SanctuaryGeometry";
 import {
   readSanctuaryProgress,
   SANCTUARY_CONFIG as CFG,
+  SANCTUARY_ASCENT as ASCENT,
   SANCTUARY_STOPS,
+  getSanctuaryAscentHeight,
+  getSanctuaryStairSurface,
   type SanctuaryStop,
 } from "./SanctuaryLayout";
 
@@ -30,11 +33,12 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 /** Just enough ground logic to use the actual game locomotion at each landing. */
 function createDockWorld(getStage: () => { index: number; state: VoyageState }): PlayerWorldQuery {
   const dockX = (stop: SanctuaryStop) => stop.x + stop.side * 27;
-  const finalStepStart = 1220;
-  const riseAt = (z: number) =>
-    z <= finalStepStart ? 1.55 : 1.55 + Math.min(27, Math.floor((z - finalStepStart) / 12.4)) * .66;
-  function finalAllowed(x: number, z: number) {
-    return Math.abs(x) <= 52 && z >= CFG.gateLandingZ - 34 && z <= CFG.gateWallZ - 10;
+  function finalAllowed(x: number, z: number, clearance = 0) {
+    if (z < ASCENT.lowerPlatformStartZ || z > ASCENT.portalApproachEndZ) return false;
+    const halfWidth = z >= ASCENT.wallFrontZ ? CFG.gateWidth / 2 - 8
+      : z >= ASCENT.stairStartZ && z < ASCENT.stairEndZ
+        ? ASCENT.stairWidth / 2 - 1 : ASCENT.platformWidth / 2;
+    return Math.abs(x) <= halfWidth - clearance;
   }
   function dockAllowed(x: number, z: number, stop: SanctuaryStop, clearance = 0) {
     return Math.abs(x - dockX(stop)) <= 26 - clearance &&
@@ -44,14 +48,14 @@ function createDockWorld(getStage: () => { index: number; state: VoyageState }):
     getTerrainHeight(x, z) { return this.getWalkableSurfaceHeight(x, z); },
     getWalkableSurfaceHeight(x, z) {
       const { index } = getStage();
-      if (isFinalStop(index)) return finalAllowed(x, z) ? riseAt(z) : CFG.riverY;
+      if (isFinalStop(index)) return finalAllowed(x, z) ? getSanctuaryAscentHeight(z) : CFG.riverY;
       const stop = SANCTUARY_STOPS[index];
       return stop && dockAllowed(x, z, stop) ? 2.05 : CFG.riverY;
     },
     isColliding(x, z, clearance = 0) {
       const { index, state } = getStage();
       if (state !== "ashore") return false;
-      if (isFinalStop(index)) return !finalAllowed(x, z);
+      if (isFinalStop(index)) return !finalAllowed(x, z, clearance);
       const stop = SANCTUARY_STOPS[index];
       return !stop || !dockAllowed(x, z, stop, clearance);
     },
@@ -59,6 +63,9 @@ function createDockWorld(getStage: () => { index: number; state: VoyageState }):
       // Avoid camera ejection by the simple placeholder dock boundary.
       // A raycast resolver can replace this when finished collision meshes exist.
       return desired.clone();
+    },
+    getStairSurfaceInfo(x, z) {
+      return isFinalStop(getStage().index) && finalAllowed(x, z) ? getSanctuaryStairSurface(z) : null;
     },
   };
 }
@@ -175,7 +182,7 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     };
     const disembark = () => {
       if (isFinalStop(targetIndex)) {
-        player.position.set(0, 1.55 + CFG.eyeHeight, CFG.gateLandingZ + 3);
+        player.position.set(0, ASCENT.lowerY + CFG.eyeHeight, CFG.gateLandingZ + 3);
       } else {
         const stop = SANCTUARY_STOPS[targetIndex];
         player.position.set(stop.x + stop.side * 24, 2.05 + CFG.eyeHeight, stop.z - 10);

@@ -24,12 +24,72 @@ export const SANCTUARY_CONFIG = {
   boatDeckY: 0.65,
   boatStartZ: -355,
   gateStopZ: 1190,
-  gateWallZ: 1570,
-  gateWidth: 115,
-  gateLandingZ: 1190,
+  gateWallZ: 2180,
+  gateWidth: 80,
+  gateLandingZ: 1198,
   eyeHeight: 1.7,
   boatSpeed: 20,
 } as const;
+
+/** Shared visual/collision dimensions for the final, climbable approach. */
+export const SANCTUARY_ASCENT = {
+  lowerY: 1.55,
+  lowerPlatformStartZ: SANCTUARY_CONFIG.gateLandingZ,
+  stairStartZ: 1260,
+  flights: 4,
+  stepsPerFlight: 90,
+  treadDepth: 2,
+  riserHeight: .6,
+  landingDepth: 26,
+  stairWidth: 112,
+  platformWidth: 124,
+  wallDepth: 105,
+  portalHeight: 240,
+  get stairEndZ() { return this.stairStartZ + this.flights * this.stepsPerFlight * this.treadDepth + (this.flights - 1) * this.landingDepth; },
+  get upperY() { return this.lowerY + this.flights * this.stepsPerFlight * this.riserHeight; },
+  get wallFrontZ() { return SANCTUARY_CONFIG.gateWallZ - this.wallDepth / 2; },
+  get portalApproachEndZ() { return SANCTUARY_CONFIG.gateWallZ + this.wallDepth / 2 - 7.5; },
+} as const;
+
+export function sanctuaryFlightStartZ(flight: number): number {
+  const ascent = SANCTUARY_ASCENT;
+  return ascent.stairStartZ + flight * (ascent.stepsPerFlight * ascent.treadDepth + ascent.landingDepth);
+}
+
+export function getSanctuaryStairSurface(z: number) {
+  const ascent = SANCTUARY_ASCENT;
+  for (let flight = 0; flight < ascent.flights; flight++) {
+    const start = sanctuaryFlightStartZ(flight);
+    const end = start + ascent.stepsPerFlight * ascent.treadDepth;
+    if (z < start || z >= end) continue;
+    const localStep = Math.min(ascent.stepsPerFlight - 1, Math.floor((z - start) / ascent.treadDepth));
+    const stepIndex = flight * ascent.stepsPerFlight + localStep;
+    const stepProgress = (z - start - localStep * ascent.treadDepth) / ascent.treadDepth;
+    return {
+      stepIndex,
+      stepProgress,
+      surfaceHeight: ascent.lowerY + (stepIndex + 1) * ascent.riserHeight,
+      presentationHeight: ascent.lowerY + (stepIndex + stepProgress) * ascent.riserHeight,
+      ascentDirectionX: 0,
+      ascentDirectionZ: 1,
+    };
+  }
+  return null;
+}
+
+export function getSanctuaryAscentHeight(z: number): number {
+  const ascent = SANCTUARY_ASCENT;
+  if (z < ascent.stairStartZ) return ascent.lowerY;
+  const stair = getSanctuaryStairSurface(z);
+  if (stair) return stair.surfaceHeight;
+  for (let flight = 0; flight < ascent.flights - 1; flight++) {
+    const landingStart = sanctuaryFlightStartZ(flight) + ascent.stepsPerFlight * ascent.treadDepth;
+    if (z >= landingStart && z < landingStart + ascent.landingDepth) {
+      return ascent.lowerY + (flight + 1) * ascent.stepsPerFlight * ascent.riserHeight;
+    }
+  }
+  return ascent.upperY;
+}
 
 /** Release only as an explicit result of completing the matching story. */
 export type SanctuaryProgress = Partial<Record<SanctuaryPillarId, boolean>>;

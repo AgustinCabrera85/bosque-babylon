@@ -44,6 +44,91 @@ function slab(scene: Scene, name: string, width: number, height: number, depth: 
   return mesh;
 }
 
+function roughStoneSkin(scene: Scene, name: string, x: number, z: number,
+  height: number, index: number, material: StandardMaterial) {
+  type Corner = [number, number, number];
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  const quad = (a: Corner, b: Corner, c: Corner, d: Corner,
+    u0: number, u1: number, v0: number, v1: number) => {
+    const start = positions.length / 3;
+    for (const point of [a, b, c, d]) positions.push(...point);
+    uvs.push(u0, v0, u0, v1, u1, v1, u1, v0);
+    indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+  };
+  const grain = (seed: number) => {
+    const value = Math.sin(seed * 12.9898) * 43758.5453;
+    return value - Math.floor(value);
+  };
+  const point = (side: number, along: number, elevation: number, relief: number): Corner => {
+    const y = elevation - height / 2;
+    if (side === 0) return [-32.5 + along, y, -33 - relief];
+    if (side === 1) return [32.5 + relief, y, -33 + along];
+    if (side === 2) return [32.5 - along, y, 33 + relief];
+    return [-32.5 - relief, y, 33 - along];
+  };
+  // Long basalt-like ribs, split into uneven blocks. All relief is shallow and
+  // the original closed box behind the joints remains fully opaque.
+  for (let side = 0; side < 4; side++) {
+    const span = side % 2 === 0 ? 65 : 66;
+    for (let strip = 0; strip < 6; strip++) {
+      const pitch = 44 + ((strip + side + index) % 3) * 8;
+      const stagger = (strip * 13 + side * 7 + index * 5) % pitch;
+      let block = 0;
+      for (let start = -stagger; start < height; start += pitch, block++) {
+        const bottom = Math.max(0, start + .7);
+        const top = Math.min(height, start + pitch - .7);
+        if (top - bottom < 8) continue;
+        const seed = index * 101 + side * 29 + strip * 11 + block * 3;
+        const left = strip * span / 6 + .5 + .7 * grain(seed + 1);
+        const right = (strip + 1) * span / 6 - .5 - .7 * grain(seed + 2);
+        const middle = (left + right) / 2 + .5 * (grain(seed + 3) - .5);
+        const depth = .65 + 1.4 * grain(seed + 4);
+        const ridge = depth + .25 + .45 * grain(seed + 5);
+        const lowLeft = bottom + 1.1 * grain(seed + 6);
+        const lowRight = bottom + 1.1 * grain(seed + 7);
+        const highLeft = top - 1.3 * grain(seed + 8);
+        const highRight = top - 1.3 * grain(seed + 9);
+        const frontLB = point(side, left, lowLeft, depth);
+        const frontLT = point(side, left, highLeft, depth);
+        const frontMB = point(side, middle, (lowLeft + lowRight) / 2, ridge);
+        const frontMT = point(side, middle, (highLeft + highRight) / 2, ridge);
+        const frontRB = point(side, right, lowRight, depth);
+        const frontRT = point(side, right, highRight, depth);
+        const backLB = point(side, left - .4, lowLeft, .08);
+        const backLT = point(side, left - .4, highLeft, .08);
+        const backRB = point(side, right + .4, lowRight, .08);
+        const backRT = point(side, right + .4, highRight, .08);
+        const u0 = left / span;
+        const um = middle / span;
+        const u1 = right / span;
+        const v0 = bottom / height;
+        const v1 = top / height;
+        quad(frontLB, frontLT, frontMT, frontMB, u0, um, v0, v1);
+        quad(frontMB, frontMT, frontRT, frontRB, um, u1, v0, v1);
+        quad(backLB, backLT, frontLT, frontLB, u0, u0, v0, v1);
+        quad(frontRB, frontRT, backRT, backRB, u1, u1, v0, v1);
+        quad(frontLT, backLT, backRT, frontRT, u0, u1, v1, v1);
+        quad(backLB, frontLB, frontRB, backRB, u0, u1, v0, v0);
+      }
+    }
+  }
+  const normals: number[] = [];
+  VertexData.ComputeNormals(positions, indices, normals);
+  const mesh = new Mesh(`${name}_roughSkin`, scene);
+  const vertices = new VertexData();
+  vertices.positions = positions;
+  vertices.normals = normals;
+  vertices.uvs = uvs;
+  vertices.indices = indices;
+  vertices.applyToMesh(mesh);
+  mesh.position.set(x, height / 2 - 6, z);
+  mesh.material = material;
+  mesh.isPickable = false;
+  return mesh;
+}
+
 // Shared world-space UVs prevent all 360 treads from repeating the same image.
 // Only texture coordinates change; stair geometry and collisions remain intact.
 function alignStairStoneUvs(mesh: Mesh) {
@@ -385,12 +470,14 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
 
   // Sparse monumental rectangular pillars: each contains a story level, topped with a trapped orb.
   const orbs = new Map<SanctuaryPillarId, OrbVisual>();
-  for (const stop of SANCTUARY_STOPS) {
+  for (const [index, stop] of SANCTUARY_STOPS.entries()) {
     const x = stop.x + stop.side * 166;
     const z = stop.z + 54;
     const h = stop.height;
     const monolith = slab(scene, `${stop.id}_monolith`, 65, h, 66, [x, h / 2 - 6, z], concrete);
+    const roughSkin = roughStoneSkin(scene, `${stop.id}_monolith`, x, z, h, index, concrete);
     stone.setPillarHeightFog(monolith, h);
+    stone.setPillarHeightFog(roughSkin, h);
     reflectors.push(monolith);
     // Very sparse concrete seams; no Gothic trim, no pointed spires.
     const ridge = slab(scene, `${stop.id}_ridge`, 65.8, 5.5, 67, [x, h * .28, z], upperStructure);

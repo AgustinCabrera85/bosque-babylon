@@ -119,6 +119,7 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
   const water = createSanctuaryWater(scene, mobile || params?.get("sanctuaryWater") === "lite");
   const black = mat(scene, "sanctuaryObsidan", new Color3(.017,.018,.022));
   const concrete = stone.pillar;
+  const upperStructure = stone.upperStructure;
   const wallMat = stone.wall;
   const stairsMat = stone.stairs;
   const wood = mat(scene, "sanctuaryBoatWood", new Color3(.087,.052,.05));
@@ -170,11 +171,13 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
     stone.setPillarHeightFog(monolith, h);
     reflectors.push(monolith);
     // Very sparse concrete seams; no Gothic trim, no pointed spires.
-    slab(scene, `${stop.id}_ridge`, 65.8, 5.5, 67, [x, h * .28, z], black);
+    const ridge = slab(scene, `${stop.id}_ridge`, 65.8, 5.5, 67, [x, h * .28, z], upperStructure);
+    stone.setPillarHeightFog(ridge, h);
     for (const angle of [0, 1, 2, 3]) {
       const px = x + (angle % 2 ? 22 : -22);
       const pz = z + (angle < 2 ? -22 : 22);
-      slab(scene, `${stop.id}_orbPrison_${angle}`, 8, 30, 8, [px, h + 7, pz], black);
+      const cage = slab(scene, `${stop.id}_orbPrison_${angle}`, 8, 30, 8, [px, h + 7, pz], upperStructure);
+      stone.setPillarHeightFog(cage, h);
     }
     const sphere = MeshBuilder.CreateSphere(`${stop.id}_lightOrb`, { diameter: 15, segments: 12 }, scene);
     sphere.position.set(x, h + 17, z);

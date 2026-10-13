@@ -18,7 +18,7 @@ type HeightFogSettings = {
   ambientDensity: number;
 };
 
-// Opaque, per-fragment atmospheric blending leaves Babylon's depth and reflection passes intact.
+// Opaque, per-fragment atmospheric blending keeps Babylon's depth and reflection passes intact.
 class SanctuaryHeightFogPlugin extends MaterialPluginBase {
   private readonly perMesh = new WeakMap<AbstractMesh, HeightFogSettings>();
 
@@ -69,14 +69,13 @@ float sanctuaryNoise = sin(vPositionW.x * 0.018 + vPositionW.z * 0.011)
 float sanctuaryHeight = vPositionW.y + sanctuaryNoise;
 float sanctuaryFade = smoothstep(sanctuaryHeightFogRange.x - sanctuaryShift,
   sanctuaryHeightFogRange.y - sanctuaryShift, sanctuaryHeight) * sanctuaryHeightFogRange.w;
-// Match the clear-sky gradient behind the stone; the existing EXP2 pass still applies afterwards.
+// Match the clear-sky gradient behind the stone; EXP2 supplies the distance tint afterwards.
 vec3 sanctuaryRay = normalize(vPositionW - vEyePosition.xyz);
 float sanctuaryElevation = clamp(sanctuaryRay.y * 0.75 + 0.42, 0.0, 1.0);
 vec3 sanctuarySky = mix(vec3(0.16, 0.026, 0.034), vec3(0.30, 0.052, 0.055), sanctuaryElevation);
 float sanctuaryHorizon = 1.0 - smoothstep(0.0, 0.24, abs(sanctuaryRay.y));
 sanctuarySky = mix(sanctuarySky, vFogColor, sanctuaryHorizon * 0.8);
-vec3 sanctuaryAtmosphere = mix(sanctuarySky, vFogColor, sanctuaryDepthFog * 0.85);
-color.rgb = mix(color.rgb, sanctuaryAtmosphere, sanctuaryFade);
+color.rgb = mix(color.rgb, sanctuarySky, sanctuaryFade);
 #endif
 `,
     };
@@ -105,7 +104,13 @@ export function createSanctuaryStoneMaterials(scene: Scene, mobile: boolean, hei
   };
   const pillar = makeStone("sanctuaryMonolithicStone", 1.5, 3.0, .62, .23);
   const wall = makeStone("sanctuaryInfiniteStoneWall", 7.0, 12.0, .40, .0);
+  // Same near-field appearance as sanctuaryObsidan, isolated from hands, gate and doors.
+  const upperStructure = new StandardMaterial("sanctuaryUpperStructure", scene);
+  upperStructure.diffuseColor = new Color3(.017, .018, .022);
+  upperStructure.specularColor = new Color3(.02, .015, .013);
+  upperStructure.emissiveColor = Color3.Black();
   const pillarFog = heightFogEnabled ? new SanctuaryHeightFogPlugin(pillar) : null;
+  const upperStructureFog = heightFogEnabled ? new SanctuaryHeightFogPlugin(upperStructure) : null;
   if (heightFogEnabled) {
     new SanctuaryHeightFogPlugin(wall, {
       fogStartHeight: 360,
@@ -120,9 +125,12 @@ export function createSanctuaryStoneMaterials(scene: Scene, mobile: boolean, hei
     // Different UV scales because the wall's surface area is vastly larger.
     pillar,
     wall,
+    upperStructure,
     stairs: makeStone("sanctuarySolidStoneSteps", 2.0, 2.0, .46, .0),
     setPillarHeightFog(mesh: AbstractMesh, height: number) {
-      pillarFog?.setMesh(mesh, {
+      const fog = mesh.material === pillar ? pillarFog
+        : mesh.material === upperStructure ? upperStructureFog : null;
+      fog?.setMesh(mesh, {
         fogStartHeight: height * .38,
         fogEndHeight: height * .92,
         distanceInfluence: .20,

@@ -14,6 +14,7 @@ import { SANCTUARY_CONFIG as CFG, SANCTUARY_ASCENT as ASCENT, SANCTUARY_STOPS,
   sanctuaryFlightStartZ, type SanctuaryPillarId, type SanctuaryProgress } from "./SanctuaryLayout";
 import { createSanctuaryWater } from "./SanctuaryWater";
 import { createSanctuaryClouds, type SanctuaryCloudMode } from "./SanctuaryClouds";
+import { createSanctuaryPortalWaterfalls } from "./SanctuaryPortalWaterfalls";
 import { createSanctuaryStoneMaterials } from "./SanctuaryStone";
 import { createSanctuaryAtmosphere } from "./SanctuaryAtmosphere";
 
@@ -495,9 +496,28 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
     }
   }
   createStairParapets(scene, stone.parapet, foundationY);
-  // Future narrow cascades: x=-590..-530 and +530..+590, in front of the
-  // stepped stone facade, with open water before baseFrontZ for their impact.
-  // No cascade geometry or water changes belong to this phase.
+  const portalFalls = createSanctuaryPortalWaterfalls(scene, {
+    wallFrontZ: ASCENT.wallFrontZ,
+    baseFrontZ,
+    portalTopY: ASCENT.upperY + ASCENT.portalHeight,
+    riverY: CFG.riverY,
+    placeholderStone: wallMat,
+    lateralOffset: 560,
+    width: 22,
+    sourceRise: 225,
+    impactClearance: 32,
+    bendDrop: 96,
+    bendLip: 27,
+    meander: 1.0,
+    topNarrowing: 0.28,
+    bottomSpread: 0.22,
+    shapeChaos: 0.65,
+    edgeRaggedness: 0.44,
+    opacity: 0.91,
+    flowSpeed: 3.4,
+    quality: mobile ? "low" : "high",
+    enabled: params?.get("sanctuaryFalls") !== "off",
+  });
 
   // Sparse monumental rectangular pillars: each contains a story level, topped with a trapped orb.
   const orbs = new Map<SanctuaryPillarId, OrbVisual>();
@@ -574,6 +594,7 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
       atmosphere.update(elapsed);
       const cameraPosition = scene.activeCamera?.globalPosition ?? Vector3.Zero();
       clouds.update(elapsed, cameraPosition);
+      portalFalls.update(elapsed, cameraPosition);
       const bx = boatRoot.position.x;
       const bz = boatRoot.position.z;
       boatRoot.position.y = CFG.riverY + .10 + water.sampleHeight(bx, bz, elapsed);

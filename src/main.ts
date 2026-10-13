@@ -241,6 +241,9 @@ async function start() {
   }).register("theatre", async () => {
     const module = await import("./game/levels/theatre/createTheatreLevel");
     return module.createTheatreLevel;
+  }).register("sanctuary", async () => {
+    const module = await import("./game/levels/sanctuary/createSanctuaryLevel");
+    return module.createSanctuaryLevel;
   });
   let activeDebug: { dispose(): void } | null = null;
   let portalTransitionPending = false;
@@ -362,7 +365,9 @@ async function start() {
   const requestedLevel = import.meta.env.DEV
     ? new URLSearchParams(window.location.search).get("level")
     : null;
-  const initialLevelId: LevelId = requestedLevel === "theatre" ? "theatre" : "forest";
+  const initialLevelId: LevelId = requestedLevel === "sanctuary"
+    ? "sanctuary"
+    : requestedLevel === "theatre" ? "theatre" : "forest";
   if (import.meta.env.DEV) {
     const debugWindow = window as Window & {
       __bosqueLevelDebug?: {

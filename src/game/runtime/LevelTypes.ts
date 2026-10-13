@@ -7,7 +7,7 @@ import type { PlayerStatsSystem } from "../PlayerStatsSystem";
 import type { CursorController } from "../input/CursorController";
 import type { InputManager } from "../input/InputManager";
 
-export type LevelId = "forest" | "theatre";
+export type LevelId = "forest" | "theatre" | "sanctuary";
 
 export type PerformanceTier = "desktop" | "mobile";
 

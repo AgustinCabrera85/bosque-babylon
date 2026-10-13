@@ -41,6 +41,24 @@ void main(void) {
 }
 `;
 
+// Smooth trilinear value noise: two samples replace the former stack of
+// projected 2D noises, avoiding sheet-like contours at similar shader cost.
+const NOISE_3D = `
+float hash31(vec3 p) {
+  return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);
+}
+float noise3(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  float x00 = mix(hash31(i), hash31(i + vec3(1.0, 0.0, 0.0)), f.x);
+  float x10 = mix(hash31(i + vec3(0.0, 1.0, 0.0)), hash31(i + vec3(1.0, 1.0, 0.0)), f.x);
+  float x01 = mix(hash31(i + vec3(0.0, 0.0, 1.0)), hash31(i + vec3(1.0, 0.0, 1.0)), f.x);
+  float x11 = mix(hash31(i + vec3(0.0, 1.0, 1.0)), hash31(i + vec3(1.0, 1.0, 1.0)), f.x);
+  return mix(mix(x00, x10, f.y), mix(x01, x11, f.y), f.z);
+}
+`;
+
 function fragmentShader(steps: number) {
   return `
 precision highp float;
@@ -53,47 +71,32 @@ uniform float uDensity;
 uniform float uWindSpeed;
 uniform float uCloudScale;
 
-// Interpolated value noise; no 3D texture asset or compute shader required.
-float hash21(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-}
-float noise2(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  f = f*f*(3.0-2.0*f);
-  float a = hash21(i);
-  float b = hash21(i+vec2(1.0,0.0));
-  float c = hash21(i+vec2(0.0,1.0));
-  float d = hash21(i+vec2(1.0,1.0));
-  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
-}
-float noise3Approx(vec3 p) {
-  // Broad current and finer counter-currents evolve at different rates.
-  return 0.54 * noise2(p.xz * 0.70 + p.y * 0.13)
-       + 0.30 * noise2(p.zy * 1.34 + p.x * 0.09 + uTime * vec2(-0.019, 0.011))
-       + 0.16 * noise2(p.xy * 2.17 + p.z * 0.06 + uTime * vec2(0.014, -0.016));
-}
+${NOISE_3D}
 float densityAt(vec3 worldP) {
   vec3 q = worldP * uCloudScale;
   q.x += uTime * uWindSpeed;
-  q.z -= uTime * uWindSpeed * 0.57;
-  q.y += sin(q.x * 0.53 + uTime * 0.021) * 0.18;
-  float warp = noise2(q.xz * 0.47 + uTime * vec2(-0.007, 0.004) + vec2(3.1, -1.7)) - 0.5;
-  q += vec3(warp * 0.80, warp * 0.17, warp * 0.55);
-  float n = noise3Approx(q);
-  // Above the monolith bases, below the unseen top of the mural.
-  float bottom = smoothstep(250.0, 640.0, worldP.y);
-  float top = 1.0 - smoothstep(1820.0, 2900.0, worldP.y);
-  float threshold = 0.49 + warp * 0.09;
-  return smoothstep(threshold - 0.14, threshold + 0.14, n) * bottom * top;
+  q.z -= uTime * uWindSpeed * 0.37;
+  q += 0.16 * vec3(
+    sin(q.z * 0.52 + uTime * 0.012),
+    sin(q.x * 0.43 - uTime * 0.010),
+    cos(q.y * 0.41 + uTime * 0.008)
+  );
+  float broad = noise3(q * 0.72);
+  float detail = noise3(q * 1.56 + uTime * vec3(-0.007, 0.004, 0.009));
+  float n = broad * 0.74 + detail * 0.26;
+  float bottom = smoothstep(250.0, 760.0, worldP.y);
+  float top = 1.0 - smoothstep(1750.0, 2950.0, worldP.y);
+  return smoothstep(0.22, 0.78, n) * 0.72 * bottom * top;
 }
 void main(void) {
   vec3 direction = normalize(vWorldPos - uCameraPosition);
   float elevation = clamp(direction.y * 0.75 + 0.42, 0.0, 1.0);
   vec3 sky = mix(vec3(0.16, 0.026, 0.034), vec3(0.30, 0.052, 0.055), elevation);
+  float horizon = 1.0 - smoothstep(0.0, 0.24, abs(direction.y));
+  sky = mix(sky, vec3(0.26, 0.05, 0.055), horizon * 0.8);
   float upward = max(direction.y, 0.0);
-  if (upward > 0.025) {
-    // The cloud sheet is a world-height bounded density volume, not a 2D sprite.
+  if (upward > 0.01) {
+    // Bounded world-space density rendered only in the sky, behind scene meshes.
     float entry = max(0.0, (240.0 - uCameraPosition.y) / upward);
     float endDist = min(8500.0, (3000.0 - uCameraPosition.y) / upward);
     float travel = max(0.0, endDist - entry);
@@ -104,15 +107,14 @@ void main(void) {
       float t = entry + (float(i) + 0.5) * stride;
       vec3 p = uCameraPosition + direction * t;
       float d = densityAt(p);
-      float extinction = clamp(d * uDensity * stride * 0.0068, 0.0, 0.75);
-      // Brighter red where the cloud layer is more tenuous; black in dense folds.
-      vec3 smoke = mix(uCloudColor, uShadowColor, smoothstep(0.22, 0.82, d));
-      float scatter = extinction * transmission;
-      radiance += smoke * scatter;
-      transmission *= (1.0 - extinction);
+      float opticalDepth = min(d * uDensity * stride * 0.0024, 4.0);
+      float stepTransmission = exp(-opticalDepth);
+      vec3 smoke = mix(uCloudColor, uShadowColor, clamp(d * 1.15, 0.0, 0.88));
+      radiance += smoke * transmission * (1.0 - stepTransmission);
+      transmission *= stepTransmission;
       if (transmission < 0.035) break;
     }
-    float horizonMask = smoothstep(0.025, 0.125, upward);
+    float horizonMask = smoothstep(0.01, 0.24, upward);
     sky = mix(sky, sky * transmission + radiance, horizonMask);
   }
   // A faint gradient prevents the horizon from reading as a featureless void.
@@ -130,33 +132,21 @@ uniform vec3 uCameraPosition;
 uniform vec3 uCloudColor;
 uniform vec3 uShadowColor;
 uniform float uTime;
-float hash21(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-}
-float noise2(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  f = f*f*(3.0-2.0*f);
-  float a = hash21(i);
-  float b = hash21(i+vec2(1.0,0.0));
-  float c = hash21(i+vec2(0.0,1.0));
-  float d = hash21(i+vec2(1.0,1.0));
-  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
-}
+${NOISE_3D}
 void main(void) {
   vec3 direction = normalize(vWorldPos - uCameraPosition);
   float elevation = clamp(direction.y * 0.75 + 0.42, 0.0, 1.0);
   vec3 sky = mix(vec3(0.16, 0.026, 0.034), vec3(0.30, 0.052, 0.055), elevation);
-  vec3 q = direction * 3.8;
-  q.x += uTime * 0.014;
-  q.z -= uTime * 0.011;
-  float warp = noise2(q.xz * 0.55 + q.y * 0.13) - 0.5;
-  float broad = noise2(q.xz + q.y * 0.26 + vec2(warp * 0.32, -warp * 0.23));
-  float fine = noise2(q.zy * 1.85 + q.x * 0.11 + uTime * vec2(-0.013, 0.009));
-  float density = smoothstep(0.40, 0.68, broad * 0.65 + fine * 0.35 + warp * 0.08);
-  float upperSky = smoothstep(-0.08, 0.34, direction.y);
-  vec3 smoke = mix(uCloudColor, uShadowColor, smoothstep(0.25, 0.90, density));
-  sky = mix(sky, smoke, density * upperSky * 0.72);
+  float horizon = 1.0 - smoothstep(0.0, 0.24, abs(direction.y));
+  sky = mix(sky, vec3(0.26, 0.05, 0.055), horizon * 0.8);
+  vec3 q = direction * 3.4 + uTime * vec3(0.008, 0.002, -0.006);
+  q += 0.10 * sin(q.zxy * 0.7 + uTime * vec3(0.007, -0.006, 0.009));
+  float broad = noise3(q * 0.92);
+  float detail = noise3(q * 1.75 + uTime * vec3(-0.005, 0.004, 0.006));
+  float density = smoothstep(0.22, 0.78, broad * 0.72 + detail * 0.28);
+  float upperSky = smoothstep(-0.12, 0.42, direction.y);
+  vec3 smoke = mix(uCloudColor, uShadowColor, density * 0.55);
+  sky = mix(sky, smoke, density * upperSky * 0.55);
   gl_FragColor = vec4(max(sky, vec3(0.003)), 1.0);
 }
 `;
@@ -181,8 +171,8 @@ export function createSanctuaryClouds(scene: Scene, options: SanctuaryCloudsOpti
   let shader: ShaderMaterial | null = null;
   if (mode !== "off") {
     const quality = options.quality ?? "standard";
-    const key = mode === "layered" ? "sanctuarySkyLayeredV3"
-      : quality === "high" ? "sanctuarySkyVolumeHighV3" : "sanctuarySkyVolumeV3";
+    const key = mode === "layered" ? "sanctuarySkyLayeredV4"
+      : quality === "high" ? "sanctuarySkyVolumeHighV4" : "sanctuarySkyVolumeV4";
     Effect.ShadersStore[`${key}VertexShader`] = VERTEX;
     Effect.ShadersStore[`${key}FragmentShader`] = mode === "layered"
       ? layeredFragmentShader() : fragmentShader(quality === "high" ? 20 : 12);
@@ -195,11 +185,11 @@ export function createSanctuaryClouds(scene: Scene, options: SanctuaryCloudsOpti
     shader.disableDepthWrite = true;
     shader.setVector3("uCameraPosition", Vector3.Zero());
     shader.setFloat("uTime", 0);
-    shader.setFloat("uDensity", quality === "high" ? 1.07 : 0.91);
-    shader.setFloat("uWindSpeed", 0.028);
-    shader.setFloat("uCloudScale", 0.0053);
-    shader.setColor3("uCloudColor", new Color3(0.68, 0.078, 0.086));
-    shader.setColor3("uShadowColor", new Color3(0.035, 0.004, 0.010));
+    shader.setFloat("uDensity", 0.92);
+    shader.setFloat("uWindSpeed", 0.014);
+    shader.setFloat("uCloudScale", 0.0047);
+    shader.setColor3("uCloudColor", new Color3(0.58, 0.074, 0.078));
+    shader.setColor3("uShadowColor", new Color3(0.042, 0.008, 0.014));
     dome.material = shader;
   } else {
     const flat = new StandardMaterial("sanctuarySkyFallbackMaterial", scene);

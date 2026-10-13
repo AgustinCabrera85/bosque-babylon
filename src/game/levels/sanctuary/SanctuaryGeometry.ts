@@ -114,7 +114,7 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
   });
   // The local smoke sheets remain a complementary low-altitude effect.
   const atmosphere = createSanctuaryAtmosphere(scene, mobile, clouds.mode === "volumetric" ? 0.43 : clouds.mode === "off" ? 0 : 1);
-  const stone = createSanctuaryStoneMaterials(scene, mobile);
+  const stone = createSanctuaryStoneMaterials(scene, mobile, params?.get("sanctuaryHeightFog") !== "off");
   const reflectors: AbstractMesh[] = [];
   const water = createSanctuaryWater(scene, mobile || params?.get("sanctuaryWater") === "lite");
   const black = mat(scene, "sanctuaryObsidan", new Color3(.017,.018,.022));
@@ -166,7 +166,9 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
     const x = stop.x + stop.side * 166;
     const z = stop.z + 54;
     const h = stop.height;
-    reflectors.push(slab(scene, `${stop.id}_monolith`, 65, h, 66, [x, h / 2 - 6, z], concrete));
+    const monolith = slab(scene, `${stop.id}_monolith`, 65, h, 66, [x, h / 2 - 6, z], concrete);
+    stone.setPillarHeightFog(monolith, h);
+    reflectors.push(monolith);
     // Very sparse concrete seams; no Gothic trim, no pointed spires.
     slab(scene, `${stop.id}_ridge`, 65.8, 5.5, 67, [x, h * .28, z], black);
     for (const angle of [0, 1, 2, 3]) {

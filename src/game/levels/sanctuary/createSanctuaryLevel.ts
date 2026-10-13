@@ -19,8 +19,9 @@ import {
 type VoyageState = "sailing" | "moored" | "ashore";
 type RoutePoint = { x: number; z: number };
 const BOAT_START: RoutePoint = { x: 0, z: CFG.boatStartZ };
+const boatDockX = (stop: SanctuaryStop) => stop.x - stop.side * 16;
 const ROUTE: RoutePoint[] = [
-  ...SANCTUARY_STOPS.map(({ x, z }) => ({ x, z })),
+  ...SANCTUARY_STOPS.map((stop) => ({ x: boatDockX(stop), z: stop.z })),
   { x: 0, z: CFG.gateStopZ },
 ];
 const isFinalStop = (index: number) => index === SANCTUARY_STOPS.length;
@@ -41,9 +42,11 @@ function createDockWorld(getStage: () => { index: number; state: VoyageState }):
   }
   return {
     getTerrainHeight(x, z) { return this.getWalkableSurfaceHeight(x, z); },
-    getWalkableSurfaceHeight(_x, z) {
+    getWalkableSurfaceHeight(x, z) {
       const { index } = getStage();
-      return isFinalStop(index) ? riseAt(z) : 2.05;
+      if (isFinalStop(index)) return finalAllowed(x, z) ? riseAt(z) : CFG.riverY;
+      const stop = SANCTUARY_STOPS[index];
+      return stop && dockAllowed(x, z, stop) ? 2.05 : CFG.riverY;
     },
     isColliding(x, z, clearance = 0) {
       const { index, state } = getStage();
@@ -135,6 +138,7 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
       gravity: -18,
       jumpingEnabled: false,
       runningEnabled: true,
+      horizontalWorldLimit: null,
     }, context.selectedCharacter);
     player.position.set(0, CFG.boatDeckY + CFG.eyeHeight, CFG.boatStartZ - 1.6);
     player.camera.maxZ = 14500;
@@ -151,8 +155,14 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
         geometry.boatRoot.position.y + CFG.boatDeckY + CFG.eyeHeight,
         geometry.boatRoot.position.z - 1.6);
     };
+    const updateAboardCamera = () => {
+      if (!context.input.isGameplayInputEnabled()) return;
+      const look = context.input.getLook();
+      if (look.x !== 0 || look.y !== 0) player.applyLookDelta(look.x, look.y);
+      if (context.input.wasPressed("changeCamera")) player.toggleViewMode();
+    };
     const embark = () => {
-      if (isFinalStop(targetIndex)) return;
+      if (isFinalStop(targetIndex)) return false;
       const previous = ROUTE[targetIndex];
       targetIndex += 1;
       boatFrom = { x: previous.x, z: previous.z };
@@ -160,7 +170,8 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
       routeT = 0;
       routeDuration = Math.max(1, Math.hypot(next.x - previous.x, next.z - previous.z) / CFG.boatSpeed);
       state = "sailing";
-      movePlayerOntoBoat();
+      player.settleLocomotionToIdle();
+      return true;
     };
     const disembark = () => {
       if (isFinalStop(targetIndex)) {
@@ -193,17 +204,22 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
         const next = ROUTE[targetIndex];
         geometry.boatRoot.position.x = boatFrom.x + (next.x - boatFrom.x) * t;
         geometry.boatRoot.position.z = boatFrom.z + (next.z - boatFrom.z) * t;
+        geometry.update(dt, elapsed, progress);
         movePlayerOntoBoat();
+        updateAboardCamera();
         hud.setText("El río conduce la balsa entre los pilares de sombra...");
         if (routeT >= 1) state = "moored";
       } else if (state === "moored") {
+        geometry.update(dt, elapsed, progress);
         movePlayerOntoBoat();
+        updateAboardCamera();
         const name = isFinalStop(targetIndex)
           ? "El umbral del Santuario"
           : SANCTUARY_STOPS[targetIndex].title;
         hud.setText(`${name}  ·  ${context.input.getActionBindingLabel("interact") ?? "E"}: desembarcar`);
         if (context.input.wasPressed("interact")) disembark();
       } else {
+        let embarked = false;
         player.update(dt, playerWorld);
         const atGate = isFinalStop(targetIndex);
         const stop = atGate ? null : SANCTUARY_STOPS[targetIndex];
@@ -222,11 +238,12 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
             // Defer disposal-triggering transitions outside this scene update frame.
             queueMicrotask(() => context.requestLevelTransition(stop.destination!, "sanctuary-pillar"));
           } else if (!nearPortal) {
-            embark();
+            embarked = embark();
           }
         }
+        geometry.update(dt, elapsed, progress);
+        if (embarked) movePlayerOntoBoat();
       }
-      geometry.update(dt, elapsed, progress);
       context.musicPlayer?.updateListenerPosition(player.position);
     };
     context.onProgress(1, "Santuario disponible (prototipo)");
@@ -234,6 +251,21 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     return {
       id: "sanctuary",
       scene,
+      enter() {
+        const musicPlayer = context.musicPlayer;
+        if (!musicPlayer) return;
+        scene.onAfterRenderObservable.addOnce(() => {
+          const startMusicTimer = window.setTimeout(() => {
+            if (scene.isDisposed) return;
+            musicPlayer.configureLevelAudio({
+              backgroundTrack: "assets/audio/music/Sobre_Rios_de_Sangre_y_Sombras.mp3",
+              ambientTrack: null,
+              waterfallArea: null,
+            });
+          }, 0);
+          cleanup.push(() => window.clearTimeout(startMusicTimer));
+        });
+      },
       update,
       dispose() {
         if (disposed) return;

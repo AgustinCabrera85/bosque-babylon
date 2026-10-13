@@ -50,6 +50,7 @@ type Settings = {
   gravity: number;
   runningEnabled?: boolean;
   jumpingEnabled?: boolean;
+  horizontalWorldLimit?: number | null;
 };
 
 export function resolveRunningRequest(
@@ -521,6 +522,25 @@ export class PlayerController {
 
   getRegisteredAnimationNames() {
     return [...this.animations.keys()];
+  }
+
+  /** Settle an externally driven player without enabling movement or physics. */
+  settleLocomotionToIdle() {
+    this.updateMovementSfx("idle");
+    if (this.controlsLocked || this.actionPlaying) return;
+
+    const idle = this.playAnimation("idle", true, this.takeLocomotionBlendTime());
+    if (!idle || !this.fadeFromAnimation) return;
+
+    const observer = this.scene.onBeforeRenderObservable.add(() => {
+      if (this.actionPlaying || this.currentAnimation !== idle.name) {
+        this.scene.onBeforeRenderObservable.remove(observer);
+        return;
+      }
+      const dt = Math.min(0.05, Math.max(1 / 120, this.scene.getEngine().getDeltaTime() / 1000));
+      this.updateAnimationFade(dt);
+      if (!this.fadeFromAnimation) this.scene.onBeforeRenderObservable.remove(observer);
+    });
   }
 
   onViewModeChange(listener: (mode: ViewMode) => void) {
@@ -1454,10 +1474,14 @@ export class PlayerController {
       }
     }
 
-    const maxX = 60;
+    const maxX = this.settings.horizontalWorldLimit === undefined
+      ? 60
+      : this.settings.horizontalWorldLimit;
     const margin = 0.25;
-    if (this.root.position.x > maxX - margin) this.root.position.x = maxX - margin;
-    if (this.root.position.x < -maxX + margin) this.root.position.x = -maxX + margin;
+    if (maxX !== null) {
+      if (this.root.position.x > maxX - margin) this.root.position.x = maxX - margin;
+      if (this.root.position.x < -maxX + margin) this.root.position.x = -maxX + margin;
+    }
 
     this.refreshWaterEnvironment(world);
     this.refreshWaterLocomotionState();

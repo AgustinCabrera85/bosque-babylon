@@ -38,7 +38,10 @@ const wait = (milliseconds: number) =>
 const nextFrame = () =>
   new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
+let lastLoadingStage = "Inicializando";
+
 function setLoading(value: number, text: string) {
+  lastLoadingStage = text;
   if (loadingText) loadingText.textContent = text;
   if (loadingBar) loadingBar.style.width = `${Math.round(value * 100)}%`;
 }
@@ -558,8 +561,10 @@ async function start() {
 }
 
 start().catch((error) => {
-  console.error("No se pudo iniciar la escena", error);
-  setLoading(1, "No se pudo iniciar la escena");
+  const failedStage = lastLoadingStage;
+  console.error(`No se pudo iniciar la escena (etapa: ${failedStage})`, error);
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  setLoading(0, `No se pudo iniciar: ${errorMessage}`);
 });
 
 window.addEventListener("resize", () => engine.resize());

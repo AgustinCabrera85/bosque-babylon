@@ -47,15 +47,16 @@ function slab(scene: Scene, name: string, width: number, height: number, depth: 
 function roughStoneSkin(scene: Scene, name: string, x: number, z: number,
   height: number, index: number, material: StandardMaterial) {
   type Corner = [number, number, number];
+  type SurfacePoint = { along: number; elevation: number; xyz: Corner };
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
   const quad = (a: Corner, b: Corner, c: Corner, d: Corner,
     u0: number, u1: number, v0: number, v1: number) => {
-    const start = positions.length / 3;
-    for (const point of [a, b, c, d]) positions.push(...point);
+    const first = positions.length / 3;
+    for (const vertex of [a, b, c, d]) positions.push(...vertex);
     uvs.push(u0, v0, u0, v1, u1, v1, u1, v0);
-    indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+    indices.push(first, first + 1, first + 2, first, first + 2, first + 3);
   };
   const grain = (seed: number) => {
     const value = Math.sin(seed * 12.9898) * 43758.5453;
@@ -68,8 +69,8 @@ function roughStoneSkin(scene: Scene, name: string, x: number, z: number,
     if (side === 2) return [32.5 - along, y, 33 + relief];
     return [-32.5 - relief, y, 33 - along];
   };
-  // Long basalt-like ribs, split into uneven blocks. All relief is shallow and
-  // the original closed box behind the joints remains fully opaque.
+  // Retain the original six strips and staggered blocks. Subdivide each face
+  // so its seams, shallow hollows and raised areas curve instead of forming slots.
   for (let side = 0; side < 4; side++) {
     const span = side % 2 === 0 ? 65 : 66;
     for (let strip = 0; strip < 6; strip++) {
@@ -81,36 +82,66 @@ function roughStoneSkin(scene: Scene, name: string, x: number, z: number,
         const top = Math.min(height, start + pitch - .7);
         if (top - bottom < 8) continue;
         const seed = index * 101 + side * 29 + strip * 11 + block * 3;
+        const phase = seed * .173;
         const left = strip * span / 6 + .5 + .7 * grain(seed + 1);
         const right = (strip + 1) * span / 6 - .5 - .7 * grain(seed + 2);
-        const middle = (left + right) / 2 + .5 * (grain(seed + 3) - .5);
         const depth = .65 + 1.4 * grain(seed + 4);
-        const ridge = depth + .25 + .45 * grain(seed + 5);
-        const lowLeft = bottom + 1.1 * grain(seed + 6);
-        const lowRight = bottom + 1.1 * grain(seed + 7);
-        const highLeft = top - 1.3 * grain(seed + 8);
-        const highRight = top - 1.3 * grain(seed + 9);
-        const frontLB = point(side, left, lowLeft, depth);
-        const frontLT = point(side, left, highLeft, depth);
-        const frontMB = point(side, middle, (lowLeft + lowRight) / 2, ridge);
-        const frontMT = point(side, middle, (highLeft + highRight) / 2, ridge);
-        const frontRB = point(side, right, lowRight, depth);
-        const frontRT = point(side, right, highRight, depth);
-        const backLB = point(side, left - .4, lowLeft, .08);
-        const backLT = point(side, left - .4, highLeft, .08);
-        const backRB = point(side, right + .4, lowRight, .08);
-        const backRT = point(side, right + .4, highRight, .08);
-        const u0 = left / span;
-        const um = middle / span;
-        const u1 = right / span;
-        const v0 = bottom / height;
-        const v1 = top / height;
-        quad(frontLB, frontLT, frontMT, frontMB, u0, um, v0, v1);
-        quad(frontMB, frontMT, frontRT, frontRB, um, u1, v0, v1);
-        quad(backLB, backLT, frontLT, frontLB, u0, u0, v0, v1);
-        quad(frontRB, frontRT, backRT, backRB, u1, u1, v0, v1);
-        quad(frontLT, backLT, backRT, frontRT, u0, u1, v1, v1);
-        quad(backLB, frontLB, frontRB, backRB, u0, u1, v0, v0);
+        const columns = 3;
+        const rows = 3;
+        const first = positions.length / 3;
+        const grid: SurfacePoint[][] = [];
+        for (let row = 0; row <= rows; row++) {
+          const v = row / rows;
+          const gridRow: SurfacePoint[] = [];
+          for (let column = 0; column <= columns; column++) {
+            const u = column / columns;
+            const leftBend = .38 * Math.sin(v * 4.1 + phase);
+            const rightBend = .38 * Math.sin(v * 3.6 + phase * 1.3);
+            const along = left + (right - left) * u + leftBend * (1 - u) + rightBend * u
+              + .22 * Math.sin(u * 5 + v * 3 + phase) * Math.sin(Math.PI * u);
+            const low = bottom + 1.1 * grain(seed + 6) + .65 * Math.sin(u * 3.2 + phase);
+            const high = top - 1.3 * grain(seed + 8) + .65 * Math.sin(u * 3.4 + phase * 1.2);
+            const elevation = low + (high - low) * v
+              + .55 * Math.sin(u * 4 + v * 3.2 + phase) * Math.sin(Math.PI * v);
+            const relief = Math.max(.24, depth + .45 * Math.sin(Math.PI * u)
+              + .4 * Math.sin(u * 3.7 + v * 3.1 + phase)
+              + .24 * Math.sin(u * 6.3 - v * 2.4 + phase * 1.7));
+            const xyz = point(side, along, elevation, relief);
+            gridRow.push({ along, elevation, xyz });
+            positions.push(...xyz);
+            uvs.push(along / span, elevation / height);
+          }
+          grid.push(gridRow);
+        }
+        for (let row = 0; row < rows; row++) {
+          for (let column = 0; column < columns; column++) {
+            const a = first + row * (columns + 1) + column;
+            const b = a + columns + 1;
+            indices.push(a, b, b + 1, a, b + 1, a + 1);
+          }
+        }
+        const back = (vertex: SurfacePoint, shift = 0) =>
+          point(side, vertex.along + shift, vertex.elevation, .08);
+        for (let row = 0; row < rows; row++) {
+          const leftA = grid[row][0];
+          const leftB = grid[row + 1][0];
+          const rightA = grid[row][columns];
+          const rightB = grid[row + 1][columns];
+          quad(back(leftA, -.4), back(leftB, -.4), leftB.xyz, leftA.xyz,
+            leftA.along / span, leftB.along / span, leftA.elevation / height, leftB.elevation / height);
+          quad(rightA.xyz, rightB.xyz, back(rightB, .4), back(rightA, .4),
+            rightA.along / span, rightB.along / span, rightA.elevation / height, rightB.elevation / height);
+        }
+        for (let column = 0; column < columns; column++) {
+          const lowA = grid[0][column];
+          const lowB = grid[0][column + 1];
+          const highA = grid[rows][column];
+          const highB = grid[rows][column + 1];
+          quad(back(lowA), lowA.xyz, lowB.xyz, back(lowB),
+            lowA.along / span, lowB.along / span, lowA.elevation / height, lowB.elevation / height);
+          quad(highA.xyz, back(highA), back(highB), highB.xyz,
+            highA.along / span, highB.along / span, highA.elevation / height, highB.elevation / height);
+        }
       }
     }
   }

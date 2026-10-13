@@ -72,12 +72,12 @@ float sanctuaryNoise = sin(vPositionW.x * 0.018 + vPositionW.z * 0.011)
 float sanctuaryHeight = vPositionW.y + sanctuaryNoise;
 float sanctuaryFade = smoothstep(sanctuaryHeightFogRange.x - sanctuaryShift,
   sanctuaryHeightFogRange.y - sanctuaryShift, sanctuaryHeight) * sanctuaryHeightFogRange.w;
-// Match the clear-sky gradient behind the stone; EXP2 supplies the distance tint afterwards.
+// Match the dark clear-sky gradient behind the stone; EXP2 supplies the distance tint afterwards.
 vec3 sanctuaryRay = normalize(vPositionW - vEyePosition.xyz);
 float sanctuaryElevation = clamp(sanctuaryRay.y * 0.75 + 0.42, 0.0, 1.0);
-vec3 sanctuarySky = mix(vec3(0.16, 0.026, 0.034), vec3(0.30, 0.052, 0.055), sanctuaryElevation);
+vec3 sanctuarySky = mix(vec3(0.075, 0.009, 0.014), vec3(0.19, 0.027, 0.03), sanctuaryElevation);
 float sanctuaryHorizon = 1.0 - smoothstep(0.0, 0.24, abs(sanctuaryRay.y));
-sanctuarySky = mix(sanctuarySky, vFogColor, sanctuaryHorizon * 0.8);
+sanctuarySky = mix(sanctuarySky, vec3(0.18, 0.028, 0.032), sanctuaryHorizon * 0.75);
 color.rgb = mix(color.rgb, sanctuarySky, sanctuaryFade);
 #endif
 `,

@@ -501,6 +501,7 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
     baseFrontZ,
     portalTopY: ASCENT.upperY + ASCENT.portalHeight,
     riverY: CFG.riverY,
+    sampleWaterHeight: water.sampleHeight,
     placeholderStone: wallMat,
     lateralOffset: 560,
     width: 22,
@@ -514,7 +515,6 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
     shapeChaos: 0.65,
     edgeRaggedness: 0.44,
     opacity: 0.91,
-    flowSpeed: 3.4,
     quality: mobile ? "low" : "high",
     enabled: params?.get("sanctuaryFalls") !== "off",
   });

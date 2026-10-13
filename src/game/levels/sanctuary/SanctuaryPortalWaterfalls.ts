@@ -1,4 +1,5 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
+import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Effect } from "@babylonjs/core/Materials/effect";
@@ -20,8 +21,7 @@ import type { Scene } from "@babylonjs/core/scene";
  * The placeholder is intentionally removable: mount the future gargoyle GLB
  * under the exported gargoyleMount, then call setPlaceholderVisible(false).
  *
- * No mist, spray, splash, audio, water RTT additions or global postprocess.
- * Inspiration: flowing distorted waterfall meshes (#3RXC7T#2); original code.
+ * The local impact effect uses two surface patches and bounded spray pools.
  */
 export type SanctuaryFallsQuality = "low" | "high";
 export type SanctuaryFallSide = "left" | "right";
@@ -48,8 +48,18 @@ export interface SanctuaryPortalWaterfallsOptions {
   /** Perforated stone socket is replaced later by a gargoyle GLB. */
   showPlaceholders?: boolean;
   quality?: SanctuaryFallsQuality;
-  /** Visual flow speed, not physical simulation speed. */
+  /** Legacy single speed override; prefer lipFlowSpeed/fallFlowSpeed. */
   flowSpeed?: number;
+  lipFlowSpeed?: number;
+  fallFlowSpeed?: number;
+  splashOpacity?: number;
+  splashRadius?: number;
+  splashHeight?: number;
+  sprayParticleRate?: number;
+  mistDriftSpeed?: number;
+  impactPulseStrength?: number;
+  /** Returns displacement above riverY at a world position. */
+  sampleWaterHeight?: (x: number, z: number, elapsedSeconds: number) => number;
   /** Horizontal drift of the stream; 1 is restrained. */
   meander?: number;
   /** Narrow the top of the stream, e.g. 0.28. */
@@ -77,7 +87,7 @@ export interface SanctuaryFallSource {
   gargoyleMount: TransformNode;
   /** World-space location where the falling liquid visibly exits the socket. */
   mouthPosition: Vector3;
-  /** World-space impact position reserved for later splash / ripple integration. */
+  /** World-space impact position shared by the stream and local splash. */
   impactPosition: Vector3;
   /** Removes the placeholder only; the water flow remains. */
   setPlaceholderVisible(visible: boolean): void;
@@ -97,6 +107,36 @@ const SMOOTH = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
+// World-space scale and animation controls for both impacts.
+const FALLS_TUNING = {
+  lipFlowSpeed: 5.5,
+  fallFlowSpeed: 16.0,
+  splashOpacity: 0.65,
+  splashRadius: 9,
+  splashHeight: 5,
+  sprayParticleRate: 35,
+  mistDriftSpeed: 0.4,
+  impactPulseStrength: 0.25,
+} as const;
+
+// The integral of smoothstep keeps phase and its velocity continuous across
+// the curved lip (ending at t=0.19) and the vertical fall.
+const FLOW_PHASE = `
+uniform float uLipFlowSpeed;
+uniform float uFallFlowSpeed;
+float flowPhase(float t) {
+  float start = 0.10;
+  float finish = 0.28;
+  float width = finish - start;
+  float s = clamp((t - start) / width, 0.0, 1.0);
+  float transitionIntegral = width * (s*s*s - 0.5*s*s*s*s);
+  float integral = t <= start ? 0.0 :
+    (t < finish ? transitionIntegral : 0.5*width + t - finish);
+  float ratio = uLipFlowSpeed / max(uFallFlowSpeed, 0.001);
+  return 76.0 * (t - (1.0 - ratio) * integral) - uTime * uLipFlowSpeed;
+}
+`;
+
 const VERTEX = `
 precision highp float;
 attribute vec3 position;
@@ -106,6 +146,7 @@ uniform mat4 world;
 uniform mat4 worldViewProjection;
 uniform float uTime;
 uniform float uRipple;
+${FLOW_PHASE}
 varying vec2 vUV;
 varying vec3 vWorld;
 varying vec3 vNormal;
@@ -114,10 +155,12 @@ void main(void) {
   // A little surface motion in 3D; the base mesh already contains the full bend.
   float body = smoothstep(0.015, 0.12, uv.y) * (1.0 - smoothstep(0.97, 1.0, uv.y));
   float angle = uv.x * 6.2831853;
-  float waveA = sin(uv.y * 84.0 - uTime * 1.75 + 2.7 * sin(angle));
-  float waveB = sin(uv.y * 141.0 - uTime * 2.24 - 3.1 * cos(angle * 2.0));
-  p.x += (waveA * 0.72 + waveB * 0.28) * body * uRipple;
-  p.z += (waveB * 0.70 + waveA * 0.30) * body * uRipple * 0.6;
+  float flow = flowPhase(uv.y);
+  float waveA = sin(flow * (84.0 / 76.0) + 2.7 * sin(angle));
+  float waveB = sin(flow * (141.0 / 76.0) - 3.1 * cos(angle * 2.0));
+  float turbulence = 1.0 + 0.18 * smoothstep(0.19, 0.42, uv.y);
+  p.x += (waveA * 0.72 + waveB * 0.28) * body * uRipple * turbulence;
+  p.z += (waveB * 0.70 + waveA * 0.30) * body * uRipple * 0.6 * turbulence;
   vWorld = (world * vec4(p, 1.0)).xyz;
   vNormal = normalize((world * vec4(normal, 0.0)).xyz);
   vUV = uv;
@@ -131,7 +174,7 @@ varying vec2 vUV;
 varying vec3 vWorld;
 varying vec3 vNormal;
 uniform float uTime;
-uniform float uFlowSpeed;
+${FLOW_PHASE}
 uniform float uEdgeRaggedness;
 uniform float uOpacity;
 uniform float uTopY;
@@ -151,7 +194,7 @@ float noise2(vec2 p) {
 }
 void main(void) {
   // Positive UV.y points DOWN. Subtracting time carries the pattern downwards.
-  float flow = vUV.y * 76.0 - uTime * uFlowSpeed;
+  float flow = flowPhase(vUV.y);
   float angle = vUV.x * 6.2831853;
   vec2 circumference = vec2(cos(angle), sin(angle));
   vec2 p = vec2(circumference.x * 7.5 + flow * 0.03,
@@ -183,6 +226,109 @@ void main(void) {
   alpha *= (0.75 + 0.25 * variation) * (1.0 - 0.42 * fog);
   if (alpha < 0.015) discard;
   gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.96));
+}
+`;
+
+const IMPACT_VERTEX = `
+precision highp float;
+attribute vec3 position;
+uniform mat4 world;
+uniform mat4 worldViewProjection;
+varying vec2 vLocal;
+varying vec3 vWorld;
+void main(void) {
+  vLocal = position.xz;
+  vWorld = (world * vec4(position, 1.0)).xyz;
+  gl_Position = worldViewProjection * vec4(position, 1.0);
+}
+`;
+
+const IMPACT_FRAGMENT = `
+precision highp float;
+varying vec2 vLocal;
+varying vec3 vWorld;
+uniform float uTime;
+uniform float uRadius;
+uniform float uOpacity;
+uniform float uDriftSpeed;
+uniform float uPulseStrength;
+uniform float uFogDensity;
+uniform vec3 uCameraPosition;
+uniform vec3 uFogColor;
+float hash21(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+float noise2(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  return mix(mix(hash21(i), hash21(i+vec2(1.0,0.0)), f.x),
+             mix(hash21(i+vec2(0.0,1.0)), hash21(i+vec2(1.0,1.0)), f.x), f.y);
+}
+void main(void) {
+  float radius = length(vLocal);
+  float angle = atan(vLocal.y, vLocal.x);
+  float drift = uTime * uDriftSpeed;
+  float noise = noise2(vLocal * 0.32 + vec2(drift, -drift*0.63));
+  float center = 1.0 - smoothstep(uRadius*0.10, uRadius*0.70,
+    radius + (noise-0.5)*uRadius*0.22);
+  float churning = 0.56 + 0.44 * noise2(vLocal*0.75 - vec2(drift*1.9, drift));
+  float waves = 0.0;
+  for (int i = 0; i < 2; i++) {
+    float age = fract(uTime*0.45 + float(i)*0.5);
+    float irregular = uRadius * (0.038*sin(angle*7.0 + drift*2.3 + float(i)*2.1)
+      + 0.021*sin(angle*11.0 - drift*1.5));
+    float ringRadius = uRadius * (0.14 + 0.78*age) + irregular;
+    float difference = (radius - ringRadius) / (uRadius * 0.105);
+    waves += exp(-difference*difference*2.0) * (1.0-age) * (0.72 + 0.28*noise);
+  }
+  float pulse = 1.0 + uPulseStrength * sin(uTime*5.2 + radius*0.7);
+  float alpha = uOpacity * (0.55*center*churning*pulse + 0.59*waves);
+  alpha *= 1.0 - smoothstep(uRadius*0.90, uRadius*1.22, radius);
+  if (alpha < 0.012) discard;
+  vec3 color = mix(vec3(0.11, 0.009, 0.016), vec3(0.39, 0.034, 0.047),
+    clamp(0.33 + 0.45*churning + 0.30*waves, 0.0, 1.0));
+  float fog = clamp(1.0-exp(-length(uCameraPosition-vWorld)*uFogDensity*0.16), 0.0, 0.28);
+  color = mix(color, uFogColor, fog);
+  gl_FragColor = vec4(color, min(alpha*(1.0-0.22*fog), 0.70));
+}
+`;
+
+const SPRAY_VERTEX = `
+precision highp float;
+attribute vec3 position;
+attribute vec2 uv;
+attribute vec4 color;
+uniform mat4 world;
+uniform mat4 worldViewProjection;
+varying vec2 vUV;
+varying vec4 vColor;
+varying vec3 vWorld;
+void main(void) {
+  vUV = uv;
+  vColor = color;
+  vWorld = (world * vec4(position, 1.0)).xyz;
+  gl_Position = worldViewProjection * vec4(position, 1.0);
+}
+`;
+
+const SPRAY_FRAGMENT = `
+precision highp float;
+varying vec2 vUV;
+varying vec4 vColor;
+varying vec3 vWorld;
+uniform float uFogDensity;
+uniform vec3 uCameraPosition;
+uniform vec3 uFogColor;
+void main(void) {
+  float side = 1.0 - smoothstep(0.22, 0.51, abs(vUV.x-0.5));
+  float lengthFade = smoothstep(0.02, 0.32, vUV.y) *
+    (1.0-smoothstep(0.70, 1.0, vUV.y));
+  float alpha = vColor.a * side * lengthFade;
+  if (alpha < 0.012) discard;
+  float fog = clamp(1.0-exp(-length(uCameraPosition-vWorld)*uFogDensity*0.16), 0.0, 0.28);
+  vec3 color = mix(vColor.rgb, uFogColor, fog);
+  gl_FragColor = vec4(color, alpha*(1.0-0.22*fog));
 }
 `;
 
@@ -280,6 +426,141 @@ function makeFallMesh(scene: Scene, id: SanctuaryFallSide, settings: {
 }
 
 const FLOW_SHADER_KEY = "sanctuaryPortalFalls3dV1";
+const IMPACT_SHADER_KEY = "sanctuaryPortalFallsImpactV1";
+const SPRAY_SHADER_KEY = "sanctuaryPortalFallsSprayV1";
+
+function createImpactPatch(scene: Scene, id: SanctuaryFallSide, position: Vector3,
+  radius: number, riverY: number, quality: SanctuaryFallsQuality,
+  sampleWaterHeight: (x: number, z: number, t: number) => number,
+  material: ShaderMaterial) {
+  const mesh = MeshBuilder.CreateGround(`sanctuaryFallImpact_${id}`, {
+    width: radius * 2.5, height: radius * 2.5,
+    subdivisions: quality === "high" ? 12 : 7,
+    updatable: true,
+  }, scene);
+  mesh.position.set(position.x, 0, position.z);
+  mesh.material = material;
+  mesh.isPickable = false;
+  mesh.alwaysSelectAsActiveMesh = true;
+  mesh.renderingGroupId = 0;
+  const vertices = mesh.getVerticesData(VertexBuffer.PositionKind)!;
+  const update = (time: number) => {
+    position.y = riverY + sampleWaterHeight(position.x, position.z, time);
+    for (let i = 0; i < vertices.length; i += 3) {
+      vertices[i + 1] = riverY + sampleWaterHeight(
+        position.x + vertices[i], position.z + vertices[i + 2], time) + 0.12;
+    }
+    mesh.updateVerticesData(VertexBuffer.PositionKind, vertices);
+  };
+  update(0);
+  return { mesh, update };
+}
+
+type SprayParticle = {
+  active: boolean;
+  age: number;
+  life: number;
+  x: number;
+  z: number;
+  vx: number;
+  vz: number;
+  vy: number;
+  size: number;
+  shade: number;
+};
+
+function createSprayPool(scene: Scene, id: SanctuaryFallSide, position: Vector3,
+  quality: SanctuaryFallsQuality, radius: number, height: number, rate: number,
+  opacity: number, material: ShaderMaterial) {
+  const capacity = quality === "high" ? 72 : 32;
+  const mesh = new Mesh(`sanctuaryFallSpray_${id}`, scene);
+  const positions = new Array<number>(capacity * 12).fill(0);
+  const colors = new Array<number>(capacity * 16).fill(0);
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  const particles: SprayParticle[] = [];
+  for (let i = 0; i < capacity; i++) {
+    const vertex = i * 4;
+    uvs.push(0, 0, 1, 0, 0, 1, 1, 1);
+    indices.push(vertex, vertex + 1, vertex + 2, vertex + 1, vertex + 3, vertex + 2);
+    particles.push({ active: false, age: 0, life: 0, x: 0, z: 0,
+      vx: 0, vz: 0, vy: 0, size: 0, shade: 0 });
+  }
+  const data = new VertexData();
+  data.positions = positions;
+  data.colors = colors;
+  data.uvs = uvs;
+  data.indices = indices;
+  data.applyToMesh(mesh, true);
+  mesh.material = material;
+  mesh.isPickable = false;
+  mesh.alwaysSelectAsActiveMesh = true;
+  mesh.renderingGroupId = 0;
+  let randomState = id === "left" ? 0x54a72b13 : 0x6c39e285;
+  const random = () => {
+    randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
+    return randomState / 4294967296;
+  };
+  let birthAccumulator = 0;
+  let nextSlot = 0;
+  const update = (dt: number, camera: Vector3) => {
+    const dx = camera.x - position.x;
+    const dz = camera.z - position.z;
+    const distance = Math.hypot(dx, dz);
+    const rightX = distance > 0.001 ? dz / distance : 1;
+    const rightZ = distance > 0.001 ? -dx / distance : 0;
+    const detail = quality === "high" ? 1 : 0.55;
+    const distanceDetail = distance > 850 ? 0.45 : distance > 450 ? 0.7 : 1;
+    birthAccumulator = Math.min(4, birthAccumulator + dt * rate * detail * distanceDetail);
+    let births = Math.min(4, Math.floor(birthAccumulator));
+    birthAccumulator -= births;
+    while (births-- > 0) {
+      const p = particles[nextSlot];
+      nextSlot = (nextSlot + 1) % capacity;
+      const angle = random() * TAU;
+      const lateral = 1.8 + random() * (radius * 0.48);
+      p.active = true;
+      p.age = 0;
+      p.vy = 7 + random() * Math.sqrt(60 * height) * 0.65;
+      p.life = Math.min(1.1, p.vy / 30 * (1.45 + random() * 0.35));
+      p.x = (random() - 0.5) * 2.2;
+      p.z = (random() - 0.5) * 2.2;
+      p.vx = Math.cos(angle) * lateral;
+      p.vz = Math.sin(angle) * lateral;
+      p.size = 0.34 + random() * 0.62;
+      p.shade = 0.65 + random() * 0.35;
+    }
+    for (let i = 0; i < capacity; i++) {
+      const p = particles[i];
+      p.age += dt;
+      if (p.age >= p.life) p.active = false;
+      const age = p.age;
+      const y = position.y + 0.2 + p.vy*age - 15*age*age;
+      const x = position.x + p.x + p.vx*age;
+      const z = position.z + p.z + p.vz*age;
+      const halfWidth = p.size * 0.5;
+      const halfHeight = p.size * (0.65 + 0.28 * Math.max(0, p.vy - 30*age) / 15);
+      const base = i * 12;
+      for (let corner = 0; corner < 4; corner++) {
+        const side = corner % 2 === 0 ? -1 : 1;
+        const top = corner >= 2 ? 1 : -1;
+        const index = base + corner * 3;
+        positions[index] = x + side * rightX * halfWidth;
+        positions[index + 1] = y + top * halfHeight;
+        positions[index + 2] = z + side * rightZ * halfWidth;
+        const ci = i * 16 + corner * 4;
+        colors[ci] = 0.38 * p.shade;
+        colors[ci + 1] = 0.026 * p.shade;
+        colors[ci + 2] = 0.040 * p.shade;
+        colors[ci + 3] = p.active ? opacity * 0.8 *
+          SMOOTH(0, 0.12, age) * (1 - SMOOTH(0.55, 1, age / p.life)) : 0;
+      }
+    }
+    mesh.updateVerticesData(VertexBuffer.PositionKind, positions);
+    mesh.updateVerticesData(VertexBuffer.ColorKind, colors);
+  };
+  return { mesh, update, capacity };
+}
 
 export function createSanctuaryPortalWaterfalls(
   scene: Scene,
@@ -303,19 +584,66 @@ export function createSanctuaryPortalWaterfalls(
   const bendLip = Math.max(12, Math.min(55, options.bendLip ?? 27));
   const edge = SAT(options.edgeRaggedness ?? 0.44);
   const tint = options.color ?? new Color3(0.42, 0.068, 0.079);
+  const lipFlowSpeed = Math.max(0.1, options.lipFlowSpeed ?? options.flowSpeed ?? FALLS_TUNING.lipFlowSpeed);
+  const fallFlowSpeed = Math.max(lipFlowSpeed, options.fallFlowSpeed ??
+    (options.flowSpeed === undefined ? FALLS_TUNING.fallFlowSpeed : options.flowSpeed * 2.9));
+  const splashOpacity = SAT(options.splashOpacity ?? FALLS_TUNING.splashOpacity);
+  const splashRadius = Math.max(2, options.splashRadius ?? FALLS_TUNING.splashRadius);
+  const splashHeight = Math.max(0.5, options.splashHeight ?? FALLS_TUNING.splashHeight);
+  const sprayParticleRate = Math.max(0, options.sprayParticleRate ?? FALLS_TUNING.sprayParticleRate);
+  const mistDriftSpeed = Math.max(0, options.mistDriftSpeed ?? FALLS_TUNING.mistDriftSpeed);
+  const impactPulseStrength = SAT(options.impactPulseStrength ?? FALLS_TUNING.impactPulseStrength);
+  const sampleWaterHeight = options.sampleWaterHeight ?? (() => 0);
 
   Effect.ShadersStore[`${FLOW_SHADER_KEY}VertexShader`] = VERTEX;
   Effect.ShadersStore[`${FLOW_SHADER_KEY}FragmentShader`] = FRAGMENT;
+  Effect.ShadersStore[`${IMPACT_SHADER_KEY}VertexShader`] = IMPACT_VERTEX;
+  Effect.ShadersStore[`${IMPACT_SHADER_KEY}FragmentShader`] = IMPACT_FRAGMENT;
+  Effect.ShadersStore[`${SPRAY_SHADER_KEY}VertexShader`] = SPRAY_VERTEX;
+  Effect.ShadersStore[`${SPRAY_SHADER_KEY}FragmentShader`] = SPRAY_FRAGMENT;
 
   const mouthDark = new StandardMaterial("sanctuaryFallSocketDark", scene);
   mouthDark.diffuseColor = new Color3(0.007, 0.004, 0.010);
   mouthDark.specularColor = Color3.Black();
   const shaderMaterials: ShaderMaterial[] = [];
   const meshes: Mesh[] = [];
+  const impactPatches: ReturnType<typeof createImpactPatch>[] = [];
+  const sprayPools: ReturnType<typeof createSprayPool>[] = [];
   const mounts: TransformNode[] = [];
   const sources: SanctuaryFallSource[] = [];
   let enabled = options.enabled !== false;
   let disposed = false;
+  let previousTime: number | undefined;
+
+  const impactMaterial = new ShaderMaterial("sanctuaryFallImpact", scene, IMPACT_SHADER_KEY, {
+    attributes: ["position"],
+    uniforms: ["world", "worldViewProjection", "uTime", "uRadius", "uOpacity",
+      "uDriftSpeed", "uPulseStrength", "uFogDensity", "uCameraPosition", "uFogColor"],
+    needAlphaBlending: true,
+  });
+  impactMaterial.backFaceCulling = false;
+  impactMaterial.disableDepthWrite = true;
+  impactMaterial.alphaMode = Engine.ALPHA_COMBINE;
+  impactMaterial.setFloat("uTime", 0);
+  impactMaterial.setFloat("uRadius", splashRadius);
+  impactMaterial.setFloat("uOpacity", splashOpacity);
+  impactMaterial.setFloat("uDriftSpeed", mistDriftSpeed);
+  impactMaterial.setFloat("uPulseStrength", impactPulseStrength);
+  impactMaterial.setFloat("uFogDensity", scene.fogDensity);
+  impactMaterial.setVector3("uCameraPosition", Vector3.Zero());
+  impactMaterial.setColor3("uFogColor", scene.fogColor);
+
+  const sprayMaterial = new ShaderMaterial("sanctuaryFallSpray", scene, SPRAY_SHADER_KEY, {
+    attributes: ["position", "uv", "color"],
+    uniforms: ["world", "worldViewProjection", "uFogDensity", "uCameraPosition", "uFogColor"],
+    needAlphaBlending: true,
+  });
+  sprayMaterial.backFaceCulling = false;
+  sprayMaterial.disableDepthWrite = true;
+  sprayMaterial.alphaMode = Engine.ALPHA_COMBINE;
+  sprayMaterial.setFloat("uFogDensity", scene.fogDensity);
+  sprayMaterial.setVector3("uCameraPosition", Vector3.Zero());
+  sprayMaterial.setColor3("uFogColor", scene.fogColor);
 
   for (const id of ["left", "right"] as const) {
     const x = id === "left" ? -xOffset : xOffset;
@@ -349,7 +677,7 @@ export function createSanctuaryPortalWaterfalls(
     meshes.push(mesh);
     const key = new ShaderMaterial(`sanctuaryFallFlow_${id}`, scene, FLOW_SHADER_KEY, {
       attributes: ["position", "normal", "uv"],
-      uniforms: ["world", "worldViewProjection", "uTime", "uRipple", "uFlowSpeed",
+      uniforms: ["world", "worldViewProjection", "uTime", "uRipple", "uLipFlowSpeed", "uFallFlowSpeed",
         "uEdgeRaggedness", "uOpacity", "uTopY", "uFogDensity", "uCameraPosition",
         "uTint", "uFogColor"],
       needAlphaBlending: true,
@@ -358,7 +686,9 @@ export function createSanctuaryPortalWaterfalls(
     key.disableDepthWrite = true;
     key.alphaMode = Engine.ALPHA_COMBINE;
     key.setFloat("uRipple", quality === "high" ? 0.32 : 0.16);
-    key.setFloat("uFlowSpeed", (options.flowSpeed ?? 3.4) * (id === "left" ? 0.96 : 1.04));
+    const speedVariation = id === "left" ? 0.96 : 1.04;
+    key.setFloat("uLipFlowSpeed", lipFlowSpeed * speedVariation);
+    key.setFloat("uFallFlowSpeed", fallFlowSpeed * speedVariation);
     key.setFloat("uEdgeRaggedness", edge);
     key.setFloat("uOpacity", opacity);
     key.setFloat("uTopY", topY);
@@ -382,29 +712,48 @@ export function createSanctuaryPortalWaterfalls(
     };
     source.setPlaceholderVisible(options.showPlaceholders !== false);
     sources.push(source);
+    impactPatches.push(createImpactPatch(scene, id, source.impactPosition,
+      splashRadius, riverY, quality, sampleWaterHeight, impactMaterial));
+    sprayPools.push(createSprayPool(scene, id, source.impactPosition,
+      quality, splashRadius, splashHeight, sprayParticleRate, splashOpacity, sprayMaterial));
   }
 
   const handle: SanctuaryPortalWaterfallsHandle = {
     sources,
     update(elapsedSeconds, cameraWorldPosition) {
       if (disposed || !enabled) return;
+      const dt = previousTime === undefined ? 0 : Math.max(0, Math.min(0.1, elapsedSeconds - previousTime));
+      previousTime = elapsedSeconds;
       for (const mat of shaderMaterials) {
         mat.setFloat("uTime", elapsedSeconds);
         mat.setVector3("uCameraPosition", cameraWorldPosition);
+      }
+      impactMaterial.setFloat("uTime", elapsedSeconds);
+      impactMaterial.setVector3("uCameraPosition", cameraWorldPosition);
+      sprayMaterial.setVector3("uCameraPosition", cameraWorldPosition);
+      for (let i = 0; i < impactPatches.length; i++) {
+        impactPatches[i].update(elapsedSeconds);
+        sprayPools[i].update(dt, cameraWorldPosition);
       }
     },
     setEnabled(value) {
       if (disposed) return;
       enabled = value;
       for (const mesh of meshes) mesh.setEnabled(value);
+      for (const patch of impactPatches) patch.mesh.setEnabled(value);
+      for (const spray of sprayPools) spray.mesh.setEnabled(value);
       for (const mount of mounts) mount.setEnabled(value);
     },
     dispose() {
       if (disposed) return;
       disposed = true;
       for (const mesh of meshes) if (!mesh.isDisposed()) mesh.dispose();
+      for (const patch of impactPatches) if (!patch.mesh.isDisposed()) patch.mesh.dispose();
+      for (const spray of sprayPools) if (!spray.mesh.isDisposed()) spray.mesh.dispose();
       for (const mount of mounts) if (!mount.isDisposed()) mount.dispose(false, false);
       for (const mat of shaderMaterials) mat.dispose();
+      impactMaterial.dispose();
+      sprayMaterial.dispose();
       mouthDark.dispose();
     },
   };

@@ -9,6 +9,7 @@ import { setupPlayerViewControls } from "../../PlayerViewControls";
 import { setupMobileControls } from "../../MobileControls";
 import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
 import { createSanctuaryGeometry } from "./SanctuaryGeometry";
+import { createSanctuaryShadowHands } from "./SanctuaryShadowHands";
 import {
   readSanctuaryProgress,
   SANCTUARY_CONFIG as CFG,
@@ -122,7 +123,12 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     upperRed.intensity = .7;
 
     let progress = readSanctuaryProgress();
-    const geometry = createSanctuaryGeometry(scene, progress, context.performanceTier === "mobile");
+    const geometry = await createSanctuaryGeometry(scene, progress, context.performanceTier === "mobile");
+    const shadowHands = await createSanctuaryShadowHands(scene).catch((error: unknown) => {
+      console.warn("Sanctuary shadow hands unavailable", error);
+      return null;
+    });
+    if (shadowHands) cleanup.push(shadowHands.dispose);
     context.onProgress(.62, "Reconociendo las columnas cautivas...");
     const hud = createSanctuaryHud();
     cleanup.push(hud.dispose);
@@ -134,7 +140,6 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     let routeDuration = Math.hypot(ROUTE[0].x - BOAT_START.x, ROUTE[0].z - BOAT_START.z) / CFG.boatSpeed;
     let elapsed = 0;
     let refreshProgressSeconds = 0;
-    let transitionQueued = false;
     const playerWorld = createDockWorld(() => ({ index: targetIndex, state }));
 
     const player = new PlayerController(scene, context.canvas, context.input, {
@@ -147,7 +152,9 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
       runningEnabled: true,
       horizontalWorldLimit: null,
     }, context.selectedCharacter);
-    player.position.set(0, CFG.boatDeckY + CFG.eyeHeight, CFG.boatStartZ - 1.6);
+    const raftRiderZ = -1.2; // Stand in the open floor space between the cross seats.
+    player.position.set(0, geometry.boatRoot.position.y + CFG.boatDeckY + CFG.eyeHeight,
+      CFG.boatStartZ + raftRiderZ);
     player.camera.maxZ = 14500;
     await player.loadCharacter();
     cleanup.push(setupPlayerViewControls(player));
@@ -160,7 +167,7 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     const movePlayerOntoBoat = () => {
       player.position.set(geometry.boatRoot.position.x,
         geometry.boatRoot.position.y + CFG.boatDeckY + CFG.eyeHeight,
-        geometry.boatRoot.position.z - 1.6);
+        geometry.boatRoot.position.z + raftRiderZ);
     };
     const updateAboardCamera = () => {
       if (!context.input.isGameplayInputEnabled()) return;
@@ -234,23 +241,15 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
         if (atGate) {
           hud.setText("El portal del Santuario permanece sellado. El desenlace se implementará más adelante.");
         } else if (nearPortal) {
-          const action = stop.destination ? `entrar a «${stop.title}»` : "explorar (pendiente de creación)";
-          hud.setText(`${stop.title}  ·  ${context.input.getActionBindingLabel("interact") ?? "E"}: ${action}`);
+          hud.setText(`${stop.title}  ·  El portal aún no responde.`);
         } else {
           hud.setText(`${stop?.title ?? ""}  ·  ${context.input.getActionBindingLabel("interact") ?? "E"}: volver a la balsa`);
         }
-        if (context.input.wasPressed("interact") && !transitionQueued) {
-          if (nearPortal && stop?.destination) {
-            transitionQueued = true;
-            // Defer disposal-triggering transitions outside this scene update frame.
-            queueMicrotask(() => context.requestLevelTransition(stop.destination!, "sanctuary-pillar"));
-          } else if (!nearPortal) {
-            embarked = embark();
-          }
-        }
+        if (context.input.wasPressed("interact") && !nearPortal) embarked = embark();
         geometry.update(dt, elapsed, progress);
         if (embarked) movePlayerOntoBoat();
       }
+      shadowHands?.update(elapsed);
       context.musicPlayer?.updateListenerPosition(player.position);
     };
     context.onProgress(1, "Santuario disponible (prototipo)");

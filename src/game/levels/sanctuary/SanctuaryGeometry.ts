@@ -1,3 +1,4 @@
+import "@babylonjs/loaders/glTF";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -6,15 +7,20 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { MaterialPluginBase } from "@babylonjs/core/Materials/materialPluginBase";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import type { Scene } from "@babylonjs/core/scene";
+import { asset } from "../../../utils/asset";
 import { SANCTUARY_CONFIG as CFG, SANCTUARY_ASCENT as ASCENT, SANCTUARY_STOPS,
   sanctuaryFlightStartZ, type SanctuaryPillarId, type SanctuaryProgress } from "./SanctuaryLayout";
 import { createSanctuaryWater } from "./SanctuaryWater";
 import { createSanctuaryClouds, type SanctuaryCloudMode } from "./SanctuaryClouds";
 import { createSanctuaryPortalWaterfalls } from "./SanctuaryPortalWaterfalls";
+import { createSanctuaryLevelPortals } from "./SanctuaryLevelPortals";
 import { createSanctuaryStoneMaterials } from "./SanctuaryStone";
 import { createSanctuaryAtmosphere } from "./SanctuaryAtmosphere";
 
@@ -272,26 +278,6 @@ function createStairParapets(scene: Scene, material: StandardMaterial, foundatio
   parapets.receiveShadows = false;
 }
 
-function createShadowHand(scene: Scene, x: number, z: number, scale: number, shadow: StandardMaterial) {
-  const root = new TransformNode(`shadowHand_${x}_${z}`, scene);
-  root.position.set(x, CFG.riverY - 3, z);
-  root.rotation.y = (x + z) * .029;
-  slab(scene, "shadowPalm", 4.0 * scale, 8 * scale, 2.4 * scale, [0, 4 * scale, 0], shadow, root);
-  for (let n = 0; n < 4; n++) {
-    const finger = MeshBuilder.CreateCylinder(`shadowFinger_${n}`, {
-      height: (10 + (n % 2) * 4) * scale,
-      diameterTop: .12 * scale,
-      diameterBottom: 1.7 * scale,
-      tessellation: 5,
-    }, scene);
-    finger.parent = root;
-    finger.position.set((n - 1.5) * 1.2 * scale, (12 + (n % 2) * 2) * scale, 0);
-    finger.rotation.z = (n - 1.5) * .24;
-    finger.material = shadow;
-    finger.isPickable = false;
-  }
-}
-
 // One continuous ground: 10-unit cells along the whole raft route and wider
 // cells in the distant mist. The outer rim still reaches the old 5000x5000
 // footprint; there are no overlapping water planes or per-frame mesh updates.
@@ -335,7 +321,7 @@ function createAdaptiveWaterGround(scene: Scene): Mesh {
   return water;
 }
 
-export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgress, mobile: boolean): SanctuaryGeometry {
+export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgress, mobile: boolean): Promise<SanctuaryGeometry> {
   const params = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
   const skyTest = params?.get("sanctuaryClouds");
   const mode = skyTest === "off" || skyTest === "layered" || skyTest === "volumetric"
@@ -356,7 +342,6 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
   const wallMat = stone.wall;
   const stairsMat = stone.stairs;
   new SanctuaryLateralBrumePlugin(wallMat);
-  const wood = mat(scene, "sanctuaryBoatWood", new Color3(.087,.052,.05));
   const ember = mat(scene, "sanctuaryPortalEmber", new Color3(.42,.045,.031), new Color3(.32,.037,.024));
   const gold = mat(scene, "sanctuaryCagedLight", new Color3(.95,.68,.38), new Color3(.9,.64,.35));
   const freed = mat(scene, "sanctuaryFreedLight", new Color3(.55,.67,.9), new Color3(.27,.39,.69));
@@ -371,6 +356,7 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
   redWater.position.y = CFG.riverY;
   redWater.material = water.material;
   redWater.isPickable = false;
+  water.addSurfaceDetail(redWater);
 
   // Top of wall is geometrically thousands of metres high and swallowed by red atmosphere.
   const wallHalfWidth = 24000;
@@ -556,28 +542,63 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
     light.setEnabled(false);
     orbs.set(stop.id, { sphere, halo, light, home: sphere.position.clone() });
 
-    // Reachable landing for future LevelGate interactions.
+    // Reachable landing for the level portal scenery.
     const dockX = stop.x + stop.side * 27;
     slab(scene, `${stop.id}_landing`, 55, 2.5, 60, [dockX, .8, stop.z], concrete);
     slab(scene, `${stop.id}_pier`, 45, 1.6, 22, [stop.x + stop.side * 13, .65, stop.z], stairsMat);
-    slab(scene, `${stop.id}_doorSlab`, 4, 16, 24, [stop.x + stop.side * 51, 8.5, stop.z + 8], black);
-    slab(scene, `${stop.id}_doorGlow`, 1.2, 10, 10, [stop.x + stop.side * 49, 7.5, stop.z + 8], ember);
   }
+  const levelPortals = await createSanctuaryLevelPortals(scene, SANCTUARY_STOPS);
 
-  // Uncanny, organic shadows: deliberately sparse to keep the entrance and stairway clear.
-  [
-    [-310, -260, 1.35], [300, -30, 1.6], [-355, 190, 1.4],
-    [345, 420, 1.8], [-385, 670, 2.1], [380, 915, 1.4]
-  ].forEach(([x, z, s]) => createShadowHand(scene, x, z, s, black));
-
-  // A spare wooden raft with enough space for the existing character model.
+  // Keep the established route and water response; only replace its visual raft.
   const boatRoot = new TransformNode("sanctuaryBoat", scene);
-  slab(scene, "raftDeck", 7.4, .6, 11.3, [0, .35, 0], wood, boatRoot);
-  for (const x of [-3.7, 3.7]) {
-    slab(scene, "raftRail", .25, .9, 10.5, [x, 1.05, 0], wood, boatRoot);
+  boatRoot.position.set(0, CFG.riverY + .25, CFG.boatStartZ);
+  const raft = await SceneLoader.LoadAssetContainerAsync(
+    asset("assets/models/sanctuary/"), "Balsa_Oscura.glb", scene);
+  if (scene.isDisposed) {
+    raft.dispose();
+    throw new Error("The sanctuary closed while loading its raft.");
   }
-  for (const z of [-5.1, 5.1]) slab(scene, "raftEnd", 7.5, .4, .5, [0, .74, z], wood, boatRoot);
-  boatRoot.position.set(0, CFG.riverY + .05, CFG.boatStartZ);
+  const raftVisual = new TransformNode("sanctuaryRaftVisual", scene);
+  raftVisual.parent = boatRoot;
+  // The GLB's long axis is X. Turn its raised prow toward the next stop.
+  // Uniform scale preserves the narrow hull and tall prow of the source model.
+  raftVisual.rotation.y = -Math.PI / 2;
+  raftVisual.scaling.setAll(12);
+  raftVisual.position.y = -.23;
+  raft.addAllToScene();
+  for (const root of raft.rootNodes) root.parent = raftVisual;
+  // Keep the model's wood grain, but remove the wet-looking PBR highlights.
+  for (const material of raft.materials) {
+    if (!(material instanceof PBRMaterial)) continue;
+    material.metallic = 0;
+    material.roughness = 1;
+    material.specularIntensity = 0.04;
+    material.environmentIntensity = 0;
+    material.clearCoat.isEnabled = false;
+  }
+  for (const mesh of raft.meshes) {
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+  }
+
+  // The imported hull has a low inner floor. Wave crests can render over it,
+  // exposing a red rectangle between the cross planks. A recessed, matte wood
+  // liner closes that area while remaining below the player's standing height.
+  const innerFloor = MeshBuilder.CreateGround("sanctuaryRaftInnerFloor",
+    { width: 1.9, height: 6.2 }, scene);
+  innerFloor.parent = boatRoot;
+  innerFloor.position.y = .45;
+  innerFloor.isPickable = false;
+  innerFloor.checkCollisions = false;
+  const innerFloorMat = new StandardMaterial("sanctuaryRaftInnerWood", scene);
+  const innerWood = new Texture(asset("assets/textures/theatre/stage/wooden-scenario-floor-texture.png"), scene);
+  innerWood.wAng = Math.PI / 2;
+  innerWood.uScale = 1.5;
+  innerWood.vScale = 2.5;
+  innerFloorMat.diffuseTexture = innerWood;
+  innerFloorMat.diffuseColor = new Color3(.24, .20, .18);
+  innerFloorMat.specularColor = Color3.Black();
+  innerFloor.material = innerFloorMat;
 
   // Render-to-texture reflections only include a small, stable scene subset.
   // Excluding the water itself is essential: otherwise it reflects its own RTT.
@@ -595,9 +616,10 @@ export function createSanctuaryGeometry(scene: Scene, progress: SanctuaryProgres
       const cameraPosition = scene.activeCamera?.globalPosition ?? Vector3.Zero();
       clouds.update(elapsed, cameraPosition);
       portalFalls.update(elapsed, cameraPosition);
+      levelPortals.update(elapsed);
       const bx = boatRoot.position.x;
       const bz = boatRoot.position.z;
-      boatRoot.position.y = CFG.riverY + .10 + water.sampleHeight(bx, bz, elapsed);
+      boatRoot.position.y = CFG.riverY + .25 + water.sampleHeight(bx, bz, elapsed);
       const leftH = water.sampleHeight(bx - 3.7, bz, elapsed);
       const rightH = water.sampleHeight(bx + 3.7, bz, elapsed);
       const frontH = water.sampleHeight(bx, bz + 5.5, elapsed);

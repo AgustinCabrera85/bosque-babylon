@@ -21,7 +21,7 @@ export const SANCTUARY_STOPS: readonly SanctuaryStop[] = [
 
 export const SANCTUARY_CONFIG = {
   riverY: -0.26,
-  boatDeckY: 0.65,
+  boatDeckY: 0.45,
   boatStartZ: -355,
   gateStopZ: 1190,
   gateWallZ: 2180,

@@ -644,6 +644,61 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
     quality: mobile ? "low" : "high",
     enabled: params?.get("sanctuaryFalls") !== "off",
   });
+  const gargoyleAsset = await SceneLoader.LoadAssetContainerAsync(
+    asset("assets/models/sanctuary/"), "Gargola1.glb", scene);
+  if (scene.isDisposed) {
+    gargoyleAsset.dispose();
+    throw new Error("The sanctuary closed while loading its waterfall gargoyles.");
+  }
+  gargoyleAsset.addAllToScene();
+  const gargoyleSource = gargoyleAsset.rootNodes[0];
+  if (!(gargoyleSource instanceof TransformNode)) {
+    throw new Error("The waterfall gargoyle has no root transform.");
+  }
+  const gargoyleBounds = gargoyleSource.getHierarchyBoundingVectors(true);
+  const gargoyleScale = 82 / (gargoyleBounds.max.y - gargoyleBounds.min.y);
+  const gargoyleCenterX = (gargoyleBounds.min.x + gargoyleBounds.max.x) / 2;
+  for (const material of gargoyleAsset.materials) {
+    if (!(material instanceof PBRMaterial)) continue;
+    material.albedoColor = new Color3(.28, .28, .28);
+    material.emissiveColor = Color3.Black();
+    material.metallic = 0;
+    material.roughness = 1;
+    material.specularIntensity = .04;
+    material.environmentIntensity = .03;
+    material.backFaceCulling = false; // The left statue has a mirrored X scale.
+    material.fogEnabled = false;
+    new SanctuaryMainPortalHazePlugin(material);
+  }
+  for (const fall of portalFalls.sources) {
+    // The stone perch reaches into the wall and carries the gargoyle's feet.
+    // The crimson stream emerges just beyond its river-facing lip.
+    const perch = MeshBuilder.CreateBox(`sanctuaryGargoylePerch_${fall.id}`,
+      { width: 68, height: 12, depth: 54 }, scene);
+    perch.parent = fall.gargoyleMount;
+    perch.position.set(0, -6, -16);
+    perch.material = wallMat;
+    perch.isPickable = false;
+    perch.checkCollisions = false;
+
+    const root = new TransformNode(`sanctuaryGargoyle_${fall.id}`, scene);
+    root.parent = fall.gargoyleMount;
+    const mirror = fall.id === "left" ? -1 : 1;
+    root.scaling.set(mirror * gargoyleScale, gargoyleScale, gargoyleScale);
+    root.position.set(-mirror * gargoyleCenterX * gargoyleScale,
+      -gargoyleBounds.min.y * gargoyleScale - .35,
+      -42 - gargoyleBounds.min.z * gargoyleScale);
+    // Tripo's +Z is its face; the waterfall mount already turns it toward the river.
+    const statue = fall.id === "right" ? gargoyleSource
+      : gargoyleSource.clone("sanctuaryGargoyleMirroredModel", root);
+    if (!statue) throw new Error("Could not mirror the left waterfall gargoyle.");
+    statue.parent = root;
+    for (const mesh of statue.getChildMeshes()) {
+      mesh.isPickable = false;
+      mesh.checkCollisions = false;
+    }
+    fall.setPlaceholderVisible(false);
+  }
 
   // Sparse monumental rectangular pillars: each contains a story level, topped with a trapped orb.
   const orbs = new Map<SanctuaryPillarId, OrbVisual>();

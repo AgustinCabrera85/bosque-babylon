@@ -18,8 +18,8 @@ import type { Scene } from "@babylonjs/core/scene";
  * The upper centerline is a cubic Bezier emerging from a stone placeholder:
  * it turns outwards above the wall, then becomes a mostly vertical stream.
  *
- * The placeholder is intentionally removable: mount the future gargoyle GLB
- * under the exported gargoyleMount, then call setPlaceholderVisible(false).
+ * The placeholder is intentionally removable: the gargoyle scenery attaches
+ * to gargoyleMount, then hides the temporary socket.
  *
  * The local impact effect uses two surface patches and bounded spray pools.
  */
@@ -89,7 +89,7 @@ export interface SanctuaryPortalWaterfallsOptions {
 
 export interface SanctuaryFallSource {
   id: SanctuaryFallSide;
-  /** Local origin / socket. Attach gargoyle GLBs here in the future. */
+  /** Local origin / socket for the gargoyle scenery. */
   gargoyleMount: TransformNode;
   /** World-space location where the falling liquid visibly exits the socket. */
   mouthPosition: Vector3;

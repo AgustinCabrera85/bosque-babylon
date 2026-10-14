@@ -60,8 +60,8 @@ void main(void) {
   float range = length(uCameraPosition.xz - vWorld.xz);
   float distanceFade = smoothstep(65.0, 260.0, range)
     * (1.0-smoothstep(2400.0, 3300.0, range));
-  float portalLane = 1.0 - 0.32 * (1.0-smoothstep(95.0, 270.0, abs(vWorld.x)))
-    * smoothstep(1250.0, 1700.0, vWorld.z);
+  float portalLane = 1.0 - 0.64 * (1.0-smoothstep(120.0, 360.0, abs(vWorld.x)))
+    * smoothstep(1120.0, 1420.0, vWorld.z);
   float alpha = uDensity * wisps * edge * distanceFade * portalLane;
   if (alpha < 0.008) discard;
   vec3 color = mix(uTint * 0.62, uTint * 1.20, broad * 0.7 + detail * 0.3);

@@ -118,7 +118,7 @@ const interpolateGrabPose = (hand: AmbientHand, curl: number) => {
 
 // The GLB has no UVs. Its tar pattern uses world space on both hand types.
 class SanctuaryTarSurface extends MaterialPluginBase {
-  constructor(material: PBRMaterial) {
+  constructor(material: PBRMaterial, private readonly heightFade?: readonly [number, number]) {
     super(material, "SanctuaryTarSurface", 200, {}, true, true);
   }
 
@@ -132,6 +132,21 @@ class SanctuaryTarSurface extends MaterialPluginBase {
 
   override getCustomCode(shaderType: string): Record<string, string> | null {
     if (shaderType !== "fragment") return null;
+    const haze = this.heightFade
+      ? `float sanctuaryTarHeight = smoothstep(${this.heightFade[0].toFixed(3)},
+  ${this.heightFade[1].toFixed(3)}, vPositionW.y);
+float sanctuaryTarRange = length(vPositionW - vEyePosition.xyz);
+float sanctuaryTarHaze = sanctuaryTarHeight
+  * (0.88 + 0.10 * smoothstep(250.0, 1600.0, sanctuaryTarRange));
+vec3 sanctuaryTarFogColor = mix(vec3(0.105, 0.024, 0.028),
+  vec3(0.22, 0.038, 0.043), sanctuaryTarHeight);
+// Let the actual moving sky show through the upper fingers and forearm.
+float sanctuaryTarMistDither = fract(52.9829189 * fract(
+  0.06711056 * gl_FragCoord.x + 0.00583715 * gl_FragCoord.y));
+if (sanctuaryTarMistDither < sanctuaryTarHeight * sanctuaryTarHeight * 0.44) discard;`
+      : `float sanctuaryTarRange = length(vPositionW - vEyePosition.xyz);
+float sanctuaryTarHaze = 0.14 + 0.34 * smoothstep(250.0, 1600.0, sanctuaryTarRange);
+vec3 sanctuaryTarFogColor = vec3(0.105, 0.024, 0.028);`;
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: `
 float sanctuaryTarPattern(vec3 worldPos) {
@@ -154,6 +169,10 @@ metallicRoughness.g = mix(0.80, 0.54, sanctuaryTarWet);
       CUSTOM_FRAGMENT_BEFORE_LIGHTS: `
 if (vPositionW.y < ${(CFG.riverY - .12).toFixed(3)}) discard;
 `,
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+${haze}
+finalColor.rgb = mix(finalColor.rgb, sanctuaryTarFogColor, sanctuaryTarHaze);
+`,
     };
   }
 }
@@ -167,7 +186,7 @@ export async function createSanctuaryShadowHands(scene: Scene) {
     throw new Error("The sanctuary closed while loading its shadow hands.");
   }
   const materials: PBRMaterial[] = [];
-  const makeTarMaterial = (name: string) => {
+  const makeTarMaterial = (name: string, heightFade?: readonly [number, number]) => {
     const material = new PBRMaterial(name, scene);
     material.albedoColor = new Color3(.001, .00085, .00095);
     material.metallic = 0;
@@ -181,8 +200,10 @@ export async function createSanctuaryShadowHands(scene: Scene) {
     material.clearCoat.roughness = .58;
     material.sheen.isEnabled = false;
     material.backFaceCulling = false;
+    // A dark, gradual haze is applied by SanctuaryTarSurface instead.
+    material.fogEnabled = false;
     materials.push(material);
-    new SanctuaryTarSurface(material);
+    new SanctuaryTarSurface(material, heightFade);
     return material;
   };
   const guideTar = makeTarMaterial("sanctuaryGuideTar");
@@ -342,7 +363,8 @@ export async function createSanctuaryShadowHands(scene: Scene) {
     }
     if (placement.mirror) root.scaling.z = -placement.scale;
     arm.material = placement.kind === "climber"
-      ? makeTarMaterial(`sanctuaryClimberTar_${index}`) : guideTar;
+      ? makeTarMaterial(`sanctuaryClimberTar_${index}`,
+        [placement.palmY * .23, placement.palmY * .90]) : guideTar;
     arm.isPickable = false;
     arm.checkCollisions = false;
     arm.alwaysSelectAsActiveMesh = true;
@@ -446,7 +468,7 @@ export async function createSanctuaryShadowHands(scene: Scene) {
       let bestThumbClearance = -Infinity;
       let bestPitchNudge = 0;
       let bestTiltNudge = 0;
-      for (const [pitchNudge, tiltNudge] of [[0, 0], [-.12, 0], [.12, 0], [0, -.12], [0, .12]]) {
+      for (const [pitchNudge, tiltNudge] of [[0, 0], [-.12, 0], [.12, 0], [0, -.30], [0, .12]]) {
         root.rotation.set(placement.pitch + pitchNudge, placement.yaw, placement.tilt + tiltNudge);
         arm.computeWorldMatrix(true);
         grab.goToFrame(grab.from);
@@ -472,7 +494,7 @@ export async function createSanctuaryShadowHands(scene: Scene) {
       }
       placement.pitch += bestPitchNudge;
       placement.tilt += bestTiltNudge;
-      placement.palmY = Math.max(placement.palmY, ASCENT.lowerY + 8 - bestThumbClearance);
+      placement.palmY = Math.max(placement.palmY, ASCENT.lowerY + 24 - bestThumbClearance);
       root.rotation.set(placement.pitch, placement.yaw, placement.tilt);
       grab.goToFrame(grab.from);
     }

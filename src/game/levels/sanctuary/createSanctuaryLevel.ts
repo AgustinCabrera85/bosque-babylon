@@ -34,12 +34,14 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 /** Just enough ground logic to use the actual game locomotion at each landing. */
 function createDockWorld(getStage: () => { index: number; state: VoyageState }): PlayerWorldQuery {
   const dockX = (stop: SanctuaryStop) => stop.x + stop.side * 27;
+  const parapetInnerX = ASCENT.stairWidth / 2;
+  const playerStoneClearance = 1.25;
   function finalAllowed(x: number, z: number, clearance = 0) {
     if (z < ASCENT.lowerPlatformStartZ || z > ASCENT.portalApproachEndZ) return false;
     const halfWidth = z >= ASCENT.wallFrontZ ? CFG.gateWidth / 2 - 8
-      : z >= ASCENT.stairStartZ && z < ASCENT.stairEndZ
-        ? ASCENT.stairWidth / 2 - 1 : ASCENT.platformWidth / 2;
-    return Math.abs(x) <= halfWidth - clearance;
+      : z <= ASCENT.stairEndZ
+        ? parapetInnerX : ASCENT.platformWidth / 2;
+    return Math.abs(x) <= halfWidth - Math.max(clearance, playerStoneClearance);
   }
   function dockAllowed(x: number, z: number, stop: SanctuaryStop, clearance = 0) {
     return Math.abs(x - dockX(stop)) <= 26 - clearance &&
@@ -61,8 +63,23 @@ function createDockWorld(getStage: () => { index: number; state: VoyageState }):
       return !stop || !dockAllowed(x, z, stop, clearance);
     },
     resolveCameraPosition(origin: Vector3, desired: Vector3) {
-      // Avoid camera ejection by the simple placeholder dock boundary.
-      // A raycast resolver can replace this when finished collision meshes exist.
+      if (isFinalStop(getStage().index) && getStage().state === "ashore") {
+        // Keep the third-person camera on the same side of the solid parapet
+        // as the player when its sight line crosses either inner stone face.
+        const innerCameraX = parapetInnerX - .75;
+        for (const side of [-1, 1]) {
+          const boundary = side * innerCameraX;
+          const travel = desired.x - origin.x;
+          if (Math.abs(origin.x) >= innerCameraX || travel * side <= 0 ||
+            (desired.x - boundary) * side <= 0) continue;
+          const t = (boundary - origin.x) / travel;
+          const crossingZ = origin.z + (desired.z - origin.z) * t;
+          const crossingY = origin.y + (desired.y - origin.y) * t;
+          if (crossingZ < ASCENT.lowerPlatformStartZ || crossingZ > ASCENT.stairEndZ ||
+            crossingY > getSanctuaryAscentHeight(crossingZ) + 13) continue;
+          return Vector3.Lerp(origin, desired, t);
+        }
+      }
       return desired.clone();
     },
     getStairSurfaceInfo(x, z) {

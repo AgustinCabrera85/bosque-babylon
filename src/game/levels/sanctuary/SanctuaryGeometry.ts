@@ -51,6 +51,27 @@ function slab(scene: Scene, name: string, width: number, height: number, depth: 
   return mesh;
 }
 
+// Keep the wall's stone grain at one world scale across the immense side slabs
+// and the tall lintel, instead of stretching one box UV over each whole face.
+function alignWallStoneUvs(mesh: Mesh) {
+  const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+  const normals = mesh.getVerticesData(VertexBuffer.NormalKind);
+  if (!positions || !normals) return;
+  const uvs = new Float32Array(positions.length / 3 * 2);
+  const span = 180;
+  for (let vertex = 0; vertex < positions.length / 3; vertex++) {
+    const i = vertex * 3;
+    const x = positions[i] + mesh.position.x;
+    const y = positions[i + 1] + mesh.position.y;
+    const z = positions[i + 2] + mesh.position.z;
+    const u = Math.abs(normals[i + 2]) > .5 ? x : Math.abs(normals[i]) > .5 ? z : x;
+    const v = Math.abs(normals[i + 1]) > .5 ? z : y;
+    uvs[vertex * 2] = u / span;
+    uvs[vertex * 2 + 1] = v / span;
+  }
+  mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+}
+
 function roughStoneSkin(scene: Scene, name: string, x: number, z: number,
   height: number, index: number, material: StandardMaterial) {
   type Corner = [number, number, number];
@@ -199,7 +220,6 @@ class SanctuaryLateralBrumePlugin extends MaterialPluginBase {
     if (shaderType !== "fragment") return null;
     return {
       CUSTOM_FRAGMENT_BEFORE_FOG: `
-#ifdef FOG
 float sanctuaryLateralDistance = abs(vPositionW.x);
 if (sanctuaryLateralDistance > 2900.0) {
   float sanctuaryLateralMist = smoothstep(2900.0, 7800.0, sanctuaryLateralDistance);
@@ -207,7 +227,81 @@ if (sanctuaryLateralDistance > 2900.0) {
     0.06711056 * gl_FragCoord.x + 0.00583715 * gl_FragCoord.y));
   if (sanctuaryMistDither < sanctuaryLateralMist) discard;
 }
+`,
+    };
+  }
+}
+
+// The route to the gate needs more definition than the surrounding river and wall.
+class SanctuaryApproachFogPlugin extends MaterialPluginBase {
+  constructor(material: StandardMaterial) {
+    super(material, "SanctuaryApproachFog", 230);
+    this._enable(true);
+  }
+
+  getCustomCode(shaderType: string) {
+    if (shaderType !== "fragment") return null;
+    return {
+      CUSTOM_FRAGMENT_BEFORE_FOG: `
+#ifdef FOG
+vec3 sanctuaryApproachClearColor = color.rgb;
 #endif
+`,
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+#ifdef FOG
+float sanctuaryApproachLane = (1.0 - smoothstep(180.0, 540.0, abs(vPositionW.x)))
+  * smoothstep(1130.0, 1450.0, vPositionW.z);
+color.rgb = mix(color.rgb, sanctuaryApproachClearColor, sanctuaryApproachLane * 0.50);
+#endif
+`,
+    };
+  }
+}
+
+// Use the portal's dark distance haze on the wall, then dissolve its upper stone
+// into the crimson sky. Babylon's brighter EXP2 fog would wash the wall red.
+class SanctuaryWallFogPlugin extends MaterialPluginBase {
+  constructor(material: StandardMaterial, private readonly heightFogEnabled: boolean) {
+    super(material, "SanctuaryWallFog", 235);
+    this._enable(true);
+  }
+
+  getCustomCode(shaderType: string) {
+    if (shaderType !== "fragment") return null;
+    return {
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+float sanctuaryWallRange = length(vPositionW - vEyePosition.xyz);
+float sanctuaryWallHaze = smoothstep(280.0, 1550.0, sanctuaryWallRange) * 0.62;
+color.rgb = mix(color.rgb, vec3(0.105, 0.024, 0.028), sanctuaryWallHaze);
+${this.heightFogEnabled ? `
+vec3 sanctuaryWallRay = normalize(vPositionW - vEyePosition.xyz);
+float sanctuaryWallElevation = clamp(sanctuaryWallRay.y * 0.75 + 0.42, 0.0, 1.0);
+vec3 sanctuaryWallSky = mix(vec3(0.075, 0.009, 0.014),
+  vec3(0.19, 0.027, 0.03), sanctuaryWallElevation);
+float sanctuaryWallHorizon = 1.0 - smoothstep(0.0, 0.24, abs(sanctuaryWallRay.y));
+sanctuaryWallSky = mix(sanctuaryWallSky, vec3(0.18, 0.028, 0.032),
+  sanctuaryWallHorizon * 0.75);
+float sanctuaryWallAltitude = smoothstep(650.0, 3400.0, vPositionW.y);
+color.rgb = mix(color.rgb, sanctuaryWallSky, sanctuaryWallAltitude);
+` : ""}
+`,
+    };
+  }
+}
+
+class SanctuaryMainPortalHazePlugin extends MaterialPluginBase {
+  constructor(material: PBRMaterial) {
+    super(material, "SanctuaryMainPortalHaze", 230, {}, true, true);
+    this._enable(true);
+  }
+
+  getCustomCode(shaderType: string) {
+    if (shaderType !== "fragment") return null;
+    return {
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+float sanctuaryPortalRange = length(vPositionW - vEyePosition.xyz);
+float sanctuaryPortalHaze = smoothstep(280.0, 1550.0, sanctuaryPortalRange) * 0.62;
+finalColor.rgb = mix(finalColor.rgb, vec3(0.105, 0.024, 0.028), sanctuaryPortalHaze);
 `,
     };
   }
@@ -232,15 +326,20 @@ function createStairParapets(scene: Scene, material: StandardMaterial, foundatio
     for (const corner of [a, b, c, d]) {
       positions.push(...corner);
       normals.push(normal[0] / length, normal[1] / length, normal[2] / length);
+      // World-space projection keeps the masonry legible along the full ascent.
+      uvs.push((Math.abs(normal[0]) > length * .5 ? corner[2] : corner[0]) / 24,
+        (Math.abs(normal[1]) > length * .5 ? corner[2] : corner[1]) / 24);
     }
-    const u = Math.hypot(...first) / 24;
-    const v = Math.hypot(d[0] - a[0], d[1] - a[1], d[2] - a[2]) / 24;
-    uvs.push(0, 0, u, 0, u, v, 0, v);
-    indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+    // Babylon's left-handed box builder uses this winding for the face whose
+    // normal points outward. The old winding exposed only the inside surfaces.
+    indices.push(start, start + 2, start + 1, start, start + 3, start + 2);
   };
   // Extrude one continuous closed profile per side. Internal caps at every rest
   // used to coincide and could read as dark gaps instead of solid stone.
-  const profile: Array<[number, number]> = [[ASCENT.stairStartZ, ASCENT.lowerY + 12]];
+  const profile: Array<[number, number]> = [
+    [ASCENT.lowerPlatformStartZ, ASCENT.lowerY + 12],
+    [ASCENT.stairStartZ, ASCENT.lowerY + 12],
+  ];
   for (let flight = 0; flight < ASCENT.flights; flight++) {
     const endZ = sanctuaryFlightStartZ(flight) + ASCENT.stepsPerFlight * ASCENT.treadDepth;
     const topY = ASCENT.lowerY + (flight + 1) * ASCENT.stepsPerFlight * ASCENT.riserHeight + 12;
@@ -332,8 +431,8 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
   // The local smoke sheets remain a complementary low-altitude effect.
   const atmosphere = createSanctuaryAtmosphere(scene, mobile, clouds.mode === "volumetric" ? 0.43 : clouds.mode === "off" ? 0 : 1);
   const stoneVariant = params?.get("sanctuaryStone") === "original" ? "original" : "megalithic";
-  const stone = createSanctuaryStoneMaterials(scene, mobile,
-    params?.get("sanctuaryHeightFog") !== "off", stoneVariant);
+  const heightFogEnabled = params?.get("sanctuaryHeightFog") !== "off";
+  const stone = createSanctuaryStoneMaterials(scene, mobile, heightFogEnabled, stoneVariant);
   const reflectors: AbstractMesh[] = [];
   const water = createSanctuaryWater(scene, mobile || params?.get("sanctuaryWater") === "lite");
   const black = mat(scene, "sanctuaryObsidan", new Color3(.017,.018,.022));
@@ -341,7 +440,11 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
   const upperStructure = stone.upperStructure;
   const wallMat = stone.wall;
   const stairsMat = stone.stairs;
+  wallMat.fogEnabled = false;
   new SanctuaryLateralBrumePlugin(wallMat);
+  new SanctuaryWallFogPlugin(wallMat, heightFogEnabled);
+  new SanctuaryApproachFogPlugin(stairsMat);
+  if (stone.parapet !== stairsMat) new SanctuaryApproachFogPlugin(stone.parapet);
   const ember = mat(scene, "sanctuaryPortalEmber", new Color3(.42,.045,.031), new Color3(.32,.037,.024));
   const gold = mat(scene, "sanctuaryCagedLight", new Color3(.95,.68,.38), new Color3(.9,.64,.35));
   const freed = mat(scene, "sanctuaryFreedLight", new Color3(.55,.67,.9), new Color3(.27,.39,.69));
@@ -367,14 +470,16 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
   const portalTop = ASCENT.upperY + ASCENT.portalHeight;
   // Beyond the accessible route, the long stone wings dissolve into the sky
   // before the camera can clip them; there are no return or rear walls.
-  // Stone modules retain their texture scale, then merge to keep two wall draw calls.
+  // World-space UVs remain continuous when the stone modules merge.
   for (const side of [-1, 1]) {
     const modules: Mesh[] = [];
     for (let segment = 0; segment < 8; segment++) {
       const inner = gap / 2 + (wallHalfWidth - gap / 2) * segment / 8;
       const outer = gap / 2 + (wallHalfWidth - gap / 2) * (segment + 1) / 8;
-      modules.push(slab(scene, `wallStoneModule_${side}_${segment}`, outer - inner, wallHeight,
-        ASCENT.wallDepth, [side * (inner + outer) / 2, wallHeight / 2 + wallBottom, CFG.gateWallZ], wallMat));
+      const module = slab(scene, `wallStoneModule_${side}_${segment}`, outer - inner, wallHeight,
+        ASCENT.wallDepth, [side * (inner + outer) / 2, wallHeight / 2 + wallBottom, CFG.gateWallZ], wallMat);
+      alignWallStoneUvs(module);
+      modules.push(module);
     }
     const mergedWall = Mesh.MergeMeshes(modules, true, true);
     if (mergedWall) {
@@ -387,15 +492,48 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
     }
   }
   // Fill the former ground-level opening; its top is the walkable floor inside the elevated gate.
-  reflectors.push(slab(scene, "wallGateLower", gap + 4, ASCENT.upperY - wallBottom, ASCENT.wallDepth,
-    [0, (ASCENT.upperY + wallBottom) / 2, CFG.gateWallZ], wallMat));
-  reflectors.push(slab(scene, "wallGateLintel", gap + 4, wallTop - portalTop, ASCENT.wallDepth,
-    [0, (wallTop + portalTop) / 2, CFG.gateWallZ], wallMat));
+  const gateLower = slab(scene, "wallGateLower", gap + 4, ASCENT.upperY - wallBottom, ASCENT.wallDepth,
+    [0, (ASCENT.upperY + wallBottom) / 2, CFG.gateWallZ], wallMat);
+  const gateLintel = slab(scene, "wallGateLintel", gap + 4, wallTop - portalTop, ASCENT.wallDepth,
+    [0, (wallTop + portalTop) / 2, CFG.gateWallZ], wallMat);
+  alignWallStoneUvs(gateLower);
+  alignWallStoneUvs(gateLintel);
+  reflectors.push(gateLower, gateLintel);
   reflectors.push(slab(scene, "gateRedVoid", gap - 13, ASCENT.portalHeight, 2,
     [0, ASCENT.upperY + ASCENT.portalHeight / 2, CFG.gateWallZ + ASCENT.wallDepth / 2 - 3.5], ember));
   for (const x of [-gap / 2, gap / 2]) {
     slab(scene, "gateJaw", 12, ASCENT.portalHeight, ASCENT.wallDepth,
       [x, ASCENT.upperY + ASCENT.portalHeight / 2, CFG.gateWallZ], black);
+  }
+
+  // The supplied arch is one unit tall. Raise it above the existing gate
+  // opening and sink its rear into the wall so the masonry frames the red void.
+  const mainPortal = await SceneLoader.LoadAssetContainerAsync(
+    asset("assets/models/sanctuary/"), "Portal_principal.glb", scene);
+  if (scene.isDisposed) {
+    mainPortal.dispose();
+    throw new Error("The sanctuary closed while loading its main portal.");
+  }
+  const mainPortalRoot = new TransformNode("sanctuaryMainPortal", scene);
+  mainPortalRoot.position.set(0, ASCENT.upperY, ASCENT.wallFrontZ - 6);
+  mainPortalRoot.scaling.set(gap * 2.25, ASCENT.portalHeight * 1.25, gap * 1.75);
+  mainPortal.addAllToScene();
+  for (const root of mainPortal.rootNodes) root.parent = mainPortalRoot;
+  for (const material of mainPortal.materials) {
+    if (!(material instanceof PBRMaterial)) continue;
+    material.albedoColor = new Color3(.30, .30, .30);
+    material.emissiveColor = Color3.Black();
+    material.metallic = 0;
+    material.roughness = .95;
+    material.specularIntensity = .035;
+    material.environmentIntensity = .035;
+    // Use a darker, controlled distance haze instead of the bright scene fog.
+    material.fogEnabled = false;
+    new SanctuaryMainPortalHazePlugin(material);
+  }
+  for (const mesh of mainPortal.meshes) {
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
   }
 
   // Four steep flights and three level rests, all merged into one static stone draw call.
@@ -407,7 +545,7 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
   const baseSegments: Mesh[] = [];
   baseSegments.push(slab(scene, "sanctuaryWallBaseCenter", 3000,
     baseTopY - foundationY, baseBackZ - baseFrontZ,
-    [0, (baseTopY + foundationY) / 2, (baseFrontZ + baseBackZ) / 2], stairsMat));
+    [0, (baseTopY + foundationY) / 2, (baseFrontZ + baseBackZ) / 2], wallMat));
   for (const side of [-1, 1]) {
     for (let segment = 0; segment < 8; segment++) {
       const inner = 1500 + segment * 3000;
@@ -415,13 +553,14 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
       baseSegments.push(slab(scene, `sanctuaryWallBase_${side}_${segment}`, outer - inner,
         baseTopY - foundationY, baseBackZ - baseFrontZ,
         [side * (inner + outer) / 2, (baseTopY + foundationY) / 2,
-          (baseFrontZ + baseBackZ) / 2], stairsMat));
+          (baseFrontZ + baseBackZ) / 2], wallMat));
     }
   }
+  for (const segment of baseSegments) alignWallStoneUvs(segment);
   const mergedBase = Mesh.MergeMeshes(baseSegments, true, true);
   if (mergedBase) {
     mergedBase.name = "sanctuaryContinuousWallBase";
-    mergedBase.material = stairsMat;
+    mergedBase.material = wallMat;
     mergedBase.isPickable = false;
     mergedBase.receiveShadows = false;
   }
@@ -469,14 +608,15 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
       const part = slab(scene, `sanctuaryUpperPlinth_${side}_${segment}`, outer - inner,
         ASCENT.upperY - baseTopY, ASCENT.wallFrontZ - ASCENT.stairEndZ,
         [side * (inner + outer) / 2, (ASCENT.upperY + baseTopY) / 2,
-          (ASCENT.stairEndZ + ASCENT.wallFrontZ) / 2], stairsMat);
+          (ASCENT.stairEndZ + ASCENT.wallFrontZ) / 2], wallMat);
+      alignWallStoneUvs(part);
       part.receiveShadows = false;
       wingParts.push(part);
     }
     const mergedWing = Mesh.MergeMeshes(wingParts, true, true);
     if (mergedWing) {
       mergedWing.name = side < 0 ? "sanctuaryUpperPlinthLeft" : "sanctuaryUpperPlinthRight";
-      mergedWing.material = stairsMat;
+      mergedWing.material = wallMat;
       mergedWing.isPickable = false;
       mergedWing.receiveShadows = false;
     }

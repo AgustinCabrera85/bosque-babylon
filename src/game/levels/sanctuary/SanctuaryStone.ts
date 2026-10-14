@@ -91,11 +91,19 @@ export function createSanctuaryStoneMaterials(scene: Scene, mobile: boolean, hei
   const makeStone = (name: string, tileU: number, tileV: number, tone: number, normalStrength: number,
     megalithic?: { albedo: string; tileU: number; tileV: number; tone: number }) => {
     const mat = new StandardMaterial(name, scene);
+    const isWall = name === "sanctuaryInfiniteStoneWall";
+    const tuneWallTexture = (texture: Texture) => {
+      if (!isWall) return;
+      texture.wrapU = Texture.WRAP_ADDRESSMODE;
+      texture.wrapV = Texture.WRAP_ADDRESSMODE;
+      texture.anisotropicFilteringLevel = mobile ? 4 : 8;
+    };
     // Keep a visible, previously shipped texture bound until the new one is ready.
     // A missing WebP therefore cannot leave the stone without an albedo.
     const original = new Texture(ORIGINAL_ALBEDO, scene, true, false);
     original.uScale = tileU;
     original.vScale = tileV;
+    tuneWallTexture(original);
     mat.diffuseTexture = original;
     const useMegalithic = variant === "megalithic" && megalithic !== undefined;
     mat.diffuseColor = new Color3(tone, tone * 1.01, tone * 1.04);
@@ -105,6 +113,7 @@ export function createSanctuaryStoneMaterials(scene: Scene, mobile: boolean, hei
       const candidate = new Texture(`${ASSET_BASE}${megalithic.albedo}`, scene, true, false);
       candidate.uScale = megalithic.tileU;
       candidate.vScale = megalithic.tileV;
+      tuneWallTexture(candidate);
       const applyMegalithic = () => {
         if (!candidate.isReady()) return;
         mat.diffuseTexture = candidate;
@@ -145,16 +154,6 @@ export function createSanctuaryStoneMaterials(scene: Scene, mobile: boolean, hei
   upperStructure.emissiveColor = Color3.Black();
   const pillarFog = heightFogEnabled ? new SanctuaryHeightFogPlugin(pillar) : null;
   const upperStructureFog = heightFogEnabled ? new SanctuaryHeightFogPlugin(upperStructure) : null;
-  if (heightFogEnabled) {
-    new SanctuaryHeightFogPlugin(wall, {
-      fogStartHeight: 360,
-      fogEndHeight: 2300,
-      distanceInfluence: .32,
-      atmosphericBlend: 1,
-      heightNoiseStrength: 65,
-      ambientDensity: scene.fogDensity,
-    });
-  }
   return {
     // Different UV scales because the wall's surface area is vastly larger.
     pillar,

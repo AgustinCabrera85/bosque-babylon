@@ -16,17 +16,21 @@ import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import type { Scene } from "@babylonjs/core/scene";
 import { asset } from "../../../utils/asset";
 import { SANCTUARY_CONFIG as CFG, SANCTUARY_ASCENT as ASCENT, SANCTUARY_STOPS,
-  sanctuaryFlightStartZ, type SanctuaryPillarId, type SanctuaryProgress } from "./SanctuaryLayout";
+  SANCTUARY_WATERFALL_X, sanctuaryFlightStartZ, type SanctuaryPillarId,
+  type SanctuaryProgress } from "./SanctuaryLayout";
 import { createSanctuaryWater } from "./SanctuaryWater";
 import { createSanctuaryClouds, type SanctuaryCloudMode } from "./SanctuaryClouds";
 import { createSanctuaryPortalWaterfalls } from "./SanctuaryPortalWaterfalls";
 import { createSanctuaryLevelPortals } from "./SanctuaryLevelPortals";
+import { createSanctuaryGuardians, type SanctuaryGuardiansHandle } from "./SanctuaryGuardians";
+import { SanctuaryDistanceHazePlugin } from "./SanctuaryDistanceHaze";
 import { createSanctuaryStoneMaterials } from "./SanctuaryStone";
 import { createSanctuaryAtmosphere } from "./SanctuaryAtmosphere";
 
 export type OrbVisual = { sphere: AbstractMesh; halo: AbstractMesh; light: PointLight; home: Vector3 };
 export type SanctuaryGeometry = {
   boatRoot: TransformNode;
+  guardians: SanctuaryGuardiansHandle;
   orbs: Map<SanctuaryPillarId, OrbVisual>;
   cloudMode: SanctuaryCloudMode;
   waterMode: "reflective" | "lightweight";
@@ -289,24 +293,6 @@ color.rgb = mix(color.rgb, sanctuaryWallSky, sanctuaryWallAltitude);
   }
 }
 
-class SanctuaryMainPortalHazePlugin extends MaterialPluginBase {
-  constructor(material: PBRMaterial) {
-    super(material, "SanctuaryMainPortalHaze", 230, {}, true, true);
-    this._enable(true);
-  }
-
-  getCustomCode(shaderType: string) {
-    if (shaderType !== "fragment") return null;
-    return {
-      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
-float sanctuaryPortalRange = length(vPositionW - vEyePosition.xyz);
-float sanctuaryPortalHaze = smoothstep(280.0, 1550.0, sanctuaryPortalRange) * 0.62;
-finalColor.rgb = mix(finalColor.rgb, vec3(0.105, 0.024, 0.028), sanctuaryPortalHaze);
-`,
-    };
-  }
-}
-
 function createStairParapets(scene: Scene, material: StandardMaterial, foundationY: number) {
   const positions: number[] = [];
   const normals: number[] = [];
@@ -529,12 +515,16 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
     material.environmentIntensity = .035;
     // Use a darker, controlled distance haze instead of the bright scene fog.
     material.fogEnabled = false;
-    new SanctuaryMainPortalHazePlugin(material);
+    new SanctuaryDistanceHazePlugin(material);
   }
   for (const mesh of mainPortal.meshes) {
     mesh.isPickable = false;
     mesh.checkCollisions = false;
   }
+  const portalBounds = mainPortalRoot.getHierarchyBoundingVectors(true);
+  const guardians = await createSanctuaryGuardians(scene,
+    portalBounds.max.y - portalBounds.min.y,
+    (portalBounds.max.x - portalBounds.min.x) / 2);
 
   // Four steep flights and three level rests, all merged into one static stone draw call.
   const stairParts: Mesh[] = [];
@@ -629,7 +619,7 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
     riverY: CFG.riverY,
     sampleWaterHeight: water.sampleHeight,
     placeholderStone: wallMat,
-    lateralOffset: 560,
+    lateralOffset: SANCTUARY_WATERFALL_X,
     width: 22,
     sourceRise: 225,
     impactClearance: 32,
@@ -668,7 +658,7 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
     material.environmentIntensity = .03;
     material.backFaceCulling = false; // The left statue has a mirrored X scale.
     material.fogEnabled = false;
-    new SanctuaryMainPortalHazePlugin(material);
+    new SanctuaryDistanceHazePlugin(material);
   }
   for (const fall of portalFalls.sources) {
     // The stone perch reaches into the wall and carries the gargoyle's feet.
@@ -802,6 +792,7 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
   const visuals = [...orbs.entries()];
   return {
     boatRoot,
+    guardians,
     orbs,
     cloudMode: clouds.mode,
     waterMode: water.quality,

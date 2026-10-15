@@ -31,6 +31,9 @@ export const SANCTUARY_CONFIG = {
   boatSpeed: 20,
 } as const;
 
+export const SANCTUARY_WATERFALL_X = 560;
+export const SANCTUARY_WATERFALL_WALK_MARGIN = 60;
+
 /** Shared visual/collision dimensions for the final, climbable approach. */
 export const SANCTUARY_ASCENT = {
   lowerY: 1.55,

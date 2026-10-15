@@ -22,7 +22,7 @@ const REFLECTIVE_WAVES = {
   mediumNormalTiling: 240,
   normalWaveLength: 0.72,
   normalStrength: 0.28,
-  normalDrift: 3.5,
+  normalDrift: 1.4,
   directionX: 0.75,
   directionZ: 0.40,
   reflectionTint: 0.65,

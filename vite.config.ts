@@ -13,7 +13,17 @@ export default defineConfig({
       });
     }
   }],
-  server: { port: 5173, strictPort: false },
+  server: { port: 5173, strictPort: true },
+  // Scan the lazy level modules up front. Otherwise first opening the forest
+  // can invalidate Babylon's pre-bundle during its dynamic import (HTTP 504).
+  optimizeDeps: {
+    entries: [
+      'index.html',
+      'src/game/levels/forest/createForestLevel.ts',
+      'src/game/levels/theatre/createTheatreLevel.ts',
+      'src/game/levels/sanctuary/createSanctuaryLevel.ts',
+    ],
+  },
   build: {
     sourcemap: false
   }

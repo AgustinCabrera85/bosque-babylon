@@ -43,6 +43,11 @@ export type HermanoMayorBodyTurnHooks = {
   onEnd?(): void;
 };
 
+export type HermanoMayorLookOptions = {
+  maxTrackingDistance?: number;
+  allowBodyTurn?: boolean;
+};
+
 /** Natural, bounded gaze overlay that can run over any base NLA action. */
 export class HermanoMayorLookAction implements HermanoMayorProceduralAction {
   private readonly mesh: Mesh | null;
@@ -65,7 +70,8 @@ export class HermanoMayorLookAction implements HermanoMayorProceduralAction {
     private readonly scene: Scene,
     private readonly root: TransformNode,
     meshes: readonly AbstractMesh[],
-    private readonly bodyTurnHooks: HermanoMayorBodyTurnHooks = {}
+    private readonly bodyTurnHooks: HermanoMayorBodyTurnHooks = {},
+    private readonly options: HermanoMayorLookOptions = {}
   ) {
     this.mesh =
       meshes.find(
@@ -143,10 +149,13 @@ export class HermanoMayorLookAction implements HermanoMayorProceduralAction {
       const planarDistance = Math.hypot(dx, dz);
       const distance = Math.hypot(planarDistance, dy);
 
-      if (distance >= MIN_TRACKING_DISTANCE && distance <= MAX_TRACKING_DISTANCE) {
+      if (distance >= MIN_TRACKING_DISTANCE &&
+          distance <= (this.options.maxTrackingDistance ?? MAX_TRACKING_DISTANCE)) {
         const targetWorldYaw = Math.atan2(dx, dz);
         let localYaw = normalizeAngle(targetWorldYaw - this.root.rotation.y);
-        this.updateBodyTurn(targetWorldYaw, localYaw, dt);
+        if (this.options.allowBodyTurn !== false) {
+          this.updateBodyTurn(targetWorldYaw, localYaw, dt);
+        }
         localYaw = normalizeAngle(targetWorldYaw - this.root.rotation.y);
 
         desiredYaw = clampWithDeadZone(

@@ -15,6 +15,8 @@ import {
   SANCTUARY_CONFIG as CFG,
   SANCTUARY_ASCENT as ASCENT,
   SANCTUARY_STOPS,
+  SANCTUARY_WATERFALL_X,
+  SANCTUARY_WATERFALL_WALK_MARGIN,
   getSanctuaryAscentHeight,
   getSanctuaryStairSurface,
   type SanctuaryStop,
@@ -40,7 +42,7 @@ function createDockWorld(getStage: () => { index: number; state: VoyageState }):
     if (z < ASCENT.lowerPlatformStartZ || z > ASCENT.portalApproachEndZ) return false;
     const halfWidth = z >= ASCENT.wallFrontZ ? CFG.gateWidth / 2 - 8
       : z <= ASCENT.stairEndZ
-        ? parapetInnerX : ASCENT.platformWidth / 2;
+        ? parapetInnerX : SANCTUARY_WATERFALL_X + SANCTUARY_WATERFALL_WALK_MARGIN;
     return Math.abs(x) <= halfWidth - Math.max(clearance, playerStoneClearance);
   }
   function dockAllowed(x: number, z: number, stop: SanctuaryStop, clearance = 0) {
@@ -213,6 +215,26 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
       }
       state = "ashore";
     };
+    if (import.meta.env.DEV) {
+      const debugWindow = window as Window & {
+        __bosqueSanctuaryDebug?: { teleportToPortal(): void };
+      };
+      const debug = {
+        teleportToPortal() {
+          targetIndex = SANCTUARY_STOPS.length;
+          state = "ashore";
+          const z = ASCENT.stairEndZ - 12;
+          player.position.set(0, getSanctuaryAscentHeight(z) + CFG.eyeHeight, z);
+          player.settleLocomotionToIdle();
+        },
+      };
+      debugWindow.__bosqueSanctuaryDebug = debug;
+      cleanup.push(() => {
+        if (debugWindow.__bosqueSanctuaryDebug === debug) {
+          delete debugWindow.__bosqueSanctuaryDebug;
+        }
+      });
+    }
     const portalPoint = (stop: SanctuaryStop) =>
       new Vector3(stop.x + stop.side * 49, 2, stop.z + 8);
     const closeEnoughToPortal = (stop: SanctuaryStop) => {
@@ -266,6 +288,7 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
         geometry.update(dt, elapsed, progress);
         if (embarked) movePlayerOntoBoat();
       }
+      geometry.guardians.update(player.position, state === "ashore" && isFinalStop(targetIndex));
       shadowHands?.update(elapsed);
       context.musicPlayer?.updateListenerPosition(player.position);
     };

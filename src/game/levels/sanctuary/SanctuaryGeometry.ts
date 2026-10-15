@@ -26,6 +26,7 @@ import { createSanctuaryGuardians, type SanctuaryGuardiansHandle } from "./Sanct
 import { SanctuaryDistanceHazePlugin } from "./SanctuaryDistanceHaze";
 import { createSanctuaryStoneMaterials } from "./SanctuaryStone";
 import { createSanctuaryAtmosphere } from "./SanctuaryAtmosphere";
+import { createSanctuaryAbyssPortal } from "../../shaders/SanctuaryAbyssPortal";
 
 export type OrbVisual = { sphere: AbstractMesh; halo: AbstractMesh; light: PointLight; home: Vector3 };
 export type SanctuaryGeometry = {
@@ -431,7 +432,6 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
   new SanctuaryWallFogPlugin(wallMat, heightFogEnabled);
   new SanctuaryApproachFogPlugin(stairsMat);
   if (stone.parapet !== stairsMat) new SanctuaryApproachFogPlugin(stone.parapet);
-  const ember = mat(scene, "sanctuaryPortalEmber", new Color3(.42,.045,.031), new Color3(.32,.037,.024));
   const gold = mat(scene, "sanctuaryCagedLight", new Color3(.95,.68,.38), new Color3(.9,.64,.35));
   const freed = mat(scene, "sanctuaryFreedLight", new Color3(.55,.67,.9), new Color3(.27,.39,.69));
   const haloMat = mat(scene, "sanctuaryHalo", new Color3(.87,.33,.19), new Color3(.55,.19,.09));
@@ -485,8 +485,13 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
   alignWallStoneUvs(gateLower);
   alignWallStoneUvs(gateLintel);
   reflectors.push(gateLower, gateLintel);
-  reflectors.push(slab(scene, "gateRedVoid", gap - 13, ASCENT.portalHeight, 2,
-    [0, ASCENT.upperY + ASCENT.portalHeight / 2, CFG.gateWallZ + ASCENT.wallDepth / 2 - 3.5], ember));
+  const portalSurface = slab(scene, "gateRedVoid", gap - 13, ASCENT.portalHeight, 2,
+    [0, ASCENT.upperY + ASCENT.portalHeight / 2, CFG.gateWallZ + ASCENT.wallDepth / 2 - 3.5], black);
+  const portalEffect = createSanctuaryAbyssPortal(scene, portalSurface);
+  portalEffect.material.setFloat("uFog", 1.2);
+  portalEffect.material.setFloat("uGlow", 1.4);
+  scene.onDisposeObservable.addOnce(() => portalEffect.dispose());
+  reflectors.push(portalSurface);
   for (const x of [-gap / 2, gap / 2]) {
     slab(scene, "gateJaw", 12, ASCENT.portalHeight, ASCENT.wallDepth,
       [x, ASCENT.upperY + ASCENT.portalHeight / 2, CFG.gateWallZ], black);

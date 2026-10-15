@@ -1,0 +1,257 @@
+{
+  "schema": "lrlo.sanctuary.abyss_portal.composition.v1",
+  "version": 1,
+  "note": "x/y are normalized centred portal coordinates [-0.5,0.5]; height_fraction scales to aperture height; depth is layer order (0 far, 1 near).",
+  "placements": [
+    {
+      "id": "ruin_pier",
+      "x": 0.34,
+      "y": 0.11,
+      "height_fraction": 0.73,
+      "depth": 0.08,
+      "opacity": 0.24,
+      "motion": "still",
+      "phase": 0.0
+    },
+    {
+      "id": "citadel_twin",
+      "x": -0.28,
+      "y": 0.11,
+      "height_fraction": 0.82,
+      "depth": 0.11,
+      "opacity": 0.34,
+      "motion": "still",
+      "phase": 1.617
+    },
+    {
+      "id": "ruin_tower_floating",
+      "x": 0.35,
+      "y": 0.28,
+      "height_fraction": 0.7,
+      "depth": 0.13,
+      "opacity": 0.32,
+      "motion": "still",
+      "phase": 3.234
+    },
+    {
+      "id": "castle_mass",
+      "x": -0.39,
+      "y": -0.1,
+      "height_fraction": 0.67,
+      "depth": 0.16,
+      "opacity": 0.29,
+      "motion": "still",
+      "phase": 4.851
+    },
+    {
+      "id": "spectral_city_far",
+      "x": 0.0,
+      "y": -0.35,
+      "height_fraction": 0.25,
+      "depth": 0.19,
+      "opacity": 0.35,
+      "motion": "still",
+      "phase": 6.468
+    },
+    {
+      "id": "rift_cold_tall",
+      "x": 0.01,
+      "y": 0.05,
+      "height_fraction": 0.86,
+      "depth": 0.35,
+      "opacity": 0.45,
+      "motion": "still",
+      "phase": 8.085
+    },
+    {
+      "id": "ruin_arch_mist",
+      "x": -0.29,
+      "y": -0.02,
+      "height_fraction": 0.64,
+      "depth": 0.45,
+      "opacity": 0.72,
+      "motion": "still",
+      "phase": 9.702
+    },
+    {
+      "id": "arch_colossal",
+      "x": 0.26,
+      "y": 0.12,
+      "height_fraction": 0.54,
+      "depth": 0.47,
+      "opacity": 0.55,
+      "motion": "still",
+      "phase": 11.319
+    },
+    {
+      "id": "arch_void",
+      "x": 0.1,
+      "y": 0.15,
+      "height_fraction": 0.52,
+      "depth": 0.52,
+      "opacity": 0.57,
+      "motion": "still",
+      "phase": 12.936
+    },
+    {
+      "id": "portal_ring_fused",
+      "x": 0.04,
+      "y": 0.25,
+      "height_fraction": 0.26,
+      "depth": 0.56,
+      "opacity": 0.29,
+      "motion": "still",
+      "phase": 14.553
+    },
+    {
+      "id": "ochre_monolith",
+      "x": -0.43,
+      "y": 0.17,
+      "height_fraction": 0.36,
+      "depth": 0.6,
+      "opacity": 0.38,
+      "motion": "still",
+      "phase": 16.17
+    },
+    {
+      "id": "tower_shard_left",
+      "x": -0.36,
+      "y": -0.19,
+      "height_fraction": 0.42,
+      "depth": 0.69,
+      "opacity": 0.66,
+      "motion": "still",
+      "phase": 17.787
+    },
+    {
+      "id": "broken_monolith",
+      "x": 0.41,
+      "y": -0.29,
+      "height_fraction": 0.28,
+      "depth": 0.73,
+      "opacity": 0.71,
+      "motion": "drift",
+      "phase": 19.404
+    },
+    {
+      "id": "floating_stairs",
+      "x": -0.1,
+      "y": -0.3,
+      "height_fraction": 0.18,
+      "depth": 0.76,
+      "opacity": 0.61,
+      "motion": "still",
+      "phase": 21.021
+    },
+    {
+      "id": "floating_city",
+      "x": 0.31,
+      "y": -0.31,
+      "height_fraction": 0.2,
+      "depth": 0.78,
+      "opacity": 0.57,
+      "motion": "still",
+      "phase": 22.638
+    },
+    {
+      "id": "floating_rock_cluster",
+      "x": -0.16,
+      "y": 0.21,
+      "height_fraction": 0.19,
+      "depth": 0.68,
+      "opacity": 0.58,
+      "motion": "drift",
+      "phase": 24.255
+    },
+    {
+      "id": "debris_field",
+      "x": 0.08,
+      "y": -0.16,
+      "height_fraction": 0.15,
+      "depth": 0.73,
+      "opacity": 0.48,
+      "motion": "drift",
+      "phase": 25.872
+    },
+    {
+      "id": "specter_shadow_01",
+      "x": 0.14,
+      "y": -0.12,
+      "height_fraction": 0.25,
+      "depth": 0.62,
+      "opacity": 0.59,
+      "motion": "specter",
+      "phase": 27.489
+    },
+    {
+      "id": "specter_03",
+      "x": -0.2,
+      "y": -0.21,
+      "height_fraction": 0.17,
+      "depth": 0.64,
+      "opacity": 0.44,
+      "motion": "specter",
+      "phase": 29.106
+    },
+    {
+      "id": "specter_guard",
+      "x": 0.3,
+      "y": 0.05,
+      "height_fraction": 0.15,
+      "depth": 0.67,
+      "opacity": 0.47,
+      "motion": "specter",
+      "phase": 30.723
+    },
+    {
+      "id": "mist_moon",
+      "x": -0.17,
+      "y": -0.35,
+      "height_fraction": 0.19,
+      "depth": 0.75,
+      "opacity": 0.45,
+      "motion": "mist",
+      "phase": 32.34
+    },
+    {
+      "id": "fogbank_night",
+      "x": 0.25,
+      "y": -0.37,
+      "height_fraction": 0.2,
+      "depth": 0.81,
+      "opacity": 0.56,
+      "motion": "mist",
+      "phase": 33.957
+    },
+    {
+      "id": "fogbank_dark",
+      "x": -0.3,
+      "y": -0.42,
+      "height_fraction": 0.26,
+      "depth": 0.84,
+      "opacity": 0.59,
+      "motion": "mist",
+      "phase": 35.574
+    },
+    {
+      "id": "fogbank_low",
+      "x": 0.02,
+      "y": -0.42,
+      "height_fraction": 0.23,
+      "depth": 0.87,
+      "opacity": 0.44,
+      "motion": "mist",
+      "phase": 37.191
+    },
+    {
+      "id": "smoke_ribbon",
+      "x": -0.02,
+      "y": -0.31,
+      "height_fraction": 0.1,
+      "depth": 0.92,
+      "opacity": 0.35,
+      "motion": "mist",
+      "phase": 38.808
+    }
+  ]
+}

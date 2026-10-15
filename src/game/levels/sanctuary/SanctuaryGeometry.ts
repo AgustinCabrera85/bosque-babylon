@@ -10,6 +10,8 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { MaterialPluginBase } from "@babylonjs/core/Materials/materialPluginBase";
+import type { UniformBuffer } from "@babylonjs/core/Materials/uniformBuffer";
+import type { SubMesh } from "@babylonjs/core/Meshes/subMesh";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
@@ -26,7 +28,7 @@ import { createSanctuaryGuardians, type SanctuaryGuardiansHandle } from "./Sanct
 import { SanctuaryDistanceHazePlugin } from "./SanctuaryDistanceHaze";
 import { createSanctuaryStoneMaterials } from "./SanctuaryStone";
 import { createSanctuaryAtmosphere } from "./SanctuaryAtmosphere";
-import { createSanctuaryAbyssPortal } from "../../shaders/SanctuaryAbyssPortal";
+import { createSanctuaryAbyssPortalHybrid } from "../../shaders/SanctuaryAbyssPortalHybrid";
 
 export type OrbVisual = { sphere: AbstractMesh; halo: AbstractMesh; light: PointLight; home: Vector3 };
 export type SanctuaryGeometry = {
@@ -263,6 +265,75 @@ color.rgb = mix(color.rgb, sanctuaryApproachClearColor, sanctuaryApproachLane * 
   }
 }
 
+// Light the actual upper landing stone, so the glow cannot float over the stair edge.
+export class SanctuaryPortalFloorLightPlugin extends MaterialPluginBase {
+  private time = 0;
+  private pulse = 0.8;
+
+  constructor(material: StandardMaterial) {
+    super(material, "SanctuaryPortalFloorLight", 240);
+    this.registerForExtraEvents = true;
+    this._enable(true);
+  }
+
+  update(time: number): void {
+    this.time = time;
+    this.pulse = 0.80 + 0.20 * Math.sin(time * 1.7) + 0.09 * Math.sin(time * 2.9);
+  }
+
+  getUniforms() {
+    return { ubo: [{ name: "sanctuaryPortalFloorLight", size: 4, type: "vec4" }] };
+  }
+
+  hardBindForSubMesh(uniformBuffer: UniformBuffer, _scene: Scene, _engine: unknown,
+    _subMesh: SubMesh): void {
+    uniformBuffer.updateFloat4("sanctuaryPortalFloorLight", this.time, this.pulse, 0, 0);
+  }
+
+  getCustomCode(shaderType: string) {
+    if (shaderType !== "fragment") return null;
+    const mouthZ = ASCENT.wallFrontZ - 6;
+    const sourceZ = CFG.gateWallZ + ASCENT.wallDepth / 2 - 5.2;
+    const stairZ = ASCENT.stairEndZ;
+    const upperY = ASCENT.upperY;
+    const portalHalfWidth = (CFG.gateWidth - 13) / 2;
+    return {
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+if (vPositionW.z >= ${stairZ.toFixed(3)}
+  && vPositionW.z <= ${sourceZ.toFixed(3)}
+  && vPositionW.y >= ${(upperY - 0.32).toFixed(3)}
+  && vPositionW.y <= ${(upperY + 0.20).toFixed(3)}
+  && abs(vPositionW.x) <= ${(portalHalfWidth * 1.72).toFixed(3)}) {
+float sanctuaryFloorApproach = clamp((${mouthZ.toFixed(3)} - vPositionW.z)
+  / ${(mouthZ - stairZ).toFixed(3)}, 0.0, 1.0);
+float sanctuaryFloorInterior = clamp((vPositionW.z - ${mouthZ.toFixed(3)})
+  / ${(sourceZ - mouthZ).toFixed(3)}, 0.0, 1.0);
+float sanctuaryFloorAlong = 1.0 - smoothstep(0.92, 1.0, sanctuaryFloorApproach);
+float sanctuaryFloorTop = smoothstep(${(upperY - 0.32).toFixed(3)},
+  ${(upperY - 0.05).toFixed(3)}, vPositionW.y)
+  * (1.0 - smoothstep(${(upperY + 0.04).toFixed(3)},
+    ${(upperY + 0.20).toFixed(3)}, vPositionW.y));
+float sanctuaryFloorHalfWidth = mix(${(portalHalfWidth * 1.05).toFixed(3)},
+  ${(portalHalfWidth * 1.72).toFixed(3)}, sanctuaryFloorApproach);
+float sanctuaryFloorSide = abs(vPositionW.x) / sanctuaryFloorHalfWidth;
+float sanctuaryFloorSpread = 1.0 - smoothstep(0.58, 1.05, sanctuaryFloorSide);
+float sanctuaryFloorRipple = 0.86 + 0.14
+  * sin(vPositionW.x * 0.12 + sanctuaryFloorApproach * 5.0
+    - sanctuaryPortalFloorLight.x * 0.48)
+  * sin(sanctuaryFloorApproach * 7.0 + sanctuaryPortalFloorLight.x * 0.31);
+float sanctuaryFloorPower = mix(0.72, 0.16, sanctuaryFloorApproach)
+  + 0.55 * sanctuaryFloorInterior;
+float sanctuaryFloorStrength = sanctuaryFloorAlong * sanctuaryFloorTop
+  * sanctuaryFloorSpread * sanctuaryFloorRipple
+  * sanctuaryFloorPower
+  * (0.84 + 0.16 * sanctuaryPortalFloorLight.y);
+color.rgb += vec3(0.36, 0.57, 0.84) * sanctuaryFloorStrength;
+}
+`,
+    };
+  }
+}
+
 // Use the portal's dark distance haze on the wall, then dissolve its upper stone
 // into the crimson sky. Babylon's brighter EXP2 fog would wash the wall red.
 class SanctuaryWallFogPlugin extends MaterialPluginBase {
@@ -431,6 +502,9 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
   new SanctuaryLateralBrumePlugin(wallMat);
   new SanctuaryWallFogPlugin(wallMat, heightFogEnabled);
   new SanctuaryApproachFogPlugin(stairsMat);
+  const portalFloorLight = new SanctuaryPortalFloorLightPlugin(stairsMat);
+  // The inner passage floor is wallGateLower's top face, which uses wall stone.
+  const portalInnerFloorLight = new SanctuaryPortalFloorLightPlugin(wallMat);
   if (stone.parapet !== stairsMat) new SanctuaryApproachFogPlugin(stone.parapet);
   const gold = mat(scene, "sanctuaryCagedLight", new Color3(.95,.68,.38), new Color3(.9,.64,.35));
   const freed = mat(scene, "sanctuaryFreedLight", new Color3(.55,.67,.9), new Color3(.27,.39,.69));
@@ -487,14 +561,17 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
   reflectors.push(gateLower, gateLintel);
   const portalSurface = slab(scene, "gateRedVoid", gap - 13, ASCENT.portalHeight, 2,
     [0, ASCENT.upperY + ASCENT.portalHeight / 2, CFG.gateWallZ + ASCENT.wallDepth / 2 - 3.5], black);
-  const portalEffect = createSanctuaryAbyssPortal(scene, portalSurface);
+  const portalEffect = createSanctuaryAbyssPortalHybrid(scene, portalSurface, {
+    mobile, portalMouthZ: ASCENT.wallFrontZ - 6,
+  });
   portalEffect.material.setFloat("uFog", 1.2);
   portalEffect.material.setFloat("uGlow", 1.4);
   scene.onDisposeObservable.addOnce(() => portalEffect.dispose());
   reflectors.push(portalSurface);
   for (const x of [-gap / 2, gap / 2]) {
-    slab(scene, "gateJaw", 12, ASCENT.portalHeight, ASCENT.wallDepth,
-      [x, ASCENT.upperY + ASCENT.portalHeight / 2, CFG.gateWallZ], black);
+    const jaw = slab(scene, "gateJaw", 12, ASCENT.portalHeight, ASCENT.wallDepth,
+      [x, ASCENT.upperY + ASCENT.portalHeight / 2, CFG.gateWallZ], wallMat);
+    alignWallStoneUvs(jaw);
   }
 
   // The supplied arch is one unit tall. Raise it above the existing gate
@@ -509,6 +586,14 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
   mainPortalRoot.position.set(0, ASCENT.upperY, ASCENT.wallFrontZ - 6);
   mainPortalRoot.scaling.set(gap * 2.25, ASCENT.portalHeight * 1.25, gap * 1.75);
   mainPortal.addAllToScene();
+  const frameLight = new PointLight("sanctuaryPortalFrameFill", new Vector3(
+    0, ASCENT.upperY + ASCENT.portalHeight * 0.56, ASCENT.wallFrontZ + 22,
+  ), scene);
+  frameLight.diffuse = new Color3(0.58, 0.76, 1.0);
+  frameLight.specular = new Color3(0.38, 0.57, 0.82);
+  frameLight.range = mobile ? 145 : 175;
+  frameLight.intensity = 0;
+  frameLight.includedOnlyMeshes.push(...mainPortal.meshes);
   for (const root of mainPortal.rootNodes) root.parent = mainPortalRoot;
   for (const material of mainPortal.materials) {
     if (!(material instanceof PBRMaterial)) continue;
@@ -518,9 +603,10 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
     material.roughness = .95;
     material.specularIntensity = .035;
     material.environmentIntensity = .035;
+    material.maxSimultaneousLights = mobile ? 5 : 6;
     // Use a darker, controlled distance haze instead of the bright scene fog.
     material.fogEnabled = false;
-    new SanctuaryDistanceHazePlugin(material);
+    new SanctuaryDistanceHazePlugin(material, 0.40);
   }
   for (const mesh of mainPortal.meshes) {
     mesh.isPickable = false;
@@ -802,6 +888,11 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
     cloudMode: clouds.mode,
     waterMode: water.quality,
     update(_dt, elapsed, currentProgress) {
+      portalFloorLight.update(elapsed);
+      portalInnerFloorLight.update(elapsed);
+      const portalPulse = 0.80 + 0.20 * Math.sin(elapsed * 1.7)
+        + 0.09 * Math.sin(elapsed * 2.9);
+      frameLight.intensity = (mobile ? 2.6 : 3.6) * portalPulse;
       water.update(elapsed);
       atmosphere.update(elapsed);
       const cameraPosition = scene.activeCamera?.globalPosition ?? Vector3.Zero();

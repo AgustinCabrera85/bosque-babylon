@@ -17,7 +17,8 @@
     "stairs:verify": "esbuild scripts/verify-theatre-stairs.mts --bundle --platform=node --format=esm --target=node22 --outfile=dist/verify-theatre-stairs.mjs && node dist/verify-theatre-stairs.mjs",
     "enemies:verify": "esbuild scripts/verify-enemy-combat.mts --bundle --platform=node --format=esm --target=node22 --outfile=dist/verify-enemy-combat.mjs && node dist/verify-enemy-combat.mjs",
     "cursor:verify": "esbuild scripts/verify-cursor-system.mts --bundle --platform=node --format=esm --target=node22 --outfile=dist/verify-cursor-system.mjs && node dist/verify-cursor-system.mjs",
-    "cursor:verify-browser": "node scripts/verify-cursor-browser.mjs"
+    "cursor:verify-browser": "node scripts/verify-cursor-browser.mjs",
+    "portal:verify-plugins": "esbuild scripts/verify-sanctuary-portal-plugins.mts --bundle --platform=node --format=esm --target=node22 --outfile=dist/verify-sanctuary-portal-plugins.mjs && node dist/verify-sanctuary-portal-plugins.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",

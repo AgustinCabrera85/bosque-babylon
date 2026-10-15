@@ -1,0 +1,2005 @@
+{
+  "schema": "lrlo.sanctuary.forest_portal.atlas.v1",
+  "version": "1.0.0",
+  "portal_id": "libre-de-culpas",
+  "atlas_origin": "top_left_px_uv_bottom",
+  "atlases": [
+    {
+      "file": "forest_atlas_00.webp",
+      "width": 2048,
+      "height": 2048
+    },
+    {
+      "file": "forest_atlas_01.webp",
+      "width": 2048,
+      "height": 2048
+    }
+  ],
+  "sprites": [
+    {
+      "id": "ancient_vines",
+      "category": "roots",
+      "origin_sheet": "c",
+      "origin_box": [
+        323,
+        0,
+        464,
+        124
+      ],
+      "width": 206,
+      "height": 246,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 6,
+        "y": 726,
+        "width": 206,
+        "height": 246
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0029296875,
+        "v0": 0.525390625,
+        "u1": 0.103515625,
+        "v1": 0.6455078125
+      },
+      "mask_svg": "masks_svg/ancient_vines.svg",
+      "png_source": "sprites_png/ancient_vines.png",
+      "size_original": {
+        "width": 206,
+        "height": 246
+      }
+    },
+    {
+      "id": "black_canopy_01",
+      "category": "canopy",
+      "origin_sheet": "b",
+      "origin_box": [
+        263,
+        0,
+        334,
+        71
+      ],
+      "width": 142,
+      "height": 142,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1181,
+        "y": 1324,
+        "width": 142,
+        "height": 142
+      },
+      "uv_bottom_origin": {
+        "u0": 0.57666015625,
+        "v0": 0.2841796875,
+        "u1": 0.64599609375,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/black_canopy_01.svg",
+      "png_source": "sprites_png/black_canopy_01.png",
+      "size_original": {
+        "width": 142,
+        "height": 142
+      }
+    },
+    {
+      "id": "black_canopy_02",
+      "category": "canopy",
+      "origin_sheet": "b",
+      "origin_box": [
+        319,
+        49,
+        377,
+        120
+      ],
+      "width": 114,
+      "height": 142,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1785,
+        "y": 1324,
+        "width": 114,
+        "height": 142
+      },
+      "uv_bottom_origin": {
+        "u0": 0.87158203125,
+        "v0": 0.2841796875,
+        "u1": 0.92724609375,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/black_canopy_02.svg",
+      "png_source": "sprites_png/black_canopy_02.png",
+      "size_original": {
+        "width": 114,
+        "height": 142
+      }
+    },
+    {
+      "id": "bush_dark_01",
+      "category": "foliage",
+      "origin_sheet": "b",
+      "origin_box": [
+        305,
+        68,
+        351,
+        119
+      ],
+      "width": 115,
+      "height": 128,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 128,
+        "y": 1524,
+        "width": 115,
+        "height": 128
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0625,
+        "v0": 0.193359375,
+        "u1": 0.11865234375,
+        "v1": 0.255859375
+      },
+      "mask_svg": "masks_svg/bush_dark_01.svg",
+      "png_source": "sprites_png/bush_dark_01.png",
+      "size_original": {
+        "width": 115,
+        "height": 128
+      }
+    },
+    {
+      "id": "dead_tree_01",
+      "category": "tree",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 300,
+      "height": 580,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 412,
+        "y": 6,
+        "width": 300,
+        "height": 580
+      },
+      "uv_bottom_origin": {
+        "u0": 0.201171875,
+        "v0": 0.7138671875,
+        "u1": 0.34765625,
+        "v1": 0.9970703125
+      },
+      "mask_svg": "masks_svg/dead_tree_01.svg",
+      "png_source": "sprites_png/dead_tree_01.png",
+      "size_original": {
+        "width": 300,
+        "height": 580
+      }
+    },
+    {
+      "id": "dead_tree_02",
+      "category": "tree",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 300,
+      "height": 580,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 718,
+        "y": 6,
+        "width": 300,
+        "height": 580
+      },
+      "uv_bottom_origin": {
+        "u0": 0.3505859375,
+        "v0": 0.7138671875,
+        "u1": 0.4970703125,
+        "v1": 0.9970703125
+      },
+      "mask_svg": "masks_svg/dead_tree_02.svg",
+      "png_source": "sprites_png/dead_tree_02.png",
+      "size_original": {
+        "width": 300,
+        "height": 580
+      }
+    },
+    {
+      "id": "dead_tree_03",
+      "category": "tree",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 300,
+      "height": 580,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 1024,
+        "y": 6,
+        "width": 300,
+        "height": 580
+      },
+      "uv_bottom_origin": {
+        "u0": 0.5,
+        "v0": 0.7138671875,
+        "u1": 0.646484375,
+        "v1": 0.9970703125
+      },
+      "mask_svg": "masks_svg/dead_tree_03.svg",
+      "png_source": "sprites_png/dead_tree_03.png",
+      "size_original": {
+        "width": 300,
+        "height": 580
+      }
+    },
+    {
+      "id": "dead_tree_04",
+      "category": "tree",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 300,
+      "height": 580,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 1330,
+        "y": 6,
+        "width": 300,
+        "height": 580
+      },
+      "uv_bottom_origin": {
+        "u0": 0.6494140625,
+        "v0": 0.7138671875,
+        "u1": 0.7958984375,
+        "v1": 0.9970703125
+      },
+      "mask_svg": "masks_svg/dead_tree_04.svg",
+      "png_source": "sprites_png/dead_tree_04.png",
+      "size_original": {
+        "width": 300,
+        "height": 580
+      }
+    },
+    {
+      "id": "dead_tree_05",
+      "category": "tree",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 300,
+      "height": 580,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 1636,
+        "y": 6,
+        "width": 300,
+        "height": 580
+      },
+      "uv_bottom_origin": {
+        "u0": 0.798828125,
+        "v0": 0.7138671875,
+        "u1": 0.9453125,
+        "v1": 0.9970703125
+      },
+      "mask_svg": "masks_svg/dead_tree_05.svg",
+      "png_source": "sprites_png/dead_tree_05.png",
+      "size_original": {
+        "width": 300,
+        "height": 580
+      }
+    },
+    {
+      "id": "dead_tree_06",
+      "category": "tree",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 300,
+      "height": 580,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 6,
+        "y": 592,
+        "width": 300,
+        "height": 580
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0029296875,
+        "v0": 0.427734375,
+        "u1": 0.1494140625,
+        "v1": 0.7109375
+      },
+      "mask_svg": "masks_svg/dead_tree_06.svg",
+      "png_source": "sprites_png/dead_tree_06.png",
+      "size_original": {
+        "width": 300,
+        "height": 580
+      }
+    },
+    {
+      "id": "dead_tree_07",
+      "category": "tree",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 300,
+      "height": 580,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 312,
+        "y": 592,
+        "width": 300,
+        "height": 580
+      },
+      "uv_bottom_origin": {
+        "u0": 0.15234375,
+        "v0": 0.427734375,
+        "u1": 0.298828125,
+        "v1": 0.7109375
+      },
+      "mask_svg": "masks_svg/dead_tree_07.svg",
+      "png_source": "sprites_png/dead_tree_07.png",
+      "size_original": {
+        "width": 300,
+        "height": 580
+      }
+    },
+    {
+      "id": "dead_tree_08",
+      "category": "tree",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 300,
+      "height": 580,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 618,
+        "y": 592,
+        "width": 300,
+        "height": 580
+      },
+      "uv_bottom_origin": {
+        "u0": 0.3017578125,
+        "v0": 0.427734375,
+        "u1": 0.4482421875,
+        "v1": 0.7109375
+      },
+      "mask_svg": "masks_svg/dead_tree_08.svg",
+      "png_source": "sprites_png/dead_tree_08.png",
+      "size_original": {
+        "width": 300,
+        "height": 580
+      }
+    },
+    {
+      "id": "dead_tree_09",
+      "category": "tree",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 300,
+      "height": 580,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 924,
+        "y": 592,
+        "width": 300,
+        "height": 580
+      },
+      "uv_bottom_origin": {
+        "u0": 0.451171875,
+        "v0": 0.427734375,
+        "u1": 0.59765625,
+        "v1": 0.7109375
+      },
+      "mask_svg": "masks_svg/dead_tree_09.svg",
+      "png_source": "sprites_png/dead_tree_09.png",
+      "size_original": {
+        "width": 300,
+        "height": 580
+      }
+    },
+    {
+      "id": "fern_dripping",
+      "category": "foliage",
+      "origin_sheet": "c",
+      "origin_box": [
+        468,
+        0,
+        614,
+        124
+      ],
+      "width": 292,
+      "height": 248,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 266,
+        "y": 388,
+        "width": 292,
+        "height": 248
+      },
+      "uv_bottom_origin": {
+        "u0": 0.1298828125,
+        "v0": 0.689453125,
+        "u1": 0.2724609375,
+        "v1": 0.810546875
+      },
+      "mask_svg": "masks_svg/fern_dripping.svg",
+      "png_source": "sprites_png/fern_dripping.png",
+      "size_original": {
+        "width": 292,
+        "height": 248
+      }
+    },
+    {
+      "id": "fern_green_01",
+      "category": "foliage",
+      "origin_sheet": "b",
+      "origin_box": [
+        139,
+        139,
+        220,
+        238
+      ],
+      "width": 162,
+      "height": 198,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1845,
+        "y": 1062,
+        "width": 162,
+        "height": 198
+      },
+      "uv_bottom_origin": {
+        "u0": 0.90087890625,
+        "v0": 0.384765625,
+        "u1": 0.97998046875,
+        "v1": 0.4814453125
+      },
+      "mask_svg": "masks_svg/fern_green_01.svg",
+      "png_source": "sprites_png/fern_green_01.png",
+      "size_original": {
+        "width": 162,
+        "height": 198
+      }
+    },
+    {
+      "id": "fern_green_02",
+      "category": "foliage",
+      "origin_sheet": "b",
+      "origin_box": [
+        8,
+        236,
+        63,
+        281
+      ],
+      "width": 148,
+      "height": 128,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1487,
+        "y": 1324,
+        "width": 148,
+        "height": 128
+      },
+      "uv_bottom_origin": {
+        "u0": 0.72607421875,
+        "v0": 0.291015625,
+        "u1": 0.79833984375,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/fern_green_02.svg",
+      "png_source": "sprites_png/fern_green_02.png",
+      "size_original": {
+        "width": 148,
+        "height": 128
+      }
+    },
+    {
+      "id": "fern_green_03",
+      "category": "foliage",
+      "origin_sheet": "b",
+      "origin_box": [
+        112,
+        230,
+        170,
+        298
+      ],
+      "width": 116,
+      "height": 136,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 6,
+        "y": 1524,
+        "width": 116,
+        "height": 136
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0029296875,
+        "v0": 0.189453125,
+        "u1": 0.0595703125,
+        "v1": 0.255859375
+      },
+      "mask_svg": "masks_svg/fern_green_03.svg",
+      "png_source": "sprites_png/fern_green_03.png",
+      "size_original": {
+        "width": 116,
+        "height": 136
+      }
+    },
+    {
+      "id": "fern_shadow_01",
+      "category": "foliage",
+      "origin_sheet": "a",
+      "origin_box": [
+        283,
+        199,
+        359,
+        272
+      ],
+      "width": 152,
+      "height": 146,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 844,
+        "y": 1324,
+        "width": 152,
+        "height": 146
+      },
+      "uv_bottom_origin": {
+        "u0": 0.412109375,
+        "v0": 0.2822265625,
+        "u1": 0.486328125,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/fern_shadow_01.svg",
+      "png_source": "sprites_png/fern_shadow_01.png",
+      "size_original": {
+        "width": 152,
+        "height": 146
+      }
+    },
+    {
+      "id": "fern_shadow_02",
+      "category": "foliage",
+      "origin_sheet": "a",
+      "origin_box": [
+        350,
+        195,
+        435,
+        284
+      ],
+      "width": 170,
+      "height": 178,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 6,
+        "y": 1324,
+        "width": 170,
+        "height": 178
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0029296875,
+        "v0": 0.2666015625,
+        "u1": 0.0859375,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/fern_shadow_02.svg",
+      "png_source": "sprites_png/fern_shadow_02.png",
+      "size_original": {
+        "width": 170,
+        "height": 178
+      }
+    },
+    {
+      "id": "fern_shadow_03",
+      "category": "foliage",
+      "origin_sheet": "a",
+      "origin_box": [
+        447,
+        162,
+        514,
+        260
+      ],
+      "width": 134,
+      "height": 194,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 534,
+        "y": 1324,
+        "width": 134,
+        "height": 194
+      },
+      "uv_bottom_origin": {
+        "u0": 0.2607421875,
+        "v0": 0.2587890625,
+        "u1": 0.326171875,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/fern_shadow_03.svg",
+      "png_source": "sprites_png/fern_shadow_03.png",
+      "size_original": {
+        "width": 134,
+        "height": 194
+      }
+    },
+    {
+      "id": "fern_shadow_04",
+      "category": "foliage",
+      "origin_sheet": "a",
+      "origin_box": [
+        92,
+        258,
+        195,
+        343
+      ],
+      "width": 206,
+      "height": 166,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1633,
+        "y": 1062,
+        "width": 206,
+        "height": 166
+      },
+      "uv_bottom_origin": {
+        "u0": 0.79736328125,
+        "v0": 0.400390625,
+        "u1": 0.89794921875,
+        "v1": 0.4814453125
+      },
+      "mask_svg": "masks_svg/fern_shadow_04.svg",
+      "png_source": "sprites_png/fern_shadow_04.png",
+      "size_original": {
+        "width": 206,
+        "height": 166
+      }
+    },
+    {
+      "id": "fog_ashen",
+      "category": "mist",
+      "origin_sheet": "a",
+      "origin_box": [
+        318,
+        264,
+        477,
+        342
+      ],
+      "width": 318,
+      "height": 156,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 386,
+        "y": 726,
+        "width": 318,
+        "height": 156
+      },
+      "uv_bottom_origin": {
+        "u0": 0.1884765625,
+        "v0": 0.5693359375,
+        "u1": 0.34375,
+        "v1": 0.6455078125
+      },
+      "mask_svg": "masks_svg/fog_ashen.svg",
+      "png_source": "sprites_png/fog_ashen.png",
+      "size_original": {
+        "width": 318,
+        "height": 156
+      }
+    },
+    {
+      "id": "fog_stone",
+      "category": "ground",
+      "origin_sheet": "a",
+      "origin_box": [
+        433,
+        254,
+        502,
+        321
+      ],
+      "width": 138,
+      "height": 134,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1641,
+        "y": 1324,
+        "width": 138,
+        "height": 134
+      },
+      "uv_bottom_origin": {
+        "u0": 0.80126953125,
+        "v0": 0.2880859375,
+        "u1": 0.86865234375,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/fog_stone.svg",
+      "png_source": "sprites_png/fog_stone.png",
+      "size_original": {
+        "width": 138,
+        "height": 134
+      }
+    },
+    {
+      "id": "foliage_crown_left",
+      "category": "canopy",
+      "origin_sheet": "a",
+      "origin_box": [
+        502,
+        3,
+        630,
+        112
+      ],
+      "width": 256,
+      "height": 214,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1722,
+        "y": 388,
+        "width": 256,
+        "height": 214
+      },
+      "uv_bottom_origin": {
+        "u0": 0.8408203125,
+        "v0": 0.7060546875,
+        "u1": 0.9658203125,
+        "v1": 0.810546875
+      },
+      "mask_svg": "masks_svg/foliage_crown_left.svg",
+      "png_source": "sprites_png/foliage_crown_left.png",
+      "size_original": {
+        "width": 256,
+        "height": 214
+      }
+    },
+    {
+      "id": "forest_mist_01",
+      "category": "mist",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 650,
+      "height": 210,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 352,
+        "y": 1178,
+        "width": 650,
+        "height": 210
+      },
+      "uv_bottom_origin": {
+        "u0": 0.171875,
+        "v0": 0.322265625,
+        "u1": 0.4892578125,
+        "v1": 0.4248046875
+      },
+      "mask_svg": "masks_svg/forest_mist_01.svg",
+      "png_source": "sprites_png/forest_mist_01.png",
+      "size_original": {
+        "width": 650,
+        "height": 210
+      }
+    },
+    {
+      "id": "forest_mist_02",
+      "category": "mist",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 650,
+      "height": 210,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 1008,
+        "y": 1178,
+        "width": 650,
+        "height": 210
+      },
+      "uv_bottom_origin": {
+        "u0": 0.4921875,
+        "v0": 0.322265625,
+        "u1": 0.8095703125,
+        "v1": 0.4248046875
+      },
+      "mask_svg": "masks_svg/forest_mist_02.svg",
+      "png_source": "sprites_png/forest_mist_02.png",
+      "size_original": {
+        "width": 650,
+        "height": 210
+      }
+    },
+    {
+      "id": "forest_mist_03",
+      "category": "mist",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 650,
+      "height": 210,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 6,
+        "y": 1644,
+        "width": 650,
+        "height": 210
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0029296875,
+        "v0": 0.0947265625,
+        "u1": 0.3203125,
+        "v1": 0.197265625
+      },
+      "mask_svg": "masks_svg/forest_mist_03.svg",
+      "png_source": "sprites_png/forest_mist_03.png",
+      "size_original": {
+        "width": 650,
+        "height": 210
+      }
+    },
+    {
+      "id": "forest_mist_04",
+      "category": "mist",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 650,
+      "height": 210,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 662,
+        "y": 1644,
+        "width": 650,
+        "height": 210
+      },
+      "uv_bottom_origin": {
+        "u0": 0.3232421875,
+        "v0": 0.0947265625,
+        "u1": 0.640625,
+        "v1": 0.197265625
+      },
+      "mask_svg": "masks_svg/forest_mist_04.svg",
+      "png_source": "sprites_png/forest_mist_04.png",
+      "size_original": {
+        "width": 650,
+        "height": 210
+      }
+    },
+    {
+      "id": "forest_mist_05",
+      "category": "mist",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 650,
+      "height": 210,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 1318,
+        "y": 1644,
+        "width": 650,
+        "height": 210
+      },
+      "uv_bottom_origin": {
+        "u0": 0.6435546875,
+        "v0": 0.0947265625,
+        "u1": 0.9609375,
+        "v1": 0.197265625
+      },
+      "mask_svg": "masks_svg/forest_mist_05.svg",
+      "png_source": "sprites_png/forest_mist_05.png",
+      "size_original": {
+        "width": 650,
+        "height": 210
+      }
+    },
+    {
+      "id": "forest_thicket",
+      "category": "foliage",
+      "origin_sheet": "b",
+      "origin_box": [
+        8,
+        274,
+        111,
+        366
+      ],
+      "width": 204,
+      "height": 184,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1147,
+        "y": 1062,
+        "width": 204,
+        "height": 184
+      },
+      "uv_bottom_origin": {
+        "u0": 0.56005859375,
+        "v0": 0.3916015625,
+        "u1": 0.65966796875,
+        "v1": 0.4814453125
+      },
+      "mask_svg": "masks_svg/forest_thicket.svg",
+      "png_source": "sprites_png/forest_thicket.png",
+      "size_original": {
+        "width": 204,
+        "height": 184
+      }
+    },
+    {
+      "id": "hanging_vines_01",
+      "category": "roots",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 340,
+      "height": 460,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 1558,
+        "y": 592,
+        "width": 340,
+        "height": 460
+      },
+      "uv_bottom_origin": {
+        "u0": 0.7607421875,
+        "v0": 0.486328125,
+        "u1": 0.9267578125,
+        "v1": 0.7109375
+      },
+      "mask_svg": "masks_svg/hanging_vines_01.svg",
+      "png_source": "sprites_png/hanging_vines_01.png",
+      "size_original": {
+        "width": 340,
+        "height": 460
+      }
+    },
+    {
+      "id": "hanging_vines_02",
+      "category": "roots",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 400,
+      "height": 460,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 6,
+        "y": 6,
+        "width": 400,
+        "height": 460
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0029296875,
+        "v0": 0.7724609375,
+        "u1": 0.1982421875,
+        "v1": 0.9970703125
+      },
+      "mask_svg": "masks_svg/hanging_vines_02.svg",
+      "png_source": "sprites_png/hanging_vines_02.png",
+      "size_original": {
+        "width": 400,
+        "height": 460
+      }
+    },
+    {
+      "id": "hanging_vines_03",
+      "category": "roots",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 340,
+      "height": 460,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 6,
+        "y": 1178,
+        "width": 340,
+        "height": 460
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0029296875,
+        "v0": 0.2001953125,
+        "u1": 0.1689453125,
+        "v1": 0.4248046875
+      },
+      "mask_svg": "masks_svg/hanging_vines_03.svg",
+      "png_source": "sprites_png/hanging_vines_03.png",
+      "size_original": {
+        "width": 340,
+        "height": 460
+      }
+    },
+    {
+      "id": "ivy_pillar_01",
+      "category": "ruin",
+      "origin_sheet": "b",
+      "origin_box": [
+        70,
+        1,
+        151,
+        157
+      ],
+      "width": 162,
+      "height": 312,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 218,
+        "y": 726,
+        "width": 162,
+        "height": 312
+      },
+      "uv_bottom_origin": {
+        "u0": 0.1064453125,
+        "v0": 0.4931640625,
+        "u1": 0.185546875,
+        "v1": 0.6455078125
+      },
+      "mask_svg": "masks_svg/ivy_pillar_01.svg",
+      "png_source": "sprites_png/ivy_pillar_01.png",
+      "size_original": {
+        "width": 162,
+        "height": 312
+      }
+    },
+    {
+      "id": "ivy_pillar_02",
+      "category": "ruin",
+      "origin_sheet": "b",
+      "origin_box": [
+        208,
+        1,
+        279,
+        166
+      ],
+      "width": 142,
+      "height": 330,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1038,
+        "y": 726,
+        "width": 142,
+        "height": 330
+      },
+      "uv_bottom_origin": {
+        "u0": 0.5068359375,
+        "v0": 0.484375,
+        "u1": 0.576171875,
+        "v1": 0.6455078125
+      },
+      "mask_svg": "masks_svg/ivy_pillar_02.svg",
+      "png_source": "sprites_png/ivy_pillar_02.png",
+      "size_original": {
+        "width": 142,
+        "height": 330
+      }
+    },
+    {
+      "id": "ivy_stele",
+      "category": "ruin",
+      "origin_sheet": "b",
+      "origin_box": [
+        142,
+        56,
+        215,
+        154
+      ],
+      "width": 146,
+      "height": 194,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 382,
+        "y": 1324,
+        "width": 146,
+        "height": 194
+      },
+      "uv_bottom_origin": {
+        "u0": 0.1865234375,
+        "v0": 0.2587890625,
+        "u1": 0.2578125,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/ivy_stele.svg",
+      "png_source": "sprites_png/ivy_stele.png",
+      "size_original": {
+        "width": 146,
+        "height": 194
+      }
+    },
+    {
+      "id": "lone_fern",
+      "category": "foliage",
+      "origin_sheet": "b",
+      "origin_box": [
+        256,
+        64,
+        310,
+        118
+      ],
+      "width": 126,
+      "height": 128,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1905,
+        "y": 1324,
+        "width": 126,
+        "height": 128
+      },
+      "uv_bottom_origin": {
+        "u0": 0.93017578125,
+        "v0": 0.291015625,
+        "u1": 0.99169921875,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/lone_fern.svg",
+      "png_source": "sprites_png/lone_fern.png",
+      "size_original": {
+        "width": 126,
+        "height": 128
+      }
+    },
+    {
+      "id": "mist_breath_long",
+      "category": "mist",
+      "origin_sheet": "b",
+      "origin_box": [
+        83,
+        260,
+        295,
+        366
+      ],
+      "width": 406,
+      "height": 212,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1290,
+        "y": 6,
+        "width": 406,
+        "height": 212
+      },
+      "uv_bottom_origin": {
+        "u0": 0.6298828125,
+        "v0": 0.8935546875,
+        "u1": 0.828125,
+        "v1": 0.9970703125
+      },
+      "mask_svg": "masks_svg/mist_breath_long.svg",
+      "png_source": "sprites_png/mist_breath_long.png",
+      "size_original": {
+        "width": 406,
+        "height": 212
+      }
+    },
+    {
+      "id": "mist_large",
+      "category": "mist",
+      "origin_sheet": "c",
+      "origin_box": [
+        1028,
+        0,
+        1298,
+        122
+      ],
+      "width": 528,
+      "height": 226,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 384,
+        "y": 6,
+        "width": 528,
+        "height": 226
+      },
+      "uv_bottom_origin": {
+        "u0": 0.1875,
+        "v0": 0.88671875,
+        "u1": 0.4453125,
+        "v1": 0.9970703125
+      },
+      "mask_svg": "masks_svg/mist_large.svg",
+      "png_source": "sprites_png/mist_large.png",
+      "size_original": {
+        "width": 528,
+        "height": 226
+      }
+    },
+    {
+      "id": "moss_circle_01",
+      "category": "ground",
+      "origin_sheet": "b",
+      "origin_box": [
+        137,
+        1,
+        214,
+        59
+      ],
+      "width": 173,
+      "height": 128,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1002,
+        "y": 1324,
+        "width": 173,
+        "height": 128
+      },
+      "uv_bottom_origin": {
+        "u0": 0.4892578125,
+        "v0": 0.291015625,
+        "u1": 0.57373046875,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/moss_circle_01.svg",
+      "png_source": "sprites_png/moss_circle_01.png",
+      "size_original": {
+        "width": 173,
+        "height": 128
+      }
+    },
+    {
+      "id": "moss_islet_long",
+      "category": "ground",
+      "origin_sheet": "a",
+      "origin_box": [
+        91,
+        77,
+        225,
+        160
+      ],
+      "width": 266,
+      "height": 166,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1418,
+        "y": 726,
+        "width": 266,
+        "height": 166
+      },
+      "uv_bottom_origin": {
+        "u0": 0.6923828125,
+        "v0": 0.564453125,
+        "u1": 0.822265625,
+        "v1": 0.6455078125
+      },
+      "mask_svg": "masks_svg/moss_islet_long.svg",
+      "png_source": "sprites_png/moss_islet_long.png",
+      "size_original": {
+        "width": 266,
+        "height": 166
+      }
+    },
+    {
+      "id": "moss_rock_fragments",
+      "category": "ground",
+      "origin_sheet": "a",
+      "origin_box": [
+        183,
+        267,
+        281,
+        344
+      ],
+      "width": 194,
+      "height": 150,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 182,
+        "y": 1324,
+        "width": 194,
+        "height": 150
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0888671875,
+        "v0": 0.2802734375,
+        "u1": 0.18359375,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/moss_rock_fragments.svg",
+      "png_source": "sprites_png/moss_rock_fragments.png",
+      "size_original": {
+        "width": 194,
+        "height": 150
+      }
+    },
+    {
+      "id": "moss_stones_01",
+      "category": "ground",
+      "origin_sheet": "a",
+      "origin_box": [
+        191,
+        88,
+        316,
+        138
+      ],
+      "width": 320,
+      "height": 128,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 176,
+        "y": 1062,
+        "width": 320,
+        "height": 128
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0859375,
+        "v0": 0.4189453125,
+        "u1": 0.2421875,
+        "v1": 0.4814453125
+      },
+      "mask_svg": "masks_svg/moss_stones_01.svg",
+      "png_source": "sprites_png/moss_stones_01.png",
+      "size_original": {
+        "width": 320,
+        "height": 128
+      }
+    },
+    {
+      "id": "moss_stones_02",
+      "category": "ground",
+      "origin_sheet": "a",
+      "origin_box": [
+        188,
+        133,
+        320,
+        188
+      ],
+      "width": 307,
+      "height": 128,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 502,
+        "y": 1062,
+        "width": 307,
+        "height": 128
+      },
+      "uv_bottom_origin": {
+        "u0": 0.2451171875,
+        "v0": 0.4189453125,
+        "u1": 0.39501953125,
+        "v1": 0.4814453125
+      },
+      "mask_svg": "masks_svg/moss_stones_02.svg",
+      "png_source": "sprites_png/moss_stones_02.png",
+      "size_original": {
+        "width": 307,
+        "height": 128
+      }
+    },
+    {
+      "id": "moss_stones_03",
+      "category": "ground",
+      "origin_sheet": "a",
+      "origin_box": [
+        188,
+        173,
+        306,
+        229
+      ],
+      "width": 270,
+      "height": 128,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1357,
+        "y": 1062,
+        "width": 270,
+        "height": 128
+      },
+      "uv_bottom_origin": {
+        "u0": 0.66259765625,
+        "v0": 0.4189453125,
+        "u1": 0.79443359375,
+        "v1": 0.4814453125
+      },
+      "mask_svg": "masks_svg/moss_stones_03.svg",
+      "png_source": "sprites_png/moss_stones_03.png",
+      "size_original": {
+        "width": 270,
+        "height": 128
+      }
+    },
+    {
+      "id": "mushrooms_green",
+      "category": "foliage",
+      "origin_sheet": "c",
+      "origin_box": [
+        752,
+        0,
+        879,
+        123
+      ],
+      "width": 254,
+      "height": 246,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 838,
+        "y": 388,
+        "width": 254,
+        "height": 246
+      },
+      "uv_bottom_origin": {
+        "u0": 0.4091796875,
+        "v0": 0.6904296875,
+        "u1": 0.533203125,
+        "v1": 0.810546875
+      },
+      "mask_svg": "masks_svg/mushrooms_green.svg",
+      "png_source": "sprites_png/mushrooms_green.png",
+      "size_original": {
+        "width": 254,
+        "height": 246
+      }
+    },
+    {
+      "id": "mushrooms_orange",
+      "category": "foliage",
+      "origin_sheet": "a",
+      "origin_box": [
+        262,
+        270,
+        344,
+        342
+      ],
+      "width": 164,
+      "height": 144,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 674,
+        "y": 1324,
+        "width": 164,
+        "height": 144
+      },
+      "uv_bottom_origin": {
+        "u0": 0.3291015625,
+        "v0": 0.283203125,
+        "u1": 0.4091796875,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/mushrooms_orange.svg",
+      "png_source": "sprites_png/mushrooms_orange.png",
+      "size_original": {
+        "width": 164,
+        "height": 144
+      }
+    },
+    {
+      "id": "oak_crown",
+      "category": "canopy",
+      "origin_sheet": "c",
+      "origin_box": [
+        1319,
+        0,
+        1502,
+        124
+      ],
+      "width": 366,
+      "height": 248,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 918,
+        "y": 6,
+        "width": 366,
+        "height": 248
+      },
+      "uv_bottom_origin": {
+        "u0": 0.4482421875,
+        "v0": 0.8759765625,
+        "u1": 0.626953125,
+        "v1": 0.9970703125
+      },
+      "mask_svg": "masks_svg/oak_crown.svg",
+      "png_source": "sprites_png/oak_crown.png",
+      "size_original": {
+        "width": 366,
+        "height": 248
+      }
+    },
+    {
+      "id": "oak_shadow",
+      "category": "tree",
+      "origin_sheet": "b",
+      "origin_box": [
+        17,
+        126,
+        144,
+        270
+      ],
+      "width": 254,
+      "height": 288,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 6,
+        "y": 388,
+        "width": 254,
+        "height": 288
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0029296875,
+        "v0": 0.669921875,
+        "u1": 0.126953125,
+        "v1": 0.810546875
+      },
+      "mask_svg": "masks_svg/oak_shadow.svg",
+      "png_source": "sprites_png/oak_shadow.png",
+      "size_original": {
+        "width": 254,
+        "height": 288
+      }
+    },
+    {
+      "id": "oak_shadow_02",
+      "category": "tree",
+      "origin_sheet": "b",
+      "origin_box": [
+        280,
+        107,
+        377,
+        257
+      ],
+      "width": 194,
+      "height": 300,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1292,
+        "y": 388,
+        "width": 194,
+        "height": 300
+      },
+      "uv_bottom_origin": {
+        "u0": 0.630859375,
+        "v0": 0.6640625,
+        "u1": 0.7255859375,
+        "v1": 0.810546875
+      },
+      "mask_svg": "masks_svg/oak_shadow_02.svg",
+      "png_source": "sprites_png/oak_shadow_02.png",
+      "size_original": {
+        "width": 194,
+        "height": 300
+      }
+    },
+    {
+      "id": "quiet_wisp_01",
+      "category": "light",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 160,
+      "height": 240,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 815,
+        "y": 1062,
+        "width": 160,
+        "height": 240
+      },
+      "uv_bottom_origin": {
+        "u0": 0.39794921875,
+        "v0": 0.3642578125,
+        "u1": 0.47607421875,
+        "v1": 0.4814453125
+      },
+      "mask_svg": "masks_svg/quiet_wisp_01.svg",
+      "png_source": "sprites_png/quiet_wisp_01.png",
+      "size_original": {
+        "width": 160,
+        "height": 240
+      }
+    },
+    {
+      "id": "quiet_wisp_02",
+      "category": "light",
+      "origin_sheet": "procedural",
+      "origin_box": null,
+      "width": 160,
+      "height": 240,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 981,
+        "y": 1062,
+        "width": 160,
+        "height": 240
+      },
+      "uv_bottom_origin": {
+        "u0": 0.47900390625,
+        "v0": 0.3642578125,
+        "u1": 0.55712890625,
+        "v1": 0.4814453125
+      },
+      "mask_svg": "masks_svg/quiet_wisp_02.svg",
+      "png_source": "sprites_png/quiet_wisp_02.png",
+      "size_original": {
+        "width": 160,
+        "height": 240
+      }
+    },
+    {
+      "id": "root_arch_left",
+      "category": "roots",
+      "origin_sheet": "a",
+      "origin_box": [
+        6,
+        2,
+        171,
+        253
+      ],
+      "width": 322,
+      "height": 502,
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 1230,
+        "y": 592,
+        "width": 322,
+        "height": 502
+      },
+      "uv_bottom_origin": {
+        "u0": 0.6005859375,
+        "v0": 0.4658203125,
+        "u1": 0.7578125,
+        "v1": 0.7109375
+      },
+      "mask_svg": "masks_svg/root_arch_left.svg",
+      "png_source": "sprites_png/root_arch_left.png",
+      "size_original": {
+        "width": 322,
+        "height": 502
+      }
+    },
+    {
+      "id": "root_arch_right",
+      "category": "roots",
+      "origin_sheet": "a",
+      "origin_box": [
+        160,
+        2,
+        346,
+        176
+      ],
+      "width": 372,
+      "height": 344,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 6,
+        "y": 6,
+        "width": 372,
+        "height": 344
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0029296875,
+        "v0": 0.8291015625,
+        "u1": 0.1845703125,
+        "v1": 0.9970703125
+      },
+      "mask_svg": "masks_svg/root_arch_right.svg",
+      "png_source": "sprites_png/root_arch_right.png",
+      "size_original": {
+        "width": 372,
+        "height": 344
+      }
+    },
+    {
+      "id": "root_crooked_lit",
+      "category": "roots",
+      "origin_sheet": "c",
+      "origin_box": [
+        5,
+        0,
+        142,
+        126
+      ],
+      "width": 268,
+      "height": 252,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 564,
+        "y": 388,
+        "width": 268,
+        "height": 252
+      },
+      "uv_bottom_origin": {
+        "u0": 0.275390625,
+        "v0": 0.6875,
+        "u1": 0.40625,
+        "v1": 0.810546875
+      },
+      "mask_svg": "masks_svg/root_crooked_lit.svg",
+      "png_source": "sprites_png/root_crooked_lit.png",
+      "size_original": {
+        "width": 268,
+        "height": 252
+      }
+    },
+    {
+      "id": "root_hand",
+      "category": "roots",
+      "origin_sheet": "a",
+      "origin_box": [
+        3,
+        241,
+        116,
+        344
+      ],
+      "width": 226,
+      "height": 206,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1186,
+        "y": 726,
+        "width": 226,
+        "height": 206
+      },
+      "uv_bottom_origin": {
+        "u0": 0.5791015625,
+        "v0": 0.544921875,
+        "u1": 0.689453125,
+        "v1": 0.6455078125
+      },
+      "mask_svg": "masks_svg/root_hand.svg",
+      "png_source": "sprites_png/root_hand.png",
+      "size_original": {
+        "width": 226,
+        "height": 206
+      }
+    },
+    {
+      "id": "shadow_apparition",
+      "category": "specter",
+      "origin_sheet": "c",
+      "origin_box": [
+        884,
+        0,
+        1022,
+        123
+      ],
+      "width": 224,
+      "height": 246,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1492,
+        "y": 388,
+        "width": 224,
+        "height": 246
+      },
+      "uv_bottom_origin": {
+        "u0": 0.728515625,
+        "v0": 0.6904296875,
+        "u1": 0.837890625,
+        "v1": 0.810546875
+      },
+      "mask_svg": "masks_svg/shadow_apparition.svg",
+      "png_source": "sprites_png/shadow_apparition.png",
+      "size_original": {
+        "width": 224,
+        "height": 246
+      }
+    },
+    {
+      "id": "small_rock_cairn",
+      "category": "ground",
+      "origin_sheet": "b",
+      "origin_box": [
+        151,
+        227,
+        220,
+        285
+      ],
+      "width": 152,
+      "height": 128,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1329,
+        "y": 1324,
+        "width": 152,
+        "height": 128
+      },
+      "uv_bottom_origin": {
+        "u0": 0.64892578125,
+        "v0": 0.291015625,
+        "u1": 0.72314453125,
+        "v1": 0.353515625
+      },
+      "mask_svg": "masks_svg/small_rock_cairn.svg",
+      "png_source": "sprites_png/small_rock_cairn.png",
+      "size_original": {
+        "width": 152,
+        "height": 128
+      }
+    },
+    {
+      "id": "specter_antler",
+      "category": "specter",
+      "origin_sheet": "a",
+      "origin_box": [
+        532,
+        153,
+        633,
+        341
+      ],
+      "width": 202,
+      "height": 376,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1702,
+        "y": 6,
+        "width": 202,
+        "height": 376
+      },
+      "uv_bottom_origin": {
+        "u0": 0.8310546875,
+        "v0": 0.8134765625,
+        "u1": 0.9296875,
+        "v1": 0.9970703125
+      },
+      "mask_svg": "masks_svg/specter_antler.svg",
+      "png_source": "sprites_png/specter_antler.png",
+      "size_original": {
+        "width": 202,
+        "height": 376
+      }
+    },
+    {
+      "id": "specter_hanging",
+      "category": "specter",
+      "origin_sheet": "a",
+      "origin_box": [
+        479,
+        216,
+        561,
+        344
+      ],
+      "width": 164,
+      "height": 256,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 6,
+        "y": 1062,
+        "width": 164,
+        "height": 256
+      },
+      "uv_bottom_origin": {
+        "u0": 0.0029296875,
+        "v0": 0.3564453125,
+        "u1": 0.0830078125,
+        "v1": 0.4814453125
+      },
+      "mask_svg": "masks_svg/specter_hanging.svg",
+      "png_source": "sprites_png/specter_hanging.png",
+      "size_original": {
+        "width": 164,
+        "height": 256
+      }
+    },
+    {
+      "id": "specter_watch",
+      "category": "specter",
+      "origin_sheet": "b",
+      "origin_box": [
+        284,
+        201,
+        378,
+        367
+      ],
+      "width": 188,
+      "height": 332,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1098,
+        "y": 388,
+        "width": 188,
+        "height": 332
+      },
+      "uv_bottom_origin": {
+        "u0": 0.5361328125,
+        "v0": 0.6484375,
+        "u1": 0.6279296875,
+        "v1": 0.810546875
+      },
+      "mask_svg": "masks_svg/specter_watch.svg",
+      "png_source": "sprites_png/specter_watch.png",
+      "size_original": {
+        "width": 188,
+        "height": 332
+      }
+    },
+    {
+      "id": "stone_column_broken",
+      "category": "ruin",
+      "origin_sheet": "a",
+      "origin_box": [
+        414,
+        1,
+        498,
+        149
+      ],
+      "width": 168,
+      "height": 286,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 864,
+        "y": 726,
+        "width": 168,
+        "height": 286
+      },
+      "uv_bottom_origin": {
+        "u0": 0.421875,
+        "v0": 0.505859375,
+        "u1": 0.50390625,
+        "v1": 0.6455078125
+      },
+      "mask_svg": "masks_svg/stone_column_broken.svg",
+      "png_source": "sprites_png/stone_column_broken.png",
+      "size_original": {
+        "width": 168,
+        "height": 286
+      }
+    },
+    {
+      "id": "stone_column_far",
+      "category": "ruin",
+      "origin_sheet": "a",
+      "origin_box": [
+        343,
+        1,
+        417,
+        151
+      ],
+      "width": 148,
+      "height": 290,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1690,
+        "y": 726,
+        "width": 148,
+        "height": 290
+      },
+      "uv_bottom_origin": {
+        "u0": 0.8251953125,
+        "v0": 0.50390625,
+        "u1": 0.8974609375,
+        "v1": 0.6455078125
+      },
+      "mask_svg": "masks_svg/stone_column_far.svg",
+      "png_source": "sprites_png/stone_column_far.png",
+      "size_original": {
+        "width": 148,
+        "height": 290
+      }
+    },
+    {
+      "id": "stone_moss_ridge",
+      "category": "ground",
+      "origin_sheet": "b",
+      "origin_box": [
+        215,
+        161,
+        301,
+        284
+      ],
+      "width": 172,
+      "height": 246,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 1844,
+        "y": 726,
+        "width": 172,
+        "height": 246
+      },
+      "uv_bottom_origin": {
+        "u0": 0.900390625,
+        "v0": 0.525390625,
+        "u1": 0.984375,
+        "v1": 0.6455078125
+      },
+      "mask_svg": "masks_svg/stone_moss_ridge.svg",
+      "png_source": "sprites_png/stone_moss_ridge.png",
+      "size_original": {
+        "width": 172,
+        "height": 246
+      }
+    },
+    {
+      "id": "twisted_tree_left",
+      "category": "tree",
+      "origin_sheet": "b",
+      "origin_box": [
+        9,
+        1,
+        83,
+        166
+      ],
+      "width": 148,
+      "height": 330,
+      "atlas": "forest_atlas_01.webp",
+      "rect_px": {
+        "x": 710,
+        "y": 726,
+        "width": 148,
+        "height": 330
+      },
+      "uv_bottom_origin": {
+        "u0": 0.3466796875,
+        "v0": 0.484375,
+        "u1": 0.4189453125,
+        "v1": 0.6455078125
+      },
+      "mask_svg": "masks_svg/twisted_tree_left.svg",
+      "png_source": "sprites_png/twisted_tree_left.png",
+      "size_original": {
+        "width": 148,
+        "height": 330
+      }
+    }
+  ]
+}

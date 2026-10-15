@@ -34,6 +34,7 @@ varying vec2 vUV;
 uniform float uTime;
 uniform float uFog;
 uniform float uGlow;
+uniform float uGeometryMix;
 uniform vec2 uParallax;
 
 float hash(vec2 p) {
@@ -189,7 +190,7 @@ void main() {
 
     color = mix(
         color,vec3(0.047,0.055,0.070),
-        farTowers*0.76
+        farTowers*0.76*uGeometryMix
     );
 
     // 4. ARCOS IMPOSIBLES
@@ -209,7 +210,7 @@ void main() {
 
     color = mix(
         color,vec3(0.068,0.071,0.081),
-        arch*0.85
+        arch*0.85*uGeometryMix
     );
 
     // 5. NIEBLA INTERMEDIA
@@ -221,6 +222,7 @@ void main() {
     float mistAmount =
         smoothstep(0.36,0.75,mist) *
         (0.25+0.55*(1.0-p.y)) *
+        (1.0-smoothstep(0.12,0.34,p.y)) *
         uFog;
 
     color = mix(
@@ -249,7 +251,7 @@ void main() {
 
     color = mix(
         color,vec3(0.023,0.028,0.039),
-        structures*0.96
+        structures*0.96*uGeometryMix
     );
 
     // Ventanas profundas
@@ -266,7 +268,7 @@ void main() {
     );
 
     color += vec3(0.16,0.025,0.023) *
-        windows*structures;
+        windows*structures*uGeometryMix;
 
     // 7. FRAGMENTOS FLOTANTES
     for (int i=0; i<15; i++) {
@@ -297,7 +299,7 @@ void main() {
 
         color = mix(
             color,vec3(0.028,0.033,0.047),
-            piece*0.90
+            piece*0.90*uGeometryMix
         );
     }
 
@@ -317,7 +319,7 @@ void main() {
 
     color = mix(
         color,vec3(0.018,0.022,0.033),
-        figures*0.92
+        figures*0.92*uGeometryMix
     );
 
     // 9. POLVO SUSPENDIDO
@@ -378,6 +380,7 @@ export function createSanctuaryAbyssPortal(
         "uTime",
         "uFog",
         "uGlow",
+        "uGeometryMix",
         "uParallax",
       ],
     }
@@ -389,6 +392,7 @@ export function createSanctuaryAbyssPortal(
   material.setFloat("uTime", 0);
   material.setFloat("uFog", 1.0);
   material.setFloat("uGlow", 1.1);
+  material.setFloat("uGeometryMix", 1.0);
   material.setVector2(
     "uParallax",
     new Vector2(0, 0)

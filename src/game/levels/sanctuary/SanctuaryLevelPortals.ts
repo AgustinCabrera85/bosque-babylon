@@ -10,6 +10,7 @@ import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import type { Scene } from "@babylonjs/core/scene";
 import { asset } from "../../../utils/asset";
 import type { SanctuaryStop } from "./SanctuaryLayout";
+import { createSanctuaryForestPortal } from "./SanctuaryForestPortal";
 
 const VERTEX = `
 precision highp float;
@@ -152,6 +153,9 @@ export async function createSanctuaryLevelPortals(scene: Scene, stops: readonly 
     material.setColor3("uFogColor", scene.fogColor);
     vortex.material = material;
     vortexMaterials.push(material);
+    if (stop.id === "libre-de-culpas") {
+      createSanctuaryForestPortal(scene, root, vortex, material);
+    }
   });
 
   return {

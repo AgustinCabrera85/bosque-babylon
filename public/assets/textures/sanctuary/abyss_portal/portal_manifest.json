@@ -1,0 +1,2761 @@
+{
+  "schema": "lrlo.sanctuary.abyss_portal.atlas.v1",
+  "description": "Original user-generated transparent PNG cutouts for the interior of the Sanctuary Nexo gateway.",
+  "coordinate_system": "top-left atlas pixels; bottom-left normalized UV; sprite positions defined in composition JSON.",
+  "version": 1,
+  "atlas_size": 2048,
+  "padding_px": 8,
+  "atlases": [
+    {
+      "file": "abyss_atlas_00.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 1252858
+    },
+    {
+      "file": "abyss_atlas_01.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 853262
+    }
+  ],
+  "sprite_count": 72,
+  "sprites": [
+    {
+      "id": "arch_colossal",
+      "category": "architecture",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        424,
+        0,
+        634,
+        565
+      ],
+      "visible_source_px": [
+        424,
+        17,
+        632,
+        565
+      ],
+      "width": 208,
+      "height": 548,
+      "aspect": 0.379562,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1774,
+        "y": 8,
+        "width": 208,
+        "height": 548
+      },
+      "uv_bottom_origin": {
+        "u0": 0.866210938,
+        "v0": 0.728515625,
+        "u1": 0.967773438,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/arch_colossal.svg",
+      "png_editable": "source_editables/sprites_png/arch_colossal.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 12,
+      "sha256_rgba": "8590843bdbdc2d6c34b53937166c6a0e46726c79797b99bf0802d78b227b10b5"
+    },
+    {
+      "id": "arch_loop",
+      "category": "architecture",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        1133,
+        0,
+        1395,
+        433
+      ],
+      "visible_source_px": [
+        1133,
+        28,
+        1395,
+        433
+      ],
+      "width": 262,
+      "height": 405,
+      "aspect": 0.646914,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 310,
+        "y": 658,
+        "width": 262,
+        "height": 405
+      },
+      "uv_bottom_origin": {
+        "u0": 0.151367188,
+        "v0": 0.480957031,
+        "u1": 0.279296875,
+        "v1": 0.678710938
+      },
+      "svg_mask": "source_editables/masks_svg/arch_loop.svg",
+      "png_editable": "source_editables/sprites_png/arch_loop.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 4,
+      "sha256_rgba": "5a6ccbf07b01a6608c9014101a63555854fa84d965e7542713da9cf622d6cc17"
+    },
+    {
+      "id": "arch_ring_ruins",
+      "category": "architecture",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        988,
+        90,
+        1208,
+        583
+      ],
+      "visible_source_px": [
+        988,
+        90,
+        1208,
+        583
+      ],
+      "width": 220,
+      "height": 493,
+      "aspect": 0.446247,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1184,
+        "y": 1370,
+        "width": 220,
+        "height": 493
+      },
+      "uv_bottom_origin": {
+        "u0": 0.578125,
+        "v0": 0.090332031,
+        "u1": 0.685546875,
+        "v1": 0.331054688
+      },
+      "svg_mask": "source_editables/masks_svg/arch_ring_ruins.svg",
+      "png_editable": "source_editables/sprites_png/arch_ring_ruins.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 15,
+      "sha256_rgba": "9265f8ee00d73b183f1c2791f1bf73b08ce44e6151137133b9feac1b97e70f05"
+    },
+    {
+      "id": "arch_spiral",
+      "category": "architecture",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        1247,
+        0,
+        1536,
+        313
+      ],
+      "visible_source_px": [
+        1247,
+        15,
+        1524,
+        313
+      ],
+      "width": 277,
+      "height": 298,
+      "aspect": 0.92953,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 812,
+        "y": 1335,
+        "width": 277,
+        "height": 298
+      },
+      "uv_bottom_origin": {
+        "u0": 0.396484375,
+        "v0": 0.202636719,
+        "u1": 0.531738281,
+        "v1": 0.348144531
+      },
+      "svg_mask": "source_editables/masks_svg/arch_spiral.svg",
+      "png_editable": "source_editables/sprites_png/arch_spiral.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 13,
+      "sha256_rgba": "19e07ca7069d21e1cb81c5a03ec506e0ba902c9fc28d27f64b64597ad5531f5a"
+    },
+    {
+      "id": "arch_void",
+      "category": "architecture",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        656,
+        0,
+        853,
+        608
+      ],
+      "visible_source_px": [
+        656,
+        8,
+        853,
+        608
+      ],
+      "width": 197,
+      "height": 600,
+      "aspect": 0.328333,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1137,
+        "y": 8,
+        "width": 197,
+        "height": 600
+      },
+      "uv_bottom_origin": {
+        "u0": 0.555175781,
+        "v0": 0.703125,
+        "u1": 0.651367188,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/arch_void.svg",
+      "png_editable": "source_editables/sprites_png/arch_void.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 13,
+      "sha256_rgba": "2c4ea9c7ad3001c385fb49896b430f70ca0a94315ecace0ad3a7dda69c510346"
+    },
+    {
+      "id": "bridge_stones",
+      "category": "debris",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        0,
+        916,
+        1146,
+        1024
+      ],
+      "visible_source_px": [
+        18,
+        916,
+        1146,
+        1020
+      ],
+      "width": 600,
+      "height": 55,
+      "aspect": 10.909091,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 1888,
+        "width": 600,
+        "height": 55
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.051269531,
+        "u1": 0.296875,
+        "v1": 0.078125
+      },
+      "svg_mask": "source_editables/masks_svg/bridge_stones.svg",
+      "png_editable": "source_editables/sprites_png/bridge_stones.png",
+      "mask_alpha_cutoff": 49,
+      "mask_contours": 18,
+      "sha256_rgba": "b6afbface0d59e1615e8d4a2bd21d913b559a8229020be42e6e619ea84b0a75c"
+    },
+    {
+      "id": "broken_monolith",
+      "category": "debris",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        1290,
+        310,
+        1536,
+        550
+      ],
+      "visible_source_px": [
+        1312,
+        310,
+        1521,
+        550
+      ],
+      "width": 209,
+      "height": 240,
+      "aspect": 0.870833,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1272,
+        "y": 211,
+        "width": 209,
+        "height": 240
+      },
+      "uv_bottom_origin": {
+        "u0": 0.62109375,
+        "v0": 0.779785156,
+        "u1": 0.723144531,
+        "v1": 0.896972656
+      },
+      "svg_mask": "source_editables/masks_svg/broken_monolith.svg",
+      "png_editable": "source_editables/sprites_png/broken_monolith.png",
+      "mask_alpha_cutoff": 49,
+      "mask_contours": 9,
+      "sha256_rgba": "d9341cc57b5ff3b1acdcac2e9a335cc5ba33e9ad921cf0929bbf2fb3f701d6fe"
+    },
+    {
+      "id": "castle_mass",
+      "category": "architecture",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        21,
+        0,
+        235,
+        686
+      ],
+      "visible_source_px": [
+        25,
+        7,
+        235,
+        686
+      ],
+      "width": 198,
+      "height": 640,
+      "aspect": 0.309375,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 542,
+        "y": 8,
+        "width": 198,
+        "height": 640
+      },
+      "uv_bottom_origin": {
+        "u0": 0.264648438,
+        "v0": 0.68359375,
+        "u1": 0.361328125,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/castle_mass.svg",
+      "png_editable": "source_editables/sprites_png/castle_mass.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 2,
+      "sha256_rgba": "b7ab0736aef69403604b4bfbd6207382d471fbe7a375ddc8d2b4f74151a379f4"
+    },
+    {
+      "id": "citadel_twin",
+      "category": "architecture",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        255,
+        0,
+        584,
+        744
+      ],
+      "visible_source_px": [
+        255,
+        16,
+        584,
+        744
+      ],
+      "width": 289,
+      "height": 640,
+      "aspect": 0.451562,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 237,
+        "y": 8,
+        "width": 289,
+        "height": 640
+      },
+      "uv_bottom_origin": {
+        "u0": 0.115722656,
+        "v0": 0.68359375,
+        "u1": 0.256835938,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/citadel_twin.svg",
+      "png_editable": "source_editables/sprites_png/citadel_twin.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 12,
+      "sha256_rgba": "4c6e9c7ebbc220b7d3c4aab832573024e8272db51a1b2e1c9688631be23c556f"
+    },
+    {
+      "id": "debris_field",
+      "category": "debris",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        1082,
+        861,
+        1536,
+        1024
+      ],
+      "visible_source_px": [
+        1083,
+        861,
+        1506,
+        1005
+      ],
+      "width": 423,
+      "height": 144,
+      "aspect": 2.9375,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1596,
+        "y": 1885,
+        "width": 423,
+        "height": 144
+      },
+      "uv_bottom_origin": {
+        "u0": 0.779296875,
+        "v0": 0.009277344,
+        "u1": 0.985839844,
+        "v1": 0.079589844
+      },
+      "svg_mask": "source_editables/masks_svg/debris_field.svg",
+      "png_editable": "source_editables/sprites_png/debris_field.png",
+      "mask_alpha_cutoff": 49,
+      "mask_contours": 57,
+      "sha256_rgba": "419918200e8ce54b01bce9f08e67396a3ced8962698d23b527f8e03afd90e1fe"
+    },
+    {
+      "id": "entangled_roots",
+      "category": "debris",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        1000,
+        739,
+        1224,
+        1054
+      ],
+      "visible_source_px": [
+        1000,
+        739,
+        1216,
+        1054
+      ],
+      "width": 216,
+      "height": 315,
+      "aspect": 0.685714,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1040,
+        "y": 279,
+        "width": 216,
+        "height": 315
+      },
+      "uv_bottom_origin": {
+        "u0": 0.5078125,
+        "v0": 0.709960938,
+        "u1": 0.61328125,
+        "v1": 0.863769531
+      },
+      "svg_mask": "source_editables/masks_svg/entangled_roots.svg",
+      "png_editable": "source_editables/sprites_png/entangled_roots.png",
+      "mask_alpha_cutoff": 49,
+      "mask_contours": 16,
+      "sha256_rgba": "92f990eaa0e0a97449dbe415bb2c092a8c4731909c1a1dfd62043fe2c5dc22f6"
+    },
+    {
+      "id": "floating_bridge",
+      "category": "architecture",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        691,
+        1177,
+        1004,
+        1284
+      ],
+      "visible_source_px": [
+        691,
+        1177,
+        1004,
+        1276
+      ],
+      "width": 313,
+      "height": 99,
+      "aspect": 3.161616,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1602,
+        "y": 1169,
+        "width": 313,
+        "height": 99
+      },
+      "uv_bottom_origin": {
+        "u0": 0.782226562,
+        "v0": 0.380859375,
+        "u1": 0.935058594,
+        "v1": 0.429199219
+      },
+      "svg_mask": "source_editables/masks_svg/floating_bridge.svg",
+      "png_editable": "source_editables/sprites_png/floating_bridge.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 8,
+      "sha256_rgba": "4158ce08047b5e783c6d20ad8f6f73d8a48efbc6270c0314a657dd874cbcddef"
+    },
+    {
+      "id": "floating_city",
+      "category": "architecture",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        1046,
+        358,
+        1323,
+        680
+      ],
+      "visible_source_px": [
+        1046,
+        358,
+        1323,
+        680
+      ],
+      "width": 277,
+      "height": 322,
+      "aspect": 0.860248,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 741,
+        "y": 997,
+        "width": 277,
+        "height": 322
+      },
+      "uv_bottom_origin": {
+        "u0": 0.361816406,
+        "v0": 0.355957031,
+        "u1": 0.497070312,
+        "v1": 0.513183594
+      },
+      "svg_mask": "source_editables/masks_svg/floating_city.svg",
+      "png_editable": "source_editables/sprites_png/floating_city.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 10,
+      "sha256_rgba": "9628404fe5947880af0a54288ce3bfcb0f02ffa072fbfd2c1932288d104c32b1"
+    },
+    {
+      "id": "floating_rock_cluster",
+      "category": "debris",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        456,
+        66,
+        667,
+        682
+      ],
+      "visible_source_px": [
+        456,
+        78,
+        667,
+        682
+      ],
+      "width": 210,
+      "height": 600,
+      "aspect": 0.35,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1350,
+        "y": 8,
+        "width": 210,
+        "height": 600
+      },
+      "uv_bottom_origin": {
+        "u0": 0.659179688,
+        "v0": 0.703125,
+        "u1": 0.76171875,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/floating_rock_cluster.svg",
+      "png_editable": "source_editables/sprites_png/floating_rock_cluster.png",
+      "mask_alpha_cutoff": 49,
+      "mask_contours": 19,
+      "sha256_rgba": "9ca8f6c3c8957e8d14e39fe45ff6692f0ca480f7f923ccb478b742aff0233d2f"
+    },
+    {
+      "id": "floating_stairs",
+      "category": "architecture",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        1096,
+        586,
+        1536,
+        880
+      ],
+      "visible_source_px": [
+        1096,
+        586,
+        1526,
+        880
+      ],
+      "width": 430,
+      "height": 294,
+      "aspect": 1.462585,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 409,
+        "y": 8,
+        "width": 430,
+        "height": 294
+      },
+      "uv_bottom_origin": {
+        "u0": 0.199707031,
+        "v0": 0.852539062,
+        "u1": 0.409667969,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/floating_stairs.svg",
+      "png_editable": "source_editables/sprites_png/floating_stairs.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 28,
+      "sha256_rgba": "8cfe8737d08a136d3d8715dae59ff55e903b3e8f1f31eb8cbf3b8e0cec5b2279"
+    },
+    {
+      "id": "floating_stone_column",
+      "category": "debris",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        701,
+        0,
+        1067,
+        552
+      ],
+      "visible_source_px": [
+        701,
+        15,
+        1067,
+        548
+      ],
+      "width": 366,
+      "height": 533,
+      "aspect": 0.686679,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1075,
+        "y": 821,
+        "width": 366,
+        "height": 533
+      },
+      "uv_bottom_origin": {
+        "u0": 0.524902344,
+        "v0": 0.338867188,
+        "u1": 0.703613281,
+        "v1": 0.599121094
+      },
+      "svg_mask": "source_editables/masks_svg/floating_stone_column.svg",
+      "png_editable": "source_editables/sprites_png/floating_stone_column.png",
+      "mask_alpha_cutoff": 49,
+      "mask_contours": 32,
+      "sha256_rgba": "5298397d7ec24094648b7b3de313db0b88d8b776100c1a004b3eba0b210d9ec6"
+    },
+    {
+      "id": "fogbank_a",
+      "category": "mist",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        0,
+        561,
+        435,
+        712
+      ],
+      "visible_source_px": [
+        7,
+        561,
+        435,
+        712
+      ],
+      "width": 428,
+      "height": 151,
+      "aspect": 2.834437,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1152,
+        "y": 1885,
+        "width": 428,
+        "height": 151
+      },
+      "uv_bottom_origin": {
+        "u0": 0.5625,
+        "v0": 0.005859375,
+        "u1": 0.771484375,
+        "v1": 0.079589844
+      },
+      "svg_mask": "source_editables/masks_svg/fogbank_a.svg",
+      "png_editable": "source_editables/sprites_png/fogbank_a.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 4,
+      "sha256_rgba": "96f4648f9cafbbfea287ff7d0186728894983be5b2e77e4cb980fc3007ecd337"
+    },
+    {
+      "id": "fogbank_b",
+      "category": "mist",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        435,
+        558,
+        897,
+        716
+      ],
+      "visible_source_px": [
+        435,
+        558,
+        897,
+        716
+      ],
+      "width": 462,
+      "height": 158,
+      "aspect": 2.924051,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 674,
+        "y": 1879,
+        "width": 462,
+        "height": 158
+      },
+      "uv_bottom_origin": {
+        "u0": 0.329101562,
+        "v0": 0.005371094,
+        "u1": 0.5546875,
+        "v1": 0.082519531
+      },
+      "svg_mask": "source_editables/masks_svg/fogbank_b.svg",
+      "png_editable": "source_editables/sprites_png/fogbank_b.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 4,
+      "sha256_rgba": "d026ba3351a9991a17632f452213997895aa88fac94a1cc492b684a0b7f54c0d"
+    },
+    {
+      "id": "fogbank_c",
+      "category": "mist",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        0,
+        713,
+        504,
+        889
+      ],
+      "visible_source_px": [
+        10,
+        713,
+        504,
+        889
+      ],
+      "width": 494,
+      "height": 176,
+      "aspect": 2.806818,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 674,
+        "y": 1663,
+        "width": 494,
+        "height": 176
+      },
+      "uv_bottom_origin": {
+        "u0": 0.329101562,
+        "v0": 0.102050781,
+        "u1": 0.5703125,
+        "v1": 0.187988281
+      },
+      "svg_mask": "source_editables/masks_svg/fogbank_c.svg",
+      "png_editable": "source_editables/sprites_png/fogbank_c.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 4,
+      "sha256_rgba": "5c7f592b33263ee7fe1de99af54e0cea45debab97351a3ec7440dc9176faab26"
+    },
+    {
+      "id": "fogbank_d",
+      "category": "mist",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        501,
+        718,
+        1059,
+        888
+      ],
+      "visible_source_px": [
+        501,
+        718,
+        1059,
+        888
+      ],
+      "width": 558,
+      "height": 170,
+      "aspect": 3.282353,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1049,
+        "y": 635,
+        "width": 558,
+        "height": 170
+      },
+      "uv_bottom_origin": {
+        "u0": 0.512207031,
+        "v0": 0.606933594,
+        "u1": 0.784667969,
+        "v1": 0.689941406
+      },
+      "svg_mask": "source_editables/masks_svg/fogbank_d.svg",
+      "png_editable": "source_editables/sprites_png/fogbank_d.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 5,
+      "sha256_rgba": "a8c8f691661f455b64c55e21356455a7b3667d22276e721714f5e3b98ff7b2fe"
+    },
+    {
+      "id": "fogbank_dark",
+      "category": "mist",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        0,
+        678,
+        464,
+        909
+      ],
+      "visible_source_px": [
+        3,
+        678,
+        464,
+        909
+      ],
+      "width": 461,
+      "height": 231,
+      "aspect": 1.995671,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1420,
+        "y": 1370,
+        "width": 461,
+        "height": 231
+      },
+      "uv_bottom_origin": {
+        "u0": 0.693359375,
+        "v0": 0.218261719,
+        "u1": 0.918457031,
+        "v1": 0.331054688
+      },
+      "svg_mask": "source_editables/masks_svg/fogbank_dark.svg",
+      "png_editable": "source_editables/sprites_png/fogbank_dark.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 5,
+      "sha256_rgba": "36b30283d81de6e88d4956a055e51a4c13284dc00652fd756cd90b98e62a5dd2"
+    },
+    {
+      "id": "fogbank_grey",
+      "category": "mist",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        461,
+        666,
+        906,
+        918
+      ],
+      "visible_source_px": [
+        461,
+        666,
+        906,
+        918
+      ],
+      "width": 445,
+      "height": 252,
+      "aspect": 1.765873,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1420,
+        "y": 1617,
+        "width": 445,
+        "height": 252
+      },
+      "uv_bottom_origin": {
+        "u0": 0.693359375,
+        "v0": 0.087402344,
+        "u1": 0.910644531,
+        "v1": 0.210449219
+      },
+      "svg_mask": "source_editables/masks_svg/fogbank_grey.svg",
+      "png_editable": "source_editables/sprites_png/fogbank_grey.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 3,
+      "sha256_rgba": "62db07166dd4232bdf04251346010e98e3db61185fc95b0229daa37ef13a16cd"
+    },
+    {
+      "id": "fogbank_low",
+      "category": "mist",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        7,
+        992,
+        690,
+        1283
+      ],
+      "visible_source_px": [
+        7,
+        992,
+        690,
+        1283
+      ],
+      "width": 650,
+      "height": 277,
+      "aspect": 2.34657,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 1500,
+        "width": 650,
+        "height": 277
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.132324219,
+        "u1": 0.321289062,
+        "v1": 0.267578125
+      },
+      "svg_mask": "source_editables/masks_svg/fogbank_low.svg",
+      "png_editable": "source_editables/sprites_png/fogbank_low.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 4,
+      "sha256_rgba": "a4b31beeb25a5d268b68d8fa8c4815740a331b3b6ee9bafe7416abe73d131224"
+    },
+    {
+      "id": "fogbank_mid",
+      "category": "mist",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        256,
+        810,
+        553,
+        997
+      ],
+      "visible_source_px": [
+        256,
+        810,
+        553,
+        997
+      ],
+      "width": 297,
+      "height": 187,
+      "aspect": 1.588235,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1196,
+        "y": 8,
+        "width": 297,
+        "height": 187
+      },
+      "uv_bottom_origin": {
+        "u0": 0.583984375,
+        "v0": 0.904785156,
+        "u1": 0.729003906,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/fogbank_mid.svg",
+      "png_editable": "source_editables/sprites_png/fogbank_mid.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 3,
+      "sha256_rgba": "74a32932f664a3edc99479cd06c00a58a928704b9bd76c48064e2a4a586678d0"
+    },
+    {
+      "id": "fogbank_night",
+      "category": "mist",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        898,
+        684,
+        1299,
+        915
+      ],
+      "visible_source_px": [
+        898,
+        684,
+        1299,
+        915
+      ],
+      "width": 401,
+      "height": 231,
+      "aspect": 1.735931,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 1738,
+        "width": 401,
+        "height": 231
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.038574219,
+        "u1": 0.199707031,
+        "v1": 0.151367188
+      },
+      "svg_mask": "source_editables/masks_svg/fogbank_night.svg",
+      "png_editable": "source_editables/sprites_png/fogbank_night.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 2,
+      "sha256_rgba": "14627e1618dff2d01f3d9369611e1c3ac211abfd9defcef7e50198b87b14f4ba"
+    },
+    {
+      "id": "halo_cold",
+      "category": "rift",
+      "source_sheet": "Hoja de recursos: ruinas y niebla flotante.png",
+      "crop_source_px": [
+        313,
+        787,
+        514,
+        1016
+      ],
+      "visible_source_px": [
+        313,
+        799,
+        514,
+        1016
+      ],
+      "width": 201,
+      "height": 217,
+      "aspect": 0.926267,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1756,
+        "y": 526,
+        "width": 201,
+        "height": 217
+      },
+      "uv_bottom_origin": {
+        "u0": 0.857421875,
+        "v0": 0.637207031,
+        "u1": 0.955566406,
+        "v1": 0.743164062
+      },
+      "svg_mask": "source_editables/masks_svg/halo_cold.svg",
+      "png_editable": "source_editables/sprites_png/halo_cold.png",
+      "mask_alpha_cutoff": 23,
+      "mask_contours": 2,
+      "sha256_rgba": "1e283c944b08fd7ffe322cc8633a7e5d875f0685839c53f0b64e409a7f4836a9"
+    },
+    {
+      "id": "mist_black",
+      "category": "mist",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        0,
+        700,
+        435,
+        1024
+      ],
+      "visible_source_px": [
+        21,
+        700,
+        435,
+        1013
+      ],
+      "width": 414,
+      "height": 313,
+      "aspect": 1.322684,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 1409,
+        "width": 414,
+        "height": 313
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.159179688,
+        "u1": 0.206054688,
+        "v1": 0.312011719
+      },
+      "svg_mask": "source_editables/masks_svg/mist_black.svg",
+      "png_editable": "source_editables/sprites_png/mist_black.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 4,
+      "sha256_rgba": "95afd66f54bf1c1385ddfaf0a487838d173dded9cc1e36ae62aa4ef208c2229b"
+    },
+    {
+      "id": "mist_high",
+      "category": "mist",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        815,
+        590,
+        1202,
+        804
+      ],
+      "visible_source_px": [
+        815,
+        590,
+        1202,
+        804
+      ],
+      "width": 387,
+      "height": 214,
+      "aspect": 1.808411,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 425,
+        "y": 1738,
+        "width": 387,
+        "height": 214
+      },
+      "uv_bottom_origin": {
+        "u0": 0.207519531,
+        "v0": 0.046875,
+        "u1": 0.396484375,
+        "v1": 0.151367188
+      },
+      "svg_mask": "source_editables/masks_svg/mist_high.svg",
+      "png_editable": "source_editables/sprites_png/mist_high.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 4,
+      "sha256_rgba": "793c803e1853351703cf4c4c6691ea95ff81056f05e8119fae66e113c4ca0b7b"
+    },
+    {
+      "id": "mist_lower_right",
+      "category": "mist",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        1170,
+        877,
+        1536,
+        1024
+      ],
+      "visible_source_px": [
+        1170,
+        877,
+        1528,
+        1024
+      ],
+      "width": 358,
+      "height": 147,
+      "aspect": 2.435374,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 438,
+        "y": 1475,
+        "width": 358,
+        "height": 147
+      },
+      "uv_bottom_origin": {
+        "u0": 0.213867188,
+        "v0": 0.208007812,
+        "u1": 0.388671875,
+        "v1": 0.279785156
+      },
+      "svg_mask": "source_editables/masks_svg/mist_lower_right.svg",
+      "png_editable": "source_editables/sprites_png/mist_lower_right.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 1,
+      "sha256_rgba": "2483a59d4ef3a74cfcd6f68fc02144e8b0d66c35de1352f60a1244e86dca437d"
+    },
+    {
+      "id": "mist_moon",
+      "category": "mist",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        204,
+        566,
+        635,
+        733
+      ],
+      "visible_source_px": [
+        204,
+        566,
+        635,
+        733
+      ],
+      "width": 431,
+      "height": 167,
+      "aspect": 2.580838,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 217,
+        "y": 475,
+        "width": 431,
+        "height": 167
+      },
+      "uv_bottom_origin": {
+        "u0": 0.105957031,
+        "v0": 0.686523438,
+        "u1": 0.31640625,
+        "v1": 0.768066406
+      },
+      "svg_mask": "source_editables/masks_svg/mist_moon.svg",
+      "png_editable": "source_editables/sprites_png/mist_moon.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 7,
+      "sha256_rgba": "36a8330944fd1e495098cf4eacdfede230179e7a1957f3c8b39112c407346738"
+    },
+    {
+      "id": "ochre_ancient_bridge",
+      "category": "architecture",
+      "source_sheet": "Hoja de recursos: ruinas y niebla flotante.png",
+      "crop_source_px": [
+        500,
+        1086,
+        801,
+        1225
+      ],
+      "visible_source_px": [
+        500,
+        1103,
+        787,
+        1225
+      ],
+      "width": 287,
+      "height": 122,
+      "aspect": 2.352459,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1509,
+        "y": 8,
+        "width": 287,
+        "height": 122
+      },
+      "uv_bottom_origin": {
+        "u0": 0.736816406,
+        "v0": 0.936523438,
+        "u1": 0.876953125,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/ochre_ancient_bridge.svg",
+      "png_editable": "source_editables/sprites_png/ochre_ancient_bridge.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 1,
+      "sha256_rgba": "cd8bb14e6bb66a6c8d68b37ab214fdf854178e144401635ae4ce59d24ff2a23f"
+    },
+    {
+      "id": "ochre_ancient_tower",
+      "category": "architecture",
+      "source_sheet": "Hoja de recursos: ruinas y niebla flotante.png",
+      "crop_source_px": [
+        0,
+        0,
+        299,
+        453
+      ],
+      "visible_source_px": [
+        13,
+        3,
+        299,
+        453
+      ],
+      "width": 286,
+      "height": 450,
+      "aspect": 0.635556,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 943,
+        "width": 286,
+        "height": 450
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.319824219,
+        "u1": 0.143554688,
+        "v1": 0.539550781
+      },
+      "svg_mask": "source_editables/masks_svg/ochre_ancient_tower.svg",
+      "png_editable": "source_editables/sprites_png/ochre_ancient_tower.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 13,
+      "sha256_rgba": "7ce5eff84c95fc1825dfaecadccbf418453df0870c4df0604399ae04e3c76e8d"
+    },
+    {
+      "id": "ochre_floating_stairs",
+      "category": "architecture",
+      "source_sheet": "Hoja de recursos: ruinas y niebla flotante.png",
+      "crop_source_px": [
+        269,
+        1083,
+        498,
+        1226
+      ],
+      "visible_source_px": [
+        269,
+        1083,
+        498,
+        1226
+      ],
+      "width": 229,
+      "height": 143,
+      "aspect": 1.601399,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1228,
+        "y": 610,
+        "width": 229,
+        "height": 143
+      },
+      "uv_bottom_origin": {
+        "u0": 0.599609375,
+        "v0": 0.632324219,
+        "u1": 0.711425781,
+        "v1": 0.702148438
+      },
+      "svg_mask": "source_editables/masks_svg/ochre_floating_stairs.svg",
+      "png_editable": "source_editables/sprites_png/ochre_floating_stairs.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 2,
+      "sha256_rgba": "9eb233ce98558df39c81a4a14388c7c5d6bdd30233a96165310a6ef31cfef5c1"
+    },
+    {
+      "id": "ochre_monolith",
+      "category": "architecture",
+      "source_sheet": "Hoja de recursos: ruinas y niebla flotante.png",
+      "crop_source_px": [
+        810,
+        0,
+        1004,
+        451
+      ],
+      "visible_source_px": [
+        810,
+        0,
+        1004,
+        451
+      ],
+      "width": 194,
+      "height": 451,
+      "aspect": 0.430155,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 199,
+        "y": 8,
+        "width": 194,
+        "height": 451
+      },
+      "uv_bottom_origin": {
+        "u0": 0.097167969,
+        "v0": 0.775878906,
+        "u1": 0.191894531,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/ochre_monolith.svg",
+      "png_editable": "source_editables/sprites_png/ochre_monolith.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 6,
+      "sha256_rgba": "882f1d76d2814e230c417da4bcd63c6642123a03884cc318a5d98b0ca4ba8979"
+    },
+    {
+      "id": "ochre_ritual_arch",
+      "category": "architecture",
+      "source_sheet": "Hoja de recursos: ruinas y niebla flotante.png",
+      "crop_source_px": [
+        517,
+        0,
+        804,
+        452
+      ],
+      "visible_source_px": [
+        517,
+        72,
+        804,
+        452
+      ],
+      "width": 287,
+      "height": 380,
+      "aspect": 0.755263,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 438,
+        "y": 1079,
+        "width": 287,
+        "height": 380
+      },
+      "uv_bottom_origin": {
+        "u0": 0.213867188,
+        "v0": 0.287597656,
+        "u1": 0.354003906,
+        "v1": 0.473144531
+      },
+      "svg_mask": "source_editables/masks_svg/ochre_ritual_arch.svg",
+      "png_editable": "source_editables/sprites_png/ochre_ritual_arch.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 11,
+      "sha256_rgba": "1972b086bb6c7b41e18e05f8292aa62cbff6a7d30d383e2bfc14f55905cdf5a1"
+    },
+    {
+      "id": "pillar_broken",
+      "category": "architecture",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        1391,
+        61,
+        1536,
+        365
+      ],
+      "visible_source_px": [
+        1391,
+        68,
+        1505,
+        365
+      ],
+      "width": 114,
+      "height": 297,
+      "aspect": 0.383838,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1034,
+        "y": 975,
+        "width": 114,
+        "height": 297
+      },
+      "uv_bottom_origin": {
+        "u0": 0.504882812,
+        "v0": 0.37890625,
+        "u1": 0.560546875,
+        "v1": 0.523925781
+      },
+      "svg_mask": "source_editables/masks_svg/pillar_broken.svg",
+      "png_editable": "source_editables/sprites_png/pillar_broken.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 4,
+      "sha256_rgba": "eaa2dbe9582dda982b1241bf80467964f1beb1f4381a41199c2cba1324196af2"
+    },
+    {
+      "id": "pillar_shard_right",
+      "category": "architecture",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        904,
+        302,
+        1033,
+        743
+      ],
+      "visible_source_px": [
+        904,
+        302,
+        1033,
+        743
+      ],
+      "width": 129,
+      "height": 441,
+      "aspect": 0.292517,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1457,
+        "y": 821,
+        "width": 129,
+        "height": 441
+      },
+      "uv_bottom_origin": {
+        "u0": 0.711425781,
+        "v0": 0.383789062,
+        "u1": 0.774414062,
+        "v1": 0.599121094
+      },
+      "svg_mask": "source_editables/masks_svg/pillar_shard_right.svg",
+      "png_editable": "source_editables/sprites_png/pillar_shard_right.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 5,
+      "sha256_rgba": "1b2e23f5b4167c258a4c7785b6742bf3d44612b14ffdcb87d37de4c22c0d552d"
+    },
+    {
+      "id": "portal_ring_fused",
+      "category": "architecture",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        633,
+        0,
+        993,
+        311
+      ],
+      "visible_source_px": [
+        633,
+        4,
+        993,
+        311
+      ],
+      "width": 360,
+      "height": 307,
+      "aspect": 1.172638,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 664,
+        "y": 318,
+        "width": 360,
+        "height": 307
+      },
+      "uv_bottom_origin": {
+        "u0": 0.32421875,
+        "v0": 0.694824219,
+        "u1": 0.5,
+        "v1": 0.844726562
+      },
+      "svg_mask": "source_editables/masks_svg/portal_ring_fused.svg",
+      "png_editable": "source_editables/sprites_png/portal_ring_fused.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 16,
+      "sha256_rgba": "3b303bd29e92fa982e739d53434d310cfd04aa5849b34df0181fd4138cfcda2a"
+    },
+    {
+      "id": "red_smoke",
+      "category": "mist",
+      "source_sheet": "Hoja de recursos: ruinas y niebla flotante.png",
+      "crop_source_px": [
+        1003,
+        515,
+        1205,
+        698
+      ],
+      "visible_source_px": [
+        1003,
+        521,
+        1205,
+        698
+      ],
+      "width": 202,
+      "height": 177,
+      "aspect": 1.141243,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1473,
+        "y": 658,
+        "width": 202,
+        "height": 177
+      },
+      "uv_bottom_origin": {
+        "u0": 0.719238281,
+        "v0": 0.592285156,
+        "u1": 0.817871094,
+        "v1": 0.678710938
+      },
+      "svg_mask": "source_editables/masks_svg/red_smoke.svg",
+      "png_editable": "source_editables/sprites_png/red_smoke.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 1,
+      "sha256_rgba": "929515c2af13106d92ae75bced371c72525cc78577d4d314d60d82de3bb63ff9"
+    },
+    {
+      "id": "rift_cold_tall",
+      "category": "rift",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        8,
+        0,
+        258,
+        820
+      ],
+      "visible_source_px": [
+        19,
+        0,
+        258,
+        820
+      ],
+      "width": 213,
+      "height": 730,
+      "aspect": 0.291781,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 8,
+        "width": 213,
+        "height": 730
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.639648438,
+        "u1": 0.107910156,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/rift_cold_tall.svg",
+      "png_editable": "source_editables/sprites_png/rift_cold_tall.png",
+      "mask_alpha_cutoff": 23,
+      "mask_contours": 9,
+      "sha256_rgba": "1b077ce0eae9feafe6b7937ab48d3f6da801646c40ac0b2b7e0ffdbf64e7c5b4"
+    },
+    {
+      "id": "rift_fragmented",
+      "category": "rift",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        641,
+        0,
+        814,
+        749
+      ],
+      "visible_source_px": [
+        641,
+        0,
+        814,
+        749
+      ],
+      "width": 169,
+      "height": 730,
+      "aspect": 0.231507,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 754,
+        "width": 169,
+        "height": 730
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.275390625,
+        "u1": 0.086425781,
+        "v1": 0.631835938
+      },
+      "svg_mask": "source_editables/masks_svg/rift_fragmented.svg",
+      "png_editable": "source_editables/sprites_png/rift_fragmented.png",
+      "mask_alpha_cutoff": 23,
+      "mask_contours": 3,
+      "sha256_rgba": "35da95be1c760860ff7a9f38752077939b8c04457a1cab9f2c38a068b00d2956"
+    },
+    {
+      "id": "rift_slit",
+      "category": "rift",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        1070,
+        0,
+        1243,
+        611
+      ],
+      "visible_source_px": [
+        1070,
+        0,
+        1243,
+        611
+      ],
+      "width": 173,
+      "height": 611,
+      "aspect": 0.283142,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 948,
+        "y": 8,
+        "width": 173,
+        "height": 611
+      },
+      "uv_bottom_origin": {
+        "u0": 0.462890625,
+        "v0": 0.697753906,
+        "u1": 0.547363281,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/rift_slit.svg",
+      "png_editable": "source_editables/sprites_png/rift_slit.png",
+      "mask_alpha_cutoff": 23,
+      "mask_contours": 2,
+      "sha256_rgba": "66882e9eb6a4714ac43143c7cd87898ad9ff6cb7e36ef9acf6e36935b0724f0b"
+    },
+    {
+      "id": "rift_split",
+      "category": "rift",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        814,
+        0,
+        998,
+        709
+      ],
+      "visible_source_px": [
+        814,
+        0,
+        998,
+        709
+      ],
+      "width": 184,
+      "height": 709,
+      "aspect": 0.25952,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 193,
+        "y": 754,
+        "width": 184,
+        "height": 709
+      },
+      "uv_bottom_origin": {
+        "u0": 0.094238281,
+        "v0": 0.285644531,
+        "u1": 0.184082031,
+        "v1": 0.631835938
+      },
+      "svg_mask": "source_editables/masks_svg/rift_split.svg",
+      "png_editable": "source_editables/sprites_png/rift_split.png",
+      "mask_alpha_cutoff": 23,
+      "mask_contours": 7,
+      "sha256_rgba": "cd6abe6a2862ec81eb91786bd6ab7c1ee14b1dcf04e4a2e7ecdd1794ae73c7bf"
+    },
+    {
+      "id": "rock_cluster_upper",
+      "category": "debris",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        1006,
+        0,
+        1224,
+        739
+      ],
+      "visible_source_px": [
+        1006,
+        8,
+        1211,
+        739
+      ],
+      "width": 168,
+      "height": 600,
+      "aspect": 0.28,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 891,
+        "y": 944,
+        "width": 168,
+        "height": 600
+      },
+      "uv_bottom_origin": {
+        "u0": 0.435058594,
+        "v0": 0.24609375,
+        "u1": 0.517089844,
+        "v1": 0.5390625
+      },
+      "svg_mask": "source_editables/masks_svg/rock_cluster_upper.svg",
+      "png_editable": "source_editables/sprites_png/rock_cluster_upper.png",
+      "mask_alpha_cutoff": 49,
+      "mask_contours": 19,
+      "sha256_rgba": "6ff0b085aa9c40cf2d772be757f7144a3b23388c18c2478542355d978259e04b"
+    },
+    {
+      "id": "ruin_arch_mist",
+      "category": "architecture",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        10,
+        0,
+        303,
+        552
+      ],
+      "visible_source_px": [
+        10,
+        0,
+        303,
+        552
+      ],
+      "width": 293,
+      "height": 552,
+      "aspect": 0.530797,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1623,
+        "y": 601,
+        "width": 293,
+        "height": 552
+      },
+      "uv_bottom_origin": {
+        "u0": 0.792480469,
+        "v0": 0.437011719,
+        "u1": 0.935546875,
+        "v1": 0.706542969
+      },
+      "svg_mask": "source_editables/masks_svg/ruin_arch_mist.svg",
+      "png_editable": "source_editables/sprites_png/ruin_arch_mist.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 3,
+      "sha256_rgba": "1835467c82a810a5b5d785ae6413ea9c8f1ffee16a83ff6a2d9736a8bd764087"
+    },
+    {
+      "id": "ruin_chapel",
+      "category": "architecture",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        532,
+        101,
+        725,
+        552
+      ],
+      "visible_source_px": [
+        532,
+        101,
+        725,
+        552
+      ],
+      "width": 193,
+      "height": 451,
+      "aspect": 0.427938,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 476,
+        "width": 193,
+        "height": 451
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.547363281,
+        "u1": 0.098144531,
+        "v1": 0.767578125
+      },
+      "svg_mask": "source_editables/masks_svg/ruin_chapel.svg",
+      "png_editable": "source_editables/sprites_png/ruin_chapel.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 6,
+      "sha256_rgba": "aec89825d374e261e674fd871ecc2a85b66e4cfc061d2cf299c0767f3c255cec"
+    },
+    {
+      "id": "ruin_mass_left",
+      "category": "architecture",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        16,
+        0,
+        230,
+        618
+      ],
+      "visible_source_px": [
+        29,
+        7,
+        230,
+        618
+      ],
+      "width": 201,
+      "height": 611,
+      "aspect": 0.328969,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 674,
+        "y": 944,
+        "width": 201,
+        "height": 611
+      },
+      "uv_bottom_origin": {
+        "u0": 0.329101562,
+        "v0": 0.240722656,
+        "u1": 0.427246094,
+        "v1": 0.5390625
+      },
+      "svg_mask": "source_editables/masks_svg/ruin_mass_left.svg",
+      "png_editable": "source_editables/sprites_png/ruin_mass_left.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 8,
+      "sha256_rgba": "a8b899d27d3b08f6849b0fdc1c7bc8ca4dedcf171192cbff0efae189367098c7"
+    },
+    {
+      "id": "ruin_needle",
+      "category": "architecture",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        305,
+        0,
+        532,
+        550
+      ],
+      "visible_source_px": [
+        305,
+        29,
+        532,
+        550
+      ],
+      "width": 227,
+      "height": 521,
+      "aspect": 0.435701,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 393,
+        "y": 944,
+        "width": 227,
+        "height": 521
+      },
+      "uv_bottom_origin": {
+        "u0": 0.191894531,
+        "v0": 0.284667969,
+        "u1": 0.302734375,
+        "v1": 0.5390625
+      },
+      "svg_mask": "source_editables/masks_svg/ruin_needle.svg",
+      "png_editable": "source_editables/sprites_png/ruin_needle.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 5,
+      "sha256_rgba": "1fba7ea34f3f515de3b14c2bdfb44d7edf0e8598036a4472dfa653c7bd980b97"
+    },
+    {
+      "id": "ruin_needle_left",
+      "category": "architecture",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        214,
+        10,
+        315,
+        556
+      ],
+      "visible_source_px": [
+        214,
+        44,
+        315,
+        556
+      ],
+      "width": 101,
+      "height": 512,
+      "aspect": 0.197266,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1932,
+        "y": 1135,
+        "width": 101,
+        "height": 512
+      },
+      "uv_bottom_origin": {
+        "u0": 0.943359375,
+        "v0": 0.195800781,
+        "u1": 0.992675781,
+        "v1": 0.445800781
+      },
+      "svg_mask": "source_editables/masks_svg/ruin_needle_left.svg",
+      "png_editable": "source_editables/sprites_png/ruin_needle_left.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 6,
+      "sha256_rgba": "918967d056d4d7df36ff351ed7220f5287e7bae30940d68571d712f52d66e364"
+    },
+    {
+      "id": "ruin_needle_mid",
+      "category": "architecture",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        314,
+        0,
+        418,
+        560
+      ],
+      "visible_source_px": [
+        314,
+        13,
+        418,
+        560
+      ],
+      "width": 104,
+      "height": 547,
+      "aspect": 0.190128,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1932,
+        "y": 572,
+        "width": 104,
+        "height": 547
+      },
+      "uv_bottom_origin": {
+        "u0": 0.943359375,
+        "v0": 0.453613281,
+        "u1": 0.994140625,
+        "v1": 0.720703125
+      },
+      "svg_mask": "source_editables/masks_svg/ruin_needle_mid.svg",
+      "png_editable": "source_editables/sprites_png/ruin_needle_mid.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 6,
+      "sha256_rgba": "f10cf0ff766fab9e3580dda2fd85f45461c71c57e80596c893ec612d8ffd1af2"
+    },
+    {
+      "id": "ruin_pier",
+      "category": "architecture",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        243,
+        0,
+        431,
+        687
+      ],
+      "visible_source_px": [
+        243,
+        13,
+        428,
+        687
+      ],
+      "width": 176,
+      "height": 640,
+      "aspect": 0.275,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 756,
+        "y": 8,
+        "width": 176,
+        "height": 640
+      },
+      "uv_bottom_origin": {
+        "u0": 0.369140625,
+        "v0": 0.68359375,
+        "u1": 0.455078125,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/ruin_pier.svg",
+      "png_editable": "source_editables/sprites_png/ruin_pier.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 14,
+      "sha256_rgba": "aa5e851b6921925c400e1c0c7248542fd9d7f79050b01fd1921e1655ed6a772f"
+    },
+    {
+      "id": "ruin_tower_floating",
+      "category": "architecture",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        812,
+        0,
+        994,
+        607
+      ],
+      "visible_source_px": [
+        812,
+        30,
+        994,
+        607
+      ],
+      "width": 182,
+      "height": 577,
+      "aspect": 0.315425,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1576,
+        "y": 8,
+        "width": 182,
+        "height": 577
+      },
+      "uv_bottom_origin": {
+        "u0": 0.76953125,
+        "v0": 0.714355469,
+        "u1": 0.858398438,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/ruin_tower_floating.svg",
+      "png_editable": "source_editables/sprites_png/ruin_tower_floating.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 10,
+      "sha256_rgba": "4a235c18e3a716c39b8d1a4e194797a57e33b4215f4369cd1b7df58183bd6075"
+    },
+    {
+      "id": "smoke_ribbon",
+      "category": "mist",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        0,
+        889,
+        1063,
+        1024
+      ],
+      "visible_source_px": [
+        20,
+        889,
+        1063,
+        1016
+      ],
+      "width": 650,
+      "height": 79,
+      "aspect": 8.227848,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 1793,
+        "width": 650,
+        "height": 79
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.0859375,
+        "u1": 0.321289062,
+        "v1": 0.124511719
+      },
+      "svg_mask": "source_editables/masks_svg/smoke_ribbon.svg",
+      "png_editable": "source_editables/sprites_png/smoke_ribbon.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 3,
+      "sha256_rgba": "6c8a620e73f02f8adf8879607691f4d3d9585d521f81025eae021231fd76d602"
+    },
+    {
+      "id": "soul_smoke",
+      "category": "specter",
+      "source_sheet": "Hoja de recursos: ruinas y niebla flotante.png",
+      "crop_source_px": [
+        525,
+        793,
+        699,
+        1016
+      ],
+      "visible_source_px": [
+        525,
+        793,
+        699,
+        1016
+      ],
+      "width": 174,
+      "height": 223,
+      "aspect": 0.780269,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 974,
+        "y": 1649,
+        "width": 174,
+        "height": 223
+      },
+      "uv_bottom_origin": {
+        "u0": 0.475585938,
+        "v0": 0.0859375,
+        "u1": 0.560546875,
+        "v1": 0.194824219
+      },
+      "svg_mask": "source_editables/masks_svg/soul_smoke.svg",
+      "png_editable": "source_editables/sprites_png/soul_smoke.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 3,
+      "sha256_rgba": "cef0b56f7e9a54b4b9f1e5d2c02a5f105e8d16a7ceeb1c268ac1b07539217252"
+    },
+    {
+      "id": "specter_01",
+      "category": "specter",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        866,
+        602,
+        932,
+        801
+      ],
+      "visible_source_px": [
+        866,
+        602,
+        932,
+        801
+      ],
+      "width": 66,
+      "height": 199,
+      "aspect": 0.331658,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1881,
+        "y": 1663,
+        "width": 66,
+        "height": 199
+      },
+      "uv_bottom_origin": {
+        "u0": 0.918457031,
+        "v0": 0.090820312,
+        "u1": 0.950683594,
+        "v1": 0.187988281
+      },
+      "svg_mask": "source_editables/masks_svg/specter_01.svg",
+      "png_editable": "source_editables/sprites_png/specter_01.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 3,
+      "sha256_rgba": "fab3c52ac3626a5e08ad7db1a10cd7ee3f9477ce7e703f407cc7b368f3a01293"
+    },
+    {
+      "id": "specter_02",
+      "category": "specter",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        929,
+        555,
+        1027,
+        805
+      ],
+      "visible_source_px": [
+        929,
+        568,
+        1027,
+        805
+      ],
+      "width": 98,
+      "height": 237,
+      "aspect": 0.413502,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1935,
+        "y": 8,
+        "width": 98,
+        "height": 237
+      },
+      "uv_bottom_origin": {
+        "u0": 0.944824219,
+        "v0": 0.880371094,
+        "u1": 0.992675781,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/specter_02.svg",
+      "png_editable": "source_editables/sprites_png/specter_02.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 2,
+      "sha256_rgba": "145237ff66e4c26a8d2c728555bd99cb01de4bd93592932416273350f4213209"
+    },
+    {
+      "id": "specter_03",
+      "category": "specter",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        1018,
+        557,
+        1125,
+        806
+      ],
+      "visible_source_px": [
+        1018,
+        557,
+        1125,
+        806
+      ],
+      "width": 107,
+      "height": 249,
+      "aspect": 0.429719,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1812,
+        "y": 8,
+        "width": 107,
+        "height": 249
+      },
+      "uv_bottom_origin": {
+        "u0": 0.884765625,
+        "v0": 0.874511719,
+        "u1": 0.937011719,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/specter_03.svg",
+      "png_editable": "source_editables/sprites_png/specter_03.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 3,
+      "sha256_rgba": "0448a34456e3523ae76e25a63f353f3d08c66025a8f865471a8dca8181fdb763"
+    },
+    {
+      "id": "specter_04",
+      "category": "specter",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        1190,
+        565,
+        1308,
+        858
+      ],
+      "visible_source_px": [
+        1190,
+        565,
+        1308,
+        858
+      ],
+      "width": 118,
+      "height": 293,
+      "aspect": 0.40273,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1094,
+        "y": 610,
+        "width": 118,
+        "height": 293
+      },
+      "uv_bottom_origin": {
+        "u0": 0.534179688,
+        "v0": 0.559082031,
+        "u1": 0.591796875,
+        "v1": 0.702148438
+      },
+      "svg_mask": "source_editables/masks_svg/specter_04.svg",
+      "png_editable": "source_editables/sprites_png/specter_04.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 2,
+      "sha256_rgba": "7f9d8653383ee89ea980f8c0a86b3d776240de8f77a388ec7486f43a75087c13"
+    },
+    {
+      "id": "specter_05",
+      "category": "specter",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        1308,
+        603,
+        1396,
+        783
+      ],
+      "visible_source_px": [
+        1308,
+        603,
+        1396,
+        783
+      ],
+      "width": 88,
+      "height": 180,
+      "aspect": 0.488889,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 1075,
+        "y": 1370,
+        "width": 88,
+        "height": 180
+      },
+      "uv_bottom_origin": {
+        "u0": 0.524902344,
+        "v0": 0.243164062,
+        "u1": 0.567871094,
+        "v1": 0.331054688
+      },
+      "svg_mask": "source_editables/masks_svg/specter_05.svg",
+      "png_editable": "source_editables/sprites_png/specter_05.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 5,
+      "sha256_rgba": "da1a5093af89a69e7fc752b772799eb6a11d7620070f4615ef0c8866650210bb"
+    },
+    {
+      "id": "specter_06",
+      "category": "specter",
+      "source_sheet": "Hoja de recursos de ruinas y portal espectral.png",
+      "crop_source_px": [
+        1392,
+        618,
+        1535,
+        852
+      ],
+      "visible_source_px": [
+        1392,
+        618,
+        1501,
+        852
+      ],
+      "width": 109,
+      "height": 234,
+      "aspect": 0.465812,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1497,
+        "y": 408,
+        "width": 109,
+        "height": 234
+      },
+      "uv_bottom_origin": {
+        "u0": 0.730957031,
+        "v0": 0.686523438,
+        "u1": 0.784179688,
+        "v1": 0.80078125
+      },
+      "svg_mask": "source_editables/masks_svg/specter_06.svg",
+      "png_editable": "source_editables/sprites_png/specter_06.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 5,
+      "sha256_rgba": "f87e22616091a80f5e126c974cf114ab55d9aa8a3f4c0b84283804c35a0c2ffd"
+    },
+    {
+      "id": "specter_drifting",
+      "category": "specter",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        788,
+        782,
+        1001,
+        1019
+      ],
+      "visible_source_px": [
+        788,
+        782,
+        1001,
+        1019
+      ],
+      "width": 213,
+      "height": 237,
+      "aspect": 0.898734,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1757,
+        "y": 273,
+        "width": 213,
+        "height": 237
+      },
+      "uv_bottom_origin": {
+        "u0": 0.857910156,
+        "v0": 0.750976562,
+        "u1": 0.961914062,
+        "v1": 0.866699219
+      },
+      "svg_mask": "source_editables/masks_svg/specter_drifting.svg",
+      "png_editable": "source_editables/sprites_png/specter_drifting.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 8,
+      "sha256_rgba": "1437a31497b3a0b2af966a87ef0cb3afd77f92e5fbc2b61f265e23e6067f0027"
+    },
+    {
+      "id": "specter_guard",
+      "category": "specter",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        1116,
+        128,
+        1246,
+        415
+      ],
+      "visible_source_px": [
+        1116,
+        128,
+        1246,
+        415
+      ],
+      "width": 130,
+      "height": 287,
+      "aspect": 0.452962,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 828,
+        "y": 1649,
+        "width": 130,
+        "height": 287
+      },
+      "uv_bottom_origin": {
+        "u0": 0.404296875,
+        "v0": 0.0546875,
+        "u1": 0.467773438,
+        "v1": 0.194824219
+      },
+      "svg_mask": "source_editables/masks_svg/specter_guard.svg",
+      "png_editable": "source_editables/sprites_png/specter_guard.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 5,
+      "sha256_rgba": "e730c847a30f8e0ba5d3a5b0c58a7ba91b8170c90fd0da09e2301fbbabcecb01"
+    },
+    {
+      "id": "specter_reaper",
+      "category": "specter",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        990,
+        0,
+        1109,
+        389
+      ],
+      "visible_source_px": [
+        990,
+        26,
+        1106,
+        389
+      ],
+      "width": 116,
+      "height": 363,
+      "aspect": 0.319559,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 588,
+        "y": 658,
+        "width": 116,
+        "height": 363
+      },
+      "uv_bottom_origin": {
+        "u0": 0.287109375,
+        "v0": 0.501464844,
+        "u1": 0.34375,
+        "v1": 0.678710938
+      },
+      "svg_mask": "source_editables/masks_svg/specter_reaper.svg",
+      "png_editable": "source_editables/sprites_png/specter_reaper.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 1,
+      "sha256_rgba": "7b9cd03de678d65cd4e8d4f50c3c2ea9e4e51ea5a764164d5030b7522492e8f5"
+    },
+    {
+      "id": "specter_shadow_01",
+      "category": "specter",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        1208,
+        269,
+        1319,
+        609
+      ],
+      "visible_source_px": [
+        1208,
+        269,
+        1319,
+        609
+      ],
+      "width": 111,
+      "height": 340,
+      "aspect": 0.326471,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 720,
+        "y": 641,
+        "width": 111,
+        "height": 340
+      },
+      "uv_bottom_origin": {
+        "u0": 0.3515625,
+        "v0": 0.520996094,
+        "u1": 0.405761719,
+        "v1": 0.687011719
+      },
+      "svg_mask": "source_editables/masks_svg/specter_shadow_01.svg",
+      "png_editable": "source_editables/sprites_png/specter_shadow_01.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 4,
+      "sha256_rgba": "5edeef542a902eca3edfe9068659884fafe2f39a446c8feec6e11d761c09afe9"
+    },
+    {
+      "id": "specter_shadow_02",
+      "category": "specter",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        1317,
+        269,
+        1422,
+        535
+      ],
+      "visible_source_px": [
+        1317,
+        279,
+        1422,
+        535
+      ],
+      "width": 105,
+      "height": 256,
+      "aspect": 0.410156,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 310,
+        "y": 1079,
+        "width": 105,
+        "height": 256
+      },
+      "uv_bottom_origin": {
+        "u0": 0.151367188,
+        "v0": 0.348144531,
+        "u1": 0.202636719,
+        "v1": 0.473144531
+      },
+      "svg_mask": "source_editables/masks_svg/specter_shadow_02.svg",
+      "png_editable": "source_editables/sprites_png/specter_shadow_02.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 3,
+      "sha256_rgba": "0b982771fc7085462ba8b3f93e4f34edef5fa2ae0897c812f2c8159a8b6d1ea2"
+    },
+    {
+      "id": "specter_shadow_03",
+      "category": "specter",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        1404,
+        389,
+        1534,
+        607
+      ],
+      "visible_source_px": [
+        1404,
+        389,
+        1522,
+        607
+      ],
+      "width": 118,
+      "height": 218,
+      "aspect": 0.541284,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1622,
+        "y": 408,
+        "width": 118,
+        "height": 218
+      },
+      "uv_bottom_origin": {
+        "u0": 0.791992188,
+        "v0": 0.694335938,
+        "u1": 0.849609375,
+        "v1": 0.80078125
+      },
+      "svg_mask": "source_editables/masks_svg/specter_shadow_03.svg",
+      "png_editable": "source_editables/sprites_png/specter_shadow_03.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 3,
+      "sha256_rgba": "d352fa894710ecc9aba11479b6ebfceb97df263fed7ead7a78a0d4daa72982ef"
+    },
+    {
+      "id": "specter_tall",
+      "category": "specter",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        558,
+        751,
+        790,
+        997
+      ],
+      "visible_source_px": [
+        558,
+        751,
+        790,
+        997
+      ],
+      "width": 232,
+      "height": 246,
+      "aspect": 0.943089,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1509,
+        "y": 146,
+        "width": 232,
+        "height": 246
+      },
+      "uv_bottom_origin": {
+        "u0": 0.736816406,
+        "v0": 0.80859375,
+        "u1": 0.850097656,
+        "v1": 0.928710938
+      },
+      "svg_mask": "source_editables/masks_svg/specter_tall.svg",
+      "png_editable": "source_editables/sprites_png/specter_tall.png",
+      "mask_alpha_cutoff": 25,
+      "mask_contours": 8,
+      "sha256_rgba": "891c8b996981b7a50b93e575e9c81ba2fee7a7d8034548d8ce036ab6f187c6bb"
+    },
+    {
+      "id": "spectral_city_far",
+      "category": "architecture",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        436,
+        730,
+        1118,
+        1011
+      ],
+      "visible_source_px": [
+        436,
+        730,
+        1118,
+        1011
+      ],
+      "width": 640,
+      "height": 264,
+      "aspect": 2.424242,
+      "atlas": "abyss_atlas_00.webp",
+      "rect_px": {
+        "x": 393,
+        "y": 664,
+        "width": 640,
+        "height": 264
+      },
+      "uv_bottom_origin": {
+        "u0": 0.191894531,
+        "v0": 0.546875,
+        "u1": 0.504394531,
+        "v1": 0.67578125
+      },
+      "svg_mask": "source_editables/masks_svg/spectral_city_far.svg",
+      "png_editable": "source_editables/sprites_png/spectral_city_far.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 7,
+      "sha256_rgba": "46d22ce014d8b80f84166c9168500f5b1ed93a1f440ee00b1c0a2e15b0860bca"
+    },
+    {
+      "id": "tower_shard_left",
+      "category": "architecture",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        613,
+        317,
+        788,
+        769
+      ],
+      "visible_source_px": [
+        613,
+        317,
+        788,
+        769
+      ],
+      "width": 175,
+      "height": 452,
+      "aspect": 0.387168,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 8,
+        "width": 175,
+        "height": 452
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.775390625,
+        "u1": 0.089355469,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/tower_shard_left.svg",
+      "png_editable": "source_editables/sprites_png/tower_shard_left.png",
+      "mask_alpha_cutoff": 38,
+      "mask_contours": 8,
+      "sha256_rgba": "98cda10dbd58a2abc5dc426fe369ef20d2e331e7114a571794605cff0564bce1"
+    },
+    {
+      "id": "upper_rock_cluster",
+      "category": "debris",
+      "source_sheet": "Kit de ruinas góticas y portal helado.png",
+      "crop_source_px": [
+        1194,
+        0,
+        1536,
+        264
+      ],
+      "visible_source_px": [
+        1194,
+        9,
+        1519,
+        264
+      ],
+      "width": 325,
+      "height": 255,
+      "aspect": 1.27451,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 855,
+        "y": 8,
+        "width": 325,
+        "height": 255
+      },
+      "uv_bottom_origin": {
+        "u0": 0.417480469,
+        "v0": 0.871582031,
+        "u1": 0.576171875,
+        "v1": 0.99609375
+      },
+      "svg_mask": "source_editables/masks_svg/upper_rock_cluster.svg",
+      "png_editable": "source_editables/sprites_png/upper_rock_cluster.png",
+      "mask_alpha_cutoff": 49,
+      "mask_contours": 16,
+      "sha256_rgba": "27196435e5ad2768b3ea2addce9942b257eeef1cc1ccd671c12e6c6104e02bd3"
+    },
+    {
+      "id": "vortex_dark",
+      "category": "rift",
+      "source_sheet": "a_dark_cinematic_fantasy_sci_fi_compositing_shee.png",
+      "crop_source_px": [
+        999,
+        1085,
+        1225,
+        1243
+      ],
+      "visible_source_px": [
+        999,
+        1085,
+        1219,
+        1243
+      ],
+      "width": 220,
+      "height": 158,
+      "aspect": 1.392405,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 1105,
+        "y": 1288,
+        "width": 220,
+        "height": 158
+      },
+      "uv_bottom_origin": {
+        "u0": 0.539550781,
+        "v0": 0.293945312,
+        "u1": 0.646972656,
+        "v1": 0.37109375
+      },
+      "svg_mask": "source_editables/masks_svg/vortex_dark.svg",
+      "png_editable": "source_editables/sprites_png/vortex_dark.png",
+      "mask_alpha_cutoff": 23,
+      "mask_contours": 1,
+      "sha256_rgba": "deaf9d7d1fe9356f68aeba912e94cc34c3fed3163f16aec16bd74d64aa3861e4"
+    },
+    {
+      "id": "vortex_mist",
+      "category": "mist",
+      "source_sheet": "Paquete de ruinas góticas y niebla dimensional.png",
+      "crop_source_px": [
+        1299,
+        699,
+        1536,
+        1024
+      ],
+      "visible_source_px": [
+        1299,
+        699,
+        1530,
+        1017
+      ],
+      "width": 231,
+      "height": 318,
+      "aspect": 0.726415,
+      "atlas": "abyss_atlas_01.webp",
+      "rect_px": {
+        "x": 847,
+        "y": 641,
+        "width": 231,
+        "height": 318
+      },
+      "uv_bottom_origin": {
+        "u0": 0.413574219,
+        "v0": 0.531738281,
+        "u1": 0.526367188,
+        "v1": 0.687011719
+      },
+      "svg_mask": "source_editables/masks_svg/vortex_mist.svg",
+      "png_editable": "source_editables/sprites_png/vortex_mist.png",
+      "mask_alpha_cutoff": 18,
+      "mask_contours": 7,
+      "sha256_rgba": "c8d68e8c4368f02ecce4034de2af238a0b60ddb37f8982ad0c505e1790fe88fe"
+    }
+  ]
+}

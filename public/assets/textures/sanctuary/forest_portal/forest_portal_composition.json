@@ -1,0 +1,268 @@
+{
+  "schema": "lrlo.sanctuary.forest_portal.composition.v1",
+  "portal_id": "libre-de-culpas",
+  "placements": [
+    {
+      "id": "dead_tree_01",
+      "x": -0.36,
+      "y": 0.02,
+      "height_fraction": 0.44,
+      "depth": 0.11,
+      "opacity": 0.67,
+      "motion": "sway",
+      "phase": 0.0
+    },
+    {
+      "id": "dead_tree_02",
+      "x": 0.39,
+      "y": 0.02,
+      "height_fraction": 0.46,
+      "depth": 0.135,
+      "opacity": 0.67,
+      "motion": "sway",
+      "phase": 1.1
+    },
+    {
+      "id": "dead_tree_03",
+      "x": -0.19,
+      "y": 0.02,
+      "height_fraction": 0.4,
+      "depth": 0.16,
+      "opacity": 0.67,
+      "motion": "sway",
+      "phase": 2.2
+    },
+    {
+      "id": "dead_tree_04",
+      "x": 0.2,
+      "y": 0.02,
+      "height_fraction": 0.37,
+      "depth": 0.185,
+      "opacity": 0.67,
+      "motion": "sway",
+      "phase": 3.3000000000000003
+    },
+    {
+      "id": "dead_tree_05",
+      "x": -0.48,
+      "y": 0.02,
+      "height_fraction": 0.52,
+      "depth": 0.21000000000000002,
+      "opacity": 0.67,
+      "motion": "sway",
+      "phase": 4.4
+    },
+    {
+      "id": "dead_tree_06",
+      "x": 0.52,
+      "y": 0.02,
+      "height_fraction": 0.5,
+      "depth": 0.235,
+      "opacity": 0.67,
+      "motion": "sway",
+      "phase": 5.5
+    },
+    {
+      "id": "moss_islet_long",
+      "x": -0.05,
+      "y": -0.33,
+      "height_fraction": 0.23,
+      "depth": 0.5,
+      "opacity": 0.49,
+      "motion": "still",
+      "phase": 0.52
+    },
+    {
+      "id": "forest_mist_01",
+      "x": 0.02,
+      "y": -0.08,
+      "height_fraction": 0.2,
+      "depth": 0.51,
+      "opacity": 0.34,
+      "motion": "mist",
+      "phase": 0.31
+    },
+    {
+      "id": "fern_green_03",
+      "x": -0.31,
+      "y": -0.38,
+      "height_fraction": 0.21,
+      "depth": 0.66,
+      "opacity": 0.85,
+      "motion": "sway",
+      "phase": 2
+    },
+    {
+      "id": "fern_shadow_04",
+      "x": 0.37,
+      "y": -0.41,
+      "height_fraction": 0.24,
+      "depth": 0.67,
+      "opacity": 0.83,
+      "motion": "sway",
+      "phase": 3
+    },
+    {
+      "id": "quiet_wisp_01",
+      "x": 0.04,
+      "y": -0.16,
+      "height_fraction": 0.1,
+      "depth": 0.35,
+      "opacity": 0.27,
+      "motion": "wisp",
+      "phase": 0.25
+    },
+    {
+      "id": "specter_hanging",
+      "x": 0.13,
+      "y": -0.05,
+      "height_fraction": 0.25,
+      "depth": 0.33,
+      "opacity": 0.1,
+      "motion": "wisp",
+      "phase": 1.3
+    },
+    {
+      "id": "forest_mist_02",
+      "x": -0.09,
+      "y": -0.37,
+      "height_fraction": 0.3,
+      "depth": 0.71,
+      "opacity": 0.35,
+      "motion": "mist",
+      "phase": 1.1
+    },
+    {
+      "id": "root_hand",
+      "x": -0.45,
+      "y": -0.36,
+      "height_fraction": 0.32,
+      "depth": 0.76,
+      "opacity": 0.47,
+      "motion": "still",
+      "phase": 0.2
+    },
+    {
+      "id": "root_crooked_lit",
+      "x": 0.38,
+      "y": -0.35,
+      "height_fraction": 0.34,
+      "depth": 0.79,
+      "opacity": 0.6,
+      "motion": "still",
+      "phase": 0.7
+    },
+    {
+      "id": "hanging_vines_01",
+      "x": -0.4,
+      "y": 0.35,
+      "height_fraction": 0.42,
+      "depth": 0.79,
+      "opacity": 0.55,
+      "motion": "sway",
+      "phase": 1.1
+    },
+    {
+      "id": "ancient_vines",
+      "x": 0.31,
+      "y": 0.36,
+      "height_fraction": 0.42,
+      "depth": 0.84,
+      "opacity": 0.43,
+      "motion": "sway",
+      "phase": 2.1
+    },
+    {
+      "id": "fern_dripping",
+      "x": -0.39,
+      "y": -0.41,
+      "height_fraction": 0.25,
+      "depth": 0.84,
+      "opacity": 0.64,
+      "motion": "sway",
+      "phase": 2.5
+    },
+    {
+      "id": "mushrooms_green",
+      "x": 0.38,
+      "y": -0.45,
+      "height_fraction": 0.12,
+      "depth": 0.88,
+      "opacity": 0.25,
+      "motion": "still",
+      "phase": 2.2
+    },
+    {
+      "id": "forest_mist_03",
+      "x": 0,
+      "y": -0.46,
+      "height_fraction": 0.31,
+      "depth": 0.9,
+      "opacity": 0.32,
+      "motion": "mist",
+      "phase": 2.4
+    },
+    {
+      "id": "mist_large",
+      "x": 0.15,
+      "y": -0.31,
+      "height_fraction": 0.36,
+      "depth": 0.92,
+      "opacity": 0.22,
+      "motion": "mist",
+      "phase": 1.8
+    },
+    {
+      "id": "quiet_wisp_02",
+      "x": -0.3,
+      "y": 0.03,
+      "height_fraction": 0.07,
+      "depth": 0.73,
+      "opacity": 0.25,
+      "motion": "wisp",
+      "phase": 2.2
+    },
+    {
+      "id": "dead_tree_07",
+      "x": -0.54,
+      "y": 0.04,
+      "height_fraction": 0.79,
+      "depth": 0.92,
+      "opacity": 0.91,
+      "motion": "sway",
+      "phase": 3.2
+    },
+    {
+      "id": "dead_tree_08",
+      "x": 0.55,
+      "y": 0.04,
+      "height_fraction": 0.68,
+      "depth": 0.93,
+      "opacity": 0.88,
+      "motion": "sway",
+      "phase": 4.1
+    },
+    {
+      "id": "forest_mist_04",
+      "x": 0,
+      "y": -0.26,
+      "height_fraction": 0.38,
+      "depth": 0.94,
+      "opacity": 0.2,
+      "motion": "mist",
+      "phase": 2.9
+    },
+    {
+      "id": "forest_mist_05",
+      "x": 0,
+      "y": -0.46,
+      "height_fraction": 0.43,
+      "depth": 0.98,
+      "opacity": 0.2,
+      "motion": "mist",
+      "phase": 3.3
+    }
+  ],
+  "placement_coordinates": "x,y centered fractions; depth 0 far, 1 near",
+  "background_file": "forest_backdrop.webp"
+}

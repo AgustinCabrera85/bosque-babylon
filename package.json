@@ -14,6 +14,7 @@
     "vfx:verify": "node scripts/verify-shadow-vfx.mjs",
     "stats:verify": "node --experimental-strip-types scripts/verify-player-stats.mts",
     "levels:verify": "esbuild scripts/verify-level-manager.mts --bundle --platform=node --format=esm --target=node22 --outfile=dist/verify-level-manager.mjs && node dist/verify-level-manager.mjs",
+    "levels:verify-browser": "node scripts/verify-level-load-browser.mjs forest && node scripts/verify-level-load-browser.mjs theatre && node scripts/verify-level-load-browser.mjs sanctuary",
     "stairs:verify": "esbuild scripts/verify-theatre-stairs.mts --bundle --platform=node --format=esm --target=node22 --outfile=dist/verify-theatre-stairs.mjs && node dist/verify-theatre-stairs.mjs",
     "enemies:verify": "esbuild scripts/verify-enemy-combat.mts --bundle --platform=node --format=esm --target=node22 --outfile=dist/verify-enemy-combat.mjs && node dist/verify-enemy-combat.mjs",
     "cursor:verify": "esbuild scripts/verify-cursor-system.mts --bundle --platform=node --format=esm --target=node22 --outfile=dist/verify-cursor-system.mjs && node dist/verify-cursor-system.mjs",

@@ -1,0 +1,98 @@
+{
+  "schema": "lrlo.sanctuary.forest_portal.parallax.v3",
+  "portal_id": "libre-de-culpas",
+  "description": "Five independently animated portrait planes from the user-approved cabin forest art, under a controlled green spectral grade.",
+  "render_order": "back_to_front",
+  "note": "Short physical z separation plus graded camera-relative UV shift, clipped against the original aperture; avoids perspective gaps near the stone frame.",
+  "textures": [
+    {
+      "id": "far_sky",
+      "file": "far_sky.webp",
+      "width": 768,
+      "height": 1664,
+      "source": "paisaje_montañoso_bajo_la_luna.png"
+    },
+    {
+      "id": "mid_forest",
+      "file": "mid_forest.webp",
+      "width": 768,
+      "height": 1664,
+      "source": "bosque_de_coníferas_bajo_la_luna_llena.png"
+    },
+    {
+      "id": "cabin",
+      "file": "cabin.webp",
+      "width": 768,
+      "height": 1664,
+      "source": "cabaña_rústica_iluminada_entre_leña_y_vegetación.png"
+    },
+    {
+      "id": "path",
+      "file": "path.webp",
+      "width": 768,
+      "height": 1664,
+      "source": "sendero_boscoso_iluminado_por_faroles.png"
+    },
+    {
+      "id": "frame",
+      "file": "frame.webp",
+      "width": 768,
+      "height": 1664,
+      "source": "marco_de_bosque_oscuro_con_transparencia.png"
+    }
+  ],
+  "layers": [
+    {
+      "id": "far_sky",
+      "depth": 0.0,
+      "plane_z": -0.04,
+      "shift_strength": 0.025,
+      "green_multiplier": 0.4,
+      "animation": "static"
+    },
+    {
+      "id": "mid_forest",
+      "depth": 0.31,
+      "plane_z": -0.032,
+      "shift_strength": 0.17,
+      "green_multiplier": 0.94,
+      "animation": "subtle_mist"
+    },
+    {
+      "id": "cabin",
+      "depth": 0.5,
+      "plane_z": -0.024,
+      "shift_strength": 0.33,
+      "green_multiplier": 0.18,
+      "animation": "static"
+    },
+    {
+      "id": "path",
+      "depth": 0.75,
+      "plane_z": -0.016,
+      "shift_strength": 0.47,
+      "green_multiplier": 0.44,
+      "animation": "subtle_mist"
+    },
+    {
+      "id": "frame",
+      "depth": 1.0,
+      "plane_z": -0.008,
+      "shift_strength": 0.82,
+      "green_multiplier": 0.6,
+      "animation": "static"
+    }
+  ],
+  "controls": {
+    "default_green": 0.75,
+    "default_parallax": 1.0,
+    "default_fog": 0.62,
+    "query": [
+      "sanctuaryForestPortal=off",
+      "sanctuaryForestGreen=0..1.5",
+      "sanctuaryForestParallax=0..2",
+      "sanctuaryForestMist=0..1.5",
+      "sanctuaryForestQuality=low"
+    ]
+  }
+}

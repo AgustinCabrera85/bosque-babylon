@@ -14,14 +14,15 @@ export default defineConfig({
     }
   }],
   server: { port: 5173, strictPort: true },
-  // Scan the lazy level modules up front. Otherwise first opening the forest
-  // can invalidate Babylon's pre-bundle during its dynamic import (HTTP 504).
+  // Keep level modules lazy. Babylon's native ESM stays outside Vite's shared
+  // dependency bundle, so changing one scene cannot invalidate the classes
+  // that another scene is currently constructing.
   optimizeDeps: {
-    entries: [
-      'index.html',
-      'src/game/levels/forest/createForestLevel.ts',
-      'src/game/levels/theatre/createTheatreLevel.ts',
-      'src/game/levels/sanctuary/createSanctuaryLevel.ts',
+    exclude: [
+      '@babylonjs/core',
+      '@babylonjs/inspector',
+      '@babylonjs/loaders',
+      '@babylonjs/materials',
     ],
   },
   build: {

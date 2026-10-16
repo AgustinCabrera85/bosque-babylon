@@ -248,11 +248,11 @@ export function createSanctuaryPortalThreshold(
   const sides: Mesh[] = [];
   for (const direction of [-1, 1]) {
     const side = MeshBuilder.CreatePlane(`sanctuaryPortalSideGlow_${direction}`, {
-      width: sourceZ - mouthZ, height: portalHalf.y * 2 + 8,
+      width: sourceZ - mouthZ, height: portalHalf.y * 2 + 26,
       sideOrientation: Mesh.FRONTSIDE,
     }, scene);
     side.position.set(portalCenter.x + direction * (portalHalf.x + 0.08),
-      portalCenter.y - 3, (sourceZ + mouthZ) * 0.5);
+      portalCenter.y + 6, (sourceZ + mouthZ) * 0.5);
     side.rotation.y = Math.PI * 0.5;
     side.material = sideMaterial;
     side.alphaIndex = 1015;

@@ -297,6 +297,8 @@ export class SanctuaryPortalFloorLightPlugin extends MaterialPluginBase {
     const stairZ = ASCENT.stairEndZ;
     const upperY = ASCENT.upperY;
     const portalHalfWidth = (CFG.gateWidth - 13) / 2;
+    const portalTop = upperY + ASCENT.portalHeight;
+    const rearZ = CFG.gateWallZ + ASCENT.wallDepth / 2;
     return {
       CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
 if (vPositionW.z >= ${stairZ.toFixed(3)}
@@ -328,6 +330,30 @@ float sanctuaryFloorStrength = sanctuaryFloorAlong * sanctuaryFloorTop
   * sanctuaryFloorPower
   * (0.84 + 0.16 * sanctuaryPortalFloorLight.y);
 color.rgb += vec3(0.36, 0.57, 0.84) * sanctuaryFloorStrength;
+}
+// Light the lintel's real underside and the first stones above its opening.
+// A soft depth fade keeps the crown connected to the portal without a flat panel.
+if (vPositionW.z >= ${(mouthZ - 14).toFixed(3)}
+  && vPositionW.z <= ${rearZ.toFixed(3)}
+  && vPositionW.y >= ${(portalTop - 0.25).toFixed(3)}
+  && vPositionW.y <= ${(portalTop + 22).toFixed(3)}
+  && abs(vPositionW.x) <= ${(CFG.gateWidth / 2 + 2).toFixed(3)}) {
+float sanctuaryCrownDepth = smoothstep(${(mouthZ - 14).toFixed(3)},
+  ${(mouthZ + 36).toFixed(3)}, vPositionW.z);
+float sanctuaryCrownSource = clamp((vPositionW.z - ${mouthZ.toFixed(3)})
+  / ${(rearZ - mouthZ).toFixed(3)}, 0.0, 1.0);
+float sanctuaryCrownHeight = 1.0 - smoothstep(${(portalTop + 1).toFixed(3)},
+  ${(portalTop + 22).toFixed(3)}, vPositionW.y);
+float sanctuaryCrownWidth = 1.0 - smoothstep(${(portalHalfWidth * 0.68).toFixed(3)},
+  ${(CFG.gateWidth / 2 + 2).toFixed(3)}, abs(vPositionW.x));
+float sanctuaryCrownRipple = 0.90 + 0.10 * sin(vPositionW.x * 0.13
+  + vPositionW.z * 0.08 - sanctuaryPortalFloorLight.x * 0.46);
+float sanctuaryCrownStrength = (0.42 + 0.58 * sanctuaryCrownDepth)
+  * sanctuaryCrownHeight
+  * sanctuaryCrownWidth * sanctuaryCrownRipple
+  * (0.50 + 0.50 * sanctuaryCrownSource)
+  * (0.84 + 0.16 * sanctuaryPortalFloorLight.y);
+color.rgb += vec3(0.34, 0.54, 0.80) * sanctuaryCrownStrength;
 }
 `,
     };
@@ -594,6 +620,14 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
   frameLight.range = mobile ? 145 : 175;
   frameLight.intensity = 0;
   frameLight.includedOnlyMeshes.push(...mainPortal.meshes);
+  const crownLight = new PointLight("sanctuaryPortalCrownFill", new Vector3(
+    0, portalTop - 7, ASCENT.wallFrontZ - 10,
+  ), scene);
+  crownLight.diffuse = new Color3(0.56, 0.74, 1.0);
+  crownLight.specular = new Color3(0.34, 0.53, 0.80);
+  crownLight.range = mobile ? 175 : 215;
+  crownLight.intensity = 0;
+  crownLight.includedOnlyMeshes.push(...mainPortal.meshes, gateLintel);
   for (const root of mainPortal.rootNodes) root.parent = mainPortalRoot;
   for (const material of mainPortal.materials) {
     if (!(material instanceof PBRMaterial)) continue;
@@ -893,6 +927,7 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
       const portalPulse = 0.80 + 0.20 * Math.sin(elapsed * 1.7)
         + 0.09 * Math.sin(elapsed * 2.9);
       frameLight.intensity = (mobile ? 2.6 : 3.6) * portalPulse;
+      crownLight.intensity = (mobile ? 2.0 : 2.8) * portalPulse;
       water.update(elapsed);
       atmosphere.update(elapsed);
       const cameraPosition = scene.activeCamera?.globalPosition ?? Vector3.Zero();

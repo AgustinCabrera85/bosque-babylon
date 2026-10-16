@@ -1,0 +1,202 @@
+{
+  "schema": "lrlo.sanctuary.forest_portal.atlas.v4",
+  "portal_id": "libre-de-culpas",
+  "source_reference": "cabaña_iluminada_bajo_la_luna_llena.png",
+  "reference_crop_px": [
+    600,
+    0,
+    1032,
+    941
+  ],
+  "visual_method": "coherent photographic backdrop + individual masked sprites using the main portal atlas pattern",
+  "base": {
+    "file": "forest_vista.webp",
+    "width": 768,
+    "height": 1673
+  },
+  "atlases": [
+    {
+      "file": "forest_atlas_00.webp",
+      "width": 2048,
+      "height": 2048
+    }
+  ],
+  "sprites": [
+    {
+      "id": "mist_amber_glow",
+      "category": "mist",
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 1504,
+        "y": 957,
+        "width": 220,
+        "height": 260
+      },
+      "uv_bottom_origin": {
+        "u0": 0.734375,
+        "u1": 0.841796875,
+        "v0": 0.405761719,
+        "v1": 0.532714844
+      },
+      "source": "procedural_luminous_fog",
+      "width": 220,
+      "height": 260,
+      "editable_png": "mist_amber_glow.png",
+      "svg_mask": "mist_amber_glow.svg"
+    },
+    {
+      "id": "mist_trail_01",
+      "category": "mist",
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 1356,
+        "width": 450,
+        "height": 250
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "u1": 0.223632812,
+        "v0": 0.215820312,
+        "v1": 0.337890625
+      },
+      "source": "procedural_luminous_fog",
+      "width": 450,
+      "height": 250,
+      "editable_png": "mist_trail_01.png",
+      "svg_mask": "mist_trail_01.svg"
+    },
+    {
+      "id": "mist_trail_02",
+      "category": "mist",
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 996,
+        "y": 957,
+        "width": 500,
+        "height": 280
+      },
+      "uv_bottom_origin": {
+        "u0": 0.486328125,
+        "u1": 0.73046875,
+        "v0": 0.395996094,
+        "v1": 0.532714844
+      },
+      "source": "procedural_luminous_fog",
+      "width": 500,
+      "height": 280,
+      "editable_png": "mist_trail_02.png",
+      "svg_mask": "mist_trail_02.svg"
+    },
+    {
+      "id": "mist_tree_03",
+      "category": "mist",
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 1236,
+        "y": 8,
+        "width": 325,
+        "height": 550
+      },
+      "uv_bottom_origin": {
+        "u0": 0.603515625,
+        "u1": 0.762207031,
+        "v0": 0.727539062,
+        "v1": 0.99609375
+      },
+      "source": "procedural_luminous_fog",
+      "width": 325,
+      "height": 550,
+      "editable_png": "mist_tree_03.png",
+      "svg_mask": "mist_tree_03.svg"
+    },
+    {
+      "id": "old_tree_left",
+      "category": "tree",
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 8,
+        "width": 600,
+        "height": 941
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "u1": 0.296875,
+        "v0": 0.536621094,
+        "v1": 0.99609375
+      },
+      "source": "marco_de_bosque_oscuro_con_transparencia.png",
+      "width": 600,
+      "height": 941,
+      "editable_png": "old_tree_left.png",
+      "svg_mask": "old_tree_left.svg"
+    },
+    {
+      "id": "old_tree_right",
+      "category": "tree",
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 616,
+        "y": 8,
+        "width": 612,
+        "height": 941
+      },
+      "uv_bottom_origin": {
+        "u0": 0.30078125,
+        "u1": 0.599609375,
+        "v0": 0.536621094,
+        "v1": 0.99609375
+      },
+      "source": "marco_de_bosque_oscuro_con_transparencia.png",
+      "width": 612,
+      "height": 941,
+      "editable_png": "old_tree_right.png",
+      "svg_mask": "old_tree_right.svg"
+    },
+    {
+      "id": "roots_lower_left",
+      "category": "foliage",
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 8,
+        "y": 957,
+        "width": 480,
+        "height": 391
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "u1": 0.23828125,
+        "v0": 0.341796875,
+        "v1": 0.532714844
+      },
+      "source": "marco_de_bosque_oscuro_con_transparencia.png",
+      "width": 480,
+      "height": 391,
+      "editable_png": "roots_lower_left.png",
+      "svg_mask": "roots_lower_left.svg"
+    },
+    {
+      "id": "roots_lower_right",
+      "category": "foliage",
+      "atlas": "forest_atlas_00.webp",
+      "rect_px": {
+        "x": 496,
+        "y": 957,
+        "width": 492,
+        "height": 391
+      },
+      "uv_bottom_origin": {
+        "u0": 0.2421875,
+        "u1": 0.482421875,
+        "v0": 0.341796875,
+        "v1": 0.532714844
+      },
+      "source": "marco_de_bosque_oscuro_con_transparencia.png",
+      "width": 492,
+      "height": 391,
+      "editable_png": "roots_lower_right.png",
+      "svg_mask": "roots_lower_right.svg"
+    }
+  ]
+}

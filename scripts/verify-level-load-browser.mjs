@@ -853,10 +853,31 @@ try {
         return manager ? Array.from({ length: manager.numTargets }, (_, index) =>
           manager.getTarget(index)) : [];
       }).find((target) => target.name === 'Mouth_Open');
+      const pyroMeshes = scene.meshes.filter((mesh) =>
+        mesh.name.startsWith('pyroFlameV3_') ||
+        mesh.name.startsWith('pyroAfterCloudV3_'));
+      const activeClouds = pyroMeshes.filter((mesh) =>
+        mesh.name.startsWith('pyroAfterCloudV3_') && mesh.isEnabled());
+      const shaderStatus = pyroMeshes.map((mesh) => ({
+        name: mesh.name,
+        ready: mesh.material?.isReadyForSubMesh(mesh, mesh.subMeshes[0]),
+        error: mesh.subMeshes[0]?.effect?.getCompilationError(),
+      }));
       return {
         screen: scene.getMaterialByName('rinaStagePinkScreen')?.emissiveColor.r,
-        flames: scene.meshes.filter((mesh) =>
-          mesh.name.startsWith('rinaPyroJet_') && mesh.isEnabled()).length,
+        flames: pyroMeshes.filter((mesh) =>
+          mesh.name.startsWith('pyroFlameV3_') && mesh.isEnabled()).length,
+        clouds: activeClouds.length,
+        cloudAboveStage: activeClouds.every((mesh) =>
+          mesh.position.y > scene.getMeshByName('rinaMainStage')
+            .getBoundingInfo().boundingBox.maximumWorld.y + 2),
+        shaderReady: shaderStatus.length > 0 && shaderStatus.every((status) =>
+          status.ready && !status.error),
+        shaderStatus,
+        legacyFlames: scene.meshes.filter((mesh) =>
+          mesh.name.startsWith('rinaPyroJet_') ||
+          mesh.name.startsWith('pyroJet_') ||
+          mesh.name.startsWith('pyroHead_')).length,
         stageTop: scene.getMeshByName('rinaMainStage')?.getBoundingInfo().boundingBox.maximumWorld.y,
         catwalkTop: scene.getMeshByName('rinaStageCatwalk')?.getBoundingInfo().boundingBox.maximumWorld.y,
         rinaZ: scene.getTransformNodeByName('enemy:rina-stage:root')?.position.z,
@@ -873,6 +894,8 @@ try {
         spot: scene.getLightByName('rinaMovingSpot_0')?.intensity,
         screenLight: scene.getLightByName('rinaScreenLight_1')?.intensity,
         singerLight: scene.getLightByName('rinaRinaKeyLight')?.intensity,
+        pyroLight: scene.getLightByName('rinaPyroLightLeft')?.intensity,
+        pyroLightEnabled: scene.getLightByName('rinaPyroLightLeft')?.isEnabled(),
         singerLightZ: scene.getLightByName('rinaRinaKeyLight')?.position.z,
         singerLightMeshes: scene.getLightByName('rinaRinaKeyLight')?.includedOnlyMeshes.length,
         screenCameraZ: scene.getCameraByName('rinaSingerScreenCamera')?.position.z,
@@ -905,15 +928,17 @@ try {
     assert.ok(farther.rinaZ < walking.rinaZ - 0.2,
       `Rina did not keep moving toward the audience: ${JSON.stringify({ walking, farther })}`);
     await songAudio(55.1);
-    await delay(450);
+    await delay(280);
     const chorus = await stageLights();
-    assert.ok(chorus.flames > 0 &&
+    assert.ok(chorus.flames > 0 && chorus.clouds === 0 &&
+      chorus.pyroLightEnabled && chorus.pyroLight > 8 &&
+      chorus.shaderReady && chorus.legacyFlames === 0 &&
       Math.abs(chorus.rinaZ - 19 * concert.scale) < 0.1 &&
       Math.abs(chorus.singerLightZ - 16) < 0.1 &&
       chorus.singerLightMeshes > 0 &&
       chorus.fullSing && !chorus.walkLower && !chorus.singUpper &&
       chorus.mouthOpen > 0.01,
-      `Rina chorus did not start at the catwalk with singing face and fire: ${JSON.stringify(chorus)}`);
+      `Rina chorus did not start at the catwalk with singing face and fire: ${JSON.stringify(chorus)}; ${errors.join(' | ')}`);
     const rollSamples = [];
     for (let sample = 0; sample < 14; sample++) {
       rollSamples.push(Math.abs((await stageLights()).cameraRoll));
@@ -923,10 +948,25 @@ try {
       assert.ok(Math.max(...rollSamples) > 0.00008,
         `Rina beat did not add subtle camera motion: ${JSON.stringify(rollSamples)}`);
     }
+    const sustained = await stageLights();
+    assert.ok(sustained.flames > 0 && sustained.clouds === 0 &&
+      sustained.pyroLightEnabled && sustained.pyroLight > 8,
+      `Rina fire or local light faded before the sustained burn ended: ${JSON.stringify(sustained)}`);
+    let afterglow = sustained;
+    for (let sample = 0; sample < 20 &&
+      (afterglow.flames > 0 || afterglow.clouds === 0); sample++) {
+      await delay(100);
+      afterglow = await stageLights();
+    }
+    assert.ok(afterglow.flames === 0 && afterglow.clouds > 0 &&
+      afterglow.cloudAboveStage && afterglow.shaderReady &&
+      !afterglow.pyroLightEnabled && afterglow.pyroLight < 0.03,
+      `Rina fire did not become clouds above the stage: ${JSON.stringify(afterglow)}; ${errors.join(' | ')}`);
     await songAudio(77);
-    await delay(220);
+    await delay(360);
     const returning = await stageLights();
-    assert.ok(returning.flames === 0 && returning.walkLower && returning.singUpper &&
+    assert.ok(returning.flames === 0 && returning.clouds > 0 &&
+      returning.walkLower && returning.singUpper &&
       returning.rinaZ > chorus.rinaZ && returning.rinaZ < startState.rinaZ,
       `Rina did not return after the first chorus: ${JSON.stringify(returning)}`);
     await songAudio(1);

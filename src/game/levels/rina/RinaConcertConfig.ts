@@ -12,3 +12,14 @@ export const RINA_CONCERT_SONG = {
     { start: 204, end: 230 },
   ],
 } as const;
+
+/** Shared timing for the flame shader, stage lighting, and retrigger interval. */
+export const RINA_PYRO_TIMING = {
+  jetTravelTime: 0.17,
+  headExpandTime: 0.13,
+  // The crown finishes expanding at 0.30 s and then stays full for 2 s.
+  sustainTime: 2.13,
+  blowoutTime: 0.22,
+  emberTime: 0.65,
+  smokeTime: 3.2,
+} as const;

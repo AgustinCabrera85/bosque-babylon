@@ -12,7 +12,8 @@ import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { RenderTargetTexture } from "@babylonjs/core/Materials/Textures/renderTargetTexture";
 import type { Scene } from "@babylonjs/core/scene";
 import type { MusicPlaybackState } from "../../MusicPlayer";
-import { RINA_CONCERT_SONG } from "./RinaConcertConfig";
+import type { StagePyroShow } from "../../effects/StagePyro";
+import { RINA_CONCERT_SONG, RINA_PYRO_TIMING } from "./RinaConcertConfig";
 import { RINA_LEVEL_QUALITY, RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
 
 function material(
@@ -73,13 +74,6 @@ export function createRinaStage(
     Color3.Black()
   );
   singerScreen.disableLighting = true;
-  const fireMaterial = material(
-    scene,
-    "rinaPyroFire",
-    new Color3(0.9, 0.24, 0.02),
-    new Color3(1.25, 0.2, 0.01)
-  );
-
   const deck = MeshBuilder.CreateBox(
     "rinaMainStage",
     {
@@ -388,7 +382,8 @@ export function createRinaStage(
     ),
   ];
   for (const light of pyroLights) {
-    light.diffuse = new Color3(1, 0.2, 0.025);
+    light.diffuse = new Color3(1, 0.34, 0.1);
+    light.specular = new Color3(0.35, 0.16, 0.05);
     light.intensity = 0;
     light.range = 22;
     light.renderPriority = 4;
@@ -443,40 +438,14 @@ export function createRinaStage(
   smoke.preWarmCycles = performanceTier === "mobile" ? 18 : 30;
   smoke.start();
 
-  const pyroJets = Array.from(
-    { length: quality.pyroJets },
-    (_, index) => {
-      const t = index / (quality.pyroJets - 1);
-      const x = -24 + t * 48;
-      const jet = MeshBuilder.CreateCylinder(
-        `rinaPyroJet_${index}`,
-        {
-          height: 1,
-          diameterTop: 0.05,
-          diameterBottom: 1.25,
-          tessellation: 12,
-        },
-        scene
-      );
-      jet.position.set(
-        x,
-        RINA_STADIUM.stage.height + 0.4,
-        RINA_STADIUM.stage.frontZ + 1.2
-      );
-      jet.material = fireMaterial;
-      jet.scaling.y = 0.02;
-      jet.setEnabled(false);
-      return jet;
-    }
-  );
-
   let elapsed = 0;
   let screenPulse = 0.22;
   let beatPulse = 0;
   let bassBaseline = 0;
   let energyBaseline = 0;
   let musicPresence = 0;
-  let fireBurst = 0;
+  let pyroLightAge = 1000;
+  let pyroCooldown = 0;
   let beatCooldown = 0;
   let lastChorus = -1;
   let liveFeed: RenderTargetTexture | null = null;
@@ -485,7 +454,8 @@ export function createRinaStage(
     music: MusicPlaybackState | null,
     singerLocalZ: number,
     singerYaw: number,
-    playerWorldPosition: Vector3
+    playerWorldPosition: Vector3,
+    pyro: StagePyroShow
   ) => {
     elapsed += dt;
 
@@ -615,35 +585,34 @@ export function createRinaStage(
           ({ start, end }) => music.currentTime >= start && music.currentTime < end
         )
       : -1;
-    if (chorus >= 0 && chorus !== lastChorus) fireBurst = 1;
+    const chorusStarted = chorus >= 0 && chorus !== lastChorus;
     lastChorus = chorus;
-    if (chorus >= 0 && beatDetected) {
-      fireBurst = Math.max(fireBurst, 0.82);
-    }
-    fireBurst = Math.max(0, fireBurst - dt * 1.65);
-    const firePulse = chorus >= 0
-      ? Math.min(1, Math.max(fireBurst, (0.05 + bass * 0.27) * musicPresence))
-      : 0;
-
-    for (let index = 0; index < pyroJets.length; index += 1) {
-      const jet = pyroJets[index];
-      const localPulse = Math.max(
-        0,
-        firePulse -
-          Math.abs(
-            (index / Math.max(1, pyroJets.length - 1) - 0.5) * 0.18
-          )
-      );
-      jet.setEnabled(localPulse > 0.03);
-      const height = 0.3 + localPulse * 6.8;
-      jet.scaling.y = height;
-      jet.position.y =
-        RINA_STADIUM.stage.height + 0.18 + height * 0.5;
+    pyroLightAge = Math.min(1000, pyroLightAge + dt);
+    pyroCooldown = Math.max(0, pyroCooldown - dt);
+    if (chorusStarted || (chorus >= 0 && beatDetected && pyroCooldown === 0)) {
+      pyro.fireAll();
+      pyroLightAge = 0;
+      // Allow the detached clouds to complete their smoke phase before the
+      // next blast resets this emitter group.
+      pyroCooldown = RINA_PYRO_TIMING.jetTravelTime +
+        RINA_PYRO_TIMING.sustainTime + RINA_PYRO_TIMING.blowoutTime +
+        RINA_PYRO_TIMING.emberTime + RINA_PYRO_TIMING.smokeTime + 0.1;
     }
 
+    const fuelCutStart = RINA_PYRO_TIMING.jetTravelTime + RINA_PYRO_TIMING.sustainTime;
+    const riseLight = Math.min(1, pyroLightAge / (RINA_PYRO_TIMING.jetTravelTime * 0.75));
+    const burnLight = riseLight * Math.max(0,
+      Math.min(1, (fuelCutStart + RINA_PYRO_TIMING.blowoutTime - pyroLightAge) /
+        RINA_PYRO_TIMING.blowoutTime));
+    const ignitionFlash = Math.exp(-Math.pow(
+      (pyroLightAge - RINA_PYRO_TIMING.jetTravelTime -
+        RINA_PYRO_TIMING.headExpandTime * 0.5) / 0.075, 2));
+    const pyroIntensity = burnLight * 14 + ignitionFlash * 34;
     for (const light of pyroLights) {
-      light.setEnabled(firePulse > 0.03);
-      light.intensity = firePulse * 18;
+      light.setEnabled(pyroIntensity > 0.03);
+      light.intensity = pyroIntensity;
+      light.diffuse.copyFromFloats(1, 0.34 + ignitionFlash * 0.5,
+        0.1 + ignitionFlash * 0.35);
     }
     stageWash.intensity =
       (performanceTier === "mobile" ? 24 : 35) *

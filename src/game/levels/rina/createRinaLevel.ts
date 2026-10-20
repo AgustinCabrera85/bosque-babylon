@@ -8,6 +8,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { StagePyroShow } from "../../effects/StagePyro";
 import { PlayerController } from "../../PlayerController";
 import { setupPlayerViewControls } from "../../PlayerViewControls";
 import { setupMobileControls } from "../../MobileControls";
@@ -19,7 +20,7 @@ import {
 } from "../../enemies/rina";
 import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
 import { createRinaCrowdPreview } from "./RinaCrowdPreview";
-import { RINA_CONCERT_SONG } from "./RinaConcertConfig";
+import { RINA_CONCERT_SONG, RINA_PYRO_TIMING } from "./RinaConcertConfig";
 import { createRinaLiveScreens } from "./RinaLiveScreens";
 import { createRinaPerformance } from "./RinaPerformance";
 import { RINA_LEVEL_QUALITY, RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
@@ -140,6 +141,31 @@ export async function createRinaLevel(
       light.range *= RINA_STADIUM_SCALE;
     }
     stadiumRoot.scaling.setAll(RINA_STADIUM_SCALE);
+    // The pyro is created after the scenery root is scaled. Its billboard
+    // meshes and particle emitters both use world coordinates.
+    const pyroScale = RINA_STADIUM_SCALE;
+    const pyro = new StagePyroShow(
+      scene,
+      Array.from({ length: quality.pyroJets }, (_, index) => {
+        const x = -24 + index / Math.max(1, quality.pyroJets - 1) * 48;
+        return new Vector3(
+          x * pyroScale,
+          (RINA_STADIUM.stage.height + 0.18) * pyroScale,
+          (RINA_STADIUM.stage.frontZ + 1.2) * pyroScale
+        );
+      }),
+      {
+        jetHeight: 7 * pyroScale,
+        jetBaseWidth: 0.85 * pyroScale,
+        headDiameter: 3.6 * pyroScale,
+        ...RINA_PYRO_TIMING,
+        cloudCount: context.performanceTier === "mobile" ? 3 : 5,
+        particles: context.performanceTier === "desktop",
+        smoke: true,
+        lighting: false,
+      }
+    );
+    cleanup.push(() => pyro.dispose());
     const playerWorld = new RinaStadiumWorld();
 
     context.onProgress(
@@ -281,7 +307,7 @@ export async function createRinaLevel(
       liveScreens.update();
       const beatPulse = stage.update(
         dt, music, rina.root.position.z / RINA_STADIUM_SCALE,
-        rina.root.rotation.y, player.position
+        rina.root.rotation.y, player.position, pyro
       );
       if (!reducedMotion.matches && music?.playing && beatPulse > 0) {
         const strength = Math.min(1, beatPulse *

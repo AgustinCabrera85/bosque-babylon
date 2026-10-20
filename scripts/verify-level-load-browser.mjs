@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const level = process.argv[2];
-assert.ok(["forest", "theatre", "sanctuary"].includes(level),
-  "Usage: node scripts/verify-level-load-browser.mjs <forest|theatre|sanctuary>");
+assert.ok(["forest", "theatre", "sanctuary", "rina"].includes(level),
+  "Usage: node scripts/verify-level-load-browser.mjs <forest|theatre|sanctuary|rina>");
 const candidates = [
   process.env.CHROME_PATH,
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
@@ -92,7 +92,8 @@ try {
     await delay(250);
   }
   assert.ok(menuReady, `Character selection did not initialize: ${errors.join(" | ")}`);
-  await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', bubbles: true })); document.getElementById('startCharacterButton')?.click(); true");
+  const character = process.argv[3] === "sofia" ? "sofia" : "lautaro";
+  await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', bubbles: true })); document.querySelector('.character-card[data-character="${character}"]')?.click(); document.getElementById('startCharacterButton')?.click(); true`);
   let state;
   for (let i = 0; i < 240; i++) {
     state = await evaluate(`({
@@ -670,6 +671,387 @@ try {
       }
     }
   }
+  if (level === "rina") {
+    const heights = await evaluate(`(async () => {
+        const storeUrl = performance.getEntriesByType('resource')
+          .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+        const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+        const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+          .find((item) => item.metadata?.rinaLevel);
+        for (const mesh of scene.meshes) {
+          if (mesh.skeleton && mesh.getTotalVertices() > 0) {
+            mesh.refreshBoundingInfo(true, true);
+          }
+        }
+        const height = (name) => {
+          const bounds = scene.getTransformNodeByName(name)?.getHierarchyBoundingVectors(true);
+          return bounds ? bounds.max.y - bounds.min.y : null;
+        };
+        return { player: height('playerAvatarRoot'), rina: height('enemy:rina-stage:visualRoot') };
+      })()`, true);
+    assert.ok(heights.player > 2.35 && heights.player < 2.8 &&
+      heights.rina > 2.5 && heights.rina < 2.65 &&
+      (character === 'sofia' ? heights.rina > heights.player : heights.rina < heights.player),
+      `Character height order is wrong (${character}): ${JSON.stringify(heights)}`);
+    console.log(`${character} ${heights.player.toFixed(2)} m; Rina ${heights.rina.toFixed(2)} m`);
+    let concert;
+    for (let i = 0; i < 120; i++) {
+      concert = await evaluate(`(async () => {
+        const storeUrl = performance.getEntriesByType('resource')
+          .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+        const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+        const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+          .find((item) => item.metadata?.rinaLevel);
+        const pitch = scene?.getMeshByName('rinaPitch');
+        const grass = pitch?.material;
+        const pitchBounds = pitch?.getBoundingInfo().boundingBox;
+        const scale = scene?.metadata?.rinaLevel?.stadiumScale;
+        const crowd = scene?.getMeshByName('rinaCrowdPreviewSource');
+        const crowdBounds = crowd?.getBoundingInfo().boundingBox;
+        const stageBounds = scene?.getMeshByName('rinaMainStage')?.getBoundingInfo().boundingBox;
+        const exit = scene?.getMeshByName('rinaExitMarker');
+        return {
+          rina: scene?.metadata?.rinaLevel?.realRinaAsset,
+          scale,
+          pitchWidth: pitchBounds && pitchBounds.maximumWorld.x - pitchBounds.minimumWorld.x,
+          pitchLength: pitchBounds && pitchBounds.maximumWorld.z - pitchBounds.minimumWorld.z,
+          crowdHeight: crowdBounds && crowdBounds.maximumWorld.y - crowdBounds.minimumWorld.y,
+          stageWidth: stageBounds && stageBounds.maximumWorld.x - stageBounds.minimumWorld.x,
+          stageFrontZ: stageBounds?.minimumWorld.z,
+          exitZ: exit?.getAbsolutePosition().z,
+          rinaZ: scene?.getTransformNodeByName('enemy:rina-stage:root')?.position.z,
+          grass: grass?.name,
+          ready: grass?.isReady(pitch),
+          textures: [grass?.albedoTexture, grass?.bumpTexture, grass?.metallicTexture]
+            .map((texture) => ({ url: texture?.url, ready: texture?.isReady() })),
+          singing: scene?.animationGroups?.some((group) =>
+            group.name.includes('rina_emote_sing') && group.isPlaying),
+          catwalk: !!scene?.getMeshByName('rinaStageCatwalk'),
+          tunnelOpen: [-58, -55, -52, -50].every((z) =>
+            !scene?.metadata?.playerWorld?.isColliding(0, z * scale)),
+          catwalkBlocks: scene?.metadata?.playerWorld?.isColliding(0, 20 * scale),
+          standGap: !!scene?.getMeshByName('rinaSouthStand_0_-1') &&
+            !!scene?.getMeshByName('rinaSouthStand_0_1'),
+          lights: scene?.lights?.filter((light) => light.name.startsWith('rinaMovingSpot_')).length,
+          ambient: scene?.getLightByName('rinaStadiumAmbient')?.intensity,
+          moon: scene?.getLightByName('rinaStadiumMoon')?.intensity,
+          spill: !!scene?.getLightByName('rinaAudienceSpill'),
+          screenLights: scene?.lights?.filter((light) =>
+            light.name.startsWith('rinaScreenLight_')).length,
+          beams: scene?.meshes?.filter((mesh) =>
+            mesh.name.startsWith('rinaSpotBeam_')).length,
+          smoke: !!scene?.particleSystems?.find((system) =>
+            system.name === 'rinaStageSmoke'),
+          rinaFill: scene?.getLightByName('rinaPortraitFill')?.intensity,
+          rinaFillMeshes: scene?.getLightByName('rinaPortraitFill')?.includedOnlyMeshes.length,
+        };
+      })()`, true);
+      if (concert?.ready && concert.textures.every((texture) => texture.ready) && concert.singing) break;
+      await delay(250);
+    }
+    assert.ok(concert.rina && concert.scale >= 1.3 &&
+      concert.pitchWidth >= 68 * 1.3 && concert.pitchLength >= 105 * 1.3 &&
+      concert.crowdHeight > 2.45 && concert.crowdHeight < 2.6 &&
+      concert.stageWidth >= 58 * 1.3 &&
+      Math.abs(concert.exitZ - (-59 + 1.2) * concert.scale) < 0.1 &&
+      concert.rinaZ > concert.stageFrontZ &&
+      concert.rinaZ - concert.stageFrontZ < 8 &&
+      concert.grass === 'rinaPitchGrass' && concert.ready &&
+      concert.textures.every((texture) => texture.ready &&
+        texture.url.includes('/assets/textures/rina/stadium/grass/')) &&
+      concert.singing && concert.catwalk && concert.tunnelOpen &&
+      concert.catwalkBlocks && concert.standGap && concert.lights >= 2 &&
+      concert.ambient <= 0.15 && concert.moon <= 0.05 &&
+      concert.spill && concert.screenLights === 2 &&
+      concert.beams === concert.lights && concert.smoke &&
+      concert.rinaFill > 0 && concert.rinaFillMeshes > 0,
+      `Rina concert incomplete: ${JSON.stringify(concert)}; ${errors.join(' | ')}`);
+    const audioPrototype = await send('Runtime.evaluate', {
+      expression: 'HTMLAudioElement.prototype',
+    });
+    const audioInstances = await send('Runtime.queryObjects', {
+      prototypeObjectId: audioPrototype.result.result.objectId,
+    });
+    await send('Input.dispatchKeyEvent', {
+      type: 'keyDown', key: 'x', code: 'KeyX', windowsVirtualKeyCode: 88,
+    });
+    await send('Input.dispatchKeyEvent', {
+      type: 'keyUp', key: 'x', code: 'KeyX', windowsVirtualKeyCode: 88,
+    });
+    const songAudio = async (seek = null) => {
+      const reply = await send('Runtime.callFunctionOn', {
+        objectId: audioInstances.result.objects.objectId,
+        functionDeclaration: `function(seek) {
+          const song = this.find((audio) => audio.currentSrc.includes('Rina%20-%20Si%20Me%20Miras.mp3'));
+          if (!song) return null;
+          if (seek !== null) song.currentTime = seek;
+          return { time: song.currentTime, duration: song.duration,
+            paused: song.paused, ready: song.readyState, volume: song.volume };
+        }`,
+        arguments: [{ value: seek }],
+        returnByValue: true,
+      });
+      if (reply.result?.exceptionDetails) throw new Error(JSON.stringify(reply.result.exceptionDetails));
+      return reply.result?.result?.value;
+    };
+    let audio;
+    for (let i = 0; i < 80; i++) {
+      audio = await songAudio();
+      if (audio?.ready >= 2 && !audio.paused && audio.time > 0) break;
+      await delay(250);
+    }
+    assert.ok(audio?.duration > 230 && audio.duration < 240 &&
+      audio.ready >= 2 && !audio.paused && audio.time > 0,
+      `Rina song did not play: ${JSON.stringify(audio)}; ${errors.join(' | ')}`);
+    const inspectLiveScreens = () => evaluate(`(async () => {
+      const storeUrl = performance.getEntriesByType('resource')
+        .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+      const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+      const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+        .find((item) => item.metadata?.rinaLevel);
+      const feed = scene.textures.find((texture) => texture.name === 'rinaSingerLiveFeed');
+      const left = scene.getMeshByName('rinaStageSingerScreen_-1');
+      const right = scene.getMeshByName('rinaStageSingerScreen_1');
+      const pixels = await feed?.readPixels();
+      let bright = 0;
+      for (let index = 0; pixels && index < pixels.length; index += 16) {
+        const intensity = pixels[index] + pixels[index + 1] + pixels[index + 2];
+        if (intensity > 45) bright++;
+      }
+      return {
+        left: !!left,
+        right: !!right,
+        shared: left?.material?.emissiveTexture === feed &&
+          right?.material?.emissiveTexture === feed,
+        camera: feed?.activeCamera?.name,
+        playerCamera: scene.activeCamera?.name,
+        renderCount: feed?.renderList?.length,
+        size: feed?.getSize(),
+        bright,
+      };
+    })()`, true);
+    let liveScreens;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      liveScreens = await inspectLiveScreens();
+      if (liveScreens?.bright > 50) break;
+      await delay(250);
+    }
+    assert.ok(liveScreens.left && liveScreens.right && liveScreens.shared &&
+      liveScreens.camera === 'rinaSingerScreenCamera' &&
+      liveScreens.playerCamera !== liveScreens.camera &&
+      liveScreens.renderCount > 0 &&
+      liveScreens.size.width >= 512 && liveScreens.bright > 50,
+      `Rina live side screens did not render the singer: ${JSON.stringify(liveScreens)}`);
+    const stageLights = () => evaluate(`(async () => {
+      const storeUrl = performance.getEntriesByType('resource')
+        .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+      const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+      const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+        .find((item) => item.metadata?.rinaLevel);
+      const mouth = scene.meshes.flatMap((mesh) => {
+        const manager = mesh.morphTargetManager;
+        return manager ? Array.from({ length: manager.numTargets }, (_, index) =>
+          manager.getTarget(index)) : [];
+      }).find((target) => target.name === 'Mouth_Open');
+      return {
+        screen: scene.getMaterialByName('rinaStagePinkScreen')?.emissiveColor.r,
+        flames: scene.meshes.filter((mesh) =>
+          mesh.name.startsWith('rinaPyroJet_') && mesh.isEnabled()).length,
+        stageTop: scene.getMeshByName('rinaMainStage')?.getBoundingInfo().boundingBox.maximumWorld.y,
+        catwalkTop: scene.getMeshByName('rinaStageCatwalk')?.getBoundingInfo().boundingBox.maximumWorld.y,
+        rinaZ: scene.getTransformNodeByName('enemy:rina-stage:root')?.position.z,
+        walkLower: scene.animationGroups.find((group) =>
+          group.name === 'rina_locomotion_walk_lower')?.isPlaying,
+        singUpper: scene.animationGroups.find((group) =>
+          group.name === 'rina_emote_sing_upper')?.isPlaying,
+        fullSing: scene.animationGroups.some((group) =>
+          group.name.includes('rina_emote_sing') &&
+          group.name !== 'rina_emote_sing_upper' && group.isPlaying),
+        mouthOpen: mouth?.influence,
+        wash: scene.getLightByName('rinaStageWash')?.intensity,
+        spill: scene.getLightByName('rinaAudienceSpill')?.intensity,
+        spot: scene.getLightByName('rinaMovingSpot_0')?.intensity,
+        screenLight: scene.getLightByName('rinaScreenLight_1')?.intensity,
+        singerLight: scene.getLightByName('rinaRinaKeyLight')?.intensity,
+        singerLightZ: scene.getLightByName('rinaRinaKeyLight')?.position.z,
+        singerLightMeshes: scene.getLightByName('rinaRinaKeyLight')?.includedOnlyMeshes.length,
+        screenCameraZ: scene.getCameraByName('rinaSingerScreenCamera')?.position.z,
+        cameraRoll: scene.activeCamera?.rotation.z,
+        reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      };
+    })()`, true);
+    const screenSamples = [];
+    for (let i = 0; i < 10; i++) {
+      screenSamples.push((await stageLights()).screen);
+      await delay(180);
+    }
+    assert.ok(Math.max(...screenSamples) - Math.min(...screenSamples) > 0.015,
+      `Rina screens did not react to the song: ${JSON.stringify(screenSamples)}`);
+    assert.equal((await stageLights()).flames, 0,
+      'Rina fire activated before the chorus');
+    const startState = await stageLights();
+    assert.ok(Math.abs(startState.stageTop - startState.catwalkTop) < 0.01,
+      `Rina catwalk is not level with the stage: ${JSON.stringify(startState)}`);
+    await songAudio(50);
+    await delay(220);
+    const walking = await stageLights();
+    assert.ok(walking.rinaZ < startState.rinaZ - 1 &&
+      walking.rinaZ > 19 * concert.scale &&
+      walking.screenCameraZ < startState.screenCameraZ - 1 &&
+      walking.walkLower && walking.singUpper && !walking.fullSing,
+      `Rina did not walk and sing toward the catwalk: ${JSON.stringify(walking)}`);
+    await delay(700);
+    const farther = await stageLights();
+    assert.ok(farther.rinaZ < walking.rinaZ - 0.2,
+      `Rina did not keep moving toward the audience: ${JSON.stringify({ walking, farther })}`);
+    await songAudio(55.1);
+    await delay(450);
+    const chorus = await stageLights();
+    assert.ok(chorus.flames > 0 &&
+      Math.abs(chorus.rinaZ - 19 * concert.scale) < 0.1 &&
+      Math.abs(chorus.singerLightZ - 16) < 0.1 &&
+      chorus.singerLightMeshes > 0 &&
+      chorus.fullSing && !chorus.walkLower && !chorus.singUpper &&
+      chorus.mouthOpen > 0.01,
+      `Rina chorus did not start at the catwalk with singing face and fire: ${JSON.stringify(chorus)}`);
+    const rollSamples = [];
+    for (let sample = 0; sample < 14; sample++) {
+      rollSamples.push(Math.abs((await stageLights()).cameraRoll));
+      await delay(90);
+    }
+    if (!chorus.reducedMotion) {
+      assert.ok(Math.max(...rollSamples) > 0.00008,
+        `Rina beat did not add subtle camera motion: ${JSON.stringify(rollSamples)}`);
+    }
+    await songAudio(77);
+    await delay(220);
+    const returning = await stageLights();
+    assert.ok(returning.flames === 0 && returning.walkLower && returning.singUpper &&
+      returning.rinaZ > chorus.rinaZ && returning.rinaZ < startState.rinaZ,
+      `Rina did not return after the first chorus: ${JSON.stringify(returning)}`);
+    await songAudio(1);
+    await delay(1100);
+    const quiet = await stageLights();
+    await send('Runtime.callFunctionOn', {
+      objectId: audioInstances.result.objects.objectId,
+      functionDeclaration: `function() {
+        this.find((audio) => audio.currentSrc.includes('Rina%20-%20Si%20Me%20Miras.mp3'))?.pause();
+      }`,
+    });
+    await delay(1200);
+    const paused = await stageLights();
+    assert.ok(quiet.wash > paused.wash * 2 &&
+      quiet.spill > paused.spill * 2 &&
+      quiet.screen > paused.screen * 2 &&
+      quiet.spot > paused.spot * 2 &&
+      quiet.screenLight > paused.screenLight * 2 &&
+      quiet.singerLight > paused.singerLight * 2,
+      `Rina stage lights did not fade during an audio pause: ${JSON.stringify({ quiet, paused })}`);
+    assert.ok(Math.abs(paused.cameraRoll) < 0.00001,
+      `Rina camera kept shaking after the song paused: ${paused.cameraRoll}`);
+    await send('Runtime.callFunctionOn', {
+      objectId: audioInstances.result.objects.objectId,
+      functionDeclaration: `async function() {
+        await this.find((audio) => audio.currentSrc.includes('Rina%20-%20Si%20Me%20Miras.mp3'))?.play();
+      }`,
+      awaitPromise: true,
+    });
+    console.log(`Rina song ${audio.duration.toFixed(2)} s; catwalk, mixed animation, singing face and rhythmic lights passed`);
+    if (process.argv[3]?.endsWith('.png')) {
+      await send('Emulation.setDeviceMetricsOverride', {
+        width: 1600, height: 900, deviceScaleFactor: 1, mobile: false,
+      });
+      await songAudio(55.1);
+      await evaluate(`(async () => {
+        const storeUrl = performance.getEntriesByType('resource')
+          .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+        const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+        const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+          .find((item) => item.metadata?.rinaLevel);
+        const scale = scene.metadata.rinaLevel.stadiumScale;
+        scene.getTransformNodeByName('playerRoot').position.set(8 * scale, 1.7, -20 * scale);
+      })()`, true);
+      await delay(700);
+      const screenshot = await send('Page.captureScreenshot', { format: 'png' });
+      await writeFile(process.argv[3], Buffer.from(screenshot.result.data, 'base64'));
+    }
+    await evaluate(`(async () => {
+      const storeUrl = performance.getEntriesByType('resource')
+        .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+      const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+      const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+        .find((item) => item.metadata?.rinaLevel);
+      await scene.whenReadyAsync();
+      return true;
+    })()`, true);
+    await delay(1500);
+    await evaluate(`(async () => {
+      const storeUrl = performance.getEntriesByType('resource')
+        .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+      const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+      const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+        .find((item) => item.metadata?.rinaLevel);
+      scene.getTransformNodeByName('playerRoot').position.set(0, 1.7,
+        -54 * scene.metadata.rinaLevel.stadiumScale);
+    })()`, true);
+    await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', code: 'KeyE', bubbles: true })); true");
+    await delay(150);
+    await evaluate("window.dispatchEvent(new KeyboardEvent('keyup', { key: 'e', code: 'KeyE', bubbles: true })); true");
+    let returned;
+    for (let i = 0; i < 240; i++) {
+      returned = await evaluate(`(async () => {
+        const storeUrl = performance.getEntriesByType('resource')
+          .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+        const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+        const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+          .find((item) => item.metadata?.sanctuary);
+        return { level: globalThis.__bosqueLevelDebug?.current(),
+          player: scene?.getTransformNodeByName('playerRoot')?.position.asArray(),
+          boat: scene?.getTransformNodeByName('sanctuaryBoat')?.position.asArray() };
+      })()`, true);
+      if (returned.level === 'sanctuary' && returned.player) break;
+      await delay(250);
+    }
+    assert.equal(returned?.level, 'sanctuary',
+      `Rina exit did not return to Sanctuary: ${JSON.stringify(returned)}; ${errors.join(' | ')}`);
+    assert.ok(Math.abs(returned.player[0] - 114) < 2 &&
+      Math.abs(returned.player[2] - 145) < 2,
+      `Rina return did not land at her Sanctuary stop: ${JSON.stringify(returned)}`);
+    assert.ok(Math.abs(returned.boat?.[0] - 74) < 2 &&
+      Math.abs(returned.boat?.[2] - 155) < 2,
+      `Rina return did not place the raft at her dock: ${JSON.stringify(returned)}`);
+    await evaluate(`(async () => {
+      const storeUrl = performance.getEntriesByType('resource')
+        .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+      const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+      const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+        .find((item) => item.metadata?.sanctuary);
+      await scene.whenReadyAsync();
+      return true;
+    })()`, true);
+    await delay(1500);
+    await evaluate(`(async () => {
+      const storeUrl = performance.getEntriesByType('resource')
+        .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+      const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+      const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+        .find((item) => item.metadata?.sanctuary);
+      scene.getTransformNodeByName('playerRoot').position.set(132, 3.75, 163);
+    })()`, true);
+    await delay(250);
+    await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', code: 'KeyE', bubbles: true })); true");
+    await delay(150);
+    await evaluate("window.dispatchEvent(new KeyboardEvent('keyup', { key: 'e', code: 'KeyE', bubbles: true })); true");
+    let reentered;
+    for (let i = 0; i < 240; i++) {
+      reentered = await evaluate("globalThis.__bosqueLevelDebug?.current()");
+      if (reentered === 'rina') break;
+      await delay(250);
+    }
+    assert.equal(reentered, 'rina',
+      `Rina portal did not reopen the stadium: ${reentered}; ${errors.join(' | ')}`);
+    await delay(500);
+  }
   const constructors = await evaluate(`(async () => ({
     spot: typeof (await import('/node_modules/@babylonjs/core/Lights/spotLight.js')).SpotLight,
     particles: typeof (await import('/node_modules/@babylonjs/core/Particles/particleSystem.js')).ParticleSystem,
@@ -678,7 +1060,7 @@ try {
   assert.equal(constructors.particles, "function");
   assert.ok(!errors.some((error) => /(?:SpotLight|ParticleSystem) is not a constructor/.test(error)),
     `Babylon constructor error in ${level}: ${errors.join(" | ")}`);
-  console.log(`${level}: loaded; SpotLight and ParticleSystem are constructors`);
+  console.log(`${level}: loaded; SpotLight and ParticleSystem are constructors${level === 'rina' ? '; Sanctuary round trip passed' : ''}`);
   if (errors.length) console.warn(`${level}: ${errors.length} browser error(s):\n${errors.slice(-3).join("\n")}`);
 } finally {
   socket?.close();

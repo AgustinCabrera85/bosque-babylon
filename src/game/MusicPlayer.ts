@@ -66,12 +66,22 @@ export type LevelAudioProfile = {
   walkFootstepEcho?: FootstepEchoSettings | null;
 };
 
+export type MusicPlaybackState = {
+  track: string;
+  currentTime: number;
+  playing: boolean;
+  energy: number;
+  bass: number;
+  voice: number;
+};
+
 export type MusicPlayerHandle = {
   configureLevelAudio: (profile: LevelAudioProfile) => void;
   configureWaterfallArea: (area: WaterfallAudioArea) => void;
   clearWaterfallArea: () => void;
   prepareForLevelTransition: () => void;
   updateListenerPosition: (position: WorldPosition) => void;
+  getMusicPlaybackState: () => MusicPlaybackState;
   getSfxVolume: () => number;
   dispose: () => void;
 };
@@ -174,6 +184,9 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   let waterfallStarted = false;
   let footstepMode: "idle" | "walk" | "run" = "idle";
   let audioContext: AudioContext | null = null;
+  let musicAnalyser: AnalyserNode | null = null;
+  let musicGain: GainNode | null = null;
+  let musicFrequencyData: Uint8Array<ArrayBuffer> | null = null;
   let sfxGain: GainNode | null = null;
   let walkSource: MediaElementAudioSourceNode | null = null;
   let walkDryGain: GainNode | null = null;
@@ -214,6 +227,20 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   function ensureAudioContext() {
     if (!audioContext) {
       audioContext = new AudioContext();
+      const musicSource = audioContext.createMediaElementSource(music);
+      musicAnalyser = audioContext.createAnalyser();
+      musicAnalyser.fftSize = 1024;
+      musicAnalyser.smoothingTimeConstant = 0.48;
+      musicFrequencyData = new Uint8Array(musicAnalyser.frequencyBinCount);
+      musicGain = audioContext.createGain();
+      musicGain.gain.value = getEffectiveVolume("music");
+      musicSource.connect(musicAnalyser);
+      musicAnalyser.connect(musicGain);
+      musicGain.connect(audioContext.destination);
+      // The analyser sees the song before the volume slider so muted players
+      // can still see the concert lights respond to the music.
+      music.volume = 1;
+      music.muted = false;
       sfxGain = audioContext.createGain();
       sfxGain.connect(audioContext.destination);
       sfxGain.gain.value = getEffectiveVolume("sfx");
@@ -536,8 +563,11 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
 
     if (channel === "music") {
       const effectiveVolume = getEffectiveVolume("music");
-      music.volume = effectiveVolume;
-      music.muted = effectiveVolume <= 0;
+      if (musicGain) musicGain.gain.value = effectiveVolume;
+      else {
+        music.volume = effectiveVolume;
+        music.muted = effectiveVolume <= 0;
+      }
       skyEyeMusic.volume = effectiveVolume;
       skyEyeMusic.muted = effectiveVolume <= 0;
       if (save) localStorage.setItem(MUSIC_VOLUME_KEY, String(next));
@@ -681,6 +711,34 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
 
   return {
     getSfxVolume: () => getEffectiveVolume("sfx"),
+    getMusicPlaybackState() {
+      const playing = !music.paused && !music.ended &&
+        music.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+        audioContext?.state === "running" && !skyEyeMusicActive;
+      let energy = 0;
+      let bass = 0;
+      let voice = 0;
+      if (playing && musicAnalyser && musicFrequencyData) {
+        musicAnalyser.getByteFrequencyData(musicFrequencyData);
+        let bassSum = 0;
+        let bodySum = 0;
+        let voiceSum = 0;
+        for (let bin = 2; bin < 10; bin += 1) bassSum += musicFrequencyData[bin];
+        for (let bin = 2; bin < 72; bin += 1) bodySum += musicFrequencyData[bin];
+        for (let bin = 12; bin < 52; bin += 1) voiceSum += musicFrequencyData[bin];
+        bass = clamp01(bassSum / (8 * 180));
+        energy = clamp01(bodySum / (70 * 145));
+        voice = clamp01(voiceSum / (40 * 155));
+      }
+      return {
+        track: currentBackgroundTrack,
+        currentTime: Number.isFinite(music.currentTime) ? music.currentTime : 0,
+        playing,
+        energy,
+        bass,
+        voice,
+      };
+    },
     configureLevelAudio(profile) {
       setBackgroundTrack(profile.backgroundTrack);
       setAmbientPlaybackProfile(
@@ -744,6 +802,9 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       prepareForLevelTransition();
       void audioContext?.close();
       audioContext = null;
+      musicAnalyser = null;
+      musicGain = null;
+      musicFrequencyData = null;
       sfxGain = null;
       waterfallSource = null;
       waterfallGain = null;

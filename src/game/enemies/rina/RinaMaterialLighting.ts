@@ -74,15 +74,20 @@ export class RinaMaterialLighting {
   private readonly violetLocal = new Vector3(-0.75, 1.95, -0.7);
   private readonly cyanLocal = new Vector3(0.8, 1.45, 0.35);
 
-  constructor(materials: readonly Material[], private readonly root: TransformNode) {
+  constructor(materials: readonly Material[], private readonly root: TransformNode,
+    height: number) {
+    const heightScale = height / 1.75;
+    this.violetLocal.scaleInPlace(heightScale);
+    this.cyanLocal.scaleInPlace(heightScale);
     for (const material of materials) {
       if (!(material instanceof PBRMaterial)) continue;
       const name = material.name.toLowerCase();
       // Keep the transparent corneas clear and the facial texture readable.
       if (name.includes("cornea")) continue;
-      const strength = name.includes("rostro") ? 0.19 :
-        name.includes("ojo_") ? 0.13 : 0.32;
-      new RinaStageLightingPlugin(material, this.lights, strength);
+      const strength = name.includes("rostro") ? 0.045 :
+        name.includes("ojo_") ? 0.025 : 0.075;
+      new RinaStageLightingPlugin(material, this.lights,
+        strength * heightScale * heightScale);
     }
     this.update();
   }

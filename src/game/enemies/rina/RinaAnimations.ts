@@ -1,4 +1,4 @@
-import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 
 /** Exact NLA clip names in Rina_NLA_ShapeKeys.glb. */
 export const RINA_NLA_ACTIONS = {
@@ -51,9 +51,20 @@ const LOOPING_ACTIONS = new Set<RinaNlaAction>([
   "idle", "jazzDance", "run", "blockIdle", "walk",
 ]);
 
+const WALK_BONES = new Set([
+  "Hips", "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase", "LeftToe_End",
+  "RightUpLeg", "RightLeg", "RightFoot", "RightToeBase", "RightToe_End",
+]);
+
+function isWalkBone(target: { name?: string } | null) {
+  return WALK_BONES.has(target?.name?.split(":").at(-1) ?? "");
+}
+
 /** Owns the imported skeletal clips. Morph targets remain independent. */
 export class RinaAnimationController {
   private readonly actions = new Map<string, AnimationGroup>();
+  private readonly walkLower: AnimationGroup;
+  private readonly singUpper: AnimationGroup;
   private currentAction: string | null = null;
 
   constructor(groups: readonly AnimationGroup[]) {
@@ -62,10 +73,28 @@ export class RinaAnimationController {
       const sourceName = group.name.split(":").at(-1) ?? group.name;
       this.actions.set(SOURCE_TO_ACTION.get(sourceName) ?? sourceName, group);
     }
-    for (const required of ["idle", "walk", "run"] as const) {
+    for (const required of ["idle", "walk", "run", "sing"] as const) {
       if (!this.actions.has(required)) {
         throw new Error(`Rina GLB is missing animation ${RINA_NLA_ACTIONS[required]}`);
       }
+    }
+    const walk = this.actions.get("walk")!;
+    const sing = this.actions.get("sing")!;
+    this.walkLower = new AnimationGroup("rina_locomotion_walk_lower", walk.getScene());
+    this.singUpper = new AnimationGroup("rina_emote_sing_upper", sing.getScene());
+    for (const targeted of walk.targetedAnimations) {
+      if (isWalkBone(targeted.target)) {
+        this.walkLower.addTargetedAnimation(targeted.animation, targeted.target);
+      }
+    }
+    for (const targeted of sing.targetedAnimations) {
+      if (!isWalkBone(targeted.target)) {
+        this.singUpper.addTargetedAnimation(targeted.animation, targeted.target);
+      }
+    }
+    if (!this.walkLower.targetedAnimations.length ||
+        !this.singUpper.targetedAnimations.length) {
+      throw new Error("Rina walk and sing clips cannot be separated by body region");
     }
   }
 
@@ -80,7 +109,7 @@ export class RinaAnimationController {
   play(action: RinaNlaAction | string, options: RinaPlayOptions = {}) {
     const group = this.actions.get(action);
     if (!group) return null;
-    if (this.currentAction) this.actions.get(this.currentAction)?.stop();
+    this.stopCurrent();
     group.enableBlending = true;
     group.blendingSpeed = options.blendingSpeed ?? 0.08;
     group.start(
@@ -93,12 +122,51 @@ export class RinaAnimationController {
     return group;
   }
 
-  pause() { this.actions.get(this.currentAction ?? "")?.pause(); }
+  /** Walk from the hips down while singing owns the torso, arms and head. */
+  playWalkAndSing() {
+    if (this.currentAction === "singWalk") return;
+    this.stopCurrent();
+    for (const group of [this.walkLower, this.singUpper]) {
+      group.enableBlending = true;
+      group.blendingSpeed = 0.1;
+      group.start(true, group === this.walkLower ? 1 : 0.96);
+    }
+    this.currentAction = "singWalk";
+  }
 
-  resume() { this.actions.get(this.currentAction ?? "")?.play(); }
+  pause() {
+    if (this.currentAction === "singWalk") {
+      this.walkLower.pause();
+      this.singUpper.pause();
+    } else this.actions.get(this.currentAction ?? "")?.pause();
+  }
+
+  resume() {
+    if (this.currentAction === "singWalk") {
+      this.walkLower.play();
+      this.singUpper.play();
+    } else this.actions.get(this.currentAction ?? "")?.play();
+  }
 
   stop() {
     for (const group of this.actions.values()) group.stop();
+    this.walkLower.stop();
+    this.singUpper.stop();
     this.currentAction = null;
+  }
+
+  dispose() {
+    this.stop();
+    this.walkLower.dispose();
+    this.singUpper.dispose();
+  }
+
+  private stopCurrent() {
+    if (this.currentAction === "singWalk") {
+      this.walkLower.stop();
+      this.singUpper.stop();
+    } else if (this.currentAction) {
+      this.actions.get(this.currentAction)?.stop();
+    }
   }
 }

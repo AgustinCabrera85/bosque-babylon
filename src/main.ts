@@ -247,6 +247,9 @@ async function start() {
   }).register("sanctuary", async () => {
     const module = await import("./game/levels/sanctuary/createSanctuaryLevel");
     return module.createSanctuaryLevel;
+  }).register("rina", async () => {
+    const module = await import("./game/levels/rina/createRinaLevel");
+    return module.createRinaLevel;
   });
   let activeDebug: { dispose(): void } | null = null;
   let portalTransitionPending = false;
@@ -273,6 +276,18 @@ async function start() {
       activeDebug = scene ? debugBootstrap?.bootstrapDebug(scene) ?? null : null;
     },
     onLevelTransitionRequested: async ({ entryPoint, load }) => {
+      if (entryPoint === "rina-portal" || entryPoint === "rina-return") {
+        showLoading();
+        setLoading(0.02, entryPoint === "rina-portal"
+          ? "Entrando al estadio de Rina..."
+          : "Volviendo al Santuario...");
+        const loaded = await load();
+        await new Promise<void>((resolve) => {
+          loaded.scene.onAfterRenderObservable.addOnce(() => resolve());
+        });
+        hideLoading();
+        return;
+      }
       if (entryPoint !== "forest-exit-portal") {
         await load();
         return;
@@ -368,7 +383,9 @@ async function start() {
   const requestedLevel = import.meta.env.DEV
     ? new URLSearchParams(window.location.search).get("level")
     : null;
-  const initialLevelId: LevelId = requestedLevel === "sanctuary"
+  const initialLevelId: LevelId = requestedLevel === "rina"
+    ? "rina"
+    : requestedLevel === "sanctuary"
     ? "sanctuary"
     : requestedLevel === "theatre" ? "theatre" : "forest";
   if (import.meta.env.DEV) {

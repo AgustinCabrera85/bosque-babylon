@@ -154,11 +154,17 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     const hud = createSanctuaryHud();
     cleanup.push(hud.dispose);
 
-    let targetIndex = 0;
-    let state: VoyageState = "sailing";
-    let boatFrom: RoutePoint = BOAT_START;
-    let routeT = 0;
+    const rinaReturnIndex = context.entryPoint === "rina-return"
+      ? SANCTUARY_STOPS.findIndex((stop) => stop.id === "rina") : -1;
+    let targetIndex = rinaReturnIndex >= 0 ? rinaReturnIndex : 0;
+    let state: VoyageState = rinaReturnIndex >= 0 ? "ashore" : "sailing";
+    let boatFrom: RoutePoint = rinaReturnIndex >= 0 ? ROUTE[rinaReturnIndex] : BOAT_START;
+    let routeT = rinaReturnIndex >= 0 ? 1 : 0;
     let routeDuration = Math.hypot(ROUTE[0].x - BOAT_START.x, ROUTE[0].z - BOAT_START.z) / CFG.boatSpeed;
+    if (rinaReturnIndex >= 0) {
+      geometry.boatRoot.position.x = ROUTE[rinaReturnIndex].x;
+      geometry.boatRoot.position.z = ROUTE[rinaReturnIndex].z;
+    }
     let elapsed = 0;
     let refreshProgressSeconds = 0;
     const playerWorld = createDockWorld(() => ({ index: targetIndex, state }));
@@ -176,6 +182,11 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     const raftRiderZ = -1.2; // Stand in the open floor space between the cross seats.
     player.position.set(0, geometry.boatRoot.position.y + CFG.boatDeckY + CFG.eyeHeight,
       CFG.boatStartZ + raftRiderZ);
+    if (rinaReturnIndex >= 0) {
+      const stop = SANCTUARY_STOPS[rinaReturnIndex];
+      player.position.set(stop.x + stop.side * 24,
+        2.05 + CFG.eyeHeight, stop.z - 10);
+    }
     player.camera.maxZ = 14500;
     await player.loadCharacter();
     cleanup.push(setupPlayerViewControls(player));
@@ -252,6 +263,7 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
       const p = portalPoint(stop);
       return Math.hypot(player.position.x - p.x, player.position.z - p.z) < 13;
     };
+    let transitionRequested = false;
 
     const update = (unclampedDt: number) => {
       const dt = Math.min(.05, Math.max(0, unclampedDt));
@@ -290,12 +302,21 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
         const nearPortal = stop && closeEnoughToPortal(stop);
         if (atGate) {
           hud.setText("El portal del Santuario permanece sellado. El desenlace se implementará más adelante.");
+        } else if (nearPortal && stop.destination === "rina") {
+          hud.setText(`${stop.title}  ·  ${context.input.getActionBindingLabel("interact") ?? "E"}: atravesar portal`);
         } else if (nearPortal) {
           hud.setText(`${stop.title}  ·  El portal aún no responde.`);
         } else {
           hud.setText(`${stop?.title ?? ""}  ·  ${context.input.getActionBindingLabel("interact") ?? "E"}: volver a la balsa`);
         }
-        if (context.input.wasPressed("interact") && !nearPortal) embarked = embark();
+        if (context.input.wasPressed("interact")) {
+          if (nearPortal && stop.destination === "rina" && !transitionRequested) {
+            transitionRequested = true;
+            context.requestLevelTransition(stop.destination, `${stop.id}-portal`);
+          } else if (!nearPortal) {
+            embarked = embark();
+          }
+        }
         geometry.update(dt, elapsed, progress, player.position);
         if (embarked) movePlayerOntoBoat();
       }

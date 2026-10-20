@@ -4,7 +4,7 @@ export const RINA_MODEL_URL = "/assets/models/enemies/rina/Rina_NLA_ShapeKeys.gl
 // The standing source mesh spans y = 0..0.999514 in the supplied GLB.
 // Game units are metres; this scale puts her feet at the spawn position.
 export const RINA_SOURCE_HEIGHT = 0.999514;
-export const RINA_DEFAULT_HEIGHT = 1.75;
+export const RINA_DEFAULT_HEIGHT = 2.58;
 export const RINA_DEFAULT_MAX_HEALTH = 30;
 
 export interface RinaConfig {

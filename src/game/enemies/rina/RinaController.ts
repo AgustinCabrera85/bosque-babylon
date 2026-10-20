@@ -46,7 +46,7 @@ export class RinaController extends BaseEnemyController {
       context.scene, this.root, this.asset.meshes, {}, { allowBodyTurn: false }
     );
     this.look.setTargetProvider(() => this.getPlayerPosition?.() ?? null);
-    this.lighting = new RinaMaterialLighting(this.asset.materials, this.root);
+    this.lighting = new RinaMaterialLighting(this.asset.materials, this.root, config.height);
     // Resolve the eyes after the shared head overlay updates the animated pose.
     this.eyeObserver = context.scene.onAfterAnimationsObservable.add(() => {
       if (!this.enabled) return;
@@ -98,7 +98,7 @@ export class RinaController extends BaseEnemyController {
   }
 
   protected override onDispose() {
-    this.animations.stop();
+    this.animations.dispose();
     this.look.dispose();
     this.scene.onAfterAnimationsObservable.remove(this.eyeObserver);
   }

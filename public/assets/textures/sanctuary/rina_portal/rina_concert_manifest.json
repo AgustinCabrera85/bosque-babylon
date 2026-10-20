@@ -1,0 +1,293 @@
+{
+  "schema": "lrlo.sanctuary.rina_concert.atlas.v1",
+  "version": "1.0.0",
+  "source_artwork": "rina_portal_approved_reference.png",
+  "crop_original_px": {
+    "x": 272,
+    "y": 184,
+    "w": 540,
+    "h": 1148
+  },
+  "aperture": {
+    "u_origin": "bottom-left",
+    "geometry": "reuse SanctuaryLevelPortals.ts/APERTURE"
+  },
+  "atlas": {
+    "file": "rina_concert_atlas.webp",
+    "width": 2048,
+    "height": 2048,
+    "alpha": true
+  },
+  "backdrop": {
+    "file": "rina_stage_clean.webp",
+    "width": 540,
+    "height": 1148
+  },
+  "original_reference_backdrop": {
+    "file": "rina_stage_original.webp",
+    "width": 540,
+    "height": 1148
+  },
+  "sprites": [
+    {
+      "id": "rina_katy_dissolving",
+      "category": "character",
+      "atlas": "rina_concert_atlas.webp",
+      "rect_px_top": {
+        "x": 8,
+        "y": 8,
+        "w": 334,
+        "h": 641
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.68310547,
+        "u1": 0.16699219,
+        "v1": 0.99609375
+      },
+      "width": 334,
+      "height": 641
+    },
+    {
+      "id": "rina_stage_aura",
+      "category": "glow",
+      "atlas": "rina_concert_atlas.webp",
+      "rect_px_top": {
+        "x": 350,
+        "y": 8,
+        "w": 540,
+        "h": 857
+      },
+      "uv_bottom_origin": {
+        "u0": 0.17089844,
+        "v0": 0.57763672,
+        "u1": 0.43457031,
+        "v1": 0.99609375
+      },
+      "width": 540,
+      "height": 857
+    },
+    {
+      "id": "rina_crowd_left",
+      "category": "foreground",
+      "atlas": "rina_concert_atlas.webp",
+      "rect_px_top": {
+        "x": 898,
+        "y": 8,
+        "w": 162,
+        "h": 425
+      },
+      "uv_bottom_origin": {
+        "u0": 0.43847656,
+        "v0": 0.78857422,
+        "u1": 0.51757812,
+        "v1": 0.99609375
+      },
+      "width": 162,
+      "height": 425
+    },
+    {
+      "id": "rina_crowd_right",
+      "category": "foreground",
+      "atlas": "rina_concert_atlas.webp",
+      "rect_px_top": {
+        "x": 1068,
+        "y": 8,
+        "w": 152,
+        "h": 414
+      },
+      "uv_bottom_origin": {
+        "u0": 0.52148438,
+        "v0": 0.79394531,
+        "u1": 0.59570312,
+        "v1": 0.99609375
+      },
+      "width": 152,
+      "height": 414
+    },
+    {
+      "id": "rina_mist_fuchsia",
+      "category": "mist",
+      "atlas": "rina_concert_atlas.webp",
+      "rect_px_top": {
+        "x": 1228,
+        "y": 8,
+        "w": 384,
+        "h": 256
+      },
+      "uv_bottom_origin": {
+        "u0": 0.59960938,
+        "v0": 0.87109375,
+        "u1": 0.78710938,
+        "v1": 0.99609375
+      },
+      "width": 384,
+      "height": 256
+    },
+    {
+      "id": "rina_mist_cyan",
+      "category": "mist",
+      "atlas": "rina_concert_atlas.webp",
+      "rect_px_top": {
+        "x": 1620,
+        "y": 8,
+        "w": 384,
+        "h": 256
+      },
+      "uv_bottom_origin": {
+        "u0": 0.79101562,
+        "v0": 0.87109375,
+        "u1": 0.97851562,
+        "v1": 0.99609375
+      },
+      "width": 384,
+      "height": 256
+    },
+    {
+      "id": "rina_photo_flash",
+      "category": "glow",
+      "atlas": "rina_concert_atlas.webp",
+      "rect_px_top": {
+        "x": 8,
+        "y": 873,
+        "w": 256,
+        "h": 256
+      },
+      "uv_bottom_origin": {
+        "u0": 0.00390625,
+        "v0": 0.44873047,
+        "u1": 0.12890625,
+        "v1": 0.57373047
+      },
+      "width": 256,
+      "height": 256
+    }
+  ],
+  "placements": [
+    {
+      "id": "rina_katy_dissolving",
+      "bounds_uv_bottom": {
+        "x": 0.0,
+        "y": 0.0,
+        "w": 0.618519,
+        "h": 0.558362
+      },
+      "depth": 0.63,
+      "opacity": 1,
+      "motion": "dissolve"
+    },
+    {
+      "id": "rina_stage_aura",
+      "bounds_uv_bottom": {
+        "x": 0.0,
+        "y": 0.253484,
+        "w": 1.0,
+        "h": 0.746516
+      },
+      "depth": 0.15,
+      "opacity": 0.44,
+      "motion": "pulse"
+    },
+    {
+      "id": "rina_crowd_left",
+      "bounds_uv_bottom": {
+        "x": 0.0,
+        "y": 0.0,
+        "w": 0.3,
+        "h": 0.370209
+      },
+      "depth": 0.86,
+      "opacity": 0.26,
+      "motion": "sway"
+    },
+    {
+      "id": "rina_crowd_right",
+      "bounds_uv_bottom": {
+        "x": 0.718519,
+        "y": 0.0,
+        "w": 0.281481,
+        "h": 0.360627
+      },
+      "depth": 0.86,
+      "opacity": 0.22,
+      "motion": "sway"
+    },
+    {
+      "id": "rina_mist_fuchsia",
+      "bounds_uv_bottom": {
+        "x": 0.0,
+        "y": 0.0,
+        "w": 0.95,
+        "h": 0.310105
+      },
+      "depth": 0.52,
+      "opacity": 0.4,
+      "motion": "drift"
+    },
+    {
+      "id": "rina_mist_cyan",
+      "bounds_uv_bottom": {
+        "x": 0.0,
+        "y": 0.100174,
+        "w": 1.0,
+        "h": 0.430314
+      },
+      "depth": 0.39,
+      "opacity": 0.28,
+      "motion": "drift"
+    },
+    {
+      "id": "rina_photo_flash",
+      "bounds_uv_bottom": {
+        "x": 0.409259,
+        "y": 0.460801,
+        "w": 0.22037,
+        "h": 0.099303
+      },
+      "depth": 0.6,
+      "opacity": 0.72,
+      "motion": "flash"
+    }
+  ],
+  "effects": {
+    "cycle_seconds": 12.0,
+    "katy_origin_uv": [
+      0.365,
+      0.3
+    ],
+    "rina_sink_uv": [
+      0.52,
+      0.72
+    ],
+    "photo_flash_uv": [
+      0.45,
+      0.505
+    ],
+    "beat_seconds": 1.42,
+    "palette_fuchsia": "#ff28ca",
+    "palette_cyan": "#29b3ff",
+    "timeline": {
+      "anticipation": [
+        0,
+        2.8
+      ],
+      "flash": [
+        2.8,
+        3.1
+      ],
+      "dissolve": [
+        3.1,
+        7.6
+      ],
+      "silence": [
+        7.6,
+        9.6
+      ],
+      "restore": [
+        9.6,
+        12.0
+      ]
+    }
+  },
+  "note": "The approved image is one perspective; sprites are local mattes sampled from that same image."
+}

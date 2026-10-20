@@ -31,10 +31,11 @@ const MANIFEST = "lrlo.sanctuary.forest_portal.atlas.v4";
 const COMPOSITION = "lrlo.sanctuary.forest_portal.composition.v4";
 // Preserve the fitted v3 panel exactly. Only the image and foreground layers
 // change in v4; the stone arch still hides these straight panel edges.
-const PANEL_LEFT = -.22;
-const PANEL_RIGHT = .27;
-const PANEL_BOTTOM = -.02;
-const PANEL_TOP = .82;
+export const FOREST_PORTAL_PANEL = { left: -.22, right: .27, bottom: -.02, top: .82 } as const;
+const PANEL_LEFT = FOREST_PORTAL_PANEL.left;
+const PANEL_RIGHT = FOREST_PORTAL_PANEL.right;
+const PANEL_BOTTOM = FOREST_PORTAL_PANEL.bottom;
+const PANEL_TOP = FOREST_PORTAL_PANEL.top;
 const PANEL_Z = -.01;
 const Y_MIN = 0.012;
 const Y_MAX = 0.777;

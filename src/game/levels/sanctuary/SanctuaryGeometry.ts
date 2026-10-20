@@ -37,7 +37,7 @@ export type SanctuaryGeometry = {
   orbs: Map<SanctuaryPillarId, OrbVisual>;
   cloudMode: SanctuaryCloudMode;
   waterMode: "reflective" | "lightweight";
-  update(dt: number, elapsed: number, progress: SanctuaryProgress): void;
+  update(dt: number, elapsed: number, progress: SanctuaryProgress, playerPosition: Vector3): void;
 };
 
 function mat(scene: Scene, name: string, color: Color3, glow?: Color3) {
@@ -921,7 +921,7 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
     orbs,
     cloudMode: clouds.mode,
     waterMode: water.quality,
-    update(_dt, elapsed, currentProgress) {
+    update(dt, elapsed, currentProgress, playerPosition) {
       portalFloorLight.update(elapsed);
       portalInnerFloorLight.update(elapsed);
       const portalPulse = 0.80 + 0.20 * Math.sin(elapsed * 1.7)
@@ -933,7 +933,7 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
       const cameraPosition = scene.activeCamera?.globalPosition ?? Vector3.Zero();
       clouds.update(elapsed, cameraPosition);
       portalFalls.update(elapsed, cameraPosition);
-      levelPortals.update(elapsed);
+      levelPortals.update(elapsed, dt, playerPosition);
       const bx = boatRoot.position.x;
       const bz = boatRoot.position.z;
       boatRoot.position.y = CFG.riverY + .25 + water.sampleHeight(bx, bz, elapsed);

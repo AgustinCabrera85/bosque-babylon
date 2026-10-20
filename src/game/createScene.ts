@@ -79,6 +79,7 @@ import {
   ShadowGrabberBehaviorSystem,
   registerSkyEye,
   registerShadowGrabber,
+  registerRina,
   spawnSkyEye,
 } from "./enemies";
 import {
@@ -361,6 +362,7 @@ export async function createScene(
   const enemyManager = new EnemyManager(scene);
   registerShadowGrabber(enemyManager, blackSmokeWrapSystem);
   registerSkyEye(enemyManager, blackSmokeWrapSystem);
+  registerRina(enemyManager, {}, () => player.position);
   scene.metadata ??= {};
   scene.metadata.blackSmokeWrapSystem = blackSmokeWrapSystem;
   scene.metadata.enemyManager = enemyManager;

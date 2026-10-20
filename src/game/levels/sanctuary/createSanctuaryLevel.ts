@@ -10,6 +10,7 @@ import { setupMobileControls } from "../../MobileControls";
 import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
 import { createSanctuaryGeometry } from "./SanctuaryGeometry";
 import { createSanctuaryShadowHands } from "./SanctuaryShadowHands";
+import { collidesWithPortalStone } from "./SanctuaryPortalCollisions";
 import {
   readSanctuaryProgress,
   SANCTUARY_CONFIG as CFG,
@@ -57,12 +58,13 @@ function createDockWorld(getStage: () => { index: number; state: VoyageState }):
       const stop = SANCTUARY_STOPS[index];
       return stop && dockAllowed(x, z, stop) ? 2.05 : CFG.riverY;
     },
-    isColliding(x, z, clearance = 0) {
+    isColliding(x, z, clearance = 0, minY, maxY) {
       const { index, state } = getStage();
       if (state !== "ashore") return false;
       if (isFinalStop(index)) return !finalAllowed(x, z, clearance);
       const stop = SANCTUARY_STOPS[index];
-      return !stop || !dockAllowed(x, z, stop, clearance);
+      return !stop || !dockAllowed(x, z, stop, clearance) ||
+        collidesWithPortalStone(stop, x, z, clearance, minY, maxY);
     },
     resolveCameraPosition(origin: Vector3, desired: Vector3) {
       if (isFinalStop(getStage().index) && getStage().state === "ashore") {
@@ -217,9 +219,18 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     };
     if (import.meta.env.DEV) {
       const debugWindow = window as Window & {
-        __bosqueSanctuaryDebug?: { teleportToPortal(): void };
+        __bosqueSanctuaryDebug?: { teleportToPortal(): void; teleportToStop(index: number): void };
       };
       const debug = {
+        teleportToStop(index: number) {
+          if (!Number.isInteger(index) || index < 0 || index >= SANCTUARY_STOPS.length) return;
+          targetIndex = index;
+          state = "ashore";
+          const stop = SANCTUARY_STOPS[index];
+          player.position.set(stop.x + stop.side * 24,
+            2.05 + CFG.eyeHeight, stop.z - 10);
+          player.settleLocomotionToIdle();
+        },
         teleportToPortal() {
           targetIndex = SANCTUARY_STOPS.length;
           state = "ashore";
@@ -257,13 +268,13 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
         const next = ROUTE[targetIndex];
         geometry.boatRoot.position.x = boatFrom.x + (next.x - boatFrom.x) * t;
         geometry.boatRoot.position.z = boatFrom.z + (next.z - boatFrom.z) * t;
-        geometry.update(dt, elapsed, progress);
+        geometry.update(dt, elapsed, progress, player.position);
         movePlayerOntoBoat();
         updateAboardCamera();
         hud.setText("El río conduce la balsa entre los pilares de sombra...");
         if (routeT >= 1) state = "moored";
       } else if (state === "moored") {
-        geometry.update(dt, elapsed, progress);
+        geometry.update(dt, elapsed, progress, player.position);
         movePlayerOntoBoat();
         updateAboardCamera();
         const name = isFinalStop(targetIndex)
@@ -285,7 +296,7 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
           hud.setText(`${stop?.title ?? ""}  ·  ${context.input.getActionBindingLabel("interact") ?? "E"}: volver a la balsa`);
         }
         if (context.input.wasPressed("interact") && !nearPortal) embarked = embark();
-        geometry.update(dt, elapsed, progress);
+        geometry.update(dt, elapsed, progress, player.position);
         if (embarked) movePlayerOntoBoat();
       }
       geometry.guardians.update(player.position, state === "ashore" && isFinalStop(targetIndex));

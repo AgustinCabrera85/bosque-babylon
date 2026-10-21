@@ -27,6 +27,7 @@ import { RINA_LEVEL_QUALITY, RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLeve
 import { createRinaStadiumGeometry } from "./RinaStadiumGeometry";
 import { RinaStadiumWorld } from "./RinaStadiumWorld";
 import { createRinaStage } from "./RinaStage";
+import { createRinaStageArchitecture } from "./RinaStageArchitecture";
 
 function createRinaLevelHud() {
   const root = document.createElement("div");
@@ -121,6 +122,9 @@ export async function createRinaLevel(
     context.onProgress(0.18, "Construyendo el campo...");
     createRinaStadiumGeometry(scene, context.performanceTier);
     const stage = createRinaStage(scene, context.performanceTier);
+    const stageArchitecture = createRinaStageArchitecture(
+      scene, context.performanceTier
+    );
     const crowdPreview = createRinaCrowdPreview(
       scene,
       context.performanceTier
@@ -141,6 +145,8 @@ export async function createRinaLevel(
       light.range *= RINA_STADIUM_SCALE;
     }
     stadiumRoot.scaling.setAll(RINA_STADIUM_SCALE);
+    stageArchitecture.root.parent = stadiumRoot;
+    cleanup.push(() => stageArchitecture.dispose());
     // The pyro is created after the scenery root is scaled. Its billboard
     // meshes and particle emitters both use world coordinates.
     const pyroScale = RINA_STADIUM_SCALE;
@@ -309,6 +315,7 @@ export async function createRinaLevel(
         dt, music, rina.root.position.z / RINA_STADIUM_SCALE,
         rina.root.rotation.y, player.position, pyro
       );
+      stageArchitecture.update(dt, music, beatPulse);
       if (!reducedMotion.matches && music?.playing && beatPulse > 0) {
         const strength = Math.min(1, beatPulse *
           (0.55 + music.bass * 0.3 + music.energy * 0.15));

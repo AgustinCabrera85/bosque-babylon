@@ -740,6 +740,27 @@ try {
             light.name.startsWith('rinaScreenLight_')).length,
           beams: scene?.meshes?.filter((mesh) =>
             mesh.name.startsWith('rinaSpotBeam_')).length,
+          architectureParent: scene?.getTransformNodeByName('rinaStageV2Root')?.parent?.name,
+          speakerRigParent: scene?.getTransformNodeByName('rinaV3SpeakerRig')?.parent?.name,
+          speakerModules: scene?.transformNodes?.filter((node) =>
+            node.name.startsWith('rinaSpeakerCabinet_')).length,
+          subwoofers: scene?.transformNodes?.filter((node) =>
+            node.name.startsWith('rinaSubwoofer_')).length,
+          stageMonitors: scene?.transformNodes?.filter((node) =>
+            node.name.startsWith('rinaMonitorWedge_')).length,
+          speakerCurve: Math.abs(
+            (scene?.getTransformNodeByName('rinaSpeakerCabinet_1_0')?.rotation.x ?? 0) -
+            (scene?.getTransformNodeByName('rinaSpeakerCabinet_1_7') ??
+              scene?.getTransformNodeByName('rinaSpeakerCabinet_1_5'))?.rotation.x),
+          mergedSpeakers: scene?.meshes?.filter((mesh) =>
+            mesh.name.startsWith('rinaV3SpeakerMerged_')).length,
+          oldSpeakers: scene?.meshes?.filter((mesh) =>
+            mesh.name.startsWith('rinaV2LineArray_') ||
+            mesh.name.startsWith('rinaV2Monitor_')).length,
+          speakerGrilles: [
+            scene?.getMaterialByName('rinaSpeakerPerforatedGrille')?.diffuseTexture?.name,
+            scene?.getMaterialByName('rinaSpeakerSubwooferGrille')?.diffuseTexture?.name,
+          ],
           smoke: !!scene?.particleSystems?.find((system) =>
             system.name === 'rinaStageSmoke'),
           rinaFill: scene?.getLightByName('rinaPortraitFill')?.intensity,
@@ -766,6 +787,15 @@ try {
       concert.beams === concert.lights && concert.smoke &&
       concert.rinaFill > 0 && concert.rinaFillMeshes > 0,
       `Rina concert incomplete: ${JSON.stringify(concert)}; ${errors.join(' | ')}`);
+    assert.ok(concert.architectureParent === 'rinaStadiumRoot' &&
+      concert.speakerRigParent === 'rinaStageV2Root' &&
+      ((concert.speakerModules === 12 && concert.subwoofers === 2) ||
+        (concert.speakerModules === 16 && concert.subwoofers === 4)) &&
+      concert.stageMonitors === 6 && concert.speakerCurve > 0.15 &&
+      concert.mergedSpeakers >= 5 && concert.oldSpeakers === 0 &&
+      concert.speakerGrilles[0] === 'rinaSpeakerGrilleTexture' &&
+      concert.speakerGrilles[1] === 'rinaSubwooferGrilleTexture',
+      `Rina V3 speaker rig incomplete: ${JSON.stringify(concert)}`);
     const audioPrototype = await send('Runtime.evaluate', {
       expression: 'HTMLAudioElement.prototype',
     });

@@ -3,6 +3,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Scene } from "@babylonjs/core/scene";
 import { createRinaStadiumGrassMaterial } from "./RinaStadiumGrassMaterial";
+import { createRinaDoubleTierSideStands } from "./RinaDoubleTierSideStands";
 import { RINA_LEVEL_QUALITY, RINA_STADIUM } from "./RinaLevelConfig";
 
 function standard(
@@ -117,27 +118,13 @@ export function createRinaStadiumGeometry(
 
   const sideTierDepth = 4.6;
   const tierRise = 1.65;
-  const baseSideX = RINA_STADIUM.pitchWidth / 2 + 7.5;
-
-  for (const side of [-1, 1]) {
-    for (let tier = 0; tier < quality.standTiers; tier += 1) {
-      const terrace = MeshBuilder.CreateBox(
-        `rinaSideStand_${side}_${tier}`,
-        {
-          width: sideTierDepth,
-          height: tierRise + 0.25,
-          depth: RINA_STADIUM.pitchLength + 24,
-        },
-        scene
-      );
-      terrace.position.set(
-        side * (baseSideX + tier * sideTierDepth),
-        0.65 + tier * tierRise,
-        0
-      );
-      terrace.material = tier % 3 === 0 ? aisle : concrete;
-    }
-  }
+  // All measurements remain local to rinaStadiumRoot, which scales them once.
+  createRinaDoubleTierSideStands(scene, performanceTier, {
+    concrete,
+    darkConcrete,
+    aisle,
+    ledRibbon,
+  });
 
   const southBaseZ = -(RINA_STADIUM.pitchLength / 2 + 7);
   const wallWidth = 1.25;
@@ -180,20 +167,6 @@ export function createRinaStadiumGeometry(
       northUpperBaseZ + (tier - 4) * sideTierDepth
     );
     terrace.material = tier % 3 === 0 ? aisle : darkConcrete;
-  }
-
-  for (const side of [-1, 1]) {
-    const ribbon = MeshBuilder.CreateBox(
-      `rinaLedRibbonSide_${side}`,
-      {
-        width: 0.28,
-        height: 0.42,
-        depth: RINA_STADIUM.pitchLength + 20,
-      },
-      scene
-    );
-    ribbon.position.set(side * (baseSideX - 2.4), 6.7, 0);
-    ribbon.material = ledRibbon;
   }
 
   const tunnelDepth =

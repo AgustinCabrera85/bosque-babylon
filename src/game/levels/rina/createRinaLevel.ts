@@ -28,6 +28,7 @@ import { createRinaStadiumGeometry } from "./RinaStadiumGeometry";
 import { RinaStadiumWorld } from "./RinaStadiumWorld";
 import { createRinaStage } from "./RinaStage";
 import { createRinaStageArchitecture } from "./RinaStageArchitecture";
+import { createRinaStageSecurityBarriers } from "./RinaStageSecurityBarriers";
 
 function createRinaLevelHud() {
   const root = document.createElement("div");
@@ -147,6 +148,11 @@ export async function createRinaLevel(
     stadiumRoot.scaling.setAll(RINA_STADIUM_SCALE);
     stageArchitecture.root.parent = stadiumRoot;
     cleanup.push(() => stageArchitecture.dispose());
+    const securityBarriers = createRinaStageSecurityBarriers(
+      scene, context.performanceTier
+    );
+    securityBarriers.root.parent = stadiumRoot;
+    cleanup.push(() => securityBarriers.dispose());
     // The pyro is created after the scenery root is scaled. Its billboard
     // meshes and particle emitters both use world coordinates.
     const pyroScale = RINA_STADIUM_SCALE;

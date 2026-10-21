@@ -1,29 +1,22 @@
-import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import "@babylonjs/loaders/glTF";
+import "@babylonjs/core/Meshes/thinInstanceMesh";
+import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
-import { RINA_STADIUM } from "./RinaLevelConfig";
+import { asset } from "../../../utils/asset";
+import { RINA_STAGE_SECURITY, RINA_STADIUM } from "./RinaLevelConfig";
 
-/**
- * UPDATE 02 — Stage-left / stage-right audience safety barriers.
- *
- * IMPORTANT TRANSFORM CONTRACT:
- * - All positions and dimensions in this file are local stadium units.
- * - The caller must parent the returned `root` to `rinaStadiumRoot` exactly once.
- * - Do not apply RINA_STADIUM_SCALE here; the scene root already does it.
- *
- * Architecture only: no colliders, no picking, no AI and no playable stairs.
- * No changes to RinaStage, StagePyro, RinaStadiumWorld or Update 01.
- */
+const MODEL_FILE = "vallado_shaded.glb";
+const MODEL_ROOT = "assets/models/rina/";
+
+/** All positions are local stadium coordinates; rinaStadiumRoot scales once. */
 export const RINA_STAGE_BARRIER_PROFILE = {
-  // The front edge of the main deck is z = 32.5 in the current scene.
-  // The first decorative stairs occupy x = ±(9 ± 2.15), z ≈ 26.5–32.5.
-  frontOffsetFromStage: 7.75,
-  // The catwalk's half width is 2.7. Keep the central approach clear.
-  innerWingStart: RINA_STADIUM.stage.catwalk.width * 0.5 + 1.15,
-  // Stair access gap is ~7.2 local units wide, centered on each x = ±9.
+  frontOffsetFromStage: RINA_STADIUM.stage.frontZ - RINA_STAGE_SECURITY.frontZ,
+  innerWingStart: RINA_STAGE_SECURITY.catwalkFenceHalfWidth,
+  catwalkTipZ: RINA_STAGE_SECURITY.catwalkFenceTipZ,
   stairCenterX: 9,
   stairWidth: 4.3,
   stairGapExtra: 1.42,
@@ -31,280 +24,192 @@ export const RINA_STAGE_BARRIER_PROFILE = {
   innerReturnEndOffset: 1.6,
   outerReturnEndOffset: 0.85,
   exteriorWingReturnDepth: 3.75,
-  // Height is local: 0.86 * 1.5 = 1.29 metres in the game.
-  panelWidth: 1.55,
-  railTop: 0.86,
-  railMiddle: 0.50,
-  railBottom: 0.12,
-  postDiameter: 0.066,
-  railDiameter: 0.055,
-  meshWireDiameter: 0.014,
-  footWidth: 0.46,
-  footDepth: 0.17,
-  footHeight: 0.055,
-  desktopVerticalWires: 11,
-  mobileVerticalWires: 6,
-  desktopHorizontalWires: 4,
-  mobileHorizontalWires: 2,
+  modelWidth: 1.9503823518753052,
+  modelHeight: 1,
+  panelWidth: 2.925,
+  mobilePanelWidth: 3.3,
+  railTop: 1.29,
 } as const;
 
 export interface RinaStageSecurityBarrierHandle {
   readonly root: TransformNode;
-  /** Render-ready meshes after material batching, not the temporary pieces. */
   readonly meshes: readonly Mesh[];
   readonly panelCount: number;
+  readonly collisionSpans: readonly RinaStageBarrierCollisionSpan[];
   setEnabled(enabled: boolean): void;
   dispose(): void;
 }
 
-type NamedGroup = "yellow" | "mesh" | "feet" | "reflective";
+export interface RinaStageBarrierCollisionSpan {
+  readonly startX: number;
+  readonly startZ: number;
+  readonly endX: number;
+  readonly endZ: number;
+  readonly bottomY: number;
+  readonly topY: number;
+}
+
 type Point2 = { x: number; z: number };
-type Assembly = {
-  yellow: Mesh[];
-  mesh: Mesh[];
-  feet: Mesh[];
-  reflective: Mesh[];
-};
-
-const WALL_THICKNESS = 0.023;
-
-function createPaintedMaterial(scene: Scene, name: string, rgb: Color3, emission: Color3) {
-  const result = new StandardMaterial(name, scene);
-  result.diffuseColor = rgb;
-  result.emissiveColor = emission;
-  result.specularColor = new Color3(0.06, 0.065, 0.075);
-  result.specularPower = 48;
-  return result;
-}
-
-/**
- * Place a short box along the local X axis of a barrier span. Each span can be
- * either straight or turned 90°, without multiplying by the stadium scale.
- */
-function addPart(
-  scene: Scene,
-  parts: Assembly,
-  kind: NamedGroup,
-  name: string,
-  width: number,
-  height: number,
-  depth: number,
-  center: Point2,
-  y: number,
-  yaw: number
-) {
-  if (width <= 0 || height <= 0 || depth <= 0) {
-    throw new Error(`Invalid Rina stage barrier dimension for ${name}`);
-  }
-  const mesh = MeshBuilder.CreateBox(name, { width, height, depth }, scene);
-  mesh.position.set(center.x, y, center.z);
-  mesh.rotation.y = yaw;
-  mesh.isPickable = false;
-  mesh.checkCollisions = false;
-  mesh.receiveShadows = false;
-  parts[kind].push(mesh);
-}
-
-/** Generate a single barrier panel between two points (oriented in XZ). */
-function addPanel(
-  scene: Scene,
-  parts: Assembly,
-  label: string,
-  a: Point2,
-  b: Point2,
-  wires: { vertical: number; horizontal: number }
-) {
-  const p = RINA_STAGE_BARRIER_PROFILE;
-  const dx = b.x - a.x;
-  const dz = b.z - a.z;
-  const length = Math.hypot(dx, dz);
-  if (length < 0.05) return false;
-
-  // Local +X rotated about Y gives (cos(yaw), 0, -sin(yaw)).
-  const yaw = -Math.atan2(dz, dx);
-  const tangentX = dx / length;
-  const tangentZ = dz / length;
-  const mid: Point2 = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
-  const at = (offset: number): Point2 => ({
-    x: mid.x + tangentX * offset,
-    z: mid.z + tangentZ * offset,
-  });
-
-  // Framework: tubular yellow top rail, two vertical end posts, bottom rail.
-  addPart(scene, parts, "yellow", `${label}_top`,
-    length + p.postDiameter, p.railDiameter, p.railDiameter,
-    mid, p.railTop, yaw);
-  addPart(scene, parts, "yellow", `${label}_mid`,
-    length - p.postDiameter, p.railDiameter * 0.76, p.railDiameter * 0.76,
-    mid, p.railMiddle, yaw);
-  addPart(scene, parts, "yellow", `${label}_baseRail`,
-    length - p.postDiameter, p.railDiameter * 0.85, p.railDiameter * 0.85,
-    mid, p.railBottom, yaw);
-
-  for (const sign of [-1, 1]) {
-    const endpoint = at(sign * length * 0.5);
-    addPart(scene, parts, "yellow", `${label}_endPost_${sign}`,
-      p.postDiameter, p.railTop + 0.06, p.postDiameter,
-      endpoint, (p.railTop + 0.06) * 0.5, yaw);
-
-    // Broad, low footplates make the modular units read as event barricades.
-    addPart(scene, parts, "feet", `${label}_foot_${sign}`,
-      p.footDepth, p.footHeight, p.footWidth,
-      endpoint, 0.03, yaw);
-  }
-
-  // Real open wirework; no transparency / textured planes to sort in smoke.
-  const meshHeight = p.railTop - p.railBottom - 0.11;
-  const meshY = (p.railTop + p.railBottom) * 0.5;
-  const meshLeft = -length * 0.5 + 0.095;
-  const meshRight = length * 0.5 - 0.095;
-  for (let i = 1; i <= wires.vertical; i++) {
-    const x = meshLeft + (meshRight - meshLeft) * i / (wires.vertical + 1);
-    addPart(scene, parts, "mesh", `${label}_meshV_${i}`,
-      p.meshWireDiameter, meshHeight, WALL_THICKNESS,
-      at(x), meshY, yaw);
-  }
-  for (let j = 1; j <= wires.horizontal; j++) {
-    const y = p.railBottom + 0.055 + meshHeight * j / (wires.horizontal + 1);
-    addPart(scene, parts, "mesh", `${label}_meshH_${j}`,
-      Math.max(0.05, length - 0.20), p.meshWireDiameter, WALL_THICKNESS,
-      mid, y, yaw);
-  }
-
-  // Retro-reflective yellow-green squares are *not* dynamic scene lights.
-  addPart(scene, parts, "reflective", `${label}_safetyStripe`,
-    Math.max(0.05, length - 0.15), 0.032, 0.012,
-    { x: mid.x - tangentZ * 0.035, z: mid.z + tangentX * 0.035 },
-    p.railTop + 0.055, yaw);
-  return true;
-}
 
 function addSpan(
-  scene: Scene,
-  parts: Assembly,
-  tag: string,
+  matrices: Matrix[],
+  collisionSpans: RinaStageBarrierCollisionSpan[],
   a: Point2,
   b: Point2,
-  wires: { vertical: number; horizontal: number }
+  targetPanelWidth: number
 ) {
-  const p = RINA_STAGE_BARRIER_PROFILE;
   const dx = b.x - a.x;
   const dz = b.z - a.z;
   const distance = Math.hypot(dx, dz);
-  if (distance <= 0.05) return 0;
-  const count = Math.max(1, Math.ceil(distance / p.panelWidth));
-  let created = 0;
-  for (let i = 0; i < count; i++) {
-    const t0 = i / count;
-    const t1 = (i + 1) / count;
-    const from = { x: a.x + dx * t0, z: a.z + dz * t0 };
-    const to = { x: a.x + dx * t1, z: a.z + dz * t1 };
-    if (addPanel(scene, parts, `${tag}_${i}`, from, to, wires)) created++;
+  if (distance <= 0.05) return;
+
+  const profile = RINA_STAGE_BARRIER_PROFILE;
+  collisionSpans.push({
+    startX: a.x, startZ: a.z,
+    endX: b.x, endZ: b.z,
+    bottomY: 0, topY: profile.railTop,
+  });
+  const count = Math.max(1, Math.round(distance / targetPanelWidth));
+  const panelLength = distance / count;
+  const yaw = -Math.atan2(dz, dx);
+  const rotation = Quaternion.FromEulerAngles(0, yaw, 0);
+  const scale = new Vector3(
+    panelLength / profile.modelWidth,
+    profile.railTop / profile.modelHeight,
+    panelLength / profile.modelWidth
+  );
+
+  for (let index = 0; index < count; index++) {
+    const t = (index + 0.5) / count;
+    const position = new Vector3(a.x + dx * t, 0, a.z + dz * t);
+    matrices.push(Matrix.Compose(scale, rotation, position));
   }
-  return created;
 }
 
-function batch(meshes: Mesh[], name: string, material: StandardMaterial, root: TransformNode) {
-  if (!meshes.length) return null;
-  const merged = meshes.length === 1
-    ? meshes[0]
-    : Mesh.MergeMeshes(meshes, true, true, undefined, false, false);
-  if (!merged) throw new Error(`Could not merge Rina stage safety barrier: ${name}`);
-  merged.name = name;
-  merged.material = material;
-  merged.parent = root;
-  merged.isPickable = false;
-  merged.checkCollisions = false;
-  merged.receiveShadows = false;
-  return merged;
-}
-
-export function createRinaStageSecurityBarriers(
-  scene: Scene,
-  performanceTier: "desktop" | "mobile"
-): RinaStageSecurityBarrierHandle {
+function buildPanelGeometry(performanceTier: "desktop" | "mobile") {
   const p = RINA_STAGE_BARRIER_PROFILE;
   const frontZ = RINA_STADIUM.stage.frontZ - p.frontOffsetFromStage;
   const stairGapStart = p.stairCenterX - p.stairWidth * 0.5 - p.stairGapExtra;
   const stairGapEnd = p.stairCenterX + p.stairWidth * 0.5 + p.stairGapExtra;
-
-  // 2.7m half-width runway + 1.15m clearance on either side;
-  // stairs centered at ±9m, width 4.3m, never covered by front rail.
   if (p.innerWingStart >= stairGapStart || stairGapEnd >= p.outerWingEnd) {
     throw new Error("Rina security barriers cannot fit around the stage stairs");
   }
-  const mats = {
-    yellow: createPaintedMaterial(scene,
-      "rinaSecurityFenceYellow", new Color3(0.94, 0.64, 0.035),
-      new Color3(0.14, 0.077, 0.005)),
-    mesh: createPaintedMaterial(scene,
-      "rinaSecurityFenceDarkMesh", new Color3(0.11, 0.12, 0.13),
-      new Color3(0.02, 0.02, 0.022)),
-    feet: createPaintedMaterial(scene,
-      "rinaSecurityFenceBlackFeet", new Color3(0.052, 0.054, 0.056),
-      new Color3(0.008, 0.009, 0.009)),
-    reflective: createPaintedMaterial(scene,
-      "rinaSecurityFenceRetroStrip", new Color3(0.92, 0.78, 0.19),
-      new Color3(0.27, 0.20, 0.037)),
-  };
-  const parts: Assembly = { yellow: [], mesh: [], feet: [], reflective: [] };
-  const wireCount = performanceTier === "desktop"
-    ? { vertical: p.desktopVerticalWires, horizontal: p.desktopHorizontalWires }
-    : { vertical: p.mobileVerticalWires, horizontal: p.mobileHorizontalWires };
 
-  // TWO mirror-image security pockets: the stage catwalk remains unobstructed;
-  // the central gap of each front line leads toward its existing side stairs.
-  let panelCount = 0;
+  const matrices: Matrix[] = [];
+  const collisionSpans: RinaStageBarrierCollisionSpan[] = [];
+  const panelWidth = performanceTier === "mobile"
+    ? p.mobilePanelWidth : p.panelWidth;
   for (const side of [-1, 1] as const) {
     const at = (x: number, z: number): Point2 => ({ x: side * x, z });
-    panelCount += addSpan(scene, parts, `rinaFence_${side}_frontInner`,
-      at(p.innerWingStart, frontZ), at(stairGapStart, frontZ), wireCount);
-    panelCount += addSpan(scene, parts, `rinaFence_${side}_frontOuter`,
-      at(stairGapEnd, frontZ), at(p.outerWingEnd, frontZ), wireCount);
-    // Two returns frame each staircase approach without placing a fence on
-    // the tread surfaces or on the main deck.
-    panelCount += addSpan(scene, parts, `rinaFence_${side}_innerReturn`,
+    addSpan(matrices, collisionSpans,
+      at(p.innerWingStart, frontZ), at(p.innerWingStart, p.catwalkTipZ),
+      panelWidth);
+    addSpan(matrices, collisionSpans,
+      at(p.innerWingStart, frontZ), at(stairGapStart, frontZ), panelWidth);
+    addSpan(matrices, collisionSpans,
+      at(stairGapEnd, frontZ), at(p.outerWingEnd, frontZ), panelWidth);
+    addSpan(matrices, collisionSpans,
       at(stairGapStart, frontZ),
       at(stairGapStart, RINA_STADIUM.stage.frontZ - p.innerReturnEndOffset),
-      wireCount);
-    panelCount += addSpan(scene, parts, `rinaFence_${side}_outerReturn`,
+      panelWidth);
+    addSpan(matrices, collisionSpans,
       at(stairGapEnd, frontZ),
       at(stairGapEnd, RINA_STADIUM.stage.frontZ - p.outerReturnEndOffset),
-      wireCount);
-    // Slight angled tail connects to the production wing without crossing
-    // the stage footprint, Rina's catwalk, or the audience circulation lane.
-    panelCount += addSpan(scene, parts, `rinaFence_${side}_outerTail`,
+      panelWidth);
+    addSpan(matrices, collisionSpans,
       at(p.outerWingEnd, frontZ),
       at(p.outerWingEnd + 1.8, frontZ + p.exteriorWingReturnDepth),
-      wireCount);
+      panelWidth);
+  }
+  addSpan(matrices, collisionSpans,
+    { x: -p.innerWingStart, z: p.catwalkTipZ },
+    { x: p.innerWingStart, z: p.catwalkTipZ },
+    panelWidth);
+  return { matrices, collisionSpans };
+}
+
+/** Load one GLB mesh and draw all stage barriers as thin instances. */
+export async function createRinaStageSecurityBarriers(
+  scene: Scene,
+  performanceTier: "desktop" | "mobile"
+): Promise<RinaStageSecurityBarrierHandle> {
+  const { matrices, collisionSpans } = buildPanelGeometry(performanceTier);
+  const container = await SceneLoader.LoadAssetContainerAsync(
+    asset(MODEL_ROOT), MODEL_FILE, scene
+  );
+  if (scene.isDisposed) {
+    container.dispose();
+    throw new Error("Rina stadium closed while the security barriers loaded");
+  }
+
+  const drawableMeshes = container.meshes.filter(
+    (mesh): mesh is Mesh => mesh instanceof Mesh && mesh.getTotalVertices() > 0
+  );
+  if (drawableMeshes.length !== 1) {
+    container.dispose();
+    throw new Error(`Expected one drawable Rina barrier mesh; found ${drawableMeshes.length}`);
   }
 
   const root = new TransformNode("rinaStageSecurityFenceRoot", scene);
-  const meshes: Mesh[] = [];
-  for (const [key, name] of [
-    ["yellow", "rinaStageFence_YellowFrames"],
-    ["mesh", "rinaStageFence_DarkGrille"],
-    ["feet", "rinaStageFence_RubberFootplates"],
-    ["reflective", "rinaStageFence_ReflectiveStrips"],
-  ] as const) {
-    const merged = batch(parts[key], name, mats[key], root);
-    if (merged) meshes.push(merged);
-  }
+  try {
+    container.addAllToScene();
+    const source = drawableMeshes[0];
+    source.name = "rinaStageFence_Model";
+    source.parent = root;
+    source.position.set(0, 0, 0);
+    source.rotationQuaternion = null;
+    source.rotation.set(0, 0, 0);
+    source.scaling.setAll(1);
+    source.isPickable = false;
+    source.checkCollisions = false;
+    source.receiveShadows = false;
 
-  let disposed = false;
-  return {
-    root,
-    meshes,
-    panelCount,
-    setEnabled(enabled: boolean) {
-      if (!disposed) root.setEnabled(enabled);
-    },
-    dispose() {
-      if (disposed) return;
-      disposed = true;
-      for (const mesh of meshes) if (!mesh.isDisposed()) mesh.dispose();
-      root.dispose(false, false);
-      for (const material of Object.values(mats)) material.dispose();
-    },
-  };
+    const buffer = new Float32Array(matrices.length * 16);
+    for (let index = 0; index < matrices.length; index++) {
+      matrices[index].copyToArray(buffer, index * 16);
+    }
+    source.thinInstanceSetBuffer("matrix", buffer, 16, true);
+    source.thinInstanceRefreshBoundingInfo(true);
+
+    for (const [index, span] of collisionSpans.entries()) {
+      const dx = span.endX - span.startX;
+      const dz = span.endZ - span.startZ;
+      const plane = MeshBuilder.CreatePlane(`rinaStageFenceCollider_${index}`, {
+        width: Math.hypot(dx, dz),
+        height: span.topY - span.bottomY,
+        sideOrientation: Mesh.DOUBLESIDE,
+      }, scene);
+      plane.parent = root;
+      plane.position.set(
+        (span.startX + span.endX) * 0.5,
+        (span.bottomY + span.topY) * 0.5,
+        (span.startZ + span.endZ) * 0.5
+      );
+      plane.rotation.y = -Math.atan2(dz, dx);
+      plane.isVisible = false;
+      plane.isPickable = false;
+      plane.checkCollisions = true;
+    }
+
+    let disposed = false;
+    return {
+      root,
+      meshes: [source],
+      panelCount: matrices.length,
+      collisionSpans,
+      setEnabled(enabled: boolean) {
+        if (!disposed) root.setEnabled(enabled);
+      },
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        container.dispose();
+        root.dispose(false, false);
+      },
+    };
+  } catch (error) {
+    container.dispose();
+    root.dispose(false, false);
+    throw error;
+  }
 }

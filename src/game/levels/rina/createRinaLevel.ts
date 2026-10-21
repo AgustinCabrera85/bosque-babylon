@@ -148,7 +148,7 @@ export async function createRinaLevel(
     stadiumRoot.scaling.setAll(RINA_STADIUM_SCALE);
     stageArchitecture.root.parent = stadiumRoot;
     cleanup.push(() => stageArchitecture.dispose());
-    const securityBarriers = createRinaStageSecurityBarriers(
+    const securityBarriers = await createRinaStageSecurityBarriers(
       scene, context.performanceTier
     );
     securityBarriers.root.parent = stadiumRoot;
@@ -178,7 +178,7 @@ export async function createRinaLevel(
       }
     );
     cleanup.push(() => pyro.dispose());
-    const playerWorld = new RinaStadiumWorld();
+    const playerWorld = new RinaStadiumWorld(securityBarriers.collisionSpans);
 
     context.onProgress(
       0.44,

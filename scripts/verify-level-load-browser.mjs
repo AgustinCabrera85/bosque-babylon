@@ -730,6 +730,43 @@ try {
           tunnelOpen: [-58, -55, -52, -50].every((z) =>
             !scene?.metadata?.playerWorld?.isColliding(0, z * scale)),
           catwalkBlocks: scene?.metadata?.playerWorld?.isColliding(0, 20 * scale),
+          stageFence: (() => {
+            const planes = scene?.meshes?.filter((mesh) =>
+              mesh.name.startsWith('rinaStageFenceCollider_')) ?? [];
+            const spectators = scene?.getMeshByName('rinaCrowdPreviewSource')?.instances ?? [];
+            const world = scene?.metadata?.playerWorld;
+            const frontZ = (32.5 - 7.75) * scale;
+            return {
+              planeCount: planes.length,
+              thinInstances: scene?.getMeshByName('rinaStageFence_Model')?.thinInstanceCount,
+              aligned: planes.every((plane) => {
+                plane.computeWorldMatrix(true);
+                const bounds = plane.getBoundingInfo().boundingBox;
+                return plane.parent?.name === 'rinaStageSecurityFenceRoot' &&
+                  plane.checkCollisions && !plane.isVisible && !plane.isPickable &&
+                  Math.abs(bounds.maximumWorld.y - bounds.minimumWorld.y -
+                    1.29 * scale) < 0.01;
+              }),
+              blocksLeft: world?.isColliding(-18 * scale, frontZ, 0, 0, 1.8),
+              blocksRight: world?.isColliding(18 * scale, frontZ, 0, 0, 1.8),
+              leftStairOpen: !world?.isColliding(-9 * scale, frontZ, 0, 0, 1.8),
+              rightStairOpen: !world?.isColliding(9 * scale, frontZ, 0, 0, 1.8),
+              clearAbove: !world?.isColliding(18 * scale, frontZ, 0, 2.1, 2.5),
+              catwalkSidesBlock: [-1, 1].every((side) =>
+                world?.isColliding(side * 4.2 * scale, 20 * scale, 0, 0, 1.8)),
+              catwalkTipBlocks: world?.isColliding(0, 15.65 * scale, 0, 0, 1.8),
+              outsideCatwalkOpen: !world?.isColliding(4.65 * scale, 20 * scale, 0, 0, 1.8),
+              spectatorCount: spectators.length,
+              spectatorViolations: spectators.filter((mesh) =>
+                !(mesh.position.z <= 24 &&
+                  (mesh.position.z <= 14.9 || Math.abs(mesh.position.x) >= 4.6)))
+                .slice(0, 5).map((mesh) => ({ name: mesh.name,
+                  x: mesh.position.x, z: mesh.position.z })),
+              spectatorsOutside: spectators.length > 0 && spectators.every((mesh) =>
+                mesh.position.z <= 24 &&
+                (mesh.position.z <= 14.9 || Math.abs(mesh.position.x) >= 4.6)),
+            };
+          })(),
           backStand: [
             'rinaRearStandConcrete', 'rinaRearStandDarkConcrete',
             'rinaRearStandAisles', 'rinaRearStandRibbons',
@@ -801,6 +838,13 @@ try {
         texture.url.includes('/assets/textures/rina/stadium/grass/')) &&
       concert.singing && concert.catwalk && concert.tunnelOpen &&
       concert.catwalkBlocks && concert.backStand && concert.rearVisualOnly &&
+      concert.stageFence.planeCount === 13 &&
+      concert.stageFence.thinInstances > 20 && concert.stageFence.aligned &&
+      concert.stageFence.blocksLeft && concert.stageFence.blocksRight &&
+      concert.stageFence.leftStairOpen && concert.stageFence.rightStairOpen &&
+      concert.stageFence.clearAbove && concert.stageFence.catwalkSidesBlock &&
+      concert.stageFence.catwalkTipBlocks && concert.stageFence.outsideCatwalkOpen &&
+      concert.stageFence.spectatorsOutside &&
       concert.exitSign && concert.lights >= 2 &&
       concert.ambient <= 0.15 && concert.moon <= 0.05 &&
       concert.spill && concert.screenLights === 2 &&

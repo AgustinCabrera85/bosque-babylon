@@ -31,6 +31,14 @@ export const RINA_STADIUM = {
   },
 } as const;
 
+export const RINA_STAGE_SECURITY = {
+  frontZ: RINA_STADIUM.stage.frontZ - 7.75,
+  catwalkFenceHalfWidth: RINA_STADIUM.stage.catwalk.width * 0.5 + 1.15,
+  catwalkFenceTipZ:
+    RINA_STADIUM.stage.catwalk.centerZ - RINA_STADIUM.stage.catwalk.depth * 0.5 - 1.15,
+  spectatorClearance: 0.75,
+} as const;
+
 export const RINA_LEVEL_QUALITY = {
   desktop: {
     fogDensity: 0.0011,

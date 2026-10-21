@@ -3,14 +3,22 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import type { Scene } from "@babylonjs/core/scene";
-import { RINA_LEVEL_QUALITY, RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
+import {
+  RINA_LEVEL_QUALITY, RINA_STAGE_SECURITY, RINA_STADIUM, RINA_STADIUM_SCALE,
+} from "./RinaLevelConfig";
 
 function isLane(x: number, z: number) {
   const verticalLane = Math.abs(x) < 2.6 || Math.abs(x - 17) < 2.2 || Math.abs(x + 17) < 2.2;
   const crossLane = Math.abs(z + 12) < 2.2 || Math.abs(z - 9) < 2.2;
-  const stageClearance = z > RINA_STADIUM.stage.frontZ - 6;
+  const stageClearance = z >
+    RINA_STAGE_SECURITY.frontZ - RINA_STAGE_SECURITY.spectatorClearance;
+  const catwalkFenceClearance =
+    z > RINA_STAGE_SECURITY.catwalkFenceTipZ - RINA_STAGE_SECURITY.spectatorClearance &&
+    Math.abs(x) < RINA_STAGE_SECURITY.catwalkFenceHalfWidth +
+      RINA_STAGE_SECURITY.spectatorClearance;
   const spawnClearance = Math.abs(x) < 7 && z < -27;
-  return verticalLane || crossLane || stageClearance || spawnClearance;
+  return verticalLane || crossLane || stageClearance ||
+    catwalkFenceClearance || spawnClearance;
 }
 
 /**

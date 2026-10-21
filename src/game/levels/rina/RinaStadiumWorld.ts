@@ -1,6 +1,7 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { PlayerWorldQuery } from "../../PlayerWorldQuery";
 import { RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
+import type { RinaStageBarrierCollisionSpan } from "./RinaStageSecurityBarriers";
 
 const FIELD_HALF_WIDTH = RINA_STADIUM.pitchWidth / 2;
 const FIELD_HALF_LENGTH = RINA_STADIUM.pitchLength / 2;
@@ -33,8 +34,34 @@ function hitsCatwalk(x: number, z: number, clearance = 0) {
     z < RINA_STADIUM.stage.frontZ + radius;
 }
 
+function hitsStageBarrier(
+  x: number,
+  z: number,
+  radius: number,
+  minY: number,
+  maxY: number,
+  spans: readonly RinaStageBarrierCollisionSpan[]
+) {
+  for (const span of spans) {
+    if (maxY < span.bottomY || minY > span.topY) continue;
+    const dx = span.endX - span.startX;
+    const dz = span.endZ - span.startZ;
+    const lengthSquared = dx * dx + dz * dz;
+    const projection = lengthSquared > 0
+      ? Math.max(0, Math.min(1,
+        ((x - span.startX) * dx + (z - span.startZ) * dz) / lengthSquared))
+      : 0;
+    const nearestX = span.startX + projection * dx;
+    const nearestZ = span.startZ + projection * dz;
+    if (Math.hypot(x - nearestX, z - nearestZ) <= radius) return true;
+  }
+  return false;
+}
+
 /** First iteration: pitch + south service tunnel are walkable. */
 export class RinaStadiumWorld implements PlayerWorldQuery {
+  constructor(private readonly barrierSpans: readonly RinaStageBarrierCollisionSpan[] = []) {}
+
   getTerrainHeight(x: number, z: number) {
     return this.getWalkableSurfaceHeight(x, z);
   }
@@ -43,11 +70,17 @@ export class RinaStadiumWorld implements PlayerWorldQuery {
     return RINA_STADIUM.fieldY;
   }
 
-  isColliding(x: number, z: number, additionalClearance = 0) {
+  isColliding(x: number, z: number, additionalClearance = 0, minY = -Infinity, maxY = Infinity) {
     const localX = x / RINA_STADIUM_SCALE;
     const localZ = z / RINA_STADIUM_SCALE;
     const localClearance = additionalClearance / RINA_STADIUM_SCALE;
-    return hitsCatwalk(localX, localZ, localClearance) || !(
+    const radius = Math.max(localClearance, PLAYER_CLEARANCE);
+    return hitsCatwalk(localX, localZ, localClearance) ||
+      hitsStageBarrier(
+        localX, localZ, radius,
+        minY / RINA_STADIUM_SCALE, maxY / RINA_STADIUM_SCALE,
+        this.barrierSpans
+      ) || !(
       insideField(localX, localZ, localClearance) ||
       insideExitTunnel(localX, localZ, localClearance)
     );

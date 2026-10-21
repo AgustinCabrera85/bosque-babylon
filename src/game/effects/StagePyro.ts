@@ -261,7 +261,7 @@ void main(void) {
                  clamp(.30+.44*smokeDetail+.30*depth,0.,1.));
   soot+=vec3(.035,.008,.001)*(1.-uSmokeBlend);
   vec3 rgb=mix(fire*uBrightness,soot,uSmokeBlend);
-  alpha *= uOpacity * mix(1.,.93,uSmokeBlend);
+  alpha *= uOpacity * mix(1.,.58,uSmokeBlend);
   alpha *= (.85+.15*smokeDetail);
   if(alpha < .008) discard;
   gl_FragColor=vec4(rgb,clamp(alpha,0.,1.));
@@ -526,7 +526,7 @@ class PyroUnit {
       this.clouds.forEach((c,i)=>{
         const rel=Math.max(0,cloudAge-.055*c.variance);
         c.mesh.setEnabled(rel>=0 && appear*fadeOut>.015);
-        const spread=(.30+.51*rel);
+        const spread=(.30+.72*rel);
         c.mesh.position.set(
           this.pos.x + R*c.side*spread + o.wind.x*rel,
           this.pos.y + o.jetHeight - R*.17 + R*c.up*(.25+.30*rel)

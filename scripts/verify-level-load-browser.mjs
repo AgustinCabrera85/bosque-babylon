@@ -892,6 +892,7 @@ try {
         wash: scene.getLightByName('rinaStageWash')?.intensity,
         spill: scene.getLightByName('rinaAudienceSpill')?.intensity,
         spot: scene.getLightByName('rinaMovingSpot_0')?.intensity,
+        screenLightLeft: scene.getLightByName('rinaScreenLight_-1')?.intensity,
         screenLight: scene.getLightByName('rinaScreenLight_1')?.intensity,
         singerLight: scene.getLightByName('rinaRinaKeyLight')?.intensity,
         pyroLight: scene.getLightByName('rinaPyroLightLeft')?.intensity,
@@ -954,7 +955,8 @@ try {
       `Rina fire or local light faded before the sustained burn ended: ${JSON.stringify(sustained)}`);
     let afterglow = sustained;
     for (let sample = 0; sample < 20 &&
-      (afterglow.flames > 0 || afterglow.clouds === 0); sample++) {
+      (afterglow.flames > 0 || afterglow.clouds === 0 ||
+        afterglow.pyroLightEnabled); sample++) {
       await delay(100);
       afterglow = await stageLights();
     }
@@ -969,6 +971,57 @@ try {
       returning.walkLower && returning.singUpper &&
       returning.rinaZ > chorus.rinaZ && returning.rinaZ < startState.rinaZ,
       `Rina did not return after the first chorus: ${JSON.stringify(returning)}`);
+    await songAudio(132.1);
+    const extendedSamples = [];
+    for (let sample = 0; sample < 45; sample++) {
+      extendedSamples.push(await stageLights());
+      await delay(60);
+    }
+    if (!chorus.reducedMotion) {
+      const wash = extendedSamples.map((state) => state.wash);
+      const floor = Math.min(...wash);
+      const peak = Math.max(...wash);
+      const threshold = floor + (peak - floor) * 0.55;
+      const litIntervals = wash.filter((value, index) =>
+        value >= threshold && (index === 0 || wash[index - 1] < threshold)).length;
+      assert.ok(peak - floor > 22 && litIntervals >= 3,
+        `Rina extended chorus lacked distinct light pulses: ${JSON.stringify({ wash, litIntervals })}`);
+      await songAudio(150.6);
+      await delay(200);
+      const briefCut = await stageLights();
+      assert.ok(briefCut.wash < peak - 15,
+        `Rina extended chorus did not leave a dark interval at the break: ${JSON.stringify({ peak, briefCut })}`);
+    }
+    await songAudio(180.2);
+    for (let sample = 0; sample < 35 && (await stageLights()).flames > 0; sample++) {
+      await delay(100);
+    }
+    await songAudio(202.2);
+    await delay(250);
+    const finaleEntrance = await stageLights();
+    assert.equal(finaleEntrance.flames, 0,
+      `Rina final chorus fire started before the 3:22 lighting entrance: ${JSON.stringify(finaleEntrance)}`);
+    await songAudio(204.1);
+    const finaleSamples = [];
+    for (let sample = 0; sample < 40; sample++) {
+      finaleSamples.push(await stageLights());
+      await delay(80);
+    }
+    assert.ok(finaleSamples.some((state) => state.flames > 0),
+      `Rina final chorus did not trigger pyro: ${JSON.stringify(finaleSamples.slice(0, 3))}`);
+    if (!chorus.reducedMotion) {
+      const screenPeaks = finaleSamples.map((state) => state.screenLight);
+      const washPeaks = finaleSamples.map((state) => state.wash);
+      assert.ok(Math.max(...screenPeaks) > chorus.screenLight + 14 &&
+        Math.max(...screenPeaks) > Math.min(...screenPeaks) + 12 &&
+        Math.max(...washPeaks) > chorus.wash + 25,
+        `Rina finale lights did not strobe above the earlier chorus: ${JSON.stringify({ chorus, screenPeaks, washPeaks })}`);
+      assert.ok(finaleSamples.some((state) =>
+        state.screenLightLeft > state.screenLight + 6) &&
+        finaleSamples.some((state) =>
+          state.screenLight > state.screenLightLeft + 6),
+      `Rina finale lights did not alternate sides: ${JSON.stringify(finaleSamples.map((state) => [state.screenLightLeft, state.screenLight]))}`);
+    }
     await songAudio(1);
     await delay(1100);
     const quiet = await stageLights();

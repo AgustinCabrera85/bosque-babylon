@@ -13,7 +13,7 @@ import type { RenderTargetTexture } from "@babylonjs/core/Materials/Textures/ren
 import type { Scene } from "@babylonjs/core/scene";
 import type { MusicPlaybackState } from "../../MusicPlayer";
 import type { StagePyroShow } from "../../effects/StagePyro";
-import { RINA_CONCERT_SONG, RINA_PYRO_TIMING } from "./RinaConcertConfig";
+import { RINA_CONCERT_MAP, RINA_CONCERT_SONG, RINA_PYRO_TIMING } from "./RinaConcertConfig";
 import { RINA_LEVEL_QUALITY, RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
 
 function material(
@@ -34,6 +34,7 @@ export function createRinaStage(
   performanceTier: "desktop" | "mobile"
 ) {
   const quality = RINA_LEVEL_QUALITY[performanceTier];
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const stageMaterial = material(
     scene,
     "rinaStageBlack",
@@ -481,33 +482,89 @@ export function createRinaStage(
       beatCooldown = 0.22;
     }
 
-    const screenTarget = Math.min(1.75,
+    const songTime = playing ? music.currentTime : -1;
+    const extendedCue = RINA_CONCERT_MAP.extendedChorus;
+    const extendedActive = songTime >= extendedCue.start &&
+      songTime < extendedCue.end &&
+      (songTime < extendedCue.breakStart || songTime >= extendedCue.breakEnd);
+    const extendedPulsePeriod = 30 / extendedCue.bpm;
+    const extendedPulseIndex = extendedActive && songTime >= extendedCue.beatOriginSeconds
+      ? Math.floor((songTime - extendedCue.beatOriginSeconds) / extendedPulsePeriod)
+      : -1;
+    const extendedPulseAge = extendedPulseIndex >= 0
+      ? songTime - extendedCue.beatOriginSeconds -
+        extendedPulseIndex * extendedPulsePeriod
+      : 1;
+    const extendedFlash = Math.max(0, 1 - extendedPulseAge / 0.085);
+    const finaleCue = RINA_CONCERT_MAP.finale;
+    const finaleActive = songTime >= finaleCue.start && songTime < finaleCue.end;
+    const finalChorus = songTime >= finaleCue.chorusStart && finaleActive;
+    const beatPeriod = 60 / finaleCue.bpm;
+    const finaleBeatIndex = finaleActive && songTime >= finaleCue.beatOriginSeconds
+      ? Math.floor((songTime - finaleCue.beatOriginSeconds) / beatPeriod)
+      : -1;
+    const beatAge = finaleBeatIndex >= 0
+      ? songTime - finaleCue.beatOriginSeconds - finaleBeatIndex * beatPeriod
+      : 1;
+    const finaleFlash = Math.max(0, 1 - beatAge / 0.12);
+    const finaleLift = finaleActive
+      ? Math.min(1, (songTime - finaleCue.start) /
+          (finaleCue.chorusStart - finaleCue.start))
+      : 0;
+    const strobe = reducedMotion.matches ? 0 : Math.max(
+      extendedFlash * (extendedPulseIndex % 2 === 0 ? 0.72 : 0.55),
+      finaleFlash * (finalChorus ? 1 : 0.35)
+    );
+    const flashSide = extendedActive
+      ? extendedPulseIndex % 2
+      : finaleBeatIndex < 0 ? 0 : finaleBeatIndex % 2;
+    const vocalFocus = finalChorus
+      ? Math.max(0, Math.min(1, ((music?.voice ?? 0) - 0.18) * 3))
+      : 0;
+    const pinkFlash = strobe * (flashSide === 0 ? 1 : 0.45);
+    const cyanFlash = strobe * (flashSide === 1 ? 1 : 0.45);
+
+    const screenTarget = Math.min(1.75 + finaleLift * 0.65,
       0.08 + musicPresence * (0.35 + energy * 0.35) +
-      beatPulse * (0.65 + musicPresence * 0.4)
+      beatPulse * (0.65 + musicPresence * 0.4) +
+      finaleLift * 0.25 + strobe * 0.75
     );
     screenPulse += (screenTarget - screenPulse) *
       Math.min(1, dt * (screenTarget > screenPulse ? 32 : 7));
     if (liveFeed) liveFeed.level = 1.08 + screenPulse * 0.28;
     pinkScreen.emissiveColor.copyFromFloats(
-      0.65 * screenPulse, 0.03 * screenPulse, 0.55 * screenPulse
+      0.65 * screenPulse + pinkFlash * 0.8,
+      0.03 * screenPulse + pinkFlash * 0.35,
+      0.55 * screenPulse + pinkFlash * 0.6
     );
     cyanScreen.emissiveColor.copyFromFloats(
-      0.045 * screenPulse, 0.44 * screenPulse, 0.73 * screenPulse
+      0.045 * screenPulse + cyanFlash * 0.35,
+      0.44 * screenPulse + cyanFlash * 0.7,
+      0.73 * screenPulse + cyanFlash * 0.85
     );
     const ledPulse = 0.12 + musicPresence * 0.44 +
-      screenPulse * 0.2 + beatPulse * 0.28;
+      screenPulse * 0.2 + beatPulse * 0.28 + finaleLift * 0.16;
     pinkLed.emissiveColor.copyFromFloats(
-      0.82 * ledPulse, 0.045 * ledPulse, 0.67 * ledPulse
+      0.82 * ledPulse + pinkFlash * 1.1,
+      0.045 * ledPulse + pinkFlash * 0.25,
+      0.67 * ledPulse + pinkFlash * 0.8
     );
     cyanLed.emissiveColor.copyFromFloats(
-      0.05 * ledPulse, 0.52 * ledPulse, 0.88 * ledPulse
+      0.05 * ledPulse + cyanFlash * 0.22,
+      0.52 * ledPulse + cyanFlash * 0.95,
+      0.88 * ledPulse + cyanFlash * 1.2
     );
-    for (const light of screenLights) {
-      light.intensity = (performanceTier === "mobile" ? 5 : 8) *
-        (0.1 + musicPresence * 0.65 + beatPulse * 0.6);
+    for (let index = 0; index < screenLights.length; index += 1) {
+      screenLights[index].intensity =
+        (performanceTier === "mobile" ? 5 : 8) *
+          (0.1 + musicPresence * 0.65 + beatPulse * 0.6) +
+        finaleLift * 5 + strobe *
+          (index === flashSide ? 38 : 16) *
+          (performanceTier === "mobile" ? 0.75 : 1);
     }
     audienceSpill.intensity = (performanceTier === "mobile" ? 30 : 45) *
-      (0.08 + musicPresence * 0.85 + beatPulse * 0.1);
+      (0.08 + musicPresence * 0.85 + beatPulse * 0.1) +
+      finaleLift * 5 + strobe * (performanceTier === "mobile" ? 24 : 36);
 
     const playerLocalPosition = playerWorldPosition.scale(1 / RINA_STADIUM_SCALE);
     let playerSpotHit = 0;
@@ -534,6 +591,9 @@ export function createRinaStage(
           (0.1 + musicPresence * 0.7 + beatPulse * 0.55)
         : (performanceTier === "mobile" ? 22 : 32) *
           (0.025 + musicPresence * 0.35 + beatPulse * 1.15);
+      light.intensity += finaleLift * (onStage ? 4 : 6) +
+        strobe * (index % 2 === flashSide ? 30 : 13) *
+          (performanceTier === "mobile" ? 0.75 : 1);
 
       if (!onStage) {
         const toPlayer = playerLocalPosition.subtract(light.position);
@@ -564,7 +624,8 @@ export function createRinaStage(
         beam.scaling.set(beamWidthScale, visibleLength, beamWidthScale);
         beam.rotationQuaternion = Quaternion.RotationAxis(axis, angle);
         beamMaterials[index][layer].alpha = (0.06 + layer * 0.018) *
-          (0.18 + musicPresence * 0.82 + beatPulse * (onStage ? 0.55 : 1.1));
+          (0.18 + musicPresence * 0.82 + beatPulse * (onStage ? 0.55 : 1.1)) +
+          strobe * (onStage ? 0.08 : 0.12);
       }
     }
     playerSpotBounce.position.set(
@@ -607,7 +668,8 @@ export function createRinaStage(
     const ignitionFlash = Math.exp(-Math.pow(
       (pyroLightAge - RINA_PYRO_TIMING.jetTravelTime -
         RINA_PYRO_TIMING.headExpandTime * 0.5) / 0.075, 2));
-    const pyroIntensity = burnLight * 14 + ignitionFlash * 34;
+    const pyroIntensity = (burnLight * 14 + ignitionFlash * 34) *
+      (1 + finaleLift * 0.25);
     for (const light of pyroLights) {
       light.setEnabled(pyroIntensity > 0.03);
       light.intensity = pyroIntensity;
@@ -616,12 +678,15 @@ export function createRinaStage(
     }
     stageWash.intensity =
       (performanceTier === "mobile" ? 24 : 35) *
-      (0.1 + musicPresence * 0.7 + beatPulse * 0.45);
+      (0.1 + musicPresence * 0.7 + beatPulse * 0.45) +
+      finaleLift * 8 + strobe * (performanceTier === "mobile" ? 40 : 62);
     rinaKeyLight.position.x = Math.sin(singerYaw) * 3;
     rinaKeyLight.position.z = singerLocalZ + Math.cos(singerYaw) * 3;
     rinaKeyLight.intensity =
       (performanceTier === "mobile" ? 20 : 24) *
-      (0.14 + musicPresence * 0.75 + beatPulse * 0.18);
+      (0.14 + musicPresence * 0.75 + beatPulse * 0.18) +
+      finaleLift * 5 + strobe * (performanceTier === "mobile" ? 22 : 30) *
+        (0.7 + vocalFocus * 0.3);
     return beatPulse;
   };
 

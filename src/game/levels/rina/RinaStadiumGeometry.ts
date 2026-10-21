@@ -5,6 +5,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import { createRinaStadiumGrassMaterial } from "./RinaStadiumGrassMaterial";
 import { createRinaDoubleTierSideStands } from "./RinaDoubleTierSideStands";
 import { createRinaBackStandWithExit } from "./RinaBackStandExit";
+import { createRinaPitchBoundarySeparation } from "./RinaPitchBoundarySeparation";
 import { RINA_LEVEL_QUALITY, RINA_STADIUM } from "./RinaLevelConfig";
 
 function standard(
@@ -121,6 +122,13 @@ export function createRinaStadiumGeometry(
   const tierRise = 1.65;
   // All measurements remain local to rinaStadiumRoot, which scales them once.
   createRinaDoubleTierSideStands(scene, performanceTier, {
+    concrete,
+    darkConcrete,
+    aisle,
+    ledRibbon,
+  });
+
+  createRinaPitchBoundarySeparation(scene, performanceTier, {
     concrete,
     darkConcrete,
     aisle,

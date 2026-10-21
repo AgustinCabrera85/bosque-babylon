@@ -37,7 +37,8 @@ const CONCOURSE_HEIGHT = 2.35;
 const CONCOURSE_DEPTH = 3.25;
 const CROWN_HEIGHT = 1.25;
 const BACK_OFFSET = 8.5;
-const STAND_HALF_WIDTH = RINA_STADIUM.pitchWidth * 0.5 + 18.5;
+// Stop the rear steps before the side stands' inner edges at the corners.
+const STAND_HALF_WIDTH = RINA_STADIUM.pitchWidth * 0.5 + 4.5;
 const OPENING_HALF_WIDTH = RINA_STADIUM.exitTunnel.halfWidth + 4.25;
 const REAR_Z = -(RINA_STADIUM.pitchLength * 0.5 + BACK_OFFSET);
 const EXIT_SIGN_WIDTH = 0.95;

@@ -709,6 +709,19 @@ try {
         const crowd = scene?.getMeshByName('rinaCrowdPreviewSource');
         const crowdBounds = crowd?.getBoundingInfo().boundingBox;
         const stageBounds = scene?.getMeshByName('rinaMainStage')?.getBoundingInfo().boundingBox;
+        const rearBounds = scene?.getMeshByName('rinaRearStandConcrete')?.getBoundingInfo().boundingBox;
+        const sideMesh = scene?.getMeshByName('rinaDoubleStandStructure');
+        const sideBounds = sideMesh?.getBoundingInfo().boundingBox;
+        const sidePositions = sideMesh?.getVerticesData('position');
+        let sideBaseInnerX = Infinity;
+        if (sidePositions) {
+          for (let i = 0; i < sidePositions.length; i += 3) {
+            if (sidePositions[i] > 0 && sidePositions[i + 1] < 2 &&
+              sidePositions[i + 2] < -50) {
+              sideBaseInnerX = Math.min(sideBaseInnerX, sidePositions[i]);
+            }
+          }
+        }
         const exit = scene?.getMeshByName('rinaExitMarker');
         return {
           rina: scene?.metadata?.rinaLevel?.realRinaAsset,
@@ -717,6 +730,14 @@ try {
           pitchLength: pitchBounds && pitchBounds.maximumWorld.z - pitchBounds.minimumWorld.z,
           crowdHeight: crowdBounds && crowdBounds.maximumWorld.y - crowdBounds.minimumWorld.y,
           stageWidth: stageBounds && stageBounds.maximumWorld.x - stageBounds.minimumWorld.x,
+          rearWidth: rearBounds && rearBounds.maximumWorld.x - rearBounds.minimumWorld.x,
+          cornerBaseGapX: rearBounds && scale &&
+            sideBaseInnerX - rearBounds.maximumWorld.x / scale,
+          sideRearGapZ: sideBounds && rearBounds && scale &&
+            (sideBounds.minimumWorld.z - rearBounds.maximumWorld.z) / scale,
+          sideLength: sideBounds && sideBounds.maximumWorld.z - sideBounds.minimumWorld.z,
+          fieldEdges: !scene?.metadata?.playerWorld?.isColliding(39 * scale, 0) &&
+            scene?.metadata?.playerWorld?.isColliding(40 * scale, 0),
           stageFrontZ: stageBounds?.minimumWorld.z,
           exitZ: exit?.getAbsolutePosition().z,
           rinaZ: scene?.getTransformNodeByName('enemy:rina-stage:root')?.position.z,
@@ -827,7 +848,13 @@ try {
       await delay(250);
     }
     assert.ok(concert.rina && concert.scale >= 1.3 &&
-      concert.pitchWidth >= 68 * 1.3 && concert.pitchLength >= 105 * 1.3 &&
+      Math.abs(concert.pitchWidth - 80 * concert.scale) < 0.1 &&
+      Math.abs(concert.rearWidth - 89 * concert.scale) < 0.1 &&
+      concert.cornerBaseGapX > 0.5 && concert.cornerBaseGapX < 3 &&
+      concert.sideRearGapZ > 5 && concert.sideRearGapZ < 9 &&
+      Math.abs(concert.sideLength - 112 * concert.scale) < 1 &&
+      concert.fieldEdges &&
+      concert.pitchLength >= 105 * 1.3 &&
       concert.crowdHeight > 2.45 && concert.crowdHeight < 2.6 &&
       concert.stageWidth >= 58 * 1.3 &&
       Math.abs(concert.exitZ - (-59 + 1.2) * concert.scale) < 0.1 &&

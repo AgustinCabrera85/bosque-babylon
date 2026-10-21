@@ -2,7 +2,7 @@
 export const RINA_STADIUM_SCALE = 1.5;
 
 export const RINA_STADIUM = {
-  pitchWidth: 68,
+  pitchWidth: 80,
   pitchLength: 105,
   fieldY: 0,
   playerEyeHeight: 1.7,

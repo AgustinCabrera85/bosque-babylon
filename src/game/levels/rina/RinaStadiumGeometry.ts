@@ -4,6 +4,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Scene } from "@babylonjs/core/scene";
 import { createRinaStadiumGrassMaterial } from "./RinaStadiumGrassMaterial";
 import { createRinaDoubleTierSideStands } from "./RinaDoubleTierSideStands";
+import { createRinaBackStandWithExit } from "./RinaBackStandExit";
 import { RINA_LEVEL_QUALITY, RINA_STADIUM } from "./RinaLevelConfig";
 
 function standard(
@@ -126,27 +127,11 @@ export function createRinaStadiumGeometry(
     ledRibbon,
   });
 
-  const southBaseZ = -(RINA_STADIUM.pitchLength / 2 + 7);
   const wallWidth = 1.25;
-  for (let tier = 0; tier < quality.standTiers; tier += 1) {
-    const totalWidth = RINA_STADIUM.pitchWidth + 36;
-    const gapHalfWidth = RINA_STADIUM.exitTunnel.halfWidth + wallWidth;
-    const sections = tier === 0 ? [-1, 1] : [0];
-    for (const side of sections) {
-      const width = side === 0 ? totalWidth : totalWidth / 2 - gapHalfWidth;
-      const terrace = MeshBuilder.CreateBox(
-        `rinaSouthStand_${tier}_${side}`,
-        { width, height: tierRise + 0.25, depth: sideTierDepth },
-        scene
-      );
-      terrace.position.set(
-        side === 0 ? 0 : side * (gapHalfWidth + width / 2),
-        0.65 + tier * tierRise,
-        southBaseZ - tier * sideTierDepth
-      );
-      terrace.material = tier % 3 === 0 ? aisle : concrete;
-    }
-  }
+  createRinaBackStandWithExit(scene, {
+    performanceTier,
+    materials: { concrete, darkConcrete, aisle, ledRibbon },
+  });
 
   // Upper tiers behind the stage. The lower north stand is visually occupied
   // by the production/stage footprint.

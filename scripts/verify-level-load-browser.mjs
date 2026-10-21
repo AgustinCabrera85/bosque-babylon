@@ -730,8 +730,27 @@ try {
           tunnelOpen: [-58, -55, -52, -50].every((z) =>
             !scene?.metadata?.playerWorld?.isColliding(0, z * scale)),
           catwalkBlocks: scene?.metadata?.playerWorld?.isColliding(0, 20 * scale),
-          standGap: !!scene?.getMeshByName('rinaSouthStand_0_-1') &&
-            !!scene?.getMeshByName('rinaSouthStand_0_1'),
+          backStand: [
+            'rinaRearStandConcrete', 'rinaRearStandDarkConcrete',
+            'rinaRearStandAisles', 'rinaRearStandRibbons',
+          ].every((name) => !!scene?.getMeshByName(name)),
+          rearVisualOnly: scene?.meshes?.filter((mesh) =>
+            mesh.name.startsWith('rinaRearStand') ||
+            mesh.name === 'rinaRearExitSign').every((mesh) =>
+              !mesh.checkCollisions && !mesh.isPickable),
+          exitSign: (() => {
+            const sign = scene?.getMeshByName('rinaRearExitSign');
+            const roof = scene?.getMeshByName('rinaExitTunnelRoof');
+            if (!sign || !roof) return false;
+            const signBounds = sign.getBoundingInfo().boundingBox;
+            const roofBounds = roof.getBoundingInfo().boundingBox;
+            return sign.parent?.name === 'rinaStadiumRoot' &&
+              Math.abs(signBounds.maximumWorld.y - signBounds.minimumWorld.y -
+                0.25 * scale) < 0.01 &&
+              signBounds.minimumWorld.y > roofBounds.maximumWorld.y &&
+              Math.abs(signBounds.minimumWorld.z -
+                roofBounds.maximumWorld.z) < 0.2;
+          })(),
           lights: scene?.lights?.filter((light) => light.name.startsWith('rinaMovingSpot_')).length,
           ambient: scene?.getLightByName('rinaStadiumAmbient')?.intensity,
           moon: scene?.getLightByName('rinaStadiumMoon')?.intensity,
@@ -781,7 +800,8 @@ try {
       concert.textures.every((texture) => texture.ready &&
         texture.url.includes('/assets/textures/rina/stadium/grass/')) &&
       concert.singing && concert.catwalk && concert.tunnelOpen &&
-      concert.catwalkBlocks && concert.standGap && concert.lights >= 2 &&
+      concert.catwalkBlocks && concert.backStand && concert.rearVisualOnly &&
+      concert.exitSign && concert.lights >= 2 &&
       concert.ambient <= 0.15 && concert.moon <= 0.05 &&
       concert.spill && concert.screenLights === 2 &&
       concert.beams === concert.lights && concert.smoke &&

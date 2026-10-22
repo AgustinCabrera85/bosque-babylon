@@ -5,6 +5,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import { createRinaStadiumGrassMaterial } from "./RinaStadiumGrassMaterial";
 import { createRinaDoubleTierSideStands } from "./RinaDoubleTierSideStands";
 import { createRinaBackStandWithExit } from "./RinaBackStandExit";
+import { createRinaStadiumCornerConnectors } from "./RinaStadiumCornerConnectors";
 import { createRinaPitchBoundarySeparation } from "./RinaPitchBoundarySeparation";
 import { RINA_LEVEL_QUALITY, RINA_STADIUM } from "./RinaLevelConfig";
 
@@ -137,6 +138,10 @@ export function createRinaStadiumGeometry(
 
   const wallWidth = 1.25;
   createRinaBackStandWithExit(scene, {
+    performanceTier,
+    materials: { concrete, darkConcrete, aisle, ledRibbon },
+  });
+  createRinaStadiumCornerConnectors(scene, {
     performanceTier,
     materials: { concrete, darkConcrete, aisle, ledRibbon },
   });

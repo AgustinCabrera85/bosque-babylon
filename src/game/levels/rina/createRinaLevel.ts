@@ -20,8 +20,10 @@ import {
 } from "../../enemies/rina";
 import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
 import { createRinaCrowdPreview } from "./RinaCrowdPreview";
+import { createRinaCornerTowerSpotlights } from "./RinaCornerTowerSpotlights";
 import { RINA_CONCERT_SONG, RINA_PYRO_TIMING } from "./RinaConcertConfig";
 import { createRinaLiveScreens } from "./RinaLiveScreens";
+import { attachRinaMicrophone } from "./RinaMicrophone";
 import { createRinaPerformance } from "./RinaPerformance";
 import { RINA_LEVEL_QUALITY, RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
 import { createRinaStadiumGeometry } from "./RinaStadiumGeometry";
@@ -29,6 +31,7 @@ import { RinaStadiumWorld } from "./RinaStadiumWorld";
 import { createRinaStage } from "./RinaStage";
 import { createRinaStageArchitecture } from "./RinaStageArchitecture";
 import { createRinaStageSecurityBarriers } from "./RinaStageSecurityBarriers";
+import { createRinaStandsLedDetails } from "./RinaStandsLedDetails";
 
 function createRinaLevelHud() {
   const root = document.createElement("div");
@@ -146,6 +149,14 @@ export async function createRinaLevel(
       light.range *= RINA_STADIUM_SCALE;
     }
     stadiumRoot.scaling.setAll(RINA_STADIUM_SCALE);
+    const standsLedDetails = createRinaStandsLedDetails(scene, context.performanceTier);
+    standsLedDetails.root.parent = stadiumRoot;
+    cleanup.push(() => standsLedDetails.dispose());
+    const cornerSpotlights = createRinaCornerTowerSpotlights(
+      scene, context.performanceTier
+    );
+    cornerSpotlights.root.parent = stadiumRoot;
+    cleanup.push(() => cornerSpotlights.dispose());
     stageArchitecture.root.parent = stadiumRoot;
     cleanup.push(() => stageArchitecture.dispose());
     const securityBarriers = await createRinaStageSecurityBarriers(
@@ -235,6 +246,7 @@ export async function createRinaLevel(
         invulnerableNarrativeEncounter: true,
       },
     });
+    await attachRinaMicrophone(scene, rina);
     const rinaMeshes = rina.root.getChildMeshes(false).filter(
       (mesh): mesh is Mesh => mesh instanceof Mesh && mesh.getTotalVertices() > 0
     );

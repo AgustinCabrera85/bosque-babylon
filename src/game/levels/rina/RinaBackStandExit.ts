@@ -41,6 +41,16 @@ const BACK_OFFSET = 8.5;
 const STAND_HALF_WIDTH = RINA_STADIUM.pitchWidth * 0.5 + 4.5;
 const OPENING_HALF_WIDTH = RINA_STADIUM.exitTunnel.halfWidth + 4.25;
 const REAR_Z = -(RINA_STADIUM.pitchLength * 0.5 + BACK_OFFSET);
+export const RINA_BACK_STAND_LED_PROFILE = {
+  halfWidth: STAND_HALF_WIDTH,
+  openingHalfWidth: OPENING_HALF_WIDTH,
+  rearZ: REAR_Z,
+  lowerRows: LOWER_ROWS,
+  lowerRowDepth: LOWER_ROW_DEPTH,
+  rowHeight: ROW_HEIGHT,
+  concourseDepth: CONCOURSE_DEPTH,
+  concourseHeight: CONCOURSE_HEIGHT,
+} as const;
 const EXIT_SIGN_WIDTH = 0.95;
 const EXIT_SIGN_HEIGHT = 0.25;
 const EXIT_SIGN_DEPTH = 0.08;

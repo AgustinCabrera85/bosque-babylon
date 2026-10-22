@@ -32,6 +32,7 @@ import { createRinaStage } from "./RinaStage";
 import { createRinaStageArchitecture } from "./RinaStageArchitecture";
 import { createRinaStageSecurityBarriers } from "./RinaStageSecurityBarriers";
 import { createRinaStandsLedDetails } from "./RinaStandsLedDetails";
+import { createRinaStandsCrowd } from "./RinaStandsCrowd";
 
 function createRinaLevelHud() {
   const root = document.createElement("div");
@@ -149,6 +150,9 @@ export async function createRinaLevel(
       light.range *= RINA_STADIUM_SCALE;
     }
     stadiumRoot.scaling.setAll(RINA_STADIUM_SCALE);
+    const standsCrowd = createRinaStandsCrowd(scene, context.performanceTier);
+    standsCrowd.root.parent = stadiumRoot;
+    cleanup.push(() => standsCrowd.dispose());
     const standsLedDetails = createRinaStandsLedDetails(scene, context.performanceTier);
     standsLedDetails.root.parent = stadiumRoot;
     cleanup.push(() => standsLedDetails.dispose());
@@ -345,6 +349,7 @@ export async function createRinaLevel(
         player.camera.rotation.z += Math.sin(phase * 0.73 + 0.5) * 0.0015 * strength;
       }
       crowdPreview.update(elapsed, beatPulse);
+      standsCrowd.update(dt, beatPulse);
       enemyManager.update(dt);
       context.musicPlayer?.updateListenerPosition(player.position);
 

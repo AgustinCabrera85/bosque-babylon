@@ -1,6 +1,7 @@
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import "@babylonjs/core/Meshes/thinInstanceMesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
@@ -10,13 +11,14 @@ import {
 } from "./RinaDoubleTierSideStands";
 import { RINA_BACK_STAND_LED_PROFILE } from "./RinaBackStandExit";
 import { RINA_STADIUM_SCALE } from "./RinaLevelConfig";
+import { RINA_CROWD_FANS, type RinaCrowdQuality } from "./crowd/RinaCrowdAssetManifest";
+import { RinaCrowdAssetRegistry } from "./crowd/RinaCrowdAssetRegistry";
 
 /**
  * UPDATE 06 — real procedural 3D people for NON-INTERACTIVE stadium seating.
  *
- * No GLB, textures, canvas, skeletons, agents, navmesh or colliders needed.
- * Three mesh complexities, small clothing palettes, deterministic positioning,
- * one thin-instance draw per visual archetype (18 archetypes altogether).
+ * Three procedural mesh complexities remain as the fallback. A bounded subset
+ * is replaced with posed GLB thin instances after the shared models load.
  *
  * IMPORTANT: source geometry is authored in LOCAL stadium units.  The stadium
  * root scales it by RINA_STADIUM_SCALE. Human height is therefore ~1.70 m
@@ -60,6 +62,7 @@ type Prototype = {
 export interface RinaStandsCrowdHandle {
   readonly root: TransformNode;
   readonly counts: Readonly<{ near: number; middle: number; far: number; total: number }>;
+  readonly assetMetrics: Readonly<{ loadedVariants: number; spectatorsByVariant: Readonly<Record<string, number>>; activeRigs: number; approximateBytes: number }>;
   update(dt: number, beatPulse: number): void;
   setEnabled(enabled: boolean): void;
   dispose(): void;
@@ -67,6 +70,9 @@ export interface RinaStandsCrowdHandle {
 
 /** Tunable without changing the positions/geometry of existing stands. */
 export const RINA_STANDS_CROWD_CONFIG = {
+  desktopFanNearLimit: 12,
+  desktopFanMiddleLimit: 160,
+  mobileFanMiddleLimit: 40,
   sideZMin: -51,
   sideZMax: 30,
   aisleExtraClearance: 0.32,
@@ -325,6 +331,13 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
   const settings = RINA_STANDS_CROWD_CONFIG[tier];
   const random = lcg(0x51a0c26d);
   const prototypes = new Map<string, Prototype>();
+  const registry = new RinaCrowdAssetRegistry(scene);
+  const candidatePool: Record<RinaCrowdQuality, { prototype: Prototype; placement: Placement }[]> = {
+    near: [], middle: [],
+  };
+  const fanGroups: { mesh: Mesh; placements: Placement[]; matrixData: Float32Array; quality: RinaCrowdQuality }[] = [];
+  const spectatorsByVariant: Record<string, number> = {};
+  let approximateBytes = 0;
   const materials: StandardMaterial[] = [];
   const counts = { near: 0, middle: 0, far: 0, total: 0 };
 
@@ -353,8 +366,10 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
     const index = Math.floor(random() * OUTFITS[lod].length);
     const proto = prototypes.get(`${lod}_${index}`)!;
     const scale = (0.91 + random() * 0.17) * (1.5 / RINA_STADIUM_SCALE);
-    proto.placements.push({ x, y, z, yaw: yaw + (random() - 0.5) * 0.22,
-      scale, phase: random() * Math.PI * 2 });
+    const placement = { x, y, z, yaw: yaw + (random() - 0.5) * 0.22,
+      scale, phase: random() * Math.PI * 2 };
+    proto.placements.push(placement);
+    if (lod !== "far") candidatePool[lod].push({ prototype: proto, placement });
     counts[lod]++;
     counts.total++;
   }
@@ -425,10 +440,10 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
 
   // One mutable matrix buffer per near archetype; middle and distant groups
   // are static. We never allocate new Babylon matrices in the update loop.
-  for (const prototype of prototypes.values()) {
+  function refreshPrototype(prototype: Prototype) {
     if (prototype.placements.length === 0) {
       prototype.mesh.setEnabled(false);
-      continue;
+      return;
     }
     const data = new Float32Array(prototype.placements.length * 16);
     for (let i = 0; i < prototype.placements.length; i++) {
@@ -438,13 +453,60 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
     prototype.mesh.thinInstanceSetBuffer("matrix", data, 16, prototype.lod !== "near" || tier === "mobile");
     prototype.mesh.thinInstanceRefreshBoundingInfo(true);
   }
+  for (const prototype of prototypes.values()) refreshPrototype(prototype);
 
   let disposed = false;
   let elapsed = 0;
   let danceAccumulator = 0;
+
+  function evenlySelected(quality: RinaCrowdQuality, limit: number) {
+    const pool = candidatePool[quality];
+    const count = Math.min(limit, pool.length);
+    return Array.from({ length: count }, (_, i) => pool[Math.floor((i + 0.5) * pool.length / count)]);
+  }
+
+  for (const quality of ["near", "middle"] as const) {
+    const limit = quality === "near"
+      ? (tier === "desktop" ? RINA_STANDS_CROWD_CONFIG.desktopFanNearLimit : 0)
+      : (tier === "desktop" ? RINA_STANDS_CROWD_CONFIG.desktopFanMiddleLimit : RINA_STANDS_CROWD_CONFIG.mobileFanMiddleLimit);
+    if (!limit || RINA_CROWD_FANS.length === 0) continue;
+    const selected = evenlySelected(quality, limit);
+    for (const [fanIndex, fan] of RINA_CROWD_FANS.entries()) {
+      const members = selected.filter((_, i) => i % RINA_CROWD_FANS.length === fanIndex);
+      if (members.length === 0) continue;
+      void registry.loadPosed(fan, quality).then(mesh => {
+        if (!mesh || disposed) return;
+        mesh.parent = root;
+        const factor = fan.targetWorldHeight / (fan.variants[quality].posedHeight * RINA_STADIUM_SCALE);
+        // Keep only slight stature variation; the imported fan should remain
+        // taller than Rina even when the procedural placeholder was shorter.
+        const placements = members.map(({ placement }) => ({ ...placement,
+          scale: factor * (1 + (placement.scale - 1) * 0.25) }));
+        const matrixData = new Float32Array(placements.length * 16);
+        for (let i = 0; i < placements.length; i++) writeMatrix(matrixData, i * 16, placements[i]);
+        mesh.thinInstanceSetBuffer("matrix", matrixData, 16, quality !== "near");
+        mesh.thinInstanceRefreshBoundingInfo(true);
+        fanGroups.push({ mesh, placements, matrixData, quality });
+        const removed = new Set(members.map(member => member.placement));
+        const touched = new Set(members.map(member => member.prototype));
+        for (const prototype of touched) {
+          prototype.placements = prototype.placements.filter(placement => !removed.has(placement));
+          refreshPrototype(prototype);
+        }
+        const key = `${fan.id}:${quality}`;
+        spectatorsByVariant[key] = placements.length;
+        approximateBytes += fan.variants[quality].bytes;
+      });
+    }
+  }
+
   return {
     root,
     counts,
+    get assetMetrics() {
+      return { loadedVariants: registry.loadedVariants, spectatorsByVariant: { ...spectatorsByVariant },
+        activeRigs: registry.activeRigs, approximateBytes };
+    },
     update(dt, beatPulse) {
       if (disposed || tier === "mobile" || !root.isEnabled()) return;
       const safeDt = clamp(dt, 0, 0.05);
@@ -464,6 +526,17 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
         }
         prototype.mesh.thinInstanceBufferUpdated("matrix");
       }
+      for (const group of fanGroups) {
+        if (group.quality !== "near") continue;
+        for (let i = 0; i < group.placements.length; i++) {
+          const spectator = group.placements[i];
+          const phase = elapsed * 2.15 + spectator.phase;
+          writeMatrix(group.matrixData, i * 16, spectator,
+            Math.max(0, Math.sin(phase * 1.65)) * (0.011 + beat * 0.022),
+            Math.sin(phase) * 0.035);
+        }
+        group.mesh.thinInstanceBufferUpdated("matrix");
+      }
     },
     setEnabled(enabled) {
       if (!disposed) root.setEnabled(enabled);
@@ -471,6 +544,7 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
     dispose() {
       if (disposed) return;
       disposed = true;
+      registry.dispose();
       for (const prototype of prototypes.values()) {
         if (!prototype.mesh.isDisposed()) prototype.mesh.dispose();
       }

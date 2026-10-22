@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "assets:optimize-runtime": "node scripts/optimize-runtime-assets.mjs",
+    "assets:optimize-rina-crowd": "node scripts/optimize-rina-crowd.mjs",
     "vfx:generate-atlas": "node scripts/generate-shadow-flame-atlas.mjs",
     "vfx:generate-npe": "node scripts/generate-shadow-npe.mjs",
     "vfx:profile": "node scripts/profile-shadow-vfx.mjs",

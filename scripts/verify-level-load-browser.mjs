@@ -66,7 +66,8 @@ try {
   });
   await send("Page.enable");
   await send("Runtime.enable");
-  if (process.env.PORTAL_CAPTURE && level === "sanctuary") {
+  if ((process.env.PORTAL_CAPTURE && level === "sanctuary") ||
+      (level === "rina" && !process.env.RINA_MOBILE_VERIFY)) {
     await send("Emulation.setDeviceMetricsOverride", {
       width: 1600, height: 900, deviceScaleFactor: 1, mobile: false,
     });
@@ -694,6 +695,46 @@ try {
       (character === 'sofia' ? heights.rina > heights.player : heights.rina < heights.player),
       `Character height order is wrong (${character}): ${JSON.stringify(heights)}`);
     console.log(`${character} ${heights.player.toFixed(2)} m; Rina ${heights.rina.toFixed(2)} m`);
+    let fanAssets;
+    for (let i = 0; i < 80; i++) {
+      fanAssets = await evaluate(`(async () => {
+        const storeUrl = performance.getEntriesByType('resource')
+          .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+        const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+        const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+          .find((item) => item.metadata?.rinaLevel);
+        return scene?.meshes.filter(mesh => mesh.name.startsWith('rinaCrowd_fan_01:'))
+          .map(mesh => ({ name: mesh.name, count: mesh.thinInstanceCount,
+            emissive: mesh.material?.emissiveColor?.r,
+            direct: mesh.material?.directIntensity,
+            textured: !!mesh.material?.emissiveTexture,
+            rigged: !!mesh.skeleton,
+            height: mesh.getBoundingInfo().boundingBox.extendSize.y * 2,
+            minMatrixScale: Math.min(...mesh.thinInstanceGetWorldMatrices().map(matrix => matrix.m[5])) }));
+      })()`, true);
+      if (fanAssets?.length >= (process.env.RINA_MOBILE_VERIFY ? 1 : 2) &&
+          fanAssets.every(fan => fan.count > 0)) break;
+      await delay(250);
+    }
+    assert.equal(fanAssets?.length, process.env.RINA_MOBILE_VERIFY ? 1 : 2,
+      `Rina fan variants did not load: ${JSON.stringify(fanAssets)}; ${errors.join(' | ')}`);
+    assert.ok(fanAssets.every(fan => fan.count > 0 && fan.emissive > 0.03 && fan.emissive < 0.05 &&
+      fan.direct >= 4 && fan.textured && !fan.rigged &&
+      fan.minMatrixScale * 1.091883 * 1.5 > heights.rina),
+      `Rina fans are dark, small, or rigged per instance: ${JSON.stringify(fanAssets)}`);
+    console.log(`Rina fan variants: ${JSON.stringify(fanAssets)}`);
+    const crowdTotals = await evaluate(`(async () => {
+      const storeUrl = performance.getEntriesByType('resource')
+        .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+      const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+      const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+        .find((item) => item.metadata?.rinaLevel);
+      const count = prefix => scene.meshes.filter(mesh => mesh.name.startsWith(prefix))
+        .reduce((sum, mesh) => sum + Math.max(0, mesh.thinInstanceCount), 0);
+      return { procedural: count('rinaStandsCrowd_'), fan: count('rinaCrowd_fan_01:') };
+    })()`, true);
+    assert.equal(crowdTotals.fan, process.env.RINA_MOBILE_VERIFY ? 40 : 172);
+    console.log(`Rina stands crowd: ${JSON.stringify(crowdTotals)}`);
     let concert;
     for (let i = 0; i < 120; i++) {
       concert = await evaluate(`(async () => {

@@ -95,56 +95,50 @@ export function createRinaCrowdPreview(
     });
   }
 
-  // One 2K fan demonstrates the animation in a clear field lane. The stands
-  // population uses the 1K version of this model.
+  // Keep the existing 2K Fan04 test and show the new Fan05 in 1K beside her.
   if (performanceTier === "desktop") {
-    const fan = RINA_CROWD_FANS.find(entry => entry.id === "fan_04")!;
-    // A fixed, easy-to-find example in the clear central lane ahead of spawn.
-    const showcase = spectators[0];
-    showcase.mesh.position.set(0, 0.84, -26);
-    showcase.mesh.rotation.y = Math.PI;
-    const fieldFans = [showcase];
-    void registry.loadAnimated(fan, "near", 1).then(groups => {
-      if (!groups || disposed) return;
-      for (const [index, group] of groups.entries()) {
-        const assigned = fieldFans.filter((_, targetIndex) => targetIndex % groups.length === index);
-        const mesh = group.mesh;
-        mesh.computeWorldMatrix(true);
-        const inverseMeshWorld = mesh.getWorldMatrix().clone().invert();
-        const localHeight = mesh.getBoundingInfo().boundingBox.extendSize.y * 2;
-        const baseScale = fan.targetWorldHeight / (localHeight * RINA_STADIUM_SCALE);
-        const matrices = new Float32Array(assigned.length * 16);
-        for (let i = 0; i < assigned.length; i++) {
-          const target = assigned[i];
-          const scale = baseScale;
-          const desired = Matrix.Compose(new Vector3(scale, scale, scale),
-            Quaternion.RotationAxis(Vector3.Up(), target.mesh.rotation.y),
-            new Vector3(target.mesh.position.x, 0, target.mesh.position.z));
-          const instance = Matrix.Identity();
-          desired.multiplyToRef(inverseMeshWorld, instance);
-          instance.copyToArray(matrices, i * 16);
-        }
-        for (const node of group.roots) node.parent = animatedRoot;
-        mesh.thinInstanceSetBuffer("matrix", matrices, 16, true);
-        mesh.thinInstanceRefreshBoundingInfo(true, true);
-        for (const target of assigned) {
+    const showcases = [
+      { fan: RINA_CROWD_FANS.find(entry => entry.id === "fan_04")!,
+        quality: "near" as const, target: spectators[0], x: 0, z: -26 },
+      { fan: RINA_CROWD_FANS.find(entry => entry.id === "fan_05")!,
+        quality: "middle" as const, target: spectators[1], x: 3.6, z: -26 },
+    ];
+    for (const showcase of showcases) {
+      const { fan, quality, target, x, z } = showcase;
+      target.mesh.position.set(x, 0.84, z);
+      target.mesh.rotation.y = Math.PI;
+      void registry.loadAnimated(fan, quality, 1).then(groups => {
+        if (!groups || disposed) return;
+        for (const group of groups) {
+          const mesh = group.mesh;
+          mesh.computeWorldMatrix(true);
+          const inverseMeshWorld = mesh.getWorldMatrix().clone().invert();
+          const localHeight = mesh.getBoundingInfo().boundingBox.extendSize.y * 2;
+          const baseScale = fan.targetWorldHeight / (localHeight * RINA_STADIUM_SCALE);
+          const matrices = new Float32Array(16);
+          const desired = Matrix.Compose(new Vector3(baseScale, baseScale, baseScale),
+            Quaternion.RotationAxis(Vector3.Up(), Math.PI), new Vector3(x, 0, z));
+          const instance = desired.multiply(inverseMeshWorld);
+          instance.copyToArray(matrices, 0);
+          for (const node of group.roots) node.parent = animatedRoot;
+          mesh.thinInstanceSetBuffer("matrix", matrices, 16, true);
+          mesh.thinInstanceRefreshBoundingInfo(true, true);
           target.replaced = true;
           target.mesh.dispose();
+          const playingIndex = Math.floor(Math.random() * group.clips.length);
+          group.clips[playingIndex].start(false);
+          animatedGroups.push({ clips: group.clips, playingIndex });
         }
-        const playingIndex = Math.floor(Math.random() * group.clips.length);
-        group.clips[playingIndex].start(false);
-        animatedGroups.push({ clips: group.clips, playingIndex });
-      }
-      for (const spectator of spectators) {
-        if (spectator.replaced) continue;
-        if (fieldFans.some(fanTarget => Math.hypot(
-          spectator.mesh.position.x - fanTarget.mesh.position.x,
-          spectator.mesh.position.z - fanTarget.mesh.position.z) < RINA_ANIMATED_FAN_CLEARANCE)) {
-          spectator.replaced = true;
-          spectator.mesh.dispose();
+        for (const spectator of spectators) {
+          if (spectator.replaced || showcases.some(entry => entry.target === spectator)) continue;
+          if (Math.hypot(spectator.mesh.position.x - x,
+            spectator.mesh.position.z - z) < RINA_ANIMATED_FAN_CLEARANCE) {
+            spectator.replaced = true;
+            spectator.mesh.dispose();
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   const jumpDuration = 0.38;

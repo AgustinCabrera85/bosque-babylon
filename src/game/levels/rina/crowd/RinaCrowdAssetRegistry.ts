@@ -95,10 +95,10 @@ export class RinaCrowdAssetRegistry {
         }
         const source = container.meshes.filter(mesh => mesh instanceof Mesh && mesh.getTotalVertices() > 0) as Mesh[];
         const names = fan.animationNames ?? [];
-        if (source.length !== 1 || container.skeletons.length !== 1 || names.length !== 3 ||
+        if (source.length !== 1 || container.skeletons.length !== 1 || names.length === 0 ||
             names.some(name => !container.animationGroups.some(group => group.name === name))) {
           container.dispose();
-          throw new Error(`Rina crowd ${key}: expected one skinned mesh and three named clips`);
+          throw new Error(`Rina crowd ${key}: expected one skinned mesh and all registered clips`);
         }
         lightFanMesh(source[0]);
         const entries: InstantiatedEntries[] = [];

@@ -695,6 +695,83 @@ try {
       (character === 'sofia' ? heights.rina > heights.player : heights.rina < heights.player),
       `Character height order is wrong (${character}): ${JSON.stringify(heights)}`);
     console.log(`${character} ${heights.player.toFixed(2)} m; Rina ${heights.rina.toFixed(2)} m`);
+    const guitarist = await evaluate(`(async () => {
+      const storeUrl = performance.getEntriesByType('resource')
+        .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+      const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+      const scene = EngineStore.Instances.flatMap(engine => engine.scenes)
+        .find(item => item.metadata?.rinaLevel);
+      const body = scene.getMeshByName('rinaGuitaristBody');
+      const guitar = scene.getMeshByName('rinaGuitaristGuitar');
+      const root = scene.getTransformNodeByName('rinaGuitaristRoot');
+      body?.refreshBoundingInfo(true);
+      const bounds = mesh => mesh ? {
+        min: mesh.getBoundingInfo().boundingBox.minimumWorld.asArray(),
+        max: mesh.getBoundingInfo().boundingBox.maximumWorld.asArray(),
+      } : null;
+      return { root: root?.position.asArray(), scale: root?.scaling.x,
+        rotation: root?.rotation.y, body: bounds(body), guitar: bounds(guitar),
+        skeletonBones: body?.skeleton?.bones.length,
+        playing: scene.animationGroups.filter(group => group.isPlaying &&
+          group.name === 'Tocando').map(group => group.name),
+        lit: ['rinaActorBounce', 'rinaActorStageRim'].every(name =>
+          [body, guitar].every(mesh => scene.getLightByName(name)?.includedOnlyMeshes.includes(mesh))),
+        key: [body, guitar].every(mesh =>
+          scene.getLightByName('rinaGuitaristKey')?.includedOnlyMeshes.includes(mesh)) };
+    })()`, true);
+    console.log(`Rina guitarist: ${JSON.stringify(guitarist)}`);
+    assert.ok(guitarist?.body && guitarist.guitar && guitarist.skeletonBones >= 60 &&
+      guitarist.playing.length === 1 && guitarist.lit && guitarist.key &&
+      guitarist.body.max[1] - guitarist.body.min[1] > heights.rina + 0.1 &&
+      guitarist.body.max[1] - guitarist.body.min[1] < heights.rina + 0.35 &&
+      Math.abs(guitarist.body.min[1] - 5.79) < 0.2 &&
+      Math.abs(guitarist.root[0] - 20.1) < 0.01 &&
+      Math.abs(guitarist.root[2] - 62.55) < 0.01,
+      `Rina guitarist is missing, incorrectly sized, or off the right riser: ${JSON.stringify(guitarist)}`);
+    const drummer = await evaluate(`(async () => {
+      const storeUrl = performance.getEntriesByType('resource')
+        .find(entry => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+      const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+      const scene = EngineStore.Instances.flatMap(engine => engine.scenes)
+        .find(item => item.metadata?.rinaLevel);
+      const root = scene.getTransformNodeByName('rinaDrummerRoot');
+      const body = scene.getMeshByName('rinaDrummerBody');
+      const kit = scene.meshes.filter(mesh => mesh.name.startsWith('rinaDrumKit_'));
+      for (const mesh of [body, ...kit]) mesh?.refreshBoundingInfo(true);
+      const bounds = mesh => mesh ? {
+        min: mesh.getBoundingInfo().boundingBox.minimumWorld.asArray(),
+        max: mesh.getBoundingInfo().boundingBox.maximumWorld.asArray(),
+      } : null;
+      const kitBounds = kit.reduce((result, mesh) => {
+        const current = bounds(mesh);
+        if (!result) return current;
+        return { min: result.min.map((value, i) => Math.min(value, current.min[i])),
+          max: result.max.map((value, i) => Math.max(value, current.max[i])) };
+      }, null);
+      return { root: root?.position.asArray(), scale: root?.scaling.x,
+        rotation: root?.rotation.y, body: bounds(body), kit: kitBounds,
+        kitMeshes: kit.length, skeletonBones: body?.skeleton?.bones.length,
+        playing: scene.animationGroups.filter(group => group.isPlaying &&
+          group.name === 'rinaDrummerTocando').map(group => group.name),
+        lit: ['rinaActorBounce', 'rinaActorStageRim'].every(name =>
+          [body, ...kit].every(mesh => scene.getLightByName(name)?.includedOnlyMeshes.includes(mesh))),
+        key: [body, ...kit].every(mesh =>
+          scene.getLightByName('rinaDrummerKey')?.includedOnlyMeshes.includes(mesh)) };
+    })()`, true);
+    console.log(`Rina drummer: ${JSON.stringify(drummer)}`);
+    assert.ok(drummer?.body && drummer.kit && drummer.kitMeshes >= 1 &&
+      drummer.skeletonBones >= 60 && drummer.playing.length === 1 &&
+      drummer.lit && drummer.key && drummer.root[0] < -10 &&
+      Math.abs(drummer.root[1] - 5.79) < 0.2 &&
+      Math.abs(drummer.root[2] - 62.55) < 0.01 &&
+      drummer.body.max[1] - drummer.body.min[1] > 2.0 &&
+      drummer.body.max[1] - drummer.body.min[1] <
+        guitarist.body.max[1] - guitarist.body.min[1] - 0.2 &&
+      Math.abs(drummer.body.min[1] - 5.79) < 0.2 &&
+      Math.abs(drummer.kit.min[1] - 5.79) < 0.2 &&
+      drummer.kit.min[0] > -29.7 && drummer.kit.max[0] < -10.5 &&
+      drummer.kit.min[2] > 56.7 && drummer.kit.max[2] < 68.1,
+      `Rina drummer is missing or off the center-left riser: ${JSON.stringify(drummer)}`);
     let fanAssets;
     for (let i = 0; i < 80; i++) {
       fanAssets = await evaluate(`(async () => {
@@ -703,7 +780,8 @@ try {
         const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
         const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
           .find((item) => item.metadata?.rinaLevel);
-        return scene?.meshes.filter(mesh => mesh.name.startsWith('rinaCrowd_fan_01:'))
+        return scene?.meshes.filter(mesh => mesh.name.startsWith('rinaCrowd_fan_01:') &&
+          mesh.getTotalVertices() > 0)
           .map(mesh => ({ name: mesh.name, count: mesh.thinInstanceCount,
             emissive: mesh.material?.emissiveColor?.r,
             direct: mesh.material?.directIntensity,
@@ -712,19 +790,18 @@ try {
             actorLight: ['rinaActorBounce', 'rinaActorStageRim'].every(name =>
               scene.getLightByName(name)?.includedOnlyMeshes.includes(mesh)),
             rigged: !!mesh.skeleton,
-            height: mesh.getBoundingInfo().boundingBox.extendSize.y * 2,
-            minMatrixScale: Math.min(...mesh.thinInstanceGetWorldMatrices().map(matrix => matrix.m[5])) }));
+            bones: mesh.skeleton?.bones.length }));
       })()`, true);
-      if (fanAssets?.length >= (process.env.RINA_MOBILE_VERIFY ? 1 : 2) &&
+      if (fanAssets?.length >= 1 &&
           fanAssets.every(fan => fan.count > 0)) break;
       await delay(250);
     }
-    assert.equal(fanAssets?.length, process.env.RINA_MOBILE_VERIFY ? 1 : 2,
-      `Rina fan variants did not load: ${JSON.stringify(fanAssets)}; ${errors.join(' | ')}`);
+    assert.equal(fanAssets?.length, 1,
+      `Rina animated fan 01 did not replace the posed model: ${JSON.stringify(fanAssets)}; ${errors.join(' | ')}`);
     assert.ok(fanAssets.every(fan => fan.count > 0 && fan.emissive === 0 &&
-      fan.direct === 1 && fan.textured && !fan.selfLit && fan.actorLight && !fan.rigged &&
-      fan.minMatrixScale * 1.091883 * 1.5 > heights.rina),
-      `Rina fans are dark, small, or rigged per instance: ${JSON.stringify(fanAssets)}`);
+      fan.direct === 1 && fan.textured && !fan.selfLit && fan.actorLight && fan.rigged &&
+      fan.bones === 65 && fan.name.includes(':middle:')),
+      `Rina animated fan 01 is unlit or missing its rig: ${JSON.stringify(fanAssets)}`);
     console.log(`Rina fan variants: ${JSON.stringify(fanAssets)}`);
     const crowdTotals = await evaluate(`(async () => {
       const storeUrl = performance.getEntriesByType('resource')
@@ -736,7 +813,8 @@ try {
         .reduce((sum, mesh) => sum + Math.max(0, mesh.thinInstanceCount), 0);
       return { procedural: count('rinaStandsCrowd_'), fan: count('rinaCrowd_fan_01:') };
     })()`, true);
-    assert.equal(crowdTotals.fan, process.env.RINA_MOBILE_VERIFY ? 20 : 92);
+    assert.ok(crowdTotals.fan >= (process.env.RINA_MOBILE_VERIFY ? 8 : 30),
+      `Rina animated fan 01 did not populate the stands: ${JSON.stringify(crowdTotals)}`);
     const animatedFans = await evaluate(`(async () => {
       const storeUrl = performance.getEntriesByType('resource')
         .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
@@ -779,6 +857,87 @@ try {
           .map(name => name.slice(name.lastIndexOf(':') + 1))).size === 1),
       `Rina fan 04 animation groups did not load: ${JSON.stringify(animatedFans)}; ${errors.join(' | ')}`);
     console.log(`Rina animated fans: ${JSON.stringify(animatedFans)}`);
+    let fan05;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      fan05 = await evaluate(`(async () => {
+        const storeUrl = performance.getEntriesByType('resource')
+          .find(entry => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+        const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+        const scene = EngineStore.Instances.flatMap(engine => engine.scenes)
+          .find(item => item.metadata?.rinaLevel);
+        const meshes = scene.meshes.filter(mesh => mesh.name.startsWith('rinaCrowd_fan_05:') &&
+          mesh.getTotalVertices() > 0);
+        const clips = scene.animationGroups.filter(group => group.name.startsWith('rinaCrowd_fan_05:'));
+        return {
+          meshes: meshes.map(mesh => ({ name: mesh.name, count: mesh.thinInstanceCount,
+            bones: mesh.skeleton?.bones.length, textured: !!mesh.material?.albedoTexture,
+            selfLit: !!mesh.material?.emissiveTexture,
+            actorLight: ['rinaActorBounce', 'rinaActorStageRim'].every(name =>
+              scene.getLightByName(name)?.includedOnlyMeshes.includes(mesh)),
+            field: (() => { let node = mesh.parent; while (node) {
+              if (node.name === 'rinaFieldAnimatedCrowdRoot') return true; node = node.parent;
+            } return false; })(),
+            rearCount: mesh.thinInstanceGetWorldMatrices()
+              .filter(matrix => matrix.multiply(mesh.getWorldMatrix()).getTranslation().z < -90).length })),
+          clipCount: clips.length, playing: clips.filter(group => group.isPlaying).map(group => group.name),
+        };
+      })()`, true);
+      if (fan05.meshes.length === (process.env.RINA_MOBILE_VERIFY ? 1 : 2)) break;
+      await delay(250);
+    }
+    assert.equal(fan05.meshes.length, process.env.RINA_MOBILE_VERIFY ? 1 : 2,
+      `Rina fan 05 did not load: ${JSON.stringify(fan05)}; ${errors.join(' | ')}`);
+    assert.ok(fan05.meshes.every(mesh => mesh.count > 0 && mesh.bones === 65 &&
+      mesh.textured && !mesh.selfLit && mesh.actorLight &&
+      mesh.name.includes(':middle:')) &&
+      fan05.meshes.filter(mesh => mesh.field).reduce((sum, mesh) => sum + mesh.count, 0) ===
+        (process.env.RINA_MOBILE_VERIFY ? 0 : 1) &&
+      fan05.meshes.filter(mesh => !mesh.field).reduce((sum, mesh) => sum + mesh.count, 0) >=
+        (process.env.RINA_MOBILE_VERIFY ? 8 : 30) &&
+      fan05.meshes.reduce((sum, mesh) => sum + mesh.rearCount, 0) >=
+        (process.env.RINA_MOBILE_VERIFY ? 5 : 20) &&
+      fan05.clipCount === fan05.meshes.length * 5 &&
+      fan05.playing.length === fan05.meshes.length,
+    `Rina fan 05 is missing the 1K model, rig, or one-shot clips: ${JSON.stringify(fan05)}`);
+    console.log(`Rina fan 05: ${JSON.stringify(fan05)}`);
+    let newFans;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      newFans = await evaluate(`(async () => {
+        const storeUrl = performance.getEntriesByType('resource')
+          .find(entry => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+        const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+        const scene = EngineStore.Instances.flatMap(engine => engine.scenes)
+          .find(item => item.metadata?.rinaLevel);
+        return ['fan_01', 'fan_02', 'fan_03'].map(id => {
+          const mesh = scene.meshes.find(item => item.name.startsWith('rinaCrowd_' + id + ':') &&
+            item.getTotalVertices() > 0);
+          const clips = scene.animationGroups.filter(group =>
+            group.name.startsWith('rinaCrowd_' + id + ':'));
+          const world = mesh?.thinInstanceCount > 0 ?
+            mesh.thinInstanceGetWorldMatrices()[0].multiply(mesh.getWorldMatrix()) : null;
+          return { id, count: mesh?.thinInstanceCount ?? 0,
+            bones: mesh?.skeleton?.bones.length,
+            clipNames: clips.map(group => group.name.slice(group.name.lastIndexOf(':') + 1)),
+            playing: clips.filter(group => group.isPlaying).length,
+            scaleY: world ? Math.abs(world.m[5]) : null,
+            poseHeight: world ? Math.abs(world.m[5]) *
+              mesh.getBoundingInfo().boundingBox.extendSize.y * 2 : null };
+        });
+      })()`, true);
+      if (newFans.every(fan => fan.count > 0)) break;
+      await delay(250);
+    }
+    assert.ok(newFans.every((fan, index) => fan.count >=
+      (process.env.RINA_MOBILE_VERIFY ? 8 : 30) && fan.bones === 65 &&
+      fan.clipNames.length === (index === 0 ? 5 : 4) && fan.playing === 1),
+    `Rina fans 01–03 lack instances, rigs or clips: ${JSON.stringify(newFans)}; ${errors.join(' | ')}`);
+    assert.ok(Math.abs(newFans[0].scaleY * 100 - 2.65) < 0.20 &&
+      Math.abs(newFans[1].scaleY * 100 - 2.55) < 0.20 &&
+      Math.abs(newFans[2].scaleY * 100 - 2.80) < 0.20 &&
+      newFans[1].scaleY < newFans[0].scaleY &&
+      newFans[0].scaleY < newFans[2].scaleY,
+    `Rina fans 01–03 have incorrect relative stature: ${JSON.stringify(newFans)}`);
+    console.log(`Rina new animated fans: ${JSON.stringify(newFans)}`);
     const fanSeparation = await evaluate(`(async () => {
       const storeUrl = performance.getEntriesByType('resource')
         .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
@@ -792,32 +951,39 @@ try {
           return [position.x, position.y, position.z];
         }));
       const fan04 = positions('rinaCrowd_fan_04:');
+      const fan05 = positions('rinaCrowd_fan_05:');
       const fieldFan04 = positions('rinaCrowd_fan_04:near:');
-      const others = [...positions('rinaCrowd_fan_01:'), ...positions('rinaStandsCrowd_')];
+      const allAnimated = ['fan_01', 'fan_02', 'fan_03']
+        .flatMap(id => positions('rinaCrowd_' + id + ':')).concat(fan04, fan05);
+      const others = positions('rinaStandsCrowd_');
       const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
       let closestFan = Infinity;
       let closestOther = Infinity;
       let duplicates = 0;
-      for (let i = 0; i < fan04.length; i++) {
-        for (let j = i + 1; j < fan04.length; j++) {
-          const d = distance(fan04[i], fan04[j]);
+      for (let i = 0; i < allAnimated.length; i++) {
+        for (let j = i + 1; j < allAnimated.length; j++) {
+          const d = distance(allAnimated[i], allAnimated[j]);
           closestFan = Math.min(closestFan, d);
           if (d < 0.05) duplicates++;
         }
         for (const other of others) {
-          const d = distance(fan04[i], other);
+          const d = distance(allAnimated[i], other);
           closestOther = Math.min(closestOther, d);
           if (d < 0.05) duplicates++;
         }
       }
       return { closestFan, closestOther, duplicates,
         showcaseDistance: fieldFan04.length ? Math.min(...fieldFan04.map(position =>
-          Math.hypot(position[0], position[2] - (-26 * 1.5)))) : null };
+          Math.hypot(position[0], position[2] - (-26 * 1.5)))) : null,
+        fan05ShowcaseDistance: fan05.length ? Math.min(...fan05.map(position =>
+          Math.hypot(position[0] - 3.6 * 1.5, position[2] - (-26 * 1.5)))) : null };
     })()`, true);
     assert.equal(fanSeparation.duplicates, 0,
-      `Rina fan 04 has overlapping instance origins: ${JSON.stringify(fanSeparation)}`);
+      `Rina animated fans have overlapping instance origins: ${JSON.stringify(fanSeparation)}`);
     if (!process.env.RINA_MOBILE_VERIFY) assert.ok(fanSeparation.showcaseDistance < 0.1,
       `Rina fan 04 showcase is not at the field test point: ${JSON.stringify(fanSeparation)}`);
+    if (!process.env.RINA_MOBILE_VERIFY) assert.ok(fanSeparation.fan05ShowcaseDistance < 0.1,
+      `Rina fan 05 showcase is not beside fan 04: ${JSON.stringify(fanSeparation)}`);
     console.log(`Rina fan separation: ${JSON.stringify(fanSeparation)}`);
     console.log(`Rina stands crowd: ${JSON.stringify(crowdTotals)}`);
     let concert;

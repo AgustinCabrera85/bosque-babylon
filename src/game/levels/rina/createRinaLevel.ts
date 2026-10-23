@@ -21,6 +21,8 @@ import {
 import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
 import { createRinaCrowdPreview } from "./RinaCrowdPreview";
 import { createRinaCornerTowerSpotlights } from "./RinaCornerTowerSpotlights";
+import { createRinaGuitarist } from "./RinaGuitarist";
+import { createRinaDrummer } from "./RinaDrummer";
 import { RINA_CONCERT_SONG, RINA_PYRO_TIMING } from "./RinaConcertConfig";
 import { createRinaLiveScreens } from "./RinaLiveScreens";
 import { attachRinaMicrophone } from "./RinaMicrophone";
@@ -254,6 +256,16 @@ export async function createRinaLevel(
       },
     });
     await attachRinaMicrophone(scene, rina);
+    const guitarist = await createRinaGuitarist(scene, stage.actorLights);
+    if (guitarist) {
+      cleanup.push(() => guitarist.dispose());
+      for (const mesh of guitarist.meshes) glow.addExcludedMesh(mesh);
+    }
+    const drummer = await createRinaDrummer(scene, stage.actorLights);
+    if (drummer) {
+      cleanup.push(() => drummer.dispose());
+      for (const mesh of drummer.meshes) glow.addExcludedMesh(mesh);
+    }
     const rinaMeshes = rina.root.getChildMeshes(false).filter(
       (mesh): mesh is Mesh => mesh instanceof Mesh && mesh.getTotalVertices() > 0
     );

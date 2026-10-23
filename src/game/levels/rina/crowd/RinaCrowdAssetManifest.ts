@@ -26,24 +26,77 @@ export const RINA_CROWD_FANS: readonly RinaCrowdFanAsset[] = [
   {
     id: "fan_01",
     type: "spectator",
-    // Rina is 2.58 m in this level. Fan 01 should stand just above her.
-    targetWorldHeight: 2.70,
+    // Lautaro is about 2.68 m tall in this level.
+    targetWorldHeight: 2.65,
+    animationNames: [
+      "fan_01_happy_idle_inplace",
+      "fan_01_cheering_inplace",
+      "fan_01_cheering_alt_inplace",
+      "fan_01_clapping_inplace",
+      "fan_01_silly_dancing_inplace",
+    ],
     variants: {
       near: {
-        riggedPath: "assets/models/rina/crowd/fan_01_near_rigged.glb",
-        posedPath: "assets/models/rina/crowd/fan_01_near_posed.glb",
+        riggedPath: "assets/models/rina/crowd/fan_01_nla_1k.glb",
         sourceHasRig: true,
-        sourceHasAnimations: false,
-        bytes: 764824,
-        posedHeight: 1.091883,
+        sourceHasAnimations: true,
+        bytes: 1002736,
       },
       middle: {
-        riggedPath: "assets/models/rina/crowd/fan_01_middle_rigged.glb",
-        posedPath: "assets/models/rina/crowd/fan_01_middle_posed.glb",
+        riggedPath: "assets/models/rina/crowd/fan_01_nla_1k.glb",
         sourceHasRig: true,
-        sourceHasAnimations: false,
-        bytes: 269204,
-        posedHeight: 1.091883,
+        sourceHasAnimations: true,
+        bytes: 1002736,
+      },
+    },
+  },
+  {
+    id: "fan_02",
+    type: "spectator",
+    targetWorldHeight: 2.55,
+    animationNames: [
+      "fan_02_happy_idle_inplace",
+      "fan_02_cheering_inplace",
+      "fan_02_cheering_alt_inplace",
+      "fan_02_standing_clap_inplace",
+    ],
+    variants: {
+      near: {
+        riggedPath: "assets/models/rina/crowd/fan_02_nla_1k.glb",
+        sourceHasRig: true,
+        sourceHasAnimations: true,
+        bytes: 1022628,
+      },
+      middle: {
+        riggedPath: "assets/models/rina/crowd/fan_02_nla_1k.glb",
+        sourceHasRig: true,
+        sourceHasAnimations: true,
+        bytes: 1022628,
+      },
+    },
+  },
+  {
+    id: "fan_03",
+    type: "spectator",
+    targetWorldHeight: 2.80,
+    animationNames: [
+      "fan_03_happy_idle_inplace",
+      "fan_03_cheering_inplace",
+      "fan_03_cheering_alt_inplace",
+      "fan_03_rallying_inplace",
+    ],
+    variants: {
+      near: {
+        riggedPath: "assets/models/rina/crowd/fan_03_nla_1k.glb",
+        sourceHasRig: true,
+        sourceHasAnimations: true,
+        bytes: 959344,
+      },
+      middle: {
+        riggedPath: "assets/models/rina/crowd/fan_03_nla_1k.glb",
+        sourceHasRig: true,
+        sourceHasAnimations: true,
+        bytes: 959344,
       },
     },
   },
@@ -68,6 +121,32 @@ export const RINA_CROWD_FANS: readonly RinaCrowdFanAsset[] = [
         sourceHasRig: true,
         sourceHasAnimations: true,
         bytes: 999420,
+      },
+    },
+  },
+  {
+    id: "fan_05",
+    type: "spectator",
+    targetWorldHeight: 2.50,
+    animationNames: [
+      "fan_05_cheering_inplace",
+      "fan_05_cheering_alt_inplace",
+      "fan_05_excited_inplace",
+      "fan_05_standing_clap_inplace",
+      "fan_05_standing_idle_inplace",
+    ],
+    variants: {
+      near: {
+        riggedPath: "assets/models/rina/crowd/fan_05_near_2k.glb",
+        sourceHasRig: true,
+        sourceHasAnimations: true,
+        bytes: 1597288,
+      },
+      middle: {
+        riggedPath: "assets/models/rina/crowd/fan_05_crowd_1k.glb",
+        sourceHasRig: true,
+        sourceHasAnimations: true,
+        bytes: 1172360,
       },
     },
   },

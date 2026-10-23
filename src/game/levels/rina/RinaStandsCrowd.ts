@@ -343,8 +343,8 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier,
   const candidatePool: Record<RinaCrowdQuality, CrowdCandidate[]> = {
     near: [], middle: [],
   };
-  const fan04Candidates: Record<"side" | "rear", CrowdCandidate[]> = {
-    side: [], rear: [],
+  const animatedCandidates: Record<"front" | "side" | "rear", CrowdCandidate[]> = {
+    front: [], side: [], rear: [],
   };
   const fanGroups: { mesh: Mesh; placements: Placement[]; matrixData: Float32Array;
     quality: RinaCrowdQuality; inverseMeshWorld?: Matrix }[] = [];
@@ -385,8 +385,9 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier,
     proto.placements.push(placement);
     const candidate = { prototype: proto, placement };
     if (lod !== "far") candidatePool[lod].push(candidate);
-    if (section === "rear" && lod !== "near") fan04Candidates.rear.push(candidate);
-    if (section === "side" && lod === "middle") fan04Candidates.side.push(candidate);
+    if (lod === "near") animatedCandidates.front.push(candidate);
+    if (section === "rear" && lod !== "near") animatedCandidates.rear.push(candidate);
+    if (section === "side" && lod === "middle") animatedCandidates.side.push(candidate);
     counts[lod]++;
     counts.total++;
   }
@@ -498,23 +499,31 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier,
     const limit = quality === "near"
       ? (tier === "desktop" ? RINA_STANDS_CROWD_CONFIG.desktopFanNearLimit : 0)
       : (tier === "desktop" ? RINA_STANDS_CROWD_CONFIG.desktopFanMiddleLimit : RINA_STANDS_CROWD_CONFIG.mobileFanMiddleLimit);
-    const eligibleFans = RINA_CROWD_FANS.filter(fan => quality !== "near" || fan.id !== "fan_04");
+    // Animated spectators use the cheap 1K variant in the stands.
+    const eligibleFans = RINA_CROWD_FANS.filter(fan => quality !== "near" || !fan.animationNames);
     if (!limit || eligibleFans.length === 0) continue;
-    const selected = evenlySelected(candidatePool[quality], limit);
-    for (const [fanIndex, fan] of eligibleFans.entries()) {
-      let members = selected.filter((_, i) => i % eligibleFans.length === fanIndex);
+    const posedFans = eligibleFans.filter(fan => !fan.animationNames);
+    const selected = posedFans.length ? evenlySelected(candidatePool[quality], limit) : [];
+    const posedSlots = Math.max(1, quality === "near" ? posedFans.length : posedFans.length + 1);
+    const posedMembers = selected.filter((_, i) => i % posedSlots < posedFans.length);
+    // Reserve placements synchronously, before either GLB finishes loading.
+    // Animated archetypes must never claim the same seat.
+    const occupied = posedMembers.map(member => member.placement);
+    for (const fan of eligibleFans) {
+      let members = fan.animationNames ? [] : selected.filter((_, i) =>
+        i % posedSlots === posedFans.indexOf(fan));
       if (fan.animationNames) {
+        const frontLimit = tier === "desktop" ? 3 : 0;
         const rearLimit = tier === "desktop" ? 48 : 12;
         const sideLimit = tier === "desktop" ? 20 : 4;
+        const available = (pool: readonly CrowdCandidate[]) => pool.filter(member =>
+          occupied.every(other => Math.hypot(member.placement.x - other.x,
+            member.placement.z - other.z) >= RINA_ANIMATED_FAN_CLEARANCE));
         members = [
-          ...evenlySelected(fan04Candidates.rear, rearLimit),
-          ...evenlySelected(fan04Candidates.side, sideLimit),
-        ];
-        // An animated pose can spread its arms into the adjacent seat. Keep
-        // the new models apart from each other and from the posed fan.
-        const occupied = selected.filter((_, i) => i % eligibleFans.length !== fanIndex)
-          .map(member => member.placement);
-        members = members.filter(member => {
+          ...evenlySelected(available(animatedCandidates.front), frontLimit),
+          ...evenlySelected(available(animatedCandidates.rear), rearLimit),
+          ...evenlySelected(available(animatedCandidates.side), sideLimit),
+        ].filter(member => {
           const clear = occupied.every(other =>
             Math.hypot(member.placement.x - other.x, member.placement.z - other.z) >= RINA_ANIMATED_FAN_CLEARANCE);
           if (clear) occupied.push(member.placement);

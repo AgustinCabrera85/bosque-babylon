@@ -20,6 +20,8 @@ import {
 } from "../../enemies/rina";
 import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
 import { createRinaCrowdPreview } from "./RinaCrowdPreview";
+import { createRinaFieldCrowdMazeLayout } from "./RinaFieldCrowdMazeLayout";
+import { createRinaFieldCrowdMazeRenderer } from "./RinaFieldCrowdMazeRenderer";
 import { createRinaCornerTowerSpotlights } from "./RinaCornerTowerSpotlights";
 import { createRinaGuitarist } from "./RinaGuitarist";
 import { createRinaDrummer } from "./RinaDrummer";
@@ -132,11 +134,15 @@ export async function createRinaLevel(
     const stageArchitecture = createRinaStageArchitecture(
       scene, context.performanceTier
     );
-    const crowdPreview = createRinaCrowdPreview(
-      scene,
-      context.performanceTier,
-      stage.actorLights
-    );
+    const ENABLE_FIELD_CROWD_MAZE = true;
+    const fieldCrowdMazeLayout = ENABLE_FIELD_CROWD_MAZE
+      ? createRinaFieldCrowdMazeLayout()
+      : null;
+    const crowdPreview = fieldCrowdMazeLayout
+      ? createRinaFieldCrowdMazeRenderer(
+          scene, context.performanceTier, fieldCrowdMazeLayout, stage.actorLights
+        )
+      : createRinaCrowdPreview(scene, context.performanceTier, stage.actorLights);
     const stadiumRoot = new TransformNode("rinaStadiumRoot", scene);
     for (const mesh of scene.meshes) {
       if (!mesh.parent) mesh.parent = stadiumRoot;
@@ -198,7 +204,10 @@ export async function createRinaLevel(
       }
     );
     cleanup.push(() => pyro.dispose());
-    const playerWorld = new RinaStadiumWorld(securityBarriers.collisionSpans);
+    const playerWorld = new RinaStadiumWorld(
+      securityBarriers.collisionSpans,
+      fieldCrowdMazeLayout
+    );
 
     context.onProgress(
       0.44,
@@ -337,7 +346,7 @@ export async function createRinaLevel(
       realRinaAsset: true,
       stadiumScale: RINA_STADIUM_SCALE,
       supportedViews: ["third", "first"],
-      crowdSystem: "preview-only",
+      crowdSystem: fieldCrowdMazeLayout ? "field-maze" : "preview-only",
     };
 
     const update = (unclampedDt: number) => {

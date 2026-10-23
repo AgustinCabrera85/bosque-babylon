@@ -1,6 +1,7 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { PlayerWorldQuery } from "../../PlayerWorldQuery";
 import { RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
+import type { RinaFieldCrowdMazeLayout } from "./RinaFieldCrowdMazeLayout";
 import type { RinaStageBarrierCollisionSpan } from "./RinaStageSecurityBarriers";
 
 const FIELD_HALF_WIDTH = RINA_STADIUM.pitchWidth / 2;
@@ -58,9 +59,12 @@ function hitsStageBarrier(
   return false;
 }
 
-/** First iteration: pitch + south service tunnel are walkable. */
+/** Field, tunnel, stage barriers, and optional crowd islands share one collision query. */
 export class RinaStadiumWorld implements PlayerWorldQuery {
-  constructor(private readonly barrierSpans: readonly RinaStageBarrierCollisionSpan[] = []) {}
+  constructor(
+    private readonly barrierSpans: readonly RinaStageBarrierCollisionSpan[] = [],
+    private readonly fieldCrowdMaze: RinaFieldCrowdMazeLayout | null = null
+  ) {}
 
   getTerrainHeight(x: number, z: number) {
     return this.getWalkableSurfaceHeight(x, z);
@@ -80,7 +84,7 @@ export class RinaStadiumWorld implements PlayerWorldQuery {
         localX, localZ, radius,
         minY / RINA_STADIUM_SCALE, maxY / RINA_STADIUM_SCALE,
         this.barrierSpans
-      ) || !(
+      ) || this.fieldCrowdMaze?.blocksPlayerLocal(localX, localZ, radius) === true || !(
       insideField(localX, localZ, localClearance) ||
       insideExitTunnel(localX, localZ, localClearance)
     );

@@ -59,7 +59,7 @@ varying vec4 vColor;
 void main(void) {
   vec4 sampleColor = texture2D(atlasTexture, vAtlasUv);
   if (sampleColor.a * vColor.a < 0.48) discard;
-  gl_FragColor = vec4(sampleColor.rgb * vColor.rgb * 0.82, 1.0);
+  gl_FragColor = vec4(sampleColor.rgb * vColor.rgb * 0.65, 1.0);
 }`;
 
 export type RinaStandsSpriteDiagnostics = {
@@ -127,7 +127,11 @@ function fillBatch(mesh: Mesh, placements: readonly SpritePlacement[], assets: S
     const a = i * 4;
     clips.set([clip.startCell, clip.frames, clip.playbackFps, p.spectator.viewIndex], a);
     motion.set([p.spectator.speed, p.spectator.frameOffset, 0, 0], a);
-    colors.set(p.spectator.color, a);
+    const [r, g, b, alpha] = p.spectator.color;
+    colors[a] = r * p.brightness;
+    colors[a + 1] = g * p.brightness;
+    colors[a + 2] = b * p.brightness;
+    colors[a + 3] = alpha;
   }
   mesh.thinInstanceSetBuffer("matrix", matrices, 16, true);
   mesh.thinInstanceSetBuffer("spriteClip", clips, 4, true);

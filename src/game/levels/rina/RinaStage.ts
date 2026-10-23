@@ -259,7 +259,7 @@ export function createRinaStage(
         : new Color3(0.08, 0.62, 1);
     light.specular = Color3.Black();
     light.intensity = performanceTier === "mobile" ? 10 : 14;
-    light.range = 145;
+    light.range = index % 2 === 0 ? 88 : 105;
     // The crowd-facing pair must reach the player's materials even when the
     // stage wash and screen lights are also active.
     light.renderPriority = index % 2 === 0 ? 1 : 3;
@@ -348,8 +348,8 @@ export function createRinaStage(
   );
   audienceSpill.diffuse = new Color3(0.34, 0.35, 0.37);
   audienceSpill.specular = Color3.Black();
-  audienceSpill.intensity = performanceTier === "mobile" ? 20 : 30;
-  audienceSpill.range = 160;
+  audienceSpill.intensity = performanceTier === "mobile" ? 12 : 18;
+  audienceSpill.range = 112;
   audienceSpill.renderPriority = 2;
 
   const screenLights = [-1, 1].map((side) => {
@@ -378,6 +378,10 @@ export function createRinaStage(
   stageWash.intensity = performanceTier === "mobile" ? 24 : 35;
   stageWash.range = 54;
   stageWash.renderPriority = 2;
+  const strobeWhite = Color3.White();
+  const spotBaseColors = spotlights.map((light) => light.diffuse.clone());
+  const screenBaseColors = screenLights.map((light) => light.diffuse.clone());
+  const stageWashBaseColor = stageWash.diffuse.clone();
 
   const rinaKeyLight = new PointLight(
     "rinaRinaKeyLight",
@@ -462,6 +466,7 @@ export function createRinaStage(
   let elapsed = 0;
   let screenPulse = 0.22;
   let beatPulse = 0;
+  let strobe = 0;
   let bassBaseline = 0;
   let energyBaseline = 0;
   let musicPresence = 0;
@@ -532,10 +537,17 @@ export function createRinaStage(
       ? Math.min(1, (songTime - finaleCue.start) /
           (finaleCue.chorusStart - finaleCue.start))
       : 0;
-    const strobe = reducedMotion.matches ? 0 : Math.max(
+    const strobeTarget = Math.max(
       extendedFlash * (extendedPulseIndex % 2 === 0 ? 0.72 : 0.55),
       finaleFlash * (finalChorus ? 1 : 0.35)
     );
+    if (reducedMotion.matches) {
+      strobe = 0;
+    } else {
+      const transitionSeconds = strobeTarget > strobe ? 0.045 : 0.16;
+      strobe += (strobeTarget - strobe) *
+        (1 - Math.exp(-dt / transitionSeconds));
+    }
     const flashSide = extendedActive
       ? extendedPulseIndex % 2
       : finaleBeatIndex < 0 ? 0 : finaleBeatIndex % 2;
@@ -576,22 +588,24 @@ export function createRinaStage(
       0.88 * ledPulse + cyanFlash * 1.2
     );
     for (let index = 0; index < screenLights.length; index += 1) {
+      Color3.LerpToRef(screenBaseColors[index], strobeWhite, strobe, screenLights[index].diffuse);
       screenLights[index].intensity =
         (performanceTier === "mobile" ? 5 : 8) *
           (0.1 + musicPresence * 0.65 + beatPulse * 0.6) +
         finaleLift * 5 + strobe *
-          (index === flashSide ? 38 : 16) *
+          (index === flashSide ? 18 : 8) *
           (performanceTier === "mobile" ? 0.75 : 1);
     }
-    audienceSpill.intensity = (performanceTier === "mobile" ? 20 : 30) *
+    audienceSpill.intensity = (performanceTier === "mobile" ? 12 : 18) *
       (0.22 + musicPresence * 0.52 + beatPulse * 0.08) +
-      finaleLift * 2 + strobe * (performanceTier === "mobile" ? 8 : 12);
+      finaleLift * 2 + strobe * (performanceTier === "mobile" ? 4 : 6);
 
     const playerLocalPosition = playerWorldPosition.scale(1 / RINA_STADIUM_SCALE);
     let playerSpotHit = 0;
     let playerSpotColor: Color3 | null = null;
     for (let index = 0; index < spotlights.length; index += 1) {
       const light = spotlights[index];
+      Color3.LerpToRef(spotBaseColors[index], strobeWhite, strobe, light.diffuse);
       const phase = elapsed * (0.34 + index * 0.04) + index * 0.85;
       const onStage = index % 2 === 0;
       const target = new Vector3(
@@ -610,10 +624,10 @@ export function createRinaStage(
       light.intensity = onStage
         ? (performanceTier === "mobile" ? 10 : 14) *
           (0.1 + musicPresence * 0.7 + beatPulse * 0.55)
-        : (performanceTier === "mobile" ? 22 : 32) *
+        : (performanceTier === "mobile" ? 16 : 22) *
           (0.025 + musicPresence * 0.35 + beatPulse * 1.15);
       light.intensity += finaleLift * (onStage ? 4 : 6) +
-        strobe * (index % 2 === flashSide ? 30 : 13) *
+        strobe * (index % 2 === flashSide ? 16 : 7) *
           (performanceTier === "mobile" ? 0.75 : 1);
 
       if (!onStage) {
@@ -641,6 +655,8 @@ export function createRinaStage(
       const beamWidthScale = visibleLength / 20;
       for (let layer = 0; layer < beamMeshes[index].length; layer += 1) {
         const beam = beamMeshes[index][layer];
+        beamMaterials[index][layer].emissiveColor.copyFrom(light.diffuse)
+          .scaleInPlace(0.72 + layer * 0.04);
         beam.position.copyFrom(beamMidpoint);
         beam.scaling.set(beamWidthScale, visibleLength, beamWidthScale);
         beam.rotationQuaternion = Quaternion.RotationAxis(axis, angle);
@@ -721,10 +737,11 @@ export function createRinaStage(
       light.diffuse.copyFromFloats(1, 0.34 + ignitionFlash * 0.5,
         0.1 + ignitionFlash * 0.35);
     }
+    Color3.LerpToRef(stageWashBaseColor, strobeWhite, strobe, stageWash.diffuse);
     stageWash.intensity =
       (performanceTier === "mobile" ? 24 : 35) *
       (0.1 + musicPresence * 0.7 + beatPulse * 0.45) +
-      finaleLift * 8 + strobe * (performanceTier === "mobile" ? 40 : 62);
+      finaleLift * 8 + strobe * (performanceTier === "mobile" ? 24 : 36);
     rinaKeyLight.position.x = Math.sin(singerYaw) * 3;
     rinaKeyLight.position.z = singerLocalZ + Math.cos(singerYaw) * 3;
     rinaKeyLight.intensity =
@@ -732,7 +749,7 @@ export function createRinaStage(
       (0.14 + musicPresence * 0.75 + beatPulse * 0.18) +
       finaleLift * 5 + strobe * (performanceTier === "mobile" ? 22 : 30) *
         (0.7 + vocalFocus * 0.3);
-    return beatPulse;
+    return { beatPulse, strobe };
   };
 
   return {

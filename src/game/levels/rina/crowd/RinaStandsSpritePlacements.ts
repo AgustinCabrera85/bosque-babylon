@@ -14,6 +14,7 @@ export type SpritePlacement = {
   z: number;
   width: number;
   height: number;
+  brightness: number;
 };
 
 type Seat = Omit<SpritePlacement, "spectator" | "width" | "height">;
@@ -24,6 +25,25 @@ export const RINA_STANDS_SPRITE_CONFIG = {
   sideZMin: -51,
   sideZMax: 30,
 } as const;
+
+export const RINA_STANDS_SPRITE_DARKENING = {
+  enabled: true,
+  rearLower: { firstRow: 0.78, lastRow: 0.42 },
+  rearUpper: { firstRow: 0.50, lastRow: 0.34 },
+  sideLower: { firstRow: 0.80, lastRow: 0.44 },
+  sideUpper: { firstRow: 0.52, lastRow: 0.36 },
+} as const;
+
+function getRowBrightness(sector: StandsSector, row: number, rowCount: number): number {
+  if (!RINA_STANDS_SPRITE_DARKENING.enabled) return 1;
+  const range = sector === "rear-lower" ? RINA_STANDS_SPRITE_DARKENING.rearLower
+    : sector === "rear-upper" ? RINA_STANDS_SPRITE_DARKENING.rearUpper
+    : sector.endsWith("-lower") ? RINA_STANDS_SPRITE_DARKENING.sideLower
+    : RINA_STANDS_SPRITE_DARKENING.sideUpper;
+  const t = Math.max(0, Math.min(1, row / Math.max(1, rowCount - 1)));
+  const smooth = t * t * (3 - 2 * t);
+  return range.firstRow + (range.lastRow - range.firstRow) * smooth;
+}
 
 function evenlySelect<T>(items: readonly T[], limit: number): T[] {
   const count = Math.min(items.length, limit);
@@ -57,8 +77,9 @@ function rearSeats(spacing: number): Seat[] {
         const z = zCenter + (rank === 0 ? 0.32 : -0.32);
         const segment = tier === "lower" ? (x < 0 ? "left" : "right")
           : String(Math.min(3, Math.floor((x + p.halfWidth) / (p.halfWidth * 0.5))));
-        seats.push({ sector: tier === "lower" ? "rear-lower" : "rear-upper",
-          batch: `rear-${tier}-${segment}`, x, y, z });
+        const sector = tier === "lower" ? "rear-lower" : "rear-upper";
+        seats.push({ sector, batch: `rear-${tier}-${segment}`, x, y, z,
+          brightness: getRowBrightness(sector, row, rows) });
       }
     }
   }
@@ -79,10 +100,12 @@ function sideSeats(side: -1 | 1, spacing: number): Seat[] {
         if (p.aislePositions.some(aisle => Math.abs(z - aisle) < p.aisleHalfWidth + 0.4)) continue;
         const anchor = getRinaSideStandAudienceAnchor(side, tier, row, z);
         const band = Math.min(2, Math.floor((z - zMin) / ((zMax - zMin) / 3)));
+        const sector: StandsSector = `side-${side < 0 ? "left" : "right"}-${tier}`;
         seats.push({
-          sector: `side-${side < 0 ? "left" : "right"}-${tier}`,
+          sector,
           batch: `side-${side < 0 ? "left" : "right"}-${tier}-${band}`,
           x: anchor.x, y: anchor.y, z,
+          brightness: getRowBrightness(sector, row, rows),
         });
       }
     }

@@ -112,7 +112,7 @@ function newStandMaterial(
   const mat = new StandardMaterial(name, scene);
   mat.diffuseColor = diffuse;
   mat.emissiveColor = emissive;
-  mat.specularColor = new Color3(0.018, 0.02, 0.025);
+  mat.specularColor = Color3.Black();
   return mat;
 }
 
@@ -215,8 +215,8 @@ export function createRinaDoubleTierSideStands(
   // legible against the current, near-black concert ambience.
   const seating = newStandMaterial(
     scene, "rinaDoubleStandSeatConcrete",
-    new Color3(0.115, 0.112, 0.108),
-    new Color3(0.003, 0.003, 0.004)
+    new Color3(0.043, 0.041, 0.040),
+    new Color3(0.002, 0.002, 0.003)
   );
   const darkVoid = newStandMaterial(
     scene, "rinaDoubleStandRecess",
@@ -225,13 +225,13 @@ export function createRinaDoubleTierSideStands(
   );
   const railing = newStandMaterial(
     scene, "rinaDoubleStandRails",
-    new Color3(0.15, 0.15, 0.15),
-    new Color3(0.006, 0.006, 0.007)
+    new Color3(0.076, 0.076, 0.076),
+    new Color3(0.003, 0.003, 0.004)
   );
   const edge = newStandMaterial(
     scene, "rinaDoubleStandEdge",
-    new Color3(0.15, 0.148, 0.145),
-    new Color3(0.007, 0.007, 0.008)
+    new Color3(0.061, 0.060, 0.058),
+    new Color3(0.003, 0.003, 0.004)
   );
 
   const structureParts: Mesh[] = [];

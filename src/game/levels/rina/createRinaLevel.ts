@@ -37,6 +37,7 @@ import { createRinaStageArchitecture } from "./RinaStageArchitecture";
 import { createRinaStageSecurityBarriers } from "./RinaStageSecurityBarriers";
 import { createRinaStandsLedDetails } from "./RinaStandsLedDetails";
 import { createRinaStandsSpriteCrowd } from "./RinaStandsSpriteCrowd";
+import { createRinaStrobePostProcess } from "./RinaStrobePostProcess";
 
 function createRinaLevelHud() {
   const root = document.createElement("div");
@@ -244,6 +245,8 @@ export async function createRinaLevel(
     // for the recital. With isometric disabled, V cycles third <-> first.
     player.setIsometricViewAllowed(false);
     player.setViewMode("third");
+    const strobePostProcess = createRinaStrobePostProcess(scene, player.camera);
+    cleanup.push(() => strobePostProcess.dispose());
     cleanup.push(setupPlayerViewControls(player));
     cleanup.push(setupMobileControls(player, context.input));
 
@@ -357,11 +360,12 @@ export async function createRinaLevel(
       const music = context.musicPlayer?.getMusicPlaybackState() ?? null;
       performance.update(dt, music);
       liveScreens.update();
-      const beatPulse = stage.update(
+      const { beatPulse, strobe } = stage.update(
         dt, music, rina.root.position.z / RINA_STADIUM_SCALE,
         rina.root.rotation.y, player.position,
         Vector3.TransformCoordinates(player.camera.position, player.root.computeWorldMatrix(true)), pyro
       );
+      strobePostProcess.update(strobe);
       stageArchitecture.update(dt, music, beatPulse);
       if (!reducedMotion.matches && music?.playing && beatPulse > 0) {
         const strength = Math.min(1, beatPulse *

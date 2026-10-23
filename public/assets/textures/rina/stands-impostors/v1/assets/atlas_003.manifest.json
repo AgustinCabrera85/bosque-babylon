@@ -1,0 +1,105 @@
+{
+  "schema": "lo-realy-lo-otro/impostor-atlas/v1",
+  "generator": "Generador de impostores Babylon",
+  "generatedUtc": "2026-10-23T14:23:57.016Z",
+  "source": {
+    "file": "Fan_02_NLA_INPLACE.glb",
+    "demo": false
+  },
+  "atlas": {
+    "file": "atlas_003.png",
+    "width": 2048,
+    "height": 2048,
+    "cellWidth": 256,
+    "cellHeight": 256,
+    "columns": 8,
+    "rows": 8,
+    "usedCells": 64,
+    "layout": "row-major",
+    "alpha": true
+  },
+  "capture": {
+    "initialYawDegrees": 0,
+    "elevationDegrees": 12,
+    "directions": 1,
+    "directionsDegrees": [
+      0
+    ],
+    "frameMargin": 1.25,
+    "orthographic": true,
+    "materialOverride": {
+      "mode": "all-opaque",
+      "materials": [
+        "tripo_mat_28e048a7"
+      ],
+      "affectedCount": 1,
+      "bakedOnly": true
+    }
+  },
+  "bounds": {
+    "minY": 0,
+    "maxY": 0.99951,
+    "height": 0.99951,
+    "width": 0.80127,
+    "note": "Unidades del modelo. Si hay escalado al importar en el juego, aplicar el mismo factor al sprite."
+  },
+  "clips": [
+    {
+      "id": "00_fan_02_happy_idle_inplace",
+      "name": "fan_02_happy_idle_inplace",
+      "index": 0,
+      "sourceFromFrame": 0,
+      "sourceToFrame": 178.00000190734863,
+      "sourceFps": 60,
+      "durationSeconds": 2.96667,
+      "playbackFps": 5.39326,
+      "frames": 16,
+      "views": 1,
+      "startCell": 0,
+      "loop": true
+    },
+    {
+      "id": "01_fan_02_cheering_inplace",
+      "name": "fan_02_cheering_inplace",
+      "index": 1,
+      "sourceFromFrame": 0,
+      "sourceToFrame": 380.00000953674316,
+      "sourceFps": 60,
+      "durationSeconds": 6.33333,
+      "playbackFps": 2.52632,
+      "frames": 16,
+      "views": 1,
+      "startCell": 16,
+      "loop": true
+    },
+    {
+      "id": "02_fan_02_cheering_alt_inplace",
+      "name": "fan_02_cheering_alt_inplace",
+      "index": 2,
+      "sourceFromFrame": 0,
+      "sourceToFrame": 521.9999885559082,
+      "sourceFps": 60,
+      "durationSeconds": 8.7,
+      "playbackFps": 1.83908,
+      "frames": 16,
+      "views": 1,
+      "startCell": 32,
+      "loop": true
+    },
+    {
+      "id": "03_fan_02_standing_clap_inplace",
+      "name": "fan_02_standing_clap_inplace",
+      "index": 3,
+      "sourceFromFrame": 0,
+      "sourceToFrame": 657.9999732971191,
+      "sourceFps": 60,
+      "durationSeconds": 10.96667,
+      "playbackFps": 1.45897,
+      "frames": 16,
+      "views": 1,
+      "startCell": 48,
+      "loop": true
+    }
+  ],
+  "cellFormula": "clip.startCell + viewIndex * clip.frames + frameIndex"
+}

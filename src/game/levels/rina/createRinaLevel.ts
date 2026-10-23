@@ -36,7 +36,7 @@ import { createRinaStage } from "./RinaStage";
 import { createRinaStageArchitecture } from "./RinaStageArchitecture";
 import { createRinaStageSecurityBarriers } from "./RinaStageSecurityBarriers";
 import { createRinaStandsLedDetails } from "./RinaStandsLedDetails";
-import { createRinaStandsCrowd } from "./RinaStandsCrowd";
+import { createRinaStandsSpriteCrowd } from "./RinaStandsSpriteCrowd";
 
 function createRinaLevelHud() {
   const root = document.createElement("div");
@@ -161,7 +161,7 @@ export async function createRinaLevel(
     stadiumRoot.scaling.setAll(RINA_STADIUM_SCALE);
     crowdPreview.root.parent = stadiumRoot;
     cleanup.push(() => crowdPreview.dispose());
-    const standsCrowd = createRinaStandsCrowd(scene, context.performanceTier, stage.actorLights);
+    const standsCrowd = await createRinaStandsSpriteCrowd(scene, context.performanceTier);
     standsCrowd.root.parent = stadiumRoot;
     cleanup.push(() => standsCrowd.dispose());
     const standsLedDetails = createRinaStandsLedDetails(scene, context.performanceTier);

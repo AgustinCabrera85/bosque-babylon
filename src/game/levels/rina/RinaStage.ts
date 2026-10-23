@@ -346,10 +346,10 @@ export function createRinaStage(
     5,
     scene
   );
-  audienceSpill.diffuse = new Color3(0.27, 0.46, 0.66);
+  audienceSpill.diffuse = new Color3(0.34, 0.35, 0.37);
   audienceSpill.specular = Color3.Black();
-  audienceSpill.intensity = performanceTier === "mobile" ? 30 : 45;
-  audienceSpill.range = 170;
+  audienceSpill.intensity = performanceTier === "mobile" ? 20 : 30;
+  audienceSpill.range = 160;
   audienceSpill.renderPriority = 2;
 
   const screenLights = [-1, 1].map((side) => {
@@ -583,9 +583,9 @@ export function createRinaStage(
           (index === flashSide ? 38 : 16) *
           (performanceTier === "mobile" ? 0.75 : 1);
     }
-    audienceSpill.intensity = (performanceTier === "mobile" ? 30 : 45) *
-      (0.08 + musicPresence * 0.85 + beatPulse * 0.1) +
-      finaleLift * 5 + strobe * (performanceTier === "mobile" ? 24 : 36);
+    audienceSpill.intensity = (performanceTier === "mobile" ? 20 : 30) *
+      (0.22 + musicPresence * 0.52 + beatPulse * 0.08) +
+      finaleLift * 2 + strobe * (performanceTier === "mobile" ? 8 : 12);
 
     const playerLocalPosition = playerWorldPosition.scale(1 / RINA_STADIUM_SCALE);
     let playerSpotHit = 0;

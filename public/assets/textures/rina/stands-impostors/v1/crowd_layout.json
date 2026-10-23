@@ -1,0 +1,10540 @@
+{
+  "schema": "lo-realy-lo-otro/crowd-layout/v1",
+  "generator": "Impostor Baker v2.2",
+  "generatedUtc": "2026-10-23T14:28:33.395Z",
+  "coordinateSystem": "Y-up; posiciones locales del laboratorio (no posiciones del nivel)",
+  "count": 500,
+  "playbackSpeed": 1,
+  "geometry": {
+    "rows": 15,
+    "columns": 34,
+    "stepX": 0.72,
+    "stepZ": 0.92,
+    "rise": 0.22,
+    "type": "packed"
+  },
+  "atlases": [
+    {
+      "atlas": "assets/atlas_001.png",
+      "manifest": "assets/atlas_001.manifest.json",
+      "name": "Fan_03_NLA_INPLACE_todos_yawp0_elevp12_1v_16f_impostor_atlas.png"
+    },
+    {
+      "atlas": "assets/atlas_002.png",
+      "manifest": "assets/atlas_002.manifest.json",
+      "name": "Female_Fan_04_NLA_INPLACE_todos_yawp0_elevp12_1v_16f_impostor_atlas.png"
+    },
+    {
+      "atlas": "assets/atlas_003.png",
+      "manifest": "assets/atlas_003.manifest.json",
+      "name": "Fan_02_NLA_INPLACE_todos_yawp0_elevp12_1v_16f_impostor_atlas.png"
+    },
+    {
+      "atlas": "assets/atlas_004.png",
+      "manifest": "assets/atlas_004.manifest.json",
+      "name": "Female_Fan_05_NLA_INPLACE_todos_yawp0_elevp12_1v_16f_impostor_atlas.png"
+    }
+  ],
+  "spectators": [
+    {
+      "id": 0,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -11.868105,
+        0.719216,
+        -6.438952
+      ],
+      "width": 1.79804,
+      "height": 1.79804,
+      "color": [
+        0.76124,
+        0.75363,
+        0.76124,
+        1
+      ],
+      "speed": 0.984332,
+      "frameOffset": 15.598229
+    },
+    {
+      "id": 1,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -11.172796,
+        0.640541,
+        -6.486391
+      ],
+      "width": 1.601352,
+      "height": 1.601352,
+      "color": [
+        0.69456,
+        0.68761,
+        0.69456,
+        1
+      ],
+      "speed": 1.031904,
+      "frameOffset": 10.125992
+    },
+    {
+      "id": 2,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -10.432653,
+        0.703784,
+        -6.451934
+      ],
+      "width": 1.759459,
+      "height": 1.759459,
+      "color": [
+        0.88244,
+        0.87361,
+        0.88244,
+        1
+      ],
+      "speed": 0.953033,
+      "frameOffset": 7.268489
+    },
+    {
+      "id": 3,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -9.723343,
+        0.637957,
+        -6.374144
+      ],
+      "width": 1.594892,
+      "height": 1.594892,
+      "color": [
+        0.95987,
+        0.95027,
+        0.95987,
+        1
+      ],
+      "speed": 0.977862,
+      "frameOffset": 12.38408
+    },
+    {
+      "id": 4,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -8.961177,
+        0.613714,
+        -6.421581
+      ],
+      "width": 1.534285,
+      "height": 1.534285,
+      "color": [
+        0.74581,
+        0.73835,
+        0.74581,
+        1
+      ],
+      "speed": 0.917424,
+      "frameOffset": 10.475017
+    },
+    {
+      "id": 5,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -8.269873,
+        0.654196,
+        -6.418616
+      ],
+      "width": 1.63549,
+      "height": 1.63549,
+      "color": [
+        0.92459,
+        0.91535,
+        0.92459,
+        1
+      ],
+      "speed": 1.066963,
+      "frameOffset": 1.354299
+    },
+    {
+      "id": 6,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -7.552474,
+        0.686927,
+        -6.502582
+      ],
+      "width": 1.717318,
+      "height": 1.717318,
+      "color": [
+        0.75724,
+        0.74966,
+        0.75724,
+        1
+      ],
+      "speed": 1.06823,
+      "frameOffset": 9.346018
+    },
+    {
+      "id": 7,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -6.877391,
+        0.657568,
+        -6.461893
+      ],
+      "width": 1.643919,
+      "height": 1.643919,
+      "color": [
+        0.9868,
+        0.97694,
+        0.9868,
+        1
+      ],
+      "speed": 1.037666,
+      "frameOffset": 7.654861
+    },
+    {
+      "id": 8,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -6.137237,
+        0.65329,
+        -6.372294
+      ],
+      "width": 1.633226,
+      "height": 1.633226,
+      "color": [
+        0.92205,
+        0.91283,
+        0.92205,
+        1
+      ],
+      "speed": 1.085978,
+      "frameOffset": 2.132335
+    },
+    {
+      "id": 9,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -5.423488,
+        0.692293,
+        -6.426381
+      ],
+      "width": 1.730731,
+      "height": 1.730731,
+      "color": [
+        0.75666,
+        0.7491,
+        0.75666,
+        1
+      ],
+      "speed": 1.051668,
+      "frameOffset": 15.3717
+    },
+    {
+      "id": 10,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -4.723891,
+        0.686034,
+        -6.382665
+      ],
+      "width": 1.715084,
+      "height": 1.715084,
+      "color": [
+        0.84813,
+        0.83965,
+        0.84813,
+        1
+      ],
+      "speed": 1.068486,
+      "frameOffset": 7.074371
+    },
+    {
+      "id": 11,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -3.966539,
+        0.62333,
+        -6.468389
+      ],
+      "width": 1.558324,
+      "height": 1.558324,
+      "color": [
+        0.95724,
+        0.94767,
+        0.95724,
+        1
+      ],
+      "speed": 0.920661,
+      "frameOffset": 11.95239
+    },
+    {
+      "id": 12,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -3.237026,
+        0.628548,
+        -6.450963
+      ],
+      "width": 1.571369,
+      "height": 1.571369,
+      "color": [
+        0.93309,
+        0.92376,
+        0.93309,
+        1
+      ],
+      "speed": 0.985459,
+      "frameOffset": 4.990632
+    },
+    {
+      "id": 13,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -2.491529,
+        0.657722,
+        -6.448457
+      ],
+      "width": 1.644304,
+      "height": 1.644304,
+      "color": [
+        0.69651,
+        0.68954,
+        0.69651,
+        1
+      ],
+      "speed": 1.024058,
+      "frameOffset": 13.943231
+    },
+    {
+      "id": 14,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -1.786653,
+        0.634603,
+        -6.409529
+      ],
+      "width": 1.586507,
+      "height": 1.586507,
+      "color": [
+        0.83801,
+        0.82963,
+        0.83801,
+        1
+      ],
+      "speed": 1.003024,
+      "frameOffset": 10.285865
+    },
+    {
+      "id": 15,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -1.042993,
+        0.647981,
+        -6.450438
+      ],
+      "width": 1.619952,
+      "height": 1.619952,
+      "color": [
+        0.85127,
+        0.84275,
+        0.85127,
+        1
+      ],
+      "speed": 0.921386,
+      "frameOffset": 7.566572
+    },
+    {
+      "id": 16,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -0.3862,
+        0.643882,
+        -6.387066
+      ],
+      "width": 1.609706,
+      "height": 1.609706,
+      "color": [
+        0.89236,
+        0.88344,
+        0.89236,
+        1
+      ],
+      "speed": 1.059846,
+      "frameOffset": 8.093663
+    },
+    {
+      "id": 17,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        0.330277,
+        0.618862,
+        -6.486788
+      ],
+      "width": 1.547154,
+      "height": 1.547154,
+      "color": [
+        0.98896,
+        0.97907,
+        0.98896,
+        1
+      ],
+      "speed": 1.089709,
+      "frameOffset": 7.487238
+    },
+    {
+      "id": 18,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        1.065895,
+        0.658361,
+        -6.452016
+      ],
+      "width": 1.645903,
+      "height": 1.645903,
+      "color": [
+        0.80838,
+        0.8003,
+        0.80838,
+        1
+      ],
+      "speed": 1.004931,
+      "frameOffset": 2.612075
+    },
+    {
+      "id": 19,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        1.841584,
+        0.629291,
+        -6.510666
+      ],
+      "width": 1.573228,
+      "height": 1.573228,
+      "color": [
+        0.78333,
+        0.77549,
+        0.78333,
+        1
+      ],
+      "speed": 1.054406,
+      "frameOffset": 10.890454
+    },
+    {
+      "id": 20,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        2.578135,
+        0.710775,
+        -6.422401
+      ],
+      "width": 1.776937,
+      "height": 1.776937,
+      "color": [
+        0.87167,
+        0.86296,
+        0.87167,
+        1
+      ],
+      "speed": 1.059925,
+      "frameOffset": 1.593338
+    },
+    {
+      "id": 21,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        3.291467,
+        0.622362,
+        -6.436715
+      ],
+      "width": 1.555905,
+      "height": 1.555905,
+      "color": [
+        0.68977,
+        0.68288,
+        0.68977,
+        1
+      ],
+      "speed": 1.047197,
+      "frameOffset": 6.414113
+    },
+    {
+      "id": 22,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        3.978029,
+        0.683589,
+        -6.47781
+      ],
+      "width": 1.708972,
+      "height": 1.708972,
+      "color": [
+        0.69621,
+        0.68925,
+        0.69621,
+        1
+      ],
+      "speed": 1.014091,
+      "frameOffset": 2.332094
+    },
+    {
+      "id": 23,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        4.61961,
+        0.678569,
+        -6.481761
+      ],
+      "width": 1.696423,
+      "height": 1.696423,
+      "color": [
+        0.9718,
+        0.96208,
+        0.9718,
+        1
+      ],
+      "speed": 1.050558,
+      "frameOffset": 6.869894
+    },
+    {
+      "id": 24,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        5.34718,
+        0.613895,
+        -6.467675
+      ],
+      "width": 1.534738,
+      "height": 1.534738,
+      "color": [
+        0.86886,
+        0.86018,
+        0.86886,
+        1
+      ],
+      "speed": 0.933407,
+      "frameOffset": 14.018933
+    },
+    {
+      "id": 25,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        6.065694,
+        0.679277,
+        -6.466157
+      ],
+      "width": 1.698191,
+      "height": 1.698191,
+      "color": [
+        0.71705,
+        0.70988,
+        0.71705,
+        1
+      ],
+      "speed": 1.042583,
+      "frameOffset": 1.419403
+    },
+    {
+      "id": 26,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        6.785774,
+        0.70564,
+        -6.417678
+      ],
+      "width": 1.7641,
+      "height": 1.7641,
+      "color": [
+        0.71749,
+        0.71032,
+        0.71749,
+        1
+      ],
+      "speed": 0.975092,
+      "frameOffset": 10.796795
+    },
+    {
+      "id": 27,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        7.567013,
+        0.660972,
+        -6.377608
+      ],
+      "width": 1.652429,
+      "height": 1.652429,
+      "color": [
+        0.70154,
+        0.69453,
+        0.70154,
+        1
+      ],
+      "speed": 0.996188,
+      "frameOffset": 10.588613
+    },
+    {
+      "id": 28,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        8.237055,
+        0.628817,
+        -6.394415
+      ],
+      "width": 1.572042,
+      "height": 1.572042,
+      "color": [
+        0.92268,
+        0.91345,
+        0.92268,
+        1
+      ],
+      "speed": 0.950437,
+      "frameOffset": 10.796214
+    },
+    {
+      "id": 29,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        8.951502,
+        0.714386,
+        -6.479038
+      ],
+      "width": 1.785964,
+      "height": 1.785964,
+      "color": [
+        0.74538,
+        0.73792,
+        0.74538,
+        1
+      ],
+      "speed": 1.039704,
+      "frameOffset": 3.221319
+    },
+    {
+      "id": 30,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        9.690095,
+        0.626711,
+        -6.46302
+      ],
+      "width": 1.566777,
+      "height": 1.566777,
+      "color": [
+        0.82301,
+        0.81478,
+        0.82301,
+        1
+      ],
+      "speed": 0.941748,
+      "frameOffset": 15.096412
+    },
+    {
+      "id": 31,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        10.442878,
+        0.675862,
+        -6.473292
+      ],
+      "width": 1.689655,
+      "height": 1.689655,
+      "color": [
+        0.98194,
+        0.97212,
+        0.98194,
+        1
+      ],
+      "speed": 0.984591,
+      "frameOffset": 0.490946
+    },
+    {
+      "id": 32,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        11.116101,
+        0.715758,
+        -6.496117
+      ],
+      "width": 1.789395,
+      "height": 1.789395,
+      "color": [
+        0.88605,
+        0.87719,
+        0.88605,
+        1
+      ],
+      "speed": 1.07578,
+      "frameOffset": 10.276807
+    },
+    {
+      "id": 33,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        11.857969,
+        0.616921,
+        -6.428454
+      ],
+      "width": 1.542304,
+      "height": 1.542304,
+      "color": [
+        0.98998,
+        0.98008,
+        0.98998,
+        1
+      ],
+      "speed": 0.961344,
+      "frameOffset": 3.496427
+    },
+    {
+      "id": 34,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -11.830628,
+        0.865258,
+        -5.576443
+      ],
+      "width": 1.613146,
+      "height": 1.613146,
+      "color": [
+        0.99587,
+        0.98591,
+        0.99587,
+        1
+      ],
+      "speed": 1.08179,
+      "frameOffset": 15.957664
+    },
+    {
+      "id": 35,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -11.140318,
+        0.886272,
+        -5.551318
+      ],
+      "width": 1.665681,
+      "height": 1.665681,
+      "color": [
+        0.85676,
+        0.84819,
+        0.85676,
+        1
+      ],
+      "speed": 0.915057,
+      "frameOffset": 1.571975
+    },
+    {
+      "id": 36,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -10.38942,
+        0.909364,
+        -5.533897
+      ],
+      "width": 1.723411,
+      "height": 1.723411,
+      "color": [
+        0.90816,
+        0.89908,
+        0.90816,
+        1
+      ],
+      "speed": 1.043283,
+      "frameOffset": 15.329071
+    },
+    {
+      "id": 37,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -9.666773,
+        0.929261,
+        -5.572987
+      ],
+      "width": 1.773152,
+      "height": 1.773152,
+      "color": [
+        0.94826,
+        0.93878,
+        0.94826,
+        1
+      ],
+      "speed": 0.916336,
+      "frameOffset": 11.651267
+    },
+    {
+      "id": 38,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -8.991464,
+        0.909864,
+        -5.454362
+      ],
+      "width": 1.724661,
+      "height": 1.724661,
+      "color": [
+        0.7268,
+        0.71953,
+        0.7268,
+        1
+      ],
+      "speed": 0.96882,
+      "frameOffset": 2.603492
+    },
+    {
+      "id": 39,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -8.231923,
+        0.924449,
+        -5.473799
+      ],
+      "width": 1.761123,
+      "height": 1.761123,
+      "color": [
+        0.76958,
+        0.76188,
+        0.76958,
+        1
+      ],
+      "speed": 0.974185,
+      "frameOffset": 4.270817
+    },
+    {
+      "id": 40,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -7.613184,
+        0.928829,
+        -5.515268
+      ],
+      "width": 1.772071,
+      "height": 1.772071,
+      "color": [
+        0.71919,
+        0.712,
+        0.71919,
+        1
+      ],
+      "speed": 0.964103,
+      "frameOffset": 11.834438
+    },
+    {
+      "id": 41,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -6.815391,
+        0.836917,
+        -5.492655
+      ],
+      "width": 1.542292,
+      "height": 1.542292,
+      "color": [
+        0.78976,
+        0.78186,
+        0.78976,
+        1
+      ],
+      "speed": 1.07873,
+      "frameOffset": 9.038731
+    },
+    {
+      "id": 42,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -6.076156,
+        0.887262,
+        -5.586951
+      ],
+      "width": 1.668155,
+      "height": 1.668155,
+      "color": [
+        0.75517,
+        0.74762,
+        0.75517,
+        1
+      ],
+      "speed": 1.001567,
+      "frameOffset": 1.178957
+    },
+    {
+      "id": 43,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -5.401091,
+        0.832946,
+        -5.50357
+      ],
+      "width": 1.532365,
+      "height": 1.532365,
+      "color": [
+        0.99977,
+        0.98977,
+        0.99977,
+        1
+      ],
+      "speed": 1.028997,
+      "frameOffset": 6.622367
+    },
+    {
+      "id": 44,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -4.685777,
+        0.87481,
+        -5.451921
+      ],
+      "width": 1.637025,
+      "height": 1.637025,
+      "color": [
+        0.73513,
+        0.72778,
+        0.73513,
+        1
+      ],
+      "speed": 0.935953,
+      "frameOffset": 14.460138
+    },
+    {
+      "id": 45,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -3.963083,
+        0.872187,
+        -5.46401
+      ],
+      "width": 1.630467,
+      "height": 1.630467,
+      "color": [
+        0.98848,
+        0.9786,
+        0.98848,
+        1
+      ],
+      "speed": 0.947686,
+      "frameOffset": 10.686029
+    },
+    {
+      "id": 46,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -3.197858,
+        0.856778,
+        -5.557039
+      ],
+      "width": 1.591945,
+      "height": 1.591945,
+      "color": [
+        0.71513,
+        0.70797,
+        0.71513,
+        1
+      ],
+      "speed": 0.940397,
+      "frameOffset": 10.862345
+    },
+    {
+      "id": 47,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -2.522196,
+        0.86034,
+        -5.535323
+      ],
+      "width": 1.600851,
+      "height": 1.600851,
+      "color": [
+        0.83861,
+        0.83022,
+        0.83861,
+        1
+      ],
+      "speed": 0.944483,
+      "frameOffset": 3.451648
+    },
+    {
+      "id": 48,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -1.814481,
+        0.865438,
+        -5.569248
+      ],
+      "width": 1.613596,
+      "height": 1.613596,
+      "color": [
+        0.99517,
+        0.98522,
+        0.99517,
+        1
+      ],
+      "speed": 1.048095,
+      "frameOffset": 5.831574
+    },
+    {
+      "id": 49,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -1.054646,
+        0.854901,
+        -5.538455
+      ],
+      "width": 1.587252,
+      "height": 1.587252,
+      "color": [
+        0.81152,
+        0.8034,
+        0.81152,
+        1
+      ],
+      "speed": 1.006526,
+      "frameOffset": 4.271489
+    },
+    {
+      "id": 50,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -0.315504,
+        0.904278,
+        -5.448313
+      ],
+      "width": 1.710694,
+      "height": 1.710694,
+      "color": [
+        0.99998,
+        0.98998,
+        0.99998,
+        1
+      ],
+      "speed": 1.023545,
+      "frameOffset": 7.202535
+    },
+    {
+      "id": 51,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        0.329919,
+        0.85952,
+        -5.476446
+      ],
+      "width": 1.598801,
+      "height": 1.598801,
+      "color": [
+        0.81132,
+        0.80321,
+        0.81132,
+        1
+      ],
+      "speed": 1.041823,
+      "frameOffset": 11.004806
+    },
+    {
+      "id": 52,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        1.128545,
+        0.828654,
+        -5.489454
+      ],
+      "width": 1.521636,
+      "height": 1.521636,
+      "color": [
+        0.83686,
+        0.82849,
+        0.83686,
+        1
+      ],
+      "speed": 1.077335,
+      "frameOffset": 5.762943
+    },
+    {
+      "id": 53,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        1.76825,
+        0.87752,
+        -5.473028
+      ],
+      "width": 1.643799,
+      "height": 1.643799,
+      "color": [
+        0.92015,
+        0.91095,
+        0.92015,
+        1
+      ],
+      "speed": 0.987606,
+      "frameOffset": 5.404038
+    },
+    {
+      "id": 54,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        2.486465,
+        0.828001,
+        -5.588416
+      ],
+      "width": 1.520003,
+      "height": 1.520003,
+      "color": [
+        0.73598,
+        0.72862,
+        0.73598,
+        1
+      ],
+      "speed": 0.943717,
+      "frameOffset": 15.48686
+    },
+    {
+      "id": 55,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        3.278024,
+        0.828873,
+        -5.476711
+      ],
+      "width": 1.522183,
+      "height": 1.522183,
+      "color": [
+        0.71572,
+        0.70856,
+        0.71572,
+        1
+      ],
+      "speed": 0.984754,
+      "frameOffset": 2.692512
+    },
+    {
+      "id": 56,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        3.956366,
+        0.877403,
+        -5.451072
+      ],
+      "width": 1.643507,
+      "height": 1.643507,
+      "color": [
+        0.77252,
+        0.76479,
+        0.77252,
+        1
+      ],
+      "speed": 0.911783,
+      "frameOffset": 12.12803
+    },
+    {
+      "id": 57,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        4.685893,
+        0.914823,
+        -5.478119
+      ],
+      "width": 1.737058,
+      "height": 1.737058,
+      "color": [
+        0.84165,
+        0.83323,
+        0.84165,
+        1
+      ],
+      "speed": 1.022708,
+      "frameOffset": 8.251294
+    },
+    {
+      "id": 58,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        5.429094,
+        0.9159,
+        -5.579654
+      ],
+      "width": 1.73975,
+      "height": 1.73975,
+      "color": [
+        0.82371,
+        0.81547,
+        0.82371,
+        1
+      ],
+      "speed": 0.991006,
+      "frameOffset": 15.566395
+    },
+    {
+      "id": 59,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        6.18032,
+        0.861307,
+        -5.556565
+      ],
+      "width": 1.603267,
+      "height": 1.603267,
+      "color": [
+        0.9546,
+        0.94505,
+        0.9546,
+        1
+      ],
+      "speed": 1.013998,
+      "frameOffset": 4.454816
+    },
+    {
+      "id": 60,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        6.837047,
+        0.887859,
+        -5.476613
+      ],
+      "width": 1.669647,
+      "height": 1.669647,
+      "color": [
+        0.83194,
+        0.82362,
+        0.83194,
+        1
+      ],
+      "speed": 0.974469,
+      "frameOffset": 3.41912
+    },
+    {
+      "id": 61,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        7.513808,
+        0.907698,
+        -5.557826
+      ],
+      "width": 1.719245,
+      "height": 1.719245,
+      "color": [
+        0.75942,
+        0.75182,
+        0.75942,
+        1
+      ],
+      "speed": 1.023111,
+      "frameOffset": 0.232368
+    },
+    {
+      "id": 62,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        8.293465,
+        0.872313,
+        -5.573485
+      ],
+      "width": 1.630784,
+      "height": 1.630784,
+      "color": [
+        0.67386,
+        0.66712,
+        0.67386,
+        1
+      ],
+      "speed": 0.976553,
+      "frameOffset": 8.579687
+    },
+    {
+      "id": 63,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        8.945677,
+        0.9047,
+        -5.480765
+      ],
+      "width": 1.71175,
+      "height": 1.71175,
+      "color": [
+        0.78402,
+        0.77618,
+        0.78402,
+        1
+      ],
+      "speed": 0.914835,
+      "frameOffset": 14.44483
+    },
+    {
+      "id": 64,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        9.739647,
+        0.925365,
+        -5.577684
+      ],
+      "width": 1.763413,
+      "height": 1.763413,
+      "color": [
+        0.71641,
+        0.70925,
+        0.71641,
+        1
+      ],
+      "speed": 1.055577,
+      "frameOffset": 3.010126
+    },
+    {
+      "id": 65,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        10.448644,
+        0.824621,
+        -5.487028
+      ],
+      "width": 1.511552,
+      "height": 1.511552,
+      "color": [
+        0.78861,
+        0.78073,
+        0.78861,
+        1
+      ],
+      "speed": 1.084095,
+      "frameOffset": 4.647222
+    },
+    {
+      "id": 66,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        11.203727,
+        0.885988,
+        -5.57489
+      ],
+      "width": 1.66497,
+      "height": 1.66497,
+      "color": [
+        0.99313,
+        0.9832,
+        0.99313,
+        1
+      ],
+      "speed": 0.92693,
+      "frameOffset": 14.078886
+    },
+    {
+      "id": 67,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        11.879116,
+        0.878423,
+        -5.568568
+      ],
+      "width": 1.646058,
+      "height": 1.646058,
+      "color": [
+        0.80193,
+        0.79391,
+        0.80193,
+        1
+      ],
+      "speed": 1.070598,
+      "frameOffset": 7.99824
+    },
+    {
+      "id": 68,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -11.836239,
+        1.126168,
+        -4.566382
+      ],
+      "width": 1.715421,
+      "height": 1.715421,
+      "color": [
+        0.75449,
+        0.74694,
+        0.75449,
+        1
+      ],
+      "speed": 1.067417,
+      "frameOffset": 12.448365
+    },
+    {
+      "id": 69,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -11.218511,
+        1.044294,
+        -4.615205
+      ],
+      "width": 1.510736,
+      "height": 1.510736,
+      "color": [
+        0.91531,
+        0.90616,
+        0.91531,
+        1
+      ],
+      "speed": 0.996207,
+      "frameOffset": 9.040682
+    },
+    {
+      "id": 70,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -10.382805,
+        1.122306,
+        -4.597252
+      ],
+      "width": 1.705765,
+      "height": 1.705765,
+      "color": [
+        0.99793,
+        0.98796,
+        0.99793,
+        1
+      ],
+      "speed": 1.013187,
+      "frameOffset": 5.002102
+    },
+    {
+      "id": 71,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -9.731342,
+        1.083059,
+        -4.66721
+      ],
+      "width": 1.607647,
+      "height": 1.607647,
+      "color": [
+        0.78989,
+        0.78199,
+        0.78989,
+        1
+      ],
+      "speed": 1.006196,
+      "frameOffset": 11.465328
+    },
+    {
+      "id": 72,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -9.025618,
+        1.057759,
+        -4.569939
+      ],
+      "width": 1.544398,
+      "height": 1.544398,
+      "color": [
+        0.82536,
+        0.8171,
+        0.82536,
+        1
+      ],
+      "speed": 0.937043,
+      "frameOffset": 5.005785
+    },
+    {
+      "id": 73,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -8.287007,
+        1.099064,
+        -4.645157
+      ],
+      "width": 1.64766,
+      "height": 1.64766,
+      "color": [
+        0.96531,
+        0.95566,
+        0.96531,
+        1
+      ],
+      "speed": 0.970406,
+      "frameOffset": 1.987199
+    },
+    {
+      "id": 74,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -7.597137,
+        1.09253,
+        -4.581955
+      ],
+      "width": 1.631324,
+      "height": 1.631324,
+      "color": [
+        0.71645,
+        0.70929,
+        0.71645,
+        1
+      ],
+      "speed": 1.014877,
+      "frameOffset": 5.101887
+    },
+    {
+      "id": 75,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -6.887876,
+        1.118524,
+        -4.572719
+      ],
+      "width": 1.696309,
+      "height": 1.696309,
+      "color": [
+        0.98063,
+        0.97082,
+        0.98063,
+        1
+      ],
+      "speed": 0.987882,
+      "frameOffset": 3.526838
+    },
+    {
+      "id": 76,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -6.153555,
+        1.084533,
+        -4.656463
+      ],
+      "width": 1.611332,
+      "height": 1.611332,
+      "color": [
+        0.76117,
+        0.75356,
+        0.76117,
+        1
+      ],
+      "speed": 1.031739,
+      "frameOffset": 0.089859
+    },
+    {
+      "id": 77,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -5.458023,
+        1.125828,
+        -4.639773
+      ],
+      "width": 1.71457,
+      "height": 1.71457,
+      "color": [
+        0.77931,
+        0.77152,
+        0.77931,
+        1
+      ],
+      "speed": 1.004096,
+      "frameOffset": 6.469819
+    },
+    {
+      "id": 78,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        -4.716996,
+        1.157496,
+        -4.638759
+      ],
+      "width": 1.79374,
+      "height": 1.79374,
+      "color": [
+        0.87716,
+        0.86839,
+        0.87716,
+        1
+      ],
+      "speed": 0.983701,
+      "frameOffset": 9.089744
+    },
+    {
+      "id": 79,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -3.918856,
+        1.048468,
+        -4.645793
+      ],
+      "width": 1.52117,
+      "height": 1.52117,
+      "color": [
+        0.81863,
+        0.81044,
+        0.81863,
+        1
+      ],
+      "speed": 1.043656,
+      "frameOffset": 9.004587
+    },
+    {
+      "id": 80,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -3.207261,
+        1.148967,
+        -4.533861
+      ],
+      "width": 1.772418,
+      "height": 1.772418,
+      "color": [
+        0.72978,
+        0.72248,
+        0.72978,
+        1
+      ],
+      "speed": 0.95602,
+      "frameOffset": 10.942012
+    },
+    {
+      "id": 81,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -2.533666,
+        1.081836,
+        -4.637188
+      ],
+      "width": 1.604589,
+      "height": 1.604589,
+      "color": [
+        0.67184,
+        0.66512,
+        0.67184,
+        1
+      ],
+      "speed": 1.083445,
+      "frameOffset": 14.84368
+    },
+    {
+      "id": 82,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        -1.746818,
+        1.143976,
+        -4.645549
+      ],
+      "width": 1.759941,
+      "height": 1.759941,
+      "color": [
+        0.8513,
+        0.84279,
+        0.8513,
+        1
+      ],
+      "speed": 0.939752,
+      "frameOffset": 11.020712
+    },
+    {
+      "id": 83,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -1.092017,
+        1.062778,
+        -4.669444
+      ],
+      "width": 1.556945,
+      "height": 1.556945,
+      "color": [
+        0.78012,
+        0.77232,
+        0.78012,
+        1
+      ],
+      "speed": 0.926011,
+      "frameOffset": 11.251617
+    },
+    {
+      "id": 84,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -0.300739,
+        1.116483,
+        -4.542955
+      ],
+      "width": 1.691208,
+      "height": 1.691208,
+      "color": [
+        0.77459,
+        0.76685,
+        0.77459,
+        1
+      ],
+      "speed": 0.945891,
+      "frameOffset": 6.985775
+    },
+    {
+      "id": 85,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        0.37126,
+        1.107347,
+        -4.673296
+      ],
+      "width": 1.668369,
+      "height": 1.668369,
+      "color": [
+        0.92225,
+        0.91302,
+        0.92225,
+        1
+      ],
+      "speed": 0.945212,
+      "frameOffset": 15.599823
+    },
+    {
+      "id": 86,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        1.107674,
+        1.064441,
+        -4.557394
+      ],
+      "width": 1.561102,
+      "height": 1.561102,
+      "color": [
+        0.88799,
+        0.87911,
+        0.88799,
+        1
+      ],
+      "speed": 0.944569,
+      "frameOffset": 15.380767
+    },
+    {
+      "id": 87,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        1.746458,
+        1.061481,
+        -4.5702
+      ],
+      "width": 1.553704,
+      "height": 1.553704,
+      "color": [
+        0.86881,
+        0.86012,
+        0.86881,
+        1
+      ],
+      "speed": 0.95328,
+      "frameOffset": 3.974496
+    },
+    {
+      "id": 88,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        2.501543,
+        1.121993,
+        -4.608725
+      ],
+      "width": 1.704983,
+      "height": 1.704983,
+      "color": [
+        0.96164,
+        0.95202,
+        0.96164,
+        1
+      ],
+      "speed": 1.043436,
+      "frameOffset": 4.148255
+    },
+    {
+      "id": 89,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        3.212271,
+        1.11011,
+        -4.556483
+      ],
+      "width": 1.675275,
+      "height": 1.675275,
+      "color": [
+        0.8414,
+        0.83299,
+        0.8414,
+        1
+      ],
+      "speed": 1.001701,
+      "frameOffset": 9.132895
+    },
+    {
+      "id": 90,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        3.905591,
+        1.114858,
+        -4.624074
+      ],
+      "width": 1.687146,
+      "height": 1.687146,
+      "color": [
+        0.9247,
+        0.91545,
+        0.9247,
+        1
+      ],
+      "speed": 0.986033,
+      "frameOffset": 0.061278
+    },
+    {
+      "id": 91,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        4.630593,
+        1.100572,
+        -4.638744
+      ],
+      "width": 1.65143,
+      "height": 1.65143,
+      "color": [
+        0.69255,
+        0.68563,
+        0.69255,
+        1
+      ],
+      "speed": 1.016618,
+      "frameOffset": 3.363011
+    },
+    {
+      "id": 92,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        5.459788,
+        1.111018,
+        -4.646098
+      ],
+      "width": 1.677546,
+      "height": 1.677546,
+      "color": [
+        0.76837,
+        0.76068,
+        0.76837,
+        1
+      ],
+      "speed": 0.927697,
+      "frameOffset": 0.22145
+    },
+    {
+      "id": 93,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        6.078475,
+        1.121691,
+        -4.617774
+      ],
+      "width": 1.704227,
+      "height": 1.704227,
+      "color": [
+        0.90181,
+        0.89279,
+        0.90181,
+        1
+      ],
+      "speed": 1.039988,
+      "frameOffset": 8.983644
+    },
+    {
+      "id": 94,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        6.794168,
+        1.115676,
+        -4.613335
+      ],
+      "width": 1.68919,
+      "height": 1.68919,
+      "color": [
+        0.89913,
+        0.89014,
+        0.89913,
+        1
+      ],
+      "speed": 0.986929,
+      "frameOffset": 1.097077
+    },
+    {
+      "id": 95,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        7.620225,
+        1.078406,
+        -4.620101
+      ],
+      "width": 1.596015,
+      "height": 1.596015,
+      "color": [
+        0.78391,
+        0.77607,
+        0.78391,
+        1
+      ],
+      "speed": 0.977941,
+      "frameOffset": 13.231176
+    },
+    {
+      "id": 96,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        8.236481,
+        1.068704,
+        -4.614959
+      ],
+      "width": 1.57176,
+      "height": 1.57176,
+      "color": [
+        0.83453,
+        0.82618,
+        0.83453,
+        1
+      ],
+      "speed": 0.967353,
+      "frameOffset": 2.246893
+    },
+    {
+      "id": 97,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        9.053797,
+        1.089854,
+        -4.654497
+      ],
+      "width": 1.624635,
+      "height": 1.624635,
+      "color": [
+        0.8051,
+        0.79705,
+        0.8051,
+        1
+      ],
+      "speed": 1.057662,
+      "frameOffset": 3.487294
+    },
+    {
+      "id": 98,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        9.757237,
+        1.08237,
+        -4.555148
+      ],
+      "width": 1.605926,
+      "height": 1.605926,
+      "color": [
+        0.95223,
+        0.94271,
+        0.95223,
+        1
+      ],
+      "speed": 1.049619,
+      "frameOffset": 12.876026
+    },
+    {
+      "id": 99,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        10.418482,
+        1.060762,
+        -4.598541
+      ],
+      "width": 1.551904,
+      "height": 1.551904,
+      "color": [
+        0.86442,
+        0.85577,
+        0.86442,
+        1
+      ],
+      "speed": 1.03436,
+      "frameOffset": 0.075859
+    },
+    {
+      "id": 100,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        11.150032,
+        1.070364,
+        -4.607768
+      ],
+      "width": 1.57591,
+      "height": 1.57591,
+      "color": [
+        0.90144,
+        0.89242,
+        0.90144,
+        1
+      ],
+      "speed": 1.03958,
+      "frameOffset": 2.086771
+    },
+    {
+      "id": 101,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        11.878564,
+        1.158677,
+        -4.622863
+      ],
+      "width": 1.796693,
+      "height": 1.796693,
+      "color": [
+        0.78437,
+        0.77653,
+        0.78437,
+        1
+      ],
+      "speed": 1.079078,
+      "frameOffset": 8.553134
+    },
+    {
+      "id": 102,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -11.885354,
+        1.266532,
+        -3.673769
+      ],
+      "width": 1.516331,
+      "height": 1.516331,
+      "color": [
+        0.9476,
+        0.93812,
+        0.9476,
+        1
+      ],
+      "speed": 0.980081,
+      "frameOffset": 3.733247
+    },
+    {
+      "id": 103,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -11.213265,
+        1.372594,
+        -3.624156
+      ],
+      "width": 1.781486,
+      "height": 1.781486,
+      "color": [
+        0.76744,
+        0.75977,
+        0.76744,
+        1
+      ],
+      "speed": 0.970299,
+      "frameOffset": 12.266034
+    },
+    {
+      "id": 104,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -10.415396,
+        1.304392,
+        -3.625814
+      ],
+      "width": 1.610979,
+      "height": 1.610979,
+      "color": [
+        0.89445,
+        0.88551,
+        0.89445,
+        1
+      ],
+      "speed": 1.017696,
+      "frameOffset": 1.672237
+    },
+    {
+      "id": 105,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -9.752768,
+        1.338531,
+        -3.741996
+      ],
+      "width": 1.696327,
+      "height": 1.696327,
+      "color": [
+        0.70506,
+        0.69801,
+        0.70506,
+        1
+      ],
+      "speed": 1.06229,
+      "frameOffset": 5.718791
+    },
+    {
+      "id": 106,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -9.002376,
+        1.30733,
+        -3.626638
+      ],
+      "width": 1.618326,
+      "height": 1.618326,
+      "color": [
+        0.67293,
+        0.6662,
+        0.67293,
+        1
+      ],
+      "speed": 1.011631,
+      "frameOffset": 3.114374
+    },
+    {
+      "id": 107,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -8.310174,
+        1.262898,
+        -3.606416
+      ],
+      "width": 1.507246,
+      "height": 1.507246,
+      "color": [
+        0.72107,
+        0.71386,
+        0.72107,
+        1
+      ],
+      "speed": 1.001113,
+      "frameOffset": 15.988884
+    },
+    {
+      "id": 108,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -7.548057,
+        1.263741,
+        -3.628312
+      ],
+      "width": 1.509351,
+      "height": 1.509351,
+      "color": [
+        0.99376,
+        0.98383,
+        0.99376,
+        1
+      ],
+      "speed": 1.034493,
+      "frameOffset": 15.710796
+    },
+    {
+      "id": 109,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -6.811504,
+        1.272111,
+        -3.70572
+      ],
+      "width": 1.530278,
+      "height": 1.530278,
+      "color": [
+        0.87982,
+        0.87102,
+        0.87982,
+        1
+      ],
+      "speed": 0.916016,
+      "frameOffset": 14.579986
+    },
+    {
+      "id": 110,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -6.07878,
+        1.37749,
+        -3.651903
+      ],
+      "width": 1.793724,
+      "height": 1.793724,
+      "color": [
+        0.81784,
+        0.80966,
+        0.81784,
+        1
+      ],
+      "speed": 1.064514,
+      "frameOffset": 7.802879
+    },
+    {
+      "id": 111,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -5.381728,
+        1.362014,
+        -3.732518
+      ],
+      "width": 1.755034,
+      "height": 1.755034,
+      "color": [
+        0.7402,
+        0.7328,
+        0.7402,
+        1
+      ],
+      "speed": 0.953938,
+      "frameOffset": 8.265774
+    },
+    {
+      "id": 112,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -4.624341,
+        1.367981,
+        -3.632417
+      ],
+      "width": 1.769952,
+      "height": 1.769952,
+      "color": [
+        0.72216,
+        0.71494,
+        0.72216,
+        1
+      ],
+      "speed": 0.945247,
+      "frameOffset": 3.959348
+    },
+    {
+      "id": 113,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -3.910169,
+        1.340106,
+        -3.688051
+      ],
+      "width": 1.700264,
+      "height": 1.700264,
+      "color": [
+        0.70954,
+        0.70244,
+        0.70954,
+        1
+      ],
+      "speed": 0.917431,
+      "frameOffset": 3.457127
+    },
+    {
+      "id": 114,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -3.253039,
+        1.278245,
+        -3.738004
+      ],
+      "width": 1.545612,
+      "height": 1.545612,
+      "color": [
+        0.89658,
+        0.88762,
+        0.89658,
+        1
+      ],
+      "speed": 1.043105,
+      "frameOffset": 15.058885
+    },
+    {
+      "id": 115,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -2.531428,
+        1.365257,
+        -3.678946
+      ],
+      "width": 1.763143,
+      "height": 1.763143,
+      "color": [
+        0.88814,
+        0.87926,
+        0.88814,
+        1
+      ],
+      "speed": 0.985399,
+      "frameOffset": 7.972346
+    },
+    {
+      "id": 116,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -1.780436,
+        1.278361,
+        -3.632431
+      ],
+      "width": 1.545902,
+      "height": 1.545902,
+      "color": [
+        0.94293,
+        0.9335,
+        0.94293,
+        1
+      ],
+      "speed": 1.001896,
+      "frameOffset": 7.54208
+    },
+    {
+      "id": 117,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -1.085427,
+        1.369738,
+        -3.679673
+      ],
+      "width": 1.774345,
+      "height": 1.774345,
+      "color": [
+        0.71907,
+        0.71188,
+        0.71907,
+        1
+      ],
+      "speed": 0.942244,
+      "frameOffset": 4.558804
+    },
+    {
+      "id": 118,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -0.414791,
+        1.373585,
+        -3.656511
+      ],
+      "width": 1.783962,
+      "height": 1.783962,
+      "color": [
+        0.88386,
+        0.87502,
+        0.88386,
+        1
+      ],
+      "speed": 0.954606,
+      "frameOffset": 3.822395
+    },
+    {
+      "id": 119,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        0.351509,
+        1.330967,
+        -3.739235
+      ],
+      "width": 1.677417,
+      "height": 1.677417,
+      "color": [
+        0.6862,
+        0.67934,
+        0.6862,
+        1
+      ],
+      "speed": 0.9777,
+      "frameOffset": 3.2753
+    },
+    {
+      "id": 120,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        1.057587,
+        1.279832,
+        -3.71008
+      ],
+      "width": 1.549581,
+      "height": 1.549581,
+      "color": [
+        0.70226,
+        0.69524,
+        0.70226,
+        1
+      ],
+      "speed": 1.063804,
+      "frameOffset": 6.774841
+    },
+    {
+      "id": 121,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        1.797514,
+        1.357776,
+        -3.724342
+      ],
+      "width": 1.744441,
+      "height": 1.744441,
+      "color": [
+        0.67586,
+        0.6691,
+        0.67586,
+        1
+      ],
+      "speed": 1.012919,
+      "frameOffset": 15.275898
+    },
+    {
+      "id": 122,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        2.557715,
+        1.364375,
+        -3.654552
+      ],
+      "width": 1.760937,
+      "height": 1.760937,
+      "color": [
+        0.90318,
+        0.89415,
+        0.90318,
+        1
+      ],
+      "speed": 0.986878,
+      "frameOffset": 0.988947
+    },
+    {
+      "id": 123,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        3.299309,
+        1.338706,
+        -3.679466
+      ],
+      "width": 1.696765,
+      "height": 1.696765,
+      "color": [
+        0.9895,
+        0.9796,
+        0.9895,
+        1
+      ],
+      "speed": 0.973318,
+      "frameOffset": 8.437878
+    },
+    {
+      "id": 124,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        3.987535,
+        1.352229,
+        -3.73527
+      ],
+      "width": 1.730572,
+      "height": 1.730572,
+      "color": [
+        0.9029,
+        0.89387,
+        0.9029,
+        1
+      ],
+      "speed": 1.035914,
+      "frameOffset": 12.811834
+    },
+    {
+      "id": 125,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        4.707045,
+        1.370806,
+        -3.680231
+      ],
+      "width": 1.777014,
+      "height": 1.777014,
+      "color": [
+        0.75202,
+        0.7445,
+        0.75202,
+        1
+      ],
+      "speed": 1.00293,
+      "frameOffset": 4.076076
+    },
+    {
+      "id": 126,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        5.407172,
+        1.29259,
+        -3.610184
+      ],
+      "width": 1.581476,
+      "height": 1.581476,
+      "color": [
+        0.93805,
+        0.92867,
+        0.93805,
+        1
+      ],
+      "speed": 0.979326,
+      "frameOffset": 10.102532
+    },
+    {
+      "id": 127,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        6.113619,
+        1.366827,
+        -3.684433
+      ],
+      "width": 1.767067,
+      "height": 1.767067,
+      "color": [
+        0.94824,
+        0.93876,
+        0.94824,
+        1
+      ],
+      "speed": 0.93444,
+      "frameOffset": 4.81213
+    },
+    {
+      "id": 128,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        6.790086,
+        1.342468,
+        -3.732119
+      ],
+      "width": 1.706169,
+      "height": 1.706169,
+      "color": [
+        0.96809,
+        0.95841,
+        0.96809,
+        1
+      ],
+      "speed": 1.041373,
+      "frameOffset": 8.366126
+    },
+    {
+      "id": 129,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        7.508276,
+        1.354969,
+        -3.677718
+      ],
+      "width": 1.737421,
+      "height": 1.737421,
+      "color": [
+        0.8374,
+        0.82903,
+        0.8374,
+        1
+      ],
+      "speed": 1.00444,
+      "frameOffset": 1.77616
+    },
+    {
+      "id": 130,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        8.255643,
+        1.295331,
+        -3.668916
+      ],
+      "width": 1.588328,
+      "height": 1.588328,
+      "color": [
+        0.88724,
+        0.87837,
+        0.88724,
+        1
+      ],
+      "speed": 0.924371,
+      "frameOffset": 5.289423
+    },
+    {
+      "id": 131,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        9.053949,
+        1.264073,
+        -3.722986
+      ],
+      "width": 1.510181,
+      "height": 1.510181,
+      "color": [
+        0.85518,
+        0.84663,
+        0.85518,
+        1
+      ],
+      "speed": 1.027834,
+      "frameOffset": 3.5938
+    },
+    {
+      "id": 132,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        9.702942,
+        1.366424,
+        -3.713932
+      ],
+      "width": 1.766061,
+      "height": 1.766061,
+      "color": [
+        0.74893,
+        0.74144,
+        0.74893,
+        1
+      ],
+      "speed": 0.995618,
+      "frameOffset": 5.072996
+    },
+    {
+      "id": 133,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        10.46751,
+        1.287325,
+        -3.609382
+      ],
+      "width": 1.568312,
+      "height": 1.568312,
+      "color": [
+        0.75332,
+        0.74579,
+        0.75332,
+        1
+      ],
+      "speed": 0.987754,
+      "frameOffset": 2.197743
+    },
+    {
+      "id": 134,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        11.164175,
+        1.28381,
+        -3.645109
+      ],
+      "width": 1.559526,
+      "height": 1.559526,
+      "color": [
+        0.74743,
+        0.73996,
+        0.74743,
+        1
+      ],
+      "speed": 1.044228,
+      "frameOffset": 15.796243
+    },
+    {
+      "id": 135,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        11.832026,
+        1.294028,
+        -3.69936
+      ],
+      "width": 1.58507,
+      "height": 1.58507,
+      "color": [
+        0.89028,
+        0.88138,
+        0.89028,
+        1
+      ],
+      "speed": 0.937622,
+      "frameOffset": 9.256648
+    },
+    {
+      "id": 136,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -11.887229,
+        1.497829,
+        -2.757525
+      ],
+      "width": 1.544573,
+      "height": 1.544573,
+      "color": [
+        0.85067,
+        0.84216,
+        0.85067,
+        1
+      ],
+      "speed": 0.915198,
+      "frameOffset": 8.339844
+    },
+    {
+      "id": 137,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -11.19905,
+        1.494612,
+        -2.743175
+      ],
+      "width": 1.53653,
+      "height": 1.53653,
+      "color": [
+        0.97567,
+        0.96591,
+        0.97567,
+        1
+      ],
+      "speed": 0.934435,
+      "frameOffset": 5.039551
+    },
+    {
+      "id": 138,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -10.388968,
+        1.545326,
+        -2.79573
+      ],
+      "width": 1.663314,
+      "height": 1.663314,
+      "color": [
+        0.8789,
+        0.87011,
+        0.8789,
+        1
+      ],
+      "speed": 0.969496,
+      "frameOffset": 7.040696
+    },
+    {
+      "id": 139,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -9.77896,
+        1.593869,
+        -2.791558
+      ],
+      "width": 1.784672,
+      "height": 1.784672,
+      "color": [
+        0.82992,
+        0.82162,
+        0.82992,
+        1
+      ],
+      "speed": 1.069908,
+      "frameOffset": 13.882683
+    },
+    {
+      "id": 140,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -9.054548,
+        1.535864,
+        -2.723659
+      ],
+      "width": 1.639661,
+      "height": 1.639661,
+      "color": [
+        0.89683,
+        0.88787,
+        0.89683,
+        1
+      ],
+      "speed": 1.076331,
+      "frameOffset": 5.754217
+    },
+    {
+      "id": 141,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -8.279278,
+        1.54419,
+        -2.801496
+      ],
+      "width": 1.660476,
+      "height": 1.660476,
+      "color": [
+        0.78054,
+        0.77274,
+        0.78054,
+        1
+      ],
+      "speed": 0.992354,
+      "frameOffset": 13.950989
+    },
+    {
+      "id": 142,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -7.574217,
+        1.544315,
+        -2.807742
+      ],
+      "width": 1.660788,
+      "height": 1.660788,
+      "color": [
+        0.73604,
+        0.72868,
+        0.73604,
+        1
+      ],
+      "speed": 1.069483,
+      "frameOffset": 1.883866
+    },
+    {
+      "id": 143,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        -6.879941,
+        1.49596,
+        -2.746321
+      ],
+      "width": 1.539899,
+      "height": 1.539899,
+      "color": [
+        0.73241,
+        0.72509,
+        0.73241,
+        1
+      ],
+      "speed": 1.028448,
+      "frameOffset": 12.631188
+    },
+    {
+      "id": 144,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        -6.164646,
+        1.552218,
+        -2.780896
+      ],
+      "width": 1.680545,
+      "height": 1.680545,
+      "color": [
+        0.90077,
+        0.89177,
+        0.90077,
+        1
+      ],
+      "speed": 1.080156,
+      "frameOffset": 10.437453
+    },
+    {
+      "id": 145,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -5.452481,
+        1.593099,
+        -2.8192
+      ],
+      "width": 1.782748,
+      "height": 1.782748,
+      "color": [
+        0.98451,
+        0.97466,
+        0.98451,
+        1
+      ],
+      "speed": 0.952102,
+      "frameOffset": 12.662344
+    },
+    {
+      "id": 146,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -4.732259,
+        1.591676,
+        -2.807452
+      ],
+      "width": 1.779189,
+      "height": 1.779189,
+      "color": [
+        0.73147,
+        0.72415,
+        0.73147,
+        1
+      ],
+      "speed": 0.969247,
+      "frameOffset": 11.456389
+    },
+    {
+      "id": 147,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -3.96142,
+        1.592587,
+        -2.767644
+      ],
+      "width": 1.781468,
+      "height": 1.781468,
+      "color": [
+        0.98324,
+        0.9734,
+        0.98324,
+        1
+      ],
+      "speed": 0.984954,
+      "frameOffset": 9.455141
+    },
+    {
+      "id": 148,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -3.251397,
+        1.54083,
+        -2.747846
+      ],
+      "width": 1.652074,
+      "height": 1.652074,
+      "color": [
+        0.7401,
+        0.7327,
+        0.7401,
+        1
+      ],
+      "speed": 0.939396,
+      "frameOffset": 0.001791
+    },
+    {
+      "id": 149,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        -2.484503,
+        1.536062,
+        -2.758126
+      ],
+      "width": 1.640155,
+      "height": 1.640155,
+      "color": [
+        0.86489,
+        0.85624,
+        0.86489,
+        1
+      ],
+      "speed": 0.977718,
+      "frameOffset": 1.097494
+    },
+    {
+      "id": 150,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -1.76763,
+        1.54174,
+        -2.741713
+      ],
+      "width": 1.65435,
+      "height": 1.65435,
+      "color": [
+        0.93568,
+        0.92632,
+        0.93568,
+        1
+      ],
+      "speed": 1.038411,
+      "frameOffset": 2.29419
+    },
+    {
+      "id": 151,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -1.121541,
+        1.572316,
+        -2.831891
+      ],
+      "width": 1.73079,
+      "height": 1.73079,
+      "color": [
+        0.98736,
+        0.97749,
+        0.98736,
+        1
+      ],
+      "speed": 0.958311,
+      "frameOffset": 2.380106
+    },
+    {
+      "id": 152,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -0.379991,
+        1.523531,
+        -2.774786
+      ],
+      "width": 1.608826,
+      "height": 1.608826,
+      "color": [
+        0.93769,
+        0.92831,
+        0.93769,
+        1
+      ],
+      "speed": 0.931826,
+      "frameOffset": 6.569601
+    },
+    {
+      "id": 153,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        0.39188,
+        1.581258,
+        -2.77748
+      ],
+      "width": 1.753146,
+      "height": 1.753146,
+      "color": [
+        0.89218,
+        0.88326,
+        0.89218,
+        1
+      ],
+      "speed": 0.944502,
+      "frameOffset": 13.263445
+    },
+    {
+      "id": 154,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        1.033254,
+        1.576355,
+        -2.736398
+      ],
+      "width": 1.740887,
+      "height": 1.740887,
+      "color": [
+        0.70763,
+        0.70055,
+        0.70763,
+        1
+      ],
+      "speed": 1.043063,
+      "frameOffset": 1.933349
+    },
+    {
+      "id": 155,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        1.815591,
+        1.596433,
+        -2.802977
+      ],
+      "width": 1.791083,
+      "height": 1.791083,
+      "color": [
+        0.96842,
+        0.95874,
+        0.96842,
+        1
+      ],
+      "speed": 1.08996,
+      "frameOffset": 1.351553
+    },
+    {
+      "id": 156,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        2.537908,
+        1.512611,
+        -2.76583
+      ],
+      "width": 1.581527,
+      "height": 1.581527,
+      "color": [
+        0.79822,
+        0.79024,
+        0.79822,
+        1
+      ],
+      "speed": 0.923232,
+      "frameOffset": 2.273865
+    },
+    {
+      "id": 157,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        3.272568,
+        1.557874,
+        -2.773297
+      ],
+      "width": 1.694686,
+      "height": 1.694686,
+      "color": [
+        0.81471,
+        0.80656,
+        0.81471,
+        1
+      ],
+      "speed": 1.061878,
+      "frameOffset": 0.533733
+    },
+    {
+      "id": 158,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        3.997802,
+        1.541405,
+        -2.715671
+      ],
+      "width": 1.653513,
+      "height": 1.653513,
+      "color": [
+        0.92992,
+        0.92062,
+        0.92992,
+        1
+      ],
+      "speed": 0.960952,
+      "frameOffset": 0.492066
+    },
+    {
+      "id": 159,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        4.673832,
+        1.515521,
+        -2.716813
+      ],
+      "width": 1.588801,
+      "height": 1.588801,
+      "color": [
+        0.98353,
+        0.97369,
+        0.98353,
+        1
+      ],
+      "speed": 0.980606,
+      "frameOffset": 14.489564
+    },
+    {
+      "id": 160,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        5.364995,
+        1.5651,
+        -2.768844
+      ],
+      "width": 1.71275,
+      "height": 1.71275,
+      "color": [
+        0.67998,
+        0.67318,
+        0.67998,
+        1
+      ],
+      "speed": 1.086109,
+      "frameOffset": 3.437808
+    },
+    {
+      "id": 161,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        6.155776,
+        1.55333,
+        -2.779645
+      ],
+      "width": 1.683324,
+      "height": 1.683324,
+      "color": [
+        0.86414,
+        0.8555,
+        0.86414,
+        1
+      ],
+      "speed": 1.070975,
+      "frameOffset": 13.39411
+    },
+    {
+      "id": 162,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        6.808989,
+        1.487025,
+        -2.772294
+      ],
+      "width": 1.517562,
+      "height": 1.517562,
+      "color": [
+        0.95422,
+        0.94468,
+        0.95422,
+        1
+      ],
+      "speed": 0.932251,
+      "frameOffset": 10.482104
+    },
+    {
+      "id": 163,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        7.508623,
+        1.551947,
+        -2.787144
+      ],
+      "width": 1.679868,
+      "height": 1.679868,
+      "color": [
+        0.71904,
+        0.71185,
+        0.71904,
+        1
+      ],
+      "speed": 0.972433,
+      "frameOffset": 14.169175
+    },
+    {
+      "id": 164,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        8.227191,
+        1.484967,
+        -2.699064
+      ],
+      "width": 1.512419,
+      "height": 1.512419,
+      "color": [
+        0.72672,
+        0.71945,
+        0.72672,
+        1
+      ],
+      "speed": 1.043497,
+      "frameOffset": 0.543279
+    },
+    {
+      "id": 165,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        8.980624,
+        1.598744,
+        -2.688803
+      ],
+      "width": 1.79686,
+      "height": 1.79686,
+      "color": [
+        0.79871,
+        0.79072,
+        0.79871,
+        1
+      ],
+      "speed": 1.064298,
+      "frameOffset": 6.522772
+    },
+    {
+      "id": 166,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        9.745193,
+        1.596498,
+        -2.694601
+      ],
+      "width": 1.791246,
+      "height": 1.791246,
+      "color": [
+        0.78676,
+        0.77889,
+        0.78676,
+        1
+      ],
+      "speed": 1.028102,
+      "frameOffset": 11.827635
+    },
+    {
+      "id": 167,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        10.442167,
+        1.565035,
+        -2.768204
+      ],
+      "width": 1.712586,
+      "height": 1.712586,
+      "color": [
+        0.94874,
+        0.93925,
+        0.94874,
+        1
+      ],
+      "speed": 1.021411,
+      "frameOffset": 5.118477
+    },
+    {
+      "id": 168,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        11.15959,
+        1.580334,
+        -2.742087
+      ],
+      "width": 1.750835,
+      "height": 1.750835,
+      "color": [
+        0.68956,
+        0.68267,
+        0.68956,
+        1
+      ],
+      "speed": 0.964886,
+      "frameOffset": 3.742832
+    },
+    {
+      "id": 169,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        11.931174,
+        1.508639,
+        -2.701758
+      ],
+      "width": 1.571598,
+      "height": 1.571598,
+      "color": [
+        0.86734,
+        0.85867,
+        0.86734,
+        1
+      ],
+      "speed": 0.932387,
+      "frameOffset": 4.71339
+    },
+    {
+      "id": 170,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -11.875839,
+        1.775263,
+        -1.781518
+      ],
+      "width": 1.688158,
+      "height": 1.688158,
+      "color": [
+        0.89516,
+        0.88621,
+        0.89516,
+        1
+      ],
+      "speed": 1.06642,
+      "frameOffset": 12.550992
+    },
+    {
+      "id": 171,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -11.114084,
+        1.795202,
+        -1.89582
+      ],
+      "width": 1.738005,
+      "height": 1.738005,
+      "color": [
+        0.81444,
+        0.8063,
+        0.81444,
+        1
+      ],
+      "speed": 0.997128,
+      "frameOffset": 13.732009
+    },
+    {
+      "id": 172,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -10.451659,
+        1.734082,
+        -1.878398
+      ],
+      "width": 1.585204,
+      "height": 1.585204,
+      "color": [
+        0.8005,
+        0.79249,
+        0.8005,
+        1
+      ],
+      "speed": 1.05133,
+      "frameOffset": 1.189044
+    },
+    {
+      "id": 173,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -9.666536,
+        1.782512,
+        -1.837585
+      ],
+      "width": 1.70628,
+      "height": 1.70628,
+      "color": [
+        0.67951,
+        0.67271,
+        0.67951,
+        1
+      ],
+      "speed": 0.914659,
+      "frameOffset": 8.870782
+    },
+    {
+      "id": 174,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -9.002937,
+        1.779674,
+        -1.855487
+      ],
+      "width": 1.699185,
+      "height": 1.699185,
+      "color": [
+        0.71774,
+        0.71056,
+        0.71774,
+        1
+      ],
+      "speed": 0.947308,
+      "frameOffset": 7.185651
+    },
+    {
+      "id": 175,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -8.292382,
+        1.816531,
+        -1.795777
+      ],
+      "width": 1.791328,
+      "height": 1.791328,
+      "color": [
+        0.95871,
+        0.94912,
+        0.95871,
+        1
+      ],
+      "speed": 1.079861,
+      "frameOffset": 4.097078
+    },
+    {
+      "id": 176,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -7.527853,
+        1.74484,
+        -1.871731
+      ],
+      "width": 1.6121,
+      "height": 1.6121,
+      "color": [
+        0.67556,
+        0.66881,
+        0.67556,
+        1
+      ],
+      "speed": 1.044861,
+      "frameOffset": 5.824565
+    },
+    {
+      "id": 177,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -6.871215,
+        1.736542,
+        -1.774876
+      ],
+      "width": 1.591355,
+      "height": 1.591355,
+      "color": [
+        0.92855,
+        0.91927,
+        0.92855,
+        1
+      ],
+      "speed": 1.006617,
+      "frameOffset": 8.150189
+    },
+    {
+      "id": 178,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -6.074615,
+        1.729841,
+        -1.876946
+      ],
+      "width": 1.574602,
+      "height": 1.574602,
+      "color": [
+        0.71048,
+        0.70337,
+        0.71048,
+        1
+      ],
+      "speed": 0.984832,
+      "frameOffset": 1.575559
+    },
+    {
+      "id": 179,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -5.390423,
+        1.707458,
+        -1.895154
+      ],
+      "width": 1.518644,
+      "height": 1.518644,
+      "color": [
+        0.95331,
+        0.94378,
+        0.95331,
+        1
+      ],
+      "speed": 1.074419,
+      "frameOffset": 15.453475
+    },
+    {
+      "id": 180,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -4.633416,
+        1.741453,
+        -1.798055
+      ],
+      "width": 1.603633,
+      "height": 1.603633,
+      "color": [
+        0.80426,
+        0.79622,
+        0.80426,
+        1
+      ],
+      "speed": 1.01363,
+      "frameOffset": 8.752284
+    },
+    {
+      "id": 181,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -3.981701,
+        1.7191,
+        -1.822914
+      ],
+      "width": 1.547751,
+      "height": 1.547751,
+      "color": [
+        0.75565,
+        0.74809,
+        0.75565,
+        1
+      ],
+      "speed": 1.080981,
+      "frameOffset": 13.404932
+    },
+    {
+      "id": 182,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -3.225353,
+        1.769527,
+        -1.813587
+      ],
+      "width": 1.673817,
+      "height": 1.673817,
+      "color": [
+        0.80946,
+        0.80136,
+        0.80946,
+        1
+      ],
+      "speed": 0.958726,
+      "frameOffset": 11.896301
+    },
+    {
+      "id": 183,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -2.498129,
+        1.79295,
+        -1.848418
+      ],
+      "width": 1.732376,
+      "height": 1.732376,
+      "color": [
+        0.94893,
+        0.93944,
+        0.94893,
+        1
+      ],
+      "speed": 1.023167,
+      "frameOffset": 8.659384
+    },
+    {
+      "id": 184,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -1.852699,
+        1.732533,
+        -1.874151
+      ],
+      "width": 1.581331,
+      "height": 1.581331,
+      "color": [
+        0.87761,
+        0.86883,
+        0.87761,
+        1
+      ],
+      "speed": 1.054902,
+      "frameOffset": 2.735619
+    },
+    {
+      "id": 185,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -1.070897,
+        1.817843,
+        -1.872836
+      ],
+      "width": 1.794608,
+      "height": 1.794608,
+      "color": [
+        0.81857,
+        0.81039,
+        0.81857,
+        1
+      ],
+      "speed": 0.931834,
+      "frameOffset": 11.052372
+    },
+    {
+      "id": 186,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -0.320182,
+        1.714361,
+        -1.791885
+      ],
+      "width": 1.535902,
+      "height": 1.535902,
+      "color": [
+        0.84735,
+        0.83888,
+        0.84735,
+        1
+      ],
+      "speed": 0.914911,
+      "frameOffset": 6.948325
+    },
+    {
+      "id": 187,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        0.388898,
+        1.778199,
+        -1.844373
+      ],
+      "width": 1.695497,
+      "height": 1.695497,
+      "color": [
+        0.83259,
+        0.82426,
+        0.83259,
+        1
+      ],
+      "speed": 1.017664,
+      "frameOffset": 1.165462
+    },
+    {
+      "id": 188,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        1.062384,
+        1.806205,
+        -1.838624
+      ],
+      "width": 1.765513,
+      "height": 1.765513,
+      "color": [
+        0.74244,
+        0.73502,
+        0.74244,
+        1
+      ],
+      "speed": 1.076672,
+      "frameOffset": 5.201185
+    },
+    {
+      "id": 189,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        1.855305,
+        1.746272,
+        -1.827322
+      ],
+      "width": 1.615681,
+      "height": 1.615681,
+      "color": [
+        0.73613,
+        0.72877,
+        0.73613,
+        1
+      ],
+      "speed": 1.00729,
+      "frameOffset": 9.469505
+    },
+    {
+      "id": 190,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        2.511755,
+        1.769422,
+        -1.824317
+      ],
+      "width": 1.673555,
+      "height": 1.673555,
+      "color": [
+        0.9334,
+        0.92406,
+        0.9334,
+        1
+      ],
+      "speed": 0.960277,
+      "frameOffset": 0.340585
+    },
+    {
+      "id": 191,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        3.198617,
+        1.784063,
+        -1.797348
+      ],
+      "width": 1.710158,
+      "height": 1.710158,
+      "color": [
+        0.94621,
+        0.93675,
+        0.94621,
+        1
+      ],
+      "speed": 1.069429,
+      "frameOffset": 12.567164
+    },
+    {
+      "id": 192,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        3.985814,
+        1.706375,
+        -1.874669
+      ],
+      "width": 1.515937,
+      "height": 1.515937,
+      "color": [
+        0.68852,
+        0.68163,
+        0.68852,
+        1
+      ],
+      "speed": 1.001586,
+      "frameOffset": 13.305136
+    },
+    {
+      "id": 193,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        4.709424,
+        1.799074,
+        -1.804524
+      ],
+      "width": 1.747684,
+      "height": 1.747684,
+      "color": [
+        0.68112,
+        0.6743,
+        0.68112,
+        1
+      ],
+      "speed": 1.055978,
+      "frameOffset": 9.091907
+    },
+    {
+      "id": 194,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        5.354465,
+        1.767789,
+        -1.867871
+      ],
+      "width": 1.669471,
+      "height": 1.669471,
+      "color": [
+        0.98386,
+        0.97402,
+        0.98386,
+        1
+      ],
+      "speed": 1.009611,
+      "frameOffset": 11.311171
+    },
+    {
+      "id": 195,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        6.062438,
+        1.735998,
+        -1.826731
+      ],
+      "width": 1.589994,
+      "height": 1.589994,
+      "color": [
+        0.83463,
+        0.82628,
+        0.83463,
+        1
+      ],
+      "speed": 0.932397,
+      "frameOffset": 14.47658
+    },
+    {
+      "id": 196,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        6.79313,
+        1.791004,
+        -1.808534
+      ],
+      "width": 1.72751,
+      "height": 1.72751,
+      "color": [
+        0.69307,
+        0.68614,
+        0.69307,
+        1
+      ],
+      "speed": 1.073026,
+      "frameOffset": 1.14918
+    },
+    {
+      "id": 197,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        7.509591,
+        1.747198,
+        -1.824359
+      ],
+      "width": 1.617994,
+      "height": 1.617994,
+      "color": [
+        0.79172,
+        0.7838,
+        0.79172,
+        1
+      ],
+      "speed": 0.962518,
+      "frameOffset": 4.602343
+    },
+    {
+      "id": 198,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        8.249564,
+        1.718743,
+        -1.891521
+      ],
+      "width": 1.546857,
+      "height": 1.546857,
+      "color": [
+        0.89547,
+        0.88652,
+        0.89547,
+        1
+      ],
+      "speed": 1.028863,
+      "frameOffset": 6.061126
+    },
+    {
+      "id": 199,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        9.060463,
+        1.746436,
+        -1.829126
+      ],
+      "width": 1.61609,
+      "height": 1.61609,
+      "color": [
+        0.7333,
+        0.72596,
+        0.7333,
+        1
+      ],
+      "speed": 1.065821,
+      "frameOffset": 13.843005
+    },
+    {
+      "id": 200,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        9.693203,
+        1.804071,
+        -1.815541
+      ],
+      "width": 1.760178,
+      "height": 1.760178,
+      "color": [
+        0.91606,
+        0.9069,
+        0.91606,
+        1
+      ],
+      "speed": 0.928045,
+      "frameOffset": 8.546238
+    },
+    {
+      "id": 201,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        10.42021,
+        1.765277,
+        -1.837811
+      ],
+      "width": 1.663192,
+      "height": 1.663192,
+      "color": [
+        0.676,
+        0.66924,
+        0.676,
+        1
+      ],
+      "speed": 1.002795,
+      "frameOffset": 11.476458
+    },
+    {
+      "id": 202,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        11.207888,
+        1.809331,
+        -1.844827
+      ],
+      "width": 1.773329,
+      "height": 1.773329,
+      "color": [
+        0.90301,
+        0.89398,
+        0.90301,
+        1
+      ],
+      "speed": 1.013345,
+      "frameOffset": 4.05835
+    },
+    {
+      "id": 203,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        11.927636,
+        1.714779,
+        -1.785312
+      ],
+      "width": 1.536947,
+      "height": 1.536947,
+      "color": [
+        0.93576,
+        0.92641,
+        0.93576,
+        1
+      ],
+      "speed": 0.917514,
+      "frameOffset": 2.018039
+    },
+    {
+      "id": 204,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -11.841982,
+        1.996621,
+        -0.956719
+      ],
+      "width": 1.691553,
+      "height": 1.691553,
+      "color": [
+        0.82892,
+        0.82063,
+        0.82892,
+        1
+      ],
+      "speed": 0.940215,
+      "frameOffset": 9.357794
+    },
+    {
+      "id": 205,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -11.126027,
+        1.998808,
+        -0.857885
+      ],
+      "width": 1.697021,
+      "height": 1.697021,
+      "color": [
+        0.81855,
+        0.81036,
+        0.81855,
+        1
+      ],
+      "speed": 1.013741,
+      "frameOffset": 10.153941
+    },
+    {
+      "id": 206,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -10.428087,
+        1.929214,
+        -0.969114
+      ],
+      "width": 1.523034,
+      "height": 1.523034,
+      "color": [
+        0.70041,
+        0.69341,
+        0.70041,
+        1
+      ],
+      "speed": 1.008588,
+      "frameOffset": 5.248586
+    },
+    {
+      "id": 207,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -9.743641,
+        1.991651,
+        -0.898518
+      ],
+      "width": 1.679129,
+      "height": 1.679129,
+      "color": [
+        0.83031,
+        0.82201,
+        0.83031,
+        1
+      ],
+      "speed": 1.065948,
+      "frameOffset": 4.995529
+    },
+    {
+      "id": 208,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -8.952711,
+        2.033921,
+        -0.908603
+      ],
+      "width": 1.784803,
+      "height": 1.784803,
+      "color": [
+        0.86206,
+        0.85344,
+        0.86206,
+        1
+      ],
+      "speed": 0.960585,
+      "frameOffset": 4.918564
+    },
+    {
+      "id": 209,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -8.333204,
+        1.974368,
+        -0.893476
+      ],
+      "width": 1.635919,
+      "height": 1.635919,
+      "color": [
+        0.72867,
+        0.72138,
+        0.72867,
+        1
+      ],
+      "speed": 1.060795,
+      "frameOffset": 4.058036
+    },
+    {
+      "id": 210,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -7.530064,
+        1.995327,
+        -0.891546
+      ],
+      "width": 1.688319,
+      "height": 1.688319,
+      "color": [
+        0.99724,
+        0.98727,
+        0.99724,
+        1
+      ],
+      "speed": 1.064445,
+      "frameOffset": 15.522391
+    },
+    {
+      "id": 211,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -6.831113,
+        2.03274,
+        -0.96109
+      ],
+      "width": 1.78185,
+      "height": 1.78185,
+      "color": [
+        0.74442,
+        0.73698,
+        0.74442,
+        1
+      ],
+      "speed": 1.077041,
+      "frameOffset": 6.641462
+    },
+    {
+      "id": 212,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -6.082862,
+        1.945242,
+        -0.899245
+      ],
+      "width": 1.563106,
+      "height": 1.563106,
+      "color": [
+        0.73498,
+        0.72763,
+        0.73498,
+        1
+      ],
+      "speed": 1.083504,
+      "frameOffset": 14.701815
+    },
+    {
+      "id": 213,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -5.382985,
+        1.976789,
+        -0.85275
+      ],
+      "width": 1.641973,
+      "height": 1.641973,
+      "color": [
+        0.80428,
+        0.79624,
+        0.80428,
+        1
+      ],
+      "speed": 0.915961,
+      "frameOffset": 0.086106
+    },
+    {
+      "id": 214,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -4.675677,
+        2.019016,
+        -0.935766
+      ],
+      "width": 1.74754,
+      "height": 1.74754,
+      "color": [
+        0.68202,
+        0.67519,
+        0.68202,
+        1
+      ],
+      "speed": 0.916593,
+      "frameOffset": 8.588914
+    },
+    {
+      "id": 215,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -3.973066,
+        1.989083,
+        -0.9437
+      ],
+      "width": 1.672707,
+      "height": 1.672707,
+      "color": [
+        0.93889,
+        0.9295,
+        0.93889,
+        1
+      ],
+      "speed": 0.971197,
+      "frameOffset": 6.36876
+    },
+    {
+      "id": 216,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -3.299707,
+        1.96141,
+        -0.907258
+      ],
+      "width": 1.603524,
+      "height": 1.603524,
+      "color": [
+        0.78358,
+        0.77575,
+        0.78358,
+        1
+      ],
+      "speed": 1.039715,
+      "frameOffset": 4.589588
+    },
+    {
+      "id": 217,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -2.481829,
+        1.956603,
+        -0.984682
+      ],
+      "width": 1.591507,
+      "height": 1.591507,
+      "color": [
+        0.85379,
+        0.84525,
+        0.85379,
+        1
+      ],
+      "speed": 1.025356,
+      "frameOffset": 7.868477
+    },
+    {
+      "id": 218,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -1.803872,
+        2.010545,
+        -0.881317
+      ],
+      "width": 1.726363,
+      "height": 1.726363,
+      "color": [
+        0.7659,
+        0.75824,
+        0.7659,
+        1
+      ],
+      "speed": 1.050797,
+      "frameOffset": 13.439972
+    },
+    {
+      "id": 219,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -1.140896,
+        1.996017,
+        -0.935289
+      ],
+      "width": 1.690042,
+      "height": 1.690042,
+      "color": [
+        0.68132,
+        0.67451,
+        0.68132,
+        1
+      ],
+      "speed": 1.050538,
+      "frameOffset": 5.310923
+    },
+    {
+      "id": 220,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -0.299558,
+        1.942165,
+        -0.922706
+      ],
+      "width": 1.555414,
+      "height": 1.555414,
+      "color": [
+        0.94669,
+        0.93723,
+        0.94669,
+        1
+      ],
+      "speed": 0.971542,
+      "frameOffset": 11.391665
+    },
+    {
+      "id": 221,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        0.37792,
+        1.985964,
+        -0.901993
+      ],
+      "width": 1.66491,
+      "height": 1.66491,
+      "color": [
+        0.80381,
+        0.79577,
+        0.80381,
+        1
+      ],
+      "speed": 0.997887,
+      "frameOffset": 4.844199
+    },
+    {
+      "id": 222,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        1.096002,
+        1.957947,
+        -0.917714
+      ],
+      "width": 1.594867,
+      "height": 1.594867,
+      "color": [
+        0.79369,
+        0.78575,
+        0.79369,
+        1
+      ],
+      "speed": 1.035905,
+      "frameOffset": 15.35448
+    },
+    {
+      "id": 223,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        1.843199,
+        2.021141,
+        -0.924098
+      ],
+      "width": 1.752853,
+      "height": 1.752853,
+      "color": [
+        0.79938,
+        0.79139,
+        0.79938,
+        1
+      ],
+      "speed": 1.014749,
+      "frameOffset": 7.869698
+    },
+    {
+      "id": 224,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        2.523614,
+        1.991071,
+        -0.854196
+      ],
+      "width": 1.677678,
+      "height": 1.677678,
+      "color": [
+        0.67245,
+        0.66573,
+        0.67245,
+        1
+      ],
+      "speed": 1.03772,
+      "frameOffset": 13.343344
+    },
+    {
+      "id": 225,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        3.232498,
+        1.996754,
+        -0.932595
+      ],
+      "width": 1.691885,
+      "height": 1.691885,
+      "color": [
+        0.74137,
+        0.73396,
+        0.74137,
+        1
+      ],
+      "speed": 1.087559,
+      "frameOffset": 11.095627
+    },
+    {
+      "id": 226,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        3.933112,
+        1.962966,
+        -0.853352
+      ],
+      "width": 1.607416,
+      "height": 1.607416,
+      "color": [
+        0.92259,
+        0.91336,
+        0.92259,
+        1
+      ],
+      "speed": 0.918446,
+      "frameOffset": 4.631378
+    },
+    {
+      "id": 227,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        4.694258,
+        1.981517,
+        -0.923881
+      ],
+      "width": 1.653792,
+      "height": 1.653792,
+      "color": [
+        0.69684,
+        0.68987,
+        0.69684,
+        1
+      ],
+      "speed": 1.069498,
+      "frameOffset": 0.513597
+    },
+    {
+      "id": 228,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        5.412875,
+        2.017109,
+        -0.976182
+      ],
+      "width": 1.742773,
+      "height": 1.742773,
+      "color": [
+        0.7481,
+        0.74061,
+        0.7481,
+        1
+      ],
+      "speed": 1.042526,
+      "frameOffset": 2.553524
+    },
+    {
+      "id": 229,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        6.124017,
+        2.026779,
+        -0.985998
+      ],
+      "width": 1.766947,
+      "height": 1.766947,
+      "color": [
+        0.75424,
+        0.7467,
+        0.75424,
+        1
+      ],
+      "speed": 1.042471,
+      "frameOffset": 2.817221
+    },
+    {
+      "id": 230,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        6.835741,
+        2.033988,
+        -0.888975
+      ],
+      "width": 1.784969,
+      "height": 1.784969,
+      "color": [
+        0.82568,
+        0.81742,
+        0.82568,
+        1
+      ],
+      "speed": 0.932397,
+      "frameOffset": 2.229767
+    },
+    {
+      "id": 231,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        7.55838,
+        1.993408,
+        -0.978475
+      ],
+      "width": 1.68352,
+      "height": 1.68352,
+      "color": [
+        0.77765,
+        0.76988,
+        0.77765,
+        1
+      ],
+      "speed": 1.07804,
+      "frameOffset": 1.562395
+    },
+    {
+      "id": 232,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        8.295644,
+        1.961045,
+        -0.895375
+      ],
+      "width": 1.602613,
+      "height": 1.602613,
+      "color": [
+        0.94486,
+        0.93541,
+        0.94486,
+        1
+      ],
+      "speed": 1.061442,
+      "frameOffset": 10.736499
+    },
+    {
+      "id": 233,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        8.956308,
+        1.97038,
+        -0.957431
+      ],
+      "width": 1.625951,
+      "height": 1.625951,
+      "color": [
+        0.9885,
+        0.97861,
+        0.9885,
+        1
+      ],
+      "speed": 1.071597,
+      "frameOffset": 13.150139
+    },
+    {
+      "id": 234,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        9.671227,
+        1.996631,
+        -0.985753
+      ],
+      "width": 1.691576,
+      "height": 1.691576,
+      "color": [
+        0.89514,
+        0.88619,
+        0.89514,
+        1
+      ],
+      "speed": 0.931014,
+      "frameOffset": 3.901644
+    },
+    {
+      "id": 235,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        10.430481,
+        1.963391,
+        -0.981276
+      ],
+      "width": 1.608478,
+      "height": 1.608478,
+      "color": [
+        0.87503,
+        0.86628,
+        0.87503,
+        1
+      ],
+      "speed": 1.001853,
+      "frameOffset": 6.834744
+    },
+    {
+      "id": 236,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        11.152395,
+        1.948734,
+        -0.864661
+      ],
+      "width": 1.571836,
+      "height": 1.571836,
+      "color": [
+        0.85453,
+        0.84598,
+        0.85453,
+        1
+      ],
+      "speed": 1.088238,
+      "frameOffset": 13.551742
+    },
+    {
+      "id": 237,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        11.897576,
+        1.932617,
+        -0.971936
+      ],
+      "width": 1.531544,
+      "height": 1.531544,
+      "color": [
+        0.95578,
+        0.94622,
+        0.95578,
+        1
+      ],
+      "speed": 0.978321,
+      "frameOffset": 6.867066
+    },
+    {
+      "id": 238,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -11.905371,
+        2.188301,
+        -0.067769
+      ],
+      "width": 1.620753,
+      "height": 1.620753,
+      "color": [
+        0.90649,
+        0.89743,
+        0.90649,
+        1
+      ],
+      "speed": 0.920804,
+      "frameOffset": 13.711834
+    },
+    {
+      "id": 239,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -11.193505,
+        2.209992,
+        0.055707
+      ],
+      "width": 1.67498,
+      "height": 1.67498,
+      "color": [
+        0.69509,
+        0.68814,
+        0.69509,
+        1
+      ],
+      "speed": 0.912164,
+      "frameOffset": 13.959679
+    },
+    {
+      "id": 240,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -10.464974,
+        2.176607,
+        0.039112
+      ],
+      "width": 1.591517,
+      "height": 1.591517,
+      "color": [
+        0.90071,
+        0.89171,
+        0.90071,
+        1
+      ],
+      "speed": 0.945076,
+      "frameOffset": 15.901753
+    },
+    {
+      "id": 241,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -9.703013,
+        2.159308,
+        0.000679
+      ],
+      "width": 1.54827,
+      "height": 1.54827,
+      "color": [
+        0.99211,
+        0.98219,
+        0.99211,
+        1
+      ],
+      "speed": 1.028208,
+      "frameOffset": 9.858167
+    },
+    {
+      "id": 242,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -9.002085,
+        2.191465,
+        -0.046333
+      ],
+      "width": 1.628661,
+      "height": 1.628661,
+      "color": [
+        0.73384,
+        0.7265,
+        0.73384,
+        1
+      ],
+      "speed": 1.038103,
+      "frameOffset": 5.154535
+    },
+    {
+      "id": 243,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -8.244235,
+        2.23006,
+        -0.043195
+      ],
+      "width": 1.72515,
+      "height": 1.72515,
+      "color": [
+        0.86934,
+        0.86065,
+        0.86934,
+        1
+      ],
+      "speed": 0.946007,
+      "frameOffset": 5.913608
+    },
+    {
+      "id": 244,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -7.510655,
+        2.22348,
+        0.046152
+      ],
+      "width": 1.7087,
+      "height": 1.7087,
+      "color": [
+        0.69257,
+        0.68564,
+        0.69257,
+        1
+      ],
+      "speed": 0.923202,
+      "frameOffset": 12.502056
+    },
+    {
+      "id": 245,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -6.888545,
+        2.168556,
+        -0.046208
+      ],
+      "width": 1.57139,
+      "height": 1.57139,
+      "color": [
+        0.88748,
+        0.8786,
+        0.88748,
+        1
+      ],
+      "speed": 1.012044,
+      "frameOffset": 12.281807
+    },
+    {
+      "id": 246,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -6.080377,
+        2.153271,
+        -0.002381
+      ],
+      "width": 1.533178,
+      "height": 1.533178,
+      "color": [
+        0.77419,
+        0.76645,
+        0.77419,
+        1
+      ],
+      "speed": 0.931618,
+      "frameOffset": 7.216854
+    },
+    {
+      "id": 247,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        -5.339591,
+        2.194815,
+        0.013129
+      ],
+      "width": 1.637037,
+      "height": 1.637037,
+      "color": [
+        0.96998,
+        0.96028,
+        0.96998,
+        1
+      ],
+      "speed": 1.069611,
+      "frameOffset": 5.025929
+    },
+    {
+      "id": 248,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -4.675342,
+        2.252474,
+        0.04636
+      ],
+      "width": 1.781186,
+      "height": 1.781186,
+      "color": [
+        0.87005,
+        0.86135,
+        0.87005,
+        1
+      ],
+      "speed": 0.995939,
+      "frameOffset": 2.191742
+    },
+    {
+      "id": 249,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -4.006161,
+        2.200134,
+        -0.061977
+      ],
+      "width": 1.650336,
+      "height": 1.650336,
+      "color": [
+        0.83239,
+        0.82407,
+        0.83239,
+        1
+      ],
+      "speed": 1.057668,
+      "frameOffset": 6.870672
+    },
+    {
+      "id": 250,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -3.180899,
+        2.155266,
+        0.061586
+      ],
+      "width": 1.538164,
+      "height": 1.538164,
+      "color": [
+        0.75249,
+        0.74497,
+        0.75249,
+        1
+      ],
+      "speed": 1.077477,
+      "frameOffset": 4.690186
+    },
+    {
+      "id": 251,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -2.560053,
+        2.195926,
+        0.02645
+      ],
+      "width": 1.639814,
+      "height": 1.639814,
+      "color": [
+        0.67163,
+        0.66491,
+        0.67163,
+        1
+      ],
+      "speed": 0.983205,
+      "frameOffset": 8.685684
+    },
+    {
+      "id": 252,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -1.779771,
+        2.216919,
+        -0.027024
+      ],
+      "width": 1.692298,
+      "height": 1.692298,
+      "color": [
+        0.82002,
+        0.81182,
+        0.82002,
+        1
+      ],
+      "speed": 0.965537,
+      "frameOffset": 11.423093
+    },
+    {
+      "id": 253,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -1.110442,
+        2.232094,
+        0.035177
+      ],
+      "width": 1.730235,
+      "height": 1.730235,
+      "color": [
+        0.84033,
+        0.83192,
+        0.84033,
+        1
+      ],
+      "speed": 0.985653,
+      "frameOffset": 5.78505
+    },
+    {
+      "id": 254,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -0.368005,
+        2.19381,
+        -0.018711
+      ],
+      "width": 1.634524,
+      "height": 1.634524,
+      "color": [
+        0.70571,
+        0.69866,
+        0.70571,
+        1
+      ],
+      "speed": 1.02517,
+      "frameOffset": 2.532686
+    },
+    {
+      "id": 255,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        0.317454,
+        2.249552,
+        -0.064773
+      ],
+      "width": 1.773879,
+      "height": 1.773879,
+      "color": [
+        0.84684,
+        0.83837,
+        0.84684,
+        1
+      ],
+      "speed": 0.995241,
+      "frameOffset": 15.416601
+    },
+    {
+      "id": 256,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        1.119974,
+        2.178753,
+        0.058286
+      ],
+      "width": 1.596883,
+      "height": 1.596883,
+      "color": [
+        0.68916,
+        0.68227,
+        0.68916,
+        1
+      ],
+      "speed": 1.064535,
+      "frameOffset": 4.611126
+    },
+    {
+      "id": 257,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        1.742906,
+        2.234389,
+        0.018532
+      ],
+      "width": 1.735971,
+      "height": 1.735971,
+      "color": [
+        0.92157,
+        0.91236,
+        0.92157,
+        1
+      ],
+      "speed": 0.987306,
+      "frameOffset": 10.467757
+    },
+    {
+      "id": 258,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        2.540816,
+        2.216002,
+        -0.063593
+      ],
+      "width": 1.690005,
+      "height": 1.690005,
+      "color": [
+        0.96186,
+        0.95224,
+        0.96186,
+        1
+      ],
+      "speed": 0.988684,
+      "frameOffset": 8.479184
+    },
+    {
+      "id": 259,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        3.290643,
+        2.191509,
+        0.067134
+      ],
+      "width": 1.628773,
+      "height": 1.628773,
+      "color": [
+        0.81546,
+        0.8073,
+        0.81546,
+        1
+      ],
+      "speed": 1.042491,
+      "frameOffset": 13.854371
+    },
+    {
+      "id": 260,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        3.993845,
+        2.173191,
+        -0.013337
+      ],
+      "width": 1.582978,
+      "height": 1.582978,
+      "color": [
+        0.70032,
+        0.69331,
+        0.70032,
+        1
+      ],
+      "speed": 0.925748,
+      "frameOffset": 1.973093
+    },
+    {
+      "id": 261,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        4.679309,
+        2.181015,
+        0.007293
+      ],
+      "width": 1.602538,
+      "height": 1.602538,
+      "color": [
+        0.80425,
+        0.79621,
+        0.80425,
+        1
+      ],
+      "speed": 1.024762,
+      "frameOffset": 1.914931
+    },
+    {
+      "id": 262,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        5.351953,
+        2.151743,
+        -0.031665
+      ],
+      "width": 1.529358,
+      "height": 1.529358,
+      "color": [
+        0.98116,
+        0.97135,
+        0.98116,
+        1
+      ],
+      "speed": 1.043311,
+      "frameOffset": 12.310922
+    },
+    {
+      "id": 263,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        6.125478,
+        2.248211,
+        -0.06817
+      ],
+      "width": 1.770528,
+      "height": 1.770528,
+      "color": [
+        0.93796,
+        0.92858,
+        0.93796,
+        1
+      ],
+      "speed": 1.040958,
+      "frameOffset": 12.422841
+    },
+    {
+      "id": 264,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        6.825023,
+        2.254174,
+        -0.07022
+      ],
+      "width": 1.785434,
+      "height": 1.785434,
+      "color": [
+        0.94554,
+        0.93609,
+        0.94554,
+        1
+      ],
+      "speed": 1.026616,
+      "frameOffset": 10.435269
+    },
+    {
+      "id": 265,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        7.499937,
+        2.213924,
+        0.046447
+      ],
+      "width": 1.684809,
+      "height": 1.684809,
+      "color": [
+        0.73225,
+        0.72492,
+        0.73225,
+        1
+      ],
+      "speed": 0.992324,
+      "frameOffset": 14.7151
+    },
+    {
+      "id": 266,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        8.246027,
+        2.194806,
+        0.038844
+      ],
+      "width": 1.637014,
+      "height": 1.637014,
+      "color": [
+        0.95484,
+        0.9453,
+        0.95484,
+        1
+      ],
+      "speed": 1.030471,
+      "frameOffset": 2.053601
+    },
+    {
+      "id": 267,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        8.983956,
+        2.195899,
+        -0.062135
+      ],
+      "width": 1.639746,
+      "height": 1.639746,
+      "color": [
+        0.82501,
+        0.81676,
+        0.82501,
+        1
+      ],
+      "speed": 0.977659,
+      "frameOffset": 11.490127
+    },
+    {
+      "id": 268,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        9.72406,
+        2.184444,
+        -0.027523
+      ],
+      "width": 1.61111,
+      "height": 1.61111,
+      "color": [
+        0.99111,
+        0.9812,
+        0.99111,
+        1
+      ],
+      "speed": 1.020252,
+      "frameOffset": 13.603477
+    },
+    {
+      "id": 269,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        10.42506,
+        2.174246,
+        0.008237
+      ],
+      "width": 1.585616,
+      "height": 1.585616,
+      "color": [
+        0.84979,
+        0.84129,
+        0.84979,
+        1
+      ],
+      "speed": 1.056897,
+      "frameOffset": 5.034162
+    },
+    {
+      "id": 270,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        11.217369,
+        2.182257,
+        0.045814
+      ],
+      "width": 1.605643,
+      "height": 1.605643,
+      "color": [
+        0.86698,
+        0.85831,
+        0.86698,
+        1
+      ],
+      "speed": 0.942594,
+      "frameOffset": 7.032411
+    },
+    {
+      "id": 271,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        11.839382,
+        2.196584,
+        -0.003227
+      ],
+      "width": 1.641461,
+      "height": 1.641461,
+      "color": [
+        0.8294,
+        0.82111,
+        0.8294,
+        1
+      ],
+      "speed": 1.038388,
+      "frameOffset": 1.640877
+    },
+    {
+      "id": 272,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -11.925175,
+        2.375184,
+        0.927298
+      ],
+      "width": 1.537961,
+      "height": 1.537961,
+      "color": [
+        0.67238,
+        0.66566,
+        0.67238,
+        1
+      ],
+      "speed": 0.910147,
+      "frameOffset": 8.584123
+    },
+    {
+      "id": 273,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -11.208901,
+        2.455371,
+        0.848055
+      ],
+      "width": 1.738427,
+      "height": 1.738427,
+      "color": [
+        0.72489,
+        0.71765,
+        0.72489,
+        1
+      ],
+      "speed": 0.989502,
+      "frameOffset": 14.433373
+    },
+    {
+      "id": 274,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -10.448108,
+        2.434533,
+        0.913594
+      ],
+      "width": 1.686332,
+      "height": 1.686332,
+      "color": [
+        0.8273,
+        0.81903,
+        0.8273,
+        1
+      ],
+      "speed": 1.018203,
+      "frameOffset": 5.121002
+    },
+    {
+      "id": 275,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -9.676562,
+        2.427462,
+        0.859627
+      ],
+      "width": 1.668656,
+      "height": 1.668656,
+      "color": [
+        0.97714,
+        0.96737,
+        0.97714,
+        1
+      ],
+      "speed": 1.018398,
+      "frameOffset": 8.633635
+    },
+    {
+      "id": 276,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -8.963895,
+        2.477924,
+        0.953405
+      ],
+      "width": 1.79481,
+      "height": 1.79481,
+      "color": [
+        0.80168,
+        0.79366,
+        0.80168,
+        1
+      ],
+      "speed": 1.063209,
+      "frameOffset": 6.652052
+    },
+    {
+      "id": 277,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -8.220968,
+        2.433933,
+        0.920683
+      ],
+      "width": 1.684833,
+      "height": 1.684833,
+      "color": [
+        0.83566,
+        0.8273,
+        0.83566,
+        1
+      ],
+      "speed": 1.02791,
+      "frameOffset": 15.128092
+    },
+    {
+      "id": 278,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -7.522633,
+        2.456796,
+        0.960692
+      ],
+      "width": 1.74199,
+      "height": 1.74199,
+      "color": [
+        0.78034,
+        0.77253,
+        0.78034,
+        1
+      ],
+      "speed": 1.069244,
+      "frameOffset": 15.14961
+    },
+    {
+      "id": 279,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -6.810136,
+        2.379689,
+        0.975314
+      ],
+      "width": 1.549222,
+      "height": 1.549222,
+      "color": [
+        0.87572,
+        0.86696,
+        0.87572,
+        1
+      ],
+      "speed": 1.049806,
+      "frameOffset": 3.853259
+    },
+    {
+      "id": 280,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -6.085418,
+        2.455549,
+        0.921092
+      ],
+      "width": 1.738872,
+      "height": 1.738872,
+      "color": [
+        0.74722,
+        0.73974,
+        0.74722,
+        1
+      ],
+      "speed": 0.997448,
+      "frameOffset": 13.361187
+    },
+    {
+      "id": 281,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -5.40906,
+        2.379282,
+        0.975628
+      ],
+      "width": 1.548204,
+      "height": 1.548204,
+      "color": [
+        0.72487,
+        0.71762,
+        0.72487,
+        1
+      ],
+      "speed": 0.923147,
+      "frameOffset": 11.505362
+    },
+    {
+      "id": 282,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -4.704114,
+        2.436212,
+        0.966219
+      ],
+      "width": 1.690531,
+      "height": 1.690531,
+      "color": [
+        0.72582,
+        0.71856,
+        0.72582,
+        1
+      ],
+      "speed": 1.078967,
+      "frameOffset": 9.108562
+    },
+    {
+      "id": 283,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -3.937043,
+        2.380876,
+        0.981607
+      ],
+      "width": 1.55219,
+      "height": 1.55219,
+      "color": [
+        0.76228,
+        0.75466,
+        0.76228,
+        1
+      ],
+      "speed": 0.978611,
+      "frameOffset": 8.933281
+    },
+    {
+      "id": 284,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -3.179707,
+        2.390868,
+        0.875553
+      ],
+      "width": 1.57717,
+      "height": 1.57717,
+      "color": [
+        0.88729,
+        0.87842,
+        0.88729,
+        1
+      ],
+      "speed": 1.012107,
+      "frameOffset": 11.820816
+    },
+    {
+      "id": 285,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -2.527021,
+        2.466384,
+        0.949086
+      ],
+      "width": 1.76596,
+      "height": 1.76596,
+      "color": [
+        0.68646,
+        0.67959,
+        0.68646,
+        1
+      ],
+      "speed": 1.04242,
+      "frameOffset": 0.497202
+    },
+    {
+      "id": 286,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -1.853916,
+        2.366172,
+        0.960161
+      ],
+      "width": 1.51543,
+      "height": 1.51543,
+      "color": [
+        0.84546,
+        0.837,
+        0.84546,
+        1
+      ],
+      "speed": 0.996693,
+      "frameOffset": 14.7399
+    },
+    {
+      "id": 287,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -1.107599,
+        2.378212,
+        0.99074
+      ],
+      "width": 1.545529,
+      "height": 1.545529,
+      "color": [
+        0.83356,
+        0.82522,
+        0.83356,
+        1
+      ],
+      "speed": 1.063858,
+      "frameOffset": 8.654161
+    },
+    {
+      "id": 288,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -0.417518,
+        2.376738,
+        0.896251
+      ],
+      "width": 1.541845,
+      "height": 1.541845,
+      "color": [
+        0.77258,
+        0.76485,
+        0.77258,
+        1
+      ],
+      "speed": 0.922614,
+      "frameOffset": 1.112449
+    },
+    {
+      "id": 289,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        0.383118,
+        2.419972,
+        0.992223
+      ],
+      "width": 1.649931,
+      "height": 1.649931,
+      "color": [
+        0.9117,
+        0.90258,
+        0.9117,
+        1
+      ],
+      "speed": 0.913544,
+      "frameOffset": 1.143079
+    },
+    {
+      "id": 290,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        1.058043,
+        2.395592,
+        0.947207
+      ],
+      "width": 1.588981,
+      "height": 1.588981,
+      "color": [
+        0.7516,
+        0.74408,
+        0.7516,
+        1
+      ],
+      "speed": 0.942042,
+      "frameOffset": 7.203927
+    },
+    {
+      "id": 291,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        1.79712,
+        2.444672,
+        0.964194
+      ],
+      "width": 1.711681,
+      "height": 1.711681,
+      "color": [
+        0.95585,
+        0.94629,
+        0.95585,
+        1
+      ],
+      "speed": 1.043886,
+      "frameOffset": 12.298461
+    },
+    {
+      "id": 292,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        2.486256,
+        2.434195,
+        0.963093
+      ],
+      "width": 1.685487,
+      "height": 1.685487,
+      "color": [
+        0.91767,
+        0.90849,
+        0.91767,
+        1
+      ],
+      "speed": 1.053832,
+      "frameOffset": 11.335627
+    },
+    {
+      "id": 293,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        3.235722,
+        2.442537,
+        0.871393
+      ],
+      "width": 1.706342,
+      "height": 1.706342,
+      "color": [
+        0.82241,
+        0.81419,
+        0.82241,
+        1
+      ],
+      "speed": 1.003048,
+      "frameOffset": 9.781471
+    },
+    {
+      "id": 294,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        3.977169,
+        2.449301,
+        0.864538
+      ],
+      "width": 1.723252,
+      "height": 1.723252,
+      "color": [
+        0.86209,
+        0.85347,
+        0.86209,
+        1
+      ],
+      "speed": 1.065895,
+      "frameOffset": 7.171912
+    },
+    {
+      "id": 295,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        4.737878,
+        2.389339,
+        0.94947
+      ],
+      "width": 1.573347,
+      "height": 1.573347,
+      "color": [
+        0.91041,
+        0.90131,
+        0.91041,
+        1
+      ],
+      "speed": 0.96358,
+      "frameOffset": 2.482579
+    },
+    {
+      "id": 296,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        5.459791,
+        2.379859,
+        0.943406
+      ],
+      "width": 1.549647,
+      "height": 1.549647,
+      "color": [
+        0.68778,
+        0.68091,
+        0.68778,
+        1
+      ],
+      "speed": 0.910493,
+      "frameOffset": 9.127613
+    },
+    {
+      "id": 297,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        6.090053,
+        2.392162,
+        0.940205
+      ],
+      "width": 1.580406,
+      "height": 1.580406,
+      "color": [
+        0.90098,
+        0.89197,
+        0.90098,
+        1
+      ],
+      "speed": 1.068593,
+      "frameOffset": 2.403089
+    },
+    {
+      "id": 298,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        6.865715,
+        2.472528,
+        0.865777
+      ],
+      "width": 1.78132,
+      "height": 1.78132,
+      "color": [
+        0.91754,
+        0.90836,
+        0.91754,
+        1
+      ],
+      "speed": 0.947134,
+      "frameOffset": 2.547491
+    },
+    {
+      "id": 299,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        7.563027,
+        2.377668,
+        0.944398
+      ],
+      "width": 1.544171,
+      "height": 1.544171,
+      "color": [
+        0.90652,
+        0.89745,
+        0.90652,
+        1
+      ],
+      "speed": 0.916207,
+      "frameOffset": 8.801764
+    },
+    {
+      "id": 300,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        8.339074,
+        2.373468,
+        0.888462
+      ],
+      "width": 1.53367,
+      "height": 1.53367,
+      "color": [
+        0.69295,
+        0.68602,
+        0.69295,
+        1
+      ],
+      "speed": 1.012307,
+      "frameOffset": 1.461918
+    },
+    {
+      "id": 301,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        8.966318,
+        2.409166,
+        0.956058
+      ],
+      "width": 1.622915,
+      "height": 1.622915,
+      "color": [
+        0.75188,
+        0.74436,
+        0.75188,
+        1
+      ],
+      "speed": 1.074485,
+      "frameOffset": 0.305778
+    },
+    {
+      "id": 302,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        9.684701,
+        2.45892,
+        0.862096
+      ],
+      "width": 1.747301,
+      "height": 1.747301,
+      "color": [
+        0.76236,
+        0.75473,
+        0.76236,
+        1
+      ],
+      "speed": 1.034266,
+      "frameOffset": 8.237764
+    },
+    {
+      "id": 303,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        10.397805,
+        2.372504,
+        0.867654
+      ],
+      "width": 1.531259,
+      "height": 1.531259,
+      "color": [
+        0.75715,
+        0.74958,
+        0.75715,
+        1
+      ],
+      "speed": 1.087897,
+      "frameOffset": 5.445677
+    },
+    {
+      "id": 304,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        11.18656,
+        2.401254,
+        0.965706
+      ],
+      "width": 1.603135,
+      "height": 1.603135,
+      "color": [
+        0.82245,
+        0.81422,
+        0.82245,
+        1
+      ],
+      "speed": 0.928986,
+      "frameOffset": 14.442811
+    },
+    {
+      "id": 305,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        11.903442,
+        2.430617,
+        0.917365
+      ],
+      "width": 1.676544,
+      "height": 1.676544,
+      "color": [
+        0.9998,
+        0.98981,
+        0.9998,
+        1
+      ],
+      "speed": 0.960755,
+      "frameOffset": 5.294101
+    },
+    {
+      "id": 306,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -11.872609,
+        2.656057,
+        1.829116
+      ],
+      "width": 1.690143,
+      "height": 1.690143,
+      "color": [
+        0.77299,
+        0.76526,
+        0.77299,
+        1
+      ],
+      "speed": 0.979006,
+      "frameOffset": 6.63075
+    },
+    {
+      "id": 307,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -11.217174,
+        2.601052,
+        1.815583
+      ],
+      "width": 1.552631,
+      "height": 1.552631,
+      "color": [
+        0.91882,
+        0.90964,
+        0.91882,
+        1
+      ],
+      "speed": 0.98597,
+      "frameOffset": 8.315516
+    },
+    {
+      "id": 308,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -10.482098,
+        2.618669,
+        1.902474
+      ],
+      "width": 1.596672,
+      "height": 1.596672,
+      "color": [
+        0.89712,
+        0.88815,
+        0.89712,
+        1
+      ],
+      "speed": 1.005101,
+      "frameOffset": 3.569159
+    },
+    {
+      "id": 309,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -9.721755,
+        2.587947,
+        1.78167
+      ],
+      "width": 1.519868,
+      "height": 1.519868,
+      "color": [
+        0.95046,
+        0.94095,
+        0.95046,
+        1
+      ],
+      "speed": 0.964504,
+      "frameOffset": 12.125017
+    },
+    {
+      "id": 310,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -9.004536,
+        2.688435,
+        1.882151
+      ],
+      "width": 1.771088,
+      "height": 1.771088,
+      "color": [
+        0.94101,
+        0.9316,
+        0.94101,
+        1
+      ],
+      "speed": 1.031252,
+      "frameOffset": 10.086971
+    },
+    {
+      "id": 311,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -8.258332,
+        2.6749,
+        1.839953
+      ],
+      "width": 1.737251,
+      "height": 1.737251,
+      "color": [
+        0.96955,
+        0.95985,
+        0.96955,
+        1
+      ],
+      "speed": 0.966935,
+      "frameOffset": 14.74997
+    },
+    {
+      "id": 312,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -7.549741,
+        2.650766,
+        1.877814
+      ],
+      "width": 1.676915,
+      "height": 1.676915,
+      "color": [
+        0.71077,
+        0.70366,
+        0.71077,
+        1
+      ],
+      "speed": 1.00812,
+      "frameOffset": 0.86873
+    },
+    {
+      "id": 313,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -6.795414,
+        2.657743,
+        1.88984
+      ],
+      "width": 1.694358,
+      "height": 1.694358,
+      "color": [
+        0.93428,
+        0.92494,
+        0.93428,
+        1
+      ],
+      "speed": 0.922656,
+      "frameOffset": 3.107753
+    },
+    {
+      "id": 314,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -6.092598,
+        2.642327,
+        1.863482
+      ],
+      "width": 1.655818,
+      "height": 1.655818,
+      "color": [
+        0.93896,
+        0.92957,
+        0.93896,
+        1
+      ],
+      "speed": 0.913294,
+      "frameOffset": 2.045747
+    },
+    {
+      "id": 315,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -5.392084,
+        2.582126,
+        1.835337
+      ],
+      "width": 1.505314,
+      "height": 1.505314,
+      "color": [
+        0.67185,
+        0.66513,
+        0.67185,
+        1
+      ],
+      "speed": 0.995304,
+      "frameOffset": 0.754088
+    },
+    {
+      "id": 316,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -4.684656,
+        2.652416,
+        1.842726
+      ],
+      "width": 1.68104,
+      "height": 1.68104,
+      "color": [
+        0.75346,
+        0.74593,
+        0.75346,
+        1
+      ],
+      "speed": 1.014731,
+      "frameOffset": 8.958691
+    },
+    {
+      "id": 317,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -3.931589,
+        2.666491,
+        1.84576
+      ],
+      "width": 1.716227,
+      "height": 1.716227,
+      "color": [
+        0.7777,
+        0.76992,
+        0.7777,
+        1
+      ],
+      "speed": 0.997971,
+      "frameOffset": 6.510882
+    },
+    {
+      "id": 318,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -3.222583,
+        2.628711,
+        1.84165
+      ],
+      "width": 1.621778,
+      "height": 1.621778,
+      "color": [
+        0.7663,
+        0.75864,
+        0.7663,
+        1
+      ],
+      "speed": 1.067401,
+      "frameOffset": 3.7176
+    },
+    {
+      "id": 319,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -2.567748,
+        2.599799,
+        1.866333
+      ],
+      "width": 1.549498,
+      "height": 1.549498,
+      "color": [
+        0.9443,
+        0.93485,
+        0.9443,
+        1
+      ],
+      "speed": 1.022808,
+      "frameOffset": 15.144819
+    },
+    {
+      "id": 320,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -1.739437,
+        2.599957,
+        1.82389
+      ],
+      "width": 1.549893,
+      "height": 1.549893,
+      "color": [
+        0.94004,
+        0.93064,
+        0.94004,
+        1
+      ],
+      "speed": 0.937686,
+      "frameOffset": 10.114377
+    },
+    {
+      "id": 321,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -1.036778,
+        2.584363,
+        1.875763
+      ],
+      "width": 1.510908,
+      "height": 1.510908,
+      "color": [
+        0.76175,
+        0.75414,
+        0.76175,
+        1
+      ],
+      "speed": 1.024476,
+      "frameOffset": 11.097381
+    },
+    {
+      "id": 322,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -0.310124,
+        2.584665,
+        1.855544
+      ],
+      "width": 1.511662,
+      "height": 1.511662,
+      "color": [
+        0.81988,
+        0.81168,
+        0.81988,
+        1
+      ],
+      "speed": 0.925781,
+      "frameOffset": 1.069702
+    },
+    {
+      "id": 323,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        0.406127,
+        2.621731,
+        1.817788
+      ],
+      "width": 1.604328,
+      "height": 1.604328,
+      "color": [
+        0.97465,
+        0.96491,
+        0.97465,
+        1
+      ],
+      "speed": 1.038137,
+      "frameOffset": 3.841965
+    },
+    {
+      "id": 324,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        1.062601,
+        2.589193,
+        1.85841
+      ],
+      "width": 1.522982,
+      "height": 1.522982,
+      "color": [
+        0.69302,
+        0.68609,
+        0.69302,
+        1
+      ],
+      "speed": 0.927247,
+      "frameOffset": 0.339186
+    },
+    {
+      "id": 325,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        1.849844,
+        2.664649,
+        1.909918
+      ],
+      "width": 1.711624,
+      "height": 1.711624,
+      "color": [
+        0.90148,
+        0.89246,
+        0.90148,
+        1
+      ],
+      "speed": 0.914244,
+      "frameOffset": 3.900452
+    },
+    {
+      "id": 326,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        2.532265,
+        2.611599,
+        1.87767
+      ],
+      "width": 1.578997,
+      "height": 1.578997,
+      "color": [
+        0.81672,
+        0.80855,
+        0.81672,
+        1
+      ],
+      "speed": 0.953144,
+      "frameOffset": 3.043616
+    },
+    {
+      "id": 327,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        3.239228,
+        2.6898,
+        1.785168
+      ],
+      "width": 1.7745,
+      "height": 1.7745,
+      "color": [
+        0.83229,
+        0.82397,
+        0.83229,
+        1
+      ],
+      "speed": 1.044613,
+      "frameOffset": 9.508485
+    },
+    {
+      "id": 328,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        3.935296,
+        2.620531,
+        1.873329
+      ],
+      "width": 1.601328,
+      "height": 1.601328,
+      "color": [
+        0.79566,
+        0.7877,
+        0.79566,
+        1
+      ],
+      "speed": 0.961586,
+      "frameOffset": 4.964838
+    },
+    {
+      "id": 329,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        4.716665,
+        2.588836,
+        1.896111
+      ],
+      "width": 1.52209,
+      "height": 1.52209,
+      "color": [
+        0.76053,
+        0.75292,
+        0.76053,
+        1
+      ],
+      "speed": 0.931932,
+      "frameOffset": 11.345364
+    },
+    {
+      "id": 330,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        5.346982,
+        2.677752,
+        1.870264
+      ],
+      "width": 1.74438,
+      "height": 1.74438,
+      "color": [
+        0.86921,
+        0.86052,
+        0.86921,
+        1
+      ],
+      "speed": 0.984801,
+      "frameOffset": 7.845747
+    },
+    {
+      "id": 331,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        6.146768,
+        2.584776,
+        1.838466
+      ],
+      "width": 1.51194,
+      "height": 1.51194,
+      "color": [
+        0.69274,
+        0.68581,
+        0.69274,
+        1
+      ],
+      "speed": 0.981162,
+      "frameOffset": 8.175895
+    },
+    {
+      "id": 332,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        6.787015,
+        2.590411,
+        1.863683
+      ],
+      "width": 1.526029,
+      "height": 1.526029,
+      "color": [
+        0.9333,
+        0.92397,
+        0.9333,
+        1
+      ],
+      "speed": 1.003651,
+      "frameOffset": 6.34115
+    },
+    {
+      "id": 333,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        7.51239,
+        2.680891,
+        1.88713
+      ],
+      "width": 1.752227,
+      "height": 1.752227,
+      "color": [
+        0.78962,
+        0.78172,
+        0.78962,
+        1
+      ],
+      "speed": 1.066776,
+      "frameOffset": 9.521174
+    },
+    {
+      "id": 334,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        8.322935,
+        2.615833,
+        1.798537
+      ],
+      "width": 1.589583,
+      "height": 1.589583,
+      "color": [
+        0.83308,
+        0.82475,
+        0.83308,
+        1
+      ],
+      "speed": 1.065065,
+      "frameOffset": 7.136224
+    },
+    {
+      "id": 335,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        8.963568,
+        2.66401,
+        1.814038
+      ],
+      "width": 1.710024,
+      "height": 1.710024,
+      "color": [
+        0.88289,
+        0.87406,
+        0.88289,
+        1
+      ],
+      "speed": 1.008972,
+      "frameOffset": 14.72253
+    },
+    {
+      "id": 336,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        9.66592,
+        2.636929,
+        1.852656
+      ],
+      "width": 1.642322,
+      "height": 1.642322,
+      "color": [
+        0.86664,
+        0.85797,
+        0.86664,
+        1
+      ],
+      "speed": 0.988927,
+      "frameOffset": 12.481642
+    },
+    {
+      "id": 337,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        10.455826,
+        2.601497,
+        1.767453
+      ],
+      "width": 1.553743,
+      "height": 1.553743,
+      "color": [
+        0.7713,
+        0.76358,
+        0.7713,
+        1
+      ],
+      "speed": 0.913213,
+      "frameOffset": 9.86295
+    },
+    {
+      "id": 338,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        11.207899,
+        2.65341,
+        1.839585
+      ],
+      "width": 1.683526,
+      "height": 1.683526,
+      "color": [
+        0.74346,
+        0.73602,
+        0.74346,
+        1
+      ],
+      "speed": 1.069695,
+      "frameOffset": 14.866353
+    },
+    {
+      "id": 339,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        11.830922,
+        2.616682,
+        1.814589
+      ],
+      "width": 1.591704,
+      "height": 1.591704,
+      "color": [
+        0.72222,
+        0.715,
+        0.72222,
+        1
+      ],
+      "speed": 0.983396,
+      "frameOffset": 7.179107
+    },
+    {
+      "id": 340,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -11.929237,
+        2.874433,
+        2.762217
+      ],
+      "width": 1.686081,
+      "height": 1.686081,
+      "color": [
+        0.78321,
+        0.77538,
+        0.78321,
+        1
+      ],
+      "speed": 1.036548,
+      "frameOffset": 14.774052
+    },
+    {
+      "id": 341,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -11.147873,
+        2.82416,
+        2.760229
+      ],
+      "width": 1.560401,
+      "height": 1.560401,
+      "color": [
+        0.73878,
+        0.73139,
+        0.73878,
+        1
+      ],
+      "speed": 0.955789,
+      "frameOffset": 3.551827
+    },
+    {
+      "id": 342,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -10.460719,
+        2.84379,
+        2.786359
+      ],
+      "width": 1.609475,
+      "height": 1.609475,
+      "color": [
+        0.76727,
+        0.7596,
+        0.76727,
+        1
+      ],
+      "speed": 0.93135,
+      "frameOffset": 0.320072
+    },
+    {
+      "id": 343,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -9.721952,
+        2.835027,
+        2.765585
+      ],
+      "width": 1.587568,
+      "height": 1.587568,
+      "color": [
+        0.71354,
+        0.70641,
+        0.71354,
+        1
+      ],
+      "speed": 1.081107,
+      "frameOffset": 13.933838
+    },
+    {
+      "id": 344,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -9.028732,
+        2.86478,
+        2.70556
+      ],
+      "width": 1.661951,
+      "height": 1.661951,
+      "color": [
+        0.8394,
+        0.83101,
+        0.8394,
+        1
+      ],
+      "speed": 0.983848,
+      "frameOffset": 10.391441
+    },
+    {
+      "id": 345,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -8.257511,
+        2.901761,
+        2.818973
+      ],
+      "width": 1.754402,
+      "height": 1.754402,
+      "color": [
+        0.91985,
+        0.91065,
+        0.91985,
+        1
+      ],
+      "speed": 1.060979,
+      "frameOffset": 0.743567
+    },
+    {
+      "id": 346,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -7.580608,
+        2.906653,
+        2.828644
+      ],
+      "width": 1.766633,
+      "height": 1.766633,
+      "color": [
+        0.81918,
+        0.81099,
+        0.81918,
+        1
+      ],
+      "speed": 1.062555,
+      "frameOffset": 1.201735
+    },
+    {
+      "id": 347,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -6.890504,
+        2.899829,
+        2.715543
+      ],
+      "width": 1.749574,
+      "height": 1.749574,
+      "color": [
+        0.7503,
+        0.74279,
+        0.7503,
+        1
+      ],
+      "speed": 1.034261,
+      "frameOffset": 11.276121
+    },
+    {
+      "id": 348,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -6.117417,
+        2.823882,
+        2.768728
+      ],
+      "width": 1.559706,
+      "height": 1.559706,
+      "color": [
+        0.9812,
+        0.97139,
+        0.9812,
+        1
+      ],
+      "speed": 1.004773,
+      "frameOffset": 12.433947
+    },
+    {
+      "id": 349,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -5.441811,
+        2.899444,
+        2.694166
+      ],
+      "width": 1.748611,
+      "height": 1.748611,
+      "color": [
+        0.97638,
+        0.96662,
+        0.97638,
+        1
+      ],
+      "speed": 0.97502,
+      "frameOffset": 10.999569
+    },
+    {
+      "id": 350,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -4.654207,
+        2.815665,
+        2.769504
+      ],
+      "width": 1.539163,
+      "height": 1.539163,
+      "color": [
+        0.75299,
+        0.74546,
+        0.75299,
+        1
+      ],
+      "speed": 1.071267,
+      "frameOffset": 11.675073
+    },
+    {
+      "id": 351,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -3.948241,
+        2.870431,
+        2.799897
+      ],
+      "width": 1.676077,
+      "height": 1.676077,
+      "color": [
+        0.95554,
+        0.94598,
+        0.95554,
+        1
+      ],
+      "speed": 1.0455,
+      "frameOffset": 4.489502
+    },
+    {
+      "id": 352,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -3.255348,
+        2.86918,
+        2.711132
+      ],
+      "width": 1.672951,
+      "height": 1.672951,
+      "color": [
+        0.95734,
+        0.94777,
+        0.95734,
+        1
+      ],
+      "speed": 0.963983,
+      "frameOffset": 1.201304
+    },
+    {
+      "id": 353,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -2.553896,
+        2.836863,
+        2.71392
+      ],
+      "width": 1.592158,
+      "height": 1.592158,
+      "color": [
+        0.68839,
+        0.6815,
+        0.68839,
+        1
+      ],
+      "speed": 1.043112,
+      "frameOffset": 4.823811
+    },
+    {
+      "id": 354,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -1.857965,
+        2.901105,
+        2.771372
+      ],
+      "width": 1.752763,
+      "height": 1.752763,
+      "color": [
+        0.76361,
+        0.75598,
+        0.76361,
+        1
+      ],
+      "speed": 1.073356,
+      "frameOffset": 7.623377
+    },
+    {
+      "id": 355,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -1.095543,
+        2.808981,
+        2.807471
+      ],
+      "width": 1.522454,
+      "height": 1.522454,
+      "color": [
+        0.8093,
+        0.8012,
+        0.8093,
+        1
+      ],
+      "speed": 1.050612,
+      "frameOffset": 8.258994
+    },
+    {
+      "id": 356,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -0.303507,
+        2.90364,
+        2.817182
+      ],
+      "width": 1.7591,
+      "height": 1.7591,
+      "color": [
+        0.82162,
+        0.81341,
+        0.82162,
+        1
+      ],
+      "speed": 1.018929,
+      "frameOffset": 11.907788
+    },
+    {
+      "id": 357,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        0.402767,
+        2.918986,
+        2.750447
+      ],
+      "width": 1.797464,
+      "height": 1.797464,
+      "color": [
+        0.88381,
+        0.87497,
+        0.88381,
+        1
+      ],
+      "speed": 0.963174,
+      "frameOffset": 0.667328
+    },
+    {
+      "id": 358,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        1.075541,
+        2.909388,
+        2.79971
+      ],
+      "width": 1.773471,
+      "height": 1.773471,
+      "color": [
+        0.82105,
+        0.81284,
+        0.82105,
+        1
+      ],
+      "speed": 0.920194,
+      "frameOffset": 2.975906
+    },
+    {
+      "id": 359,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        1.847227,
+        2.866846,
+        2.694749
+      ],
+      "width": 1.667114,
+      "height": 1.667114,
+      "color": [
+        0.8665,
+        0.85783,
+        0.8665,
+        1
+      ],
+      "speed": 0.940554,
+      "frameOffset": 13.507801
+    },
+    {
+      "id": 360,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        2.523175,
+        2.897164,
+        2.69307
+      ],
+      "width": 1.742911,
+      "height": 1.742911,
+      "color": [
+        0.91686,
+        0.9077,
+        0.91686,
+        1
+      ],
+      "speed": 1.059033,
+      "frameOffset": 14.915671
+    },
+    {
+      "id": 361,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        3.258063,
+        2.916542,
+        2.775653
+      ],
+      "width": 1.791356,
+      "height": 1.791356,
+      "color": [
+        0.67334,
+        0.66661,
+        0.67334,
+        1
+      ],
+      "speed": 1.020796,
+      "frameOffset": 9.098436
+    },
+    {
+      "id": 362,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        3.973227,
+        2.837862,
+        2.745679
+      ],
+      "width": 1.594655,
+      "height": 1.594655,
+      "color": [
+        0.70016,
+        0.69316,
+        0.70016,
+        1
+      ],
+      "speed": 0.959329,
+      "frameOffset": 12.015079
+    },
+    {
+      "id": 363,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        4.68403,
+        2.905114,
+        2.77424
+      ],
+      "width": 1.762784,
+      "height": 1.762784,
+      "color": [
+        0.94663,
+        0.93716,
+        0.94663,
+        1
+      ],
+      "speed": 0.935062,
+      "frameOffset": 7.733573
+    },
+    {
+      "id": 364,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        5.382628,
+        2.877142,
+        2.798328
+      ],
+      "width": 1.692854,
+      "height": 1.692854,
+      "color": [
+        0.74017,
+        0.73277,
+        0.74017,
+        1
+      ],
+      "speed": 0.989202,
+      "frameOffset": 14.941514
+    },
+    {
+      "id": 365,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        6.083473,
+        2.908104,
+        2.783046
+      ],
+      "width": 1.77026,
+      "height": 1.77026,
+      "color": [
+        0.96209,
+        0.95246,
+        0.96209,
+        1
+      ],
+      "speed": 1.034075,
+      "frameOffset": 7.936661
+    },
+    {
+      "id": 366,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        6.883665,
+        2.830466,
+        2.784943
+      ],
+      "width": 1.576166,
+      "height": 1.576166,
+      "color": [
+        0.70405,
+        0.69701,
+        0.70405,
+        1
+      ],
+      "speed": 0.952463,
+      "frameOffset": 13.03323
+    },
+    {
+      "id": 367,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        7.525205,
+        2.8606,
+        2.792971
+      ],
+      "width": 1.651501,
+      "height": 1.651501,
+      "color": [
+        0.88046,
+        0.87165,
+        0.88046,
+        1
+      ],
+      "speed": 0.976875,
+      "frameOffset": 1.878224
+    },
+    {
+      "id": 368,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        8.284525,
+        2.913644,
+        2.816233
+      ],
+      "width": 1.78411,
+      "height": 1.78411,
+      "color": [
+        0.8177,
+        0.80952,
+        0.8177,
+        1
+      ],
+      "speed": 0.994922,
+      "frameOffset": 0.864995
+    },
+    {
+      "id": 369,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        8.956318,
+        2.862337,
+        2.798356
+      ],
+      "width": 1.655841,
+      "height": 1.655841,
+      "color": [
+        0.91111,
+        0.902,
+        0.91111,
+        1
+      ],
+      "speed": 1.024471,
+      "frameOffset": 4.294233
+    },
+    {
+      "id": 370,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        9.701848,
+        2.857441,
+        2.767836
+      ],
+      "width": 1.643602,
+      "height": 1.643602,
+      "color": [
+        0.67169,
+        0.66497,
+        0.67169,
+        1
+      ],
+      "speed": 0.930957,
+      "frameOffset": 5.586963
+    },
+    {
+      "id": 371,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        10.472066,
+        2.90239,
+        2.729214
+      ],
+      "width": 1.755974,
+      "height": 1.755974,
+      "color": [
+        0.87416,
+        0.86542,
+        0.87416,
+        1
+      ],
+      "speed": 1.0133,
+      "frameOffset": 12.664682
+    },
+    {
+      "id": 372,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        11.187298,
+        2.910531,
+        2.813124
+      ],
+      "width": 1.776328,
+      "height": 1.776328,
+      "color": [
+        0.77738,
+        0.7696,
+        0.77738,
+        1
+      ],
+      "speed": 0.943545,
+      "frameOffset": 11.686085
+    },
+    {
+      "id": 373,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        11.834392,
+        2.890077,
+        2.703564
+      ],
+      "width": 1.725193,
+      "height": 1.725193,
+      "color": [
+        0.75122,
+        0.74371,
+        0.75122,
+        1
+      ],
+      "speed": 1.023992,
+      "frameOffset": 1.45837
+    },
+    {
+      "id": 374,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -11.826085,
+        3.089978,
+        3.645045
+      ],
+      "width": 1.674946,
+      "height": 1.674946,
+      "color": [
+        0.83004,
+        0.82174,
+        0.83004,
+        1
+      ],
+      "speed": 0.944698,
+      "frameOffset": 10.759969
+    },
+    {
+      "id": 375,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        -11.195774,
+        3.06747,
+        3.707206
+      ],
+      "width": 1.618675,
+      "height": 1.618675,
+      "color": [
+        0.79686,
+        0.7889,
+        0.79686,
+        1
+      ],
+      "speed": 1.089497,
+      "frameOffset": 13.483089
+    },
+    {
+      "id": 376,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -10.435423,
+        3.137389,
+        3.682896
+      ],
+      "width": 1.793472,
+      "height": 1.793472,
+      "color": [
+        0.87987,
+        0.87108,
+        0.87987,
+        1
+      ],
+      "speed": 0.92167,
+      "frameOffset": 15.196378
+    },
+    {
+      "id": 377,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -9.718561,
+        3.088627,
+        3.681002
+      ],
+      "width": 1.671568,
+      "height": 1.671568,
+      "color": [
+        0.72441,
+        0.71717,
+        0.72441,
+        1
+      ],
+      "speed": 0.960232,
+      "frameOffset": 2.836549
+    },
+    {
+      "id": 378,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -8.970906,
+        3.021899,
+        3.685124
+      ],
+      "width": 1.504747,
+      "height": 1.504747,
+      "color": [
+        0.95872,
+        0.94914,
+        0.95872,
+        1
+      ],
+      "speed": 1.021667,
+      "frameOffset": 5.829941
+    },
+    {
+      "id": 379,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -8.244421,
+        3.112897,
+        3.71258
+      ],
+      "width": 1.732242,
+      "height": 1.732242,
+      "color": [
+        0.90529,
+        0.89624,
+        0.90529,
+        1
+      ],
+      "speed": 0.999434,
+      "frameOffset": 5.420869
+    },
+    {
+      "id": 380,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -7.5305,
+        3.099504,
+        3.72125
+      ],
+      "width": 1.69876,
+      "height": 1.69876,
+      "color": [
+        0.74032,
+        0.73292,
+        0.74032,
+        1
+      ],
+      "speed": 1.021218,
+      "frameOffset": 15.757251
+    },
+    {
+      "id": 381,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -6.818133,
+        3.087531,
+        3.709963
+      ],
+      "width": 1.668828,
+      "height": 1.668828,
+      "color": [
+        0.69182,
+        0.6849,
+        0.69182,
+        1
+      ],
+      "speed": 0.985371,
+      "frameOffset": 4.619415
+    },
+    {
+      "id": 382,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -6.144295,
+        3.128437,
+        3.629719
+      ],
+      "width": 1.771092,
+      "height": 1.771092,
+      "color": [
+        0.79174,
+        0.78382,
+        0.79174,
+        1
+      ],
+      "speed": 0.915657,
+      "frameOffset": 14.74492
+    },
+    {
+      "id": 383,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -5.444194,
+        3.130247,
+        3.617436
+      ],
+      "width": 1.775618,
+      "height": 1.775618,
+      "color": [
+        0.72551,
+        0.71826,
+        0.72551,
+        1
+      ],
+      "speed": 1.01086,
+      "frameOffset": 15.414276
+    },
+    {
+      "id": 384,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -4.622231,
+        3.111752,
+        3.741934
+      ],
+      "width": 1.729381,
+      "height": 1.729381,
+      "color": [
+        0.75757,
+        0.75,
+        0.75757,
+        1
+      ],
+      "speed": 1.087243,
+      "frameOffset": 15.61096
+    },
+    {
+      "id": 385,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -3.957721,
+        3.118903,
+        3.719949
+      ],
+      "width": 1.747258,
+      "height": 1.747258,
+      "color": [
+        0.77798,
+        0.7702,
+        0.77798,
+        1
+      ],
+      "speed": 0.9567,
+      "frameOffset": 11.837322
+    },
+    {
+      "id": 386,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -3.236658,
+        3.080489,
+        3.667357
+      ],
+      "width": 1.651223,
+      "height": 1.651223,
+      "color": [
+        0.72451,
+        0.71727,
+        0.72451,
+        1
+      ],
+      "speed": 1.012428,
+      "frameOffset": 12.482196
+    },
+    {
+      "id": 387,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -2.511448,
+        3.063862,
+        3.681861
+      ],
+      "width": 1.609655,
+      "height": 1.609655,
+      "color": [
+        0.94351,
+        0.93407,
+        0.94351,
+        1
+      ],
+      "speed": 1.006291,
+      "frameOffset": 10.959224
+    },
+    {
+      "id": 388,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -1.781784,
+        3.034425,
+        3.646019
+      ],
+      "width": 1.536062,
+      "height": 1.536062,
+      "color": [
+        0.8385,
+        0.83011,
+        0.8385,
+        1
+      ],
+      "speed": 1.065145,
+      "frameOffset": 8.254749
+    },
+    {
+      "id": 389,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -1.054555,
+        3.121115,
+        3.62897
+      ],
+      "width": 1.752787,
+      "height": 1.752787,
+      "color": [
+        0.73773,
+        0.73035,
+        0.73773,
+        1
+      ],
+      "speed": 1.013632,
+      "frameOffset": 13.800824
+    },
+    {
+      "id": 390,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -0.384858,
+        3.111308,
+        3.742366
+      ],
+      "width": 1.72827,
+      "height": 1.72827,
+      "color": [
+        0.99134,
+        0.98143,
+        0.99134,
+        1
+      ],
+      "speed": 1.008576,
+      "frameOffset": 1.757094
+    },
+    {
+      "id": 391,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        0.352326,
+        3.082167,
+        3.709509
+      ],
+      "width": 1.655418,
+      "height": 1.655418,
+      "color": [
+        0.84547,
+        0.83702,
+        0.84547,
+        1
+      ],
+      "speed": 0.954136,
+      "frameOffset": 13.46495
+    },
+    {
+      "id": 392,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        1.063963,
+        3.094885,
+        3.648846
+      ],
+      "width": 1.687212,
+      "height": 1.687212,
+      "color": [
+        0.67744,
+        0.67066,
+        0.67744,
+        1
+      ],
+      "speed": 0.956787,
+      "frameOffset": 13.485164
+    },
+    {
+      "id": 393,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        1.756478,
+        3.099386,
+        3.715652
+      ],
+      "width": 1.698465,
+      "height": 1.698465,
+      "color": [
+        0.98977,
+        0.97987,
+        0.98977,
+        1
+      ],
+      "speed": 1.012486,
+      "frameOffset": 1.360762
+    },
+    {
+      "id": 394,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        2.459571,
+        3.097809,
+        3.712135
+      ],
+      "width": 1.694523,
+      "height": 1.694523,
+      "color": [
+        0.81193,
+        0.80381,
+        0.81193,
+        1
+      ],
+      "speed": 1.068297,
+      "frameOffset": 8.059758
+    },
+    {
+      "id": 395,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        3.205654,
+        3.082551,
+        3.716207
+      ],
+      "width": 1.656378,
+      "height": 1.656378,
+      "color": [
+        0.82292,
+        0.81469,
+        0.82292,
+        1
+      ],
+      "speed": 1.044078,
+      "frameOffset": 0.412017
+    },
+    {
+      "id": 396,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        3.905031,
+        3.063697,
+        3.700817
+      ],
+      "width": 1.609242,
+      "height": 1.609242,
+      "color": [
+        0.87936,
+        0.87056,
+        0.87936,
+        1
+      ],
+      "speed": 1.047806,
+      "frameOffset": 4.954903
+    },
+    {
+      "id": 397,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        4.69474,
+        3.039128,
+        3.723194
+      ],
+      "width": 1.54782,
+      "height": 1.54782,
+      "color": [
+        0.91222,
+        0.9031,
+        0.91222,
+        1
+      ],
+      "speed": 1.02523,
+      "frameOffset": 8.736161
+    },
+    {
+      "id": 398,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        5.403502,
+        3.043196,
+        3.721719
+      ],
+      "width": 1.557989,
+      "height": 1.557989,
+      "color": [
+        0.94574,
+        0.93628,
+        0.94574,
+        1
+      ],
+      "speed": 0.97723,
+      "frameOffset": 10.071402
+    },
+    {
+      "id": 399,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        6.160306,
+        3.081452,
+        3.694531
+      ],
+      "width": 1.65363,
+      "height": 1.65363,
+      "color": [
+        0.8878,
+        0.87892,
+        0.8878,
+        1
+      ],
+      "speed": 0.976759,
+      "frameOffset": 4.078632
+    },
+    {
+      "id": 400,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        6.892791,
+        3.036717,
+        3.753218
+      ],
+      "width": 1.541793,
+      "height": 1.541793,
+      "color": [
+        0.94765,
+        0.93817,
+        0.94765,
+        1
+      ],
+      "speed": 1.012736,
+      "frameOffset": 0.928312
+    },
+    {
+      "id": 401,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        7.526416,
+        3.051793,
+        3.661503
+      ],
+      "width": 1.579482,
+      "height": 1.579482,
+      "color": [
+        0.93957,
+        0.93017,
+        0.93957,
+        1
+      ],
+      "speed": 1.066998,
+      "frameOffset": 8.216269
+    },
+    {
+      "id": 402,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        8.28397,
+        3.06049,
+        3.702562
+      ],
+      "width": 1.601225,
+      "height": 1.601225,
+      "color": [
+        0.80733,
+        0.79926,
+        0.80733,
+        1
+      ],
+      "speed": 1.01894,
+      "frameOffset": 1.671739
+    },
+    {
+      "id": 403,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        9.047505,
+        3.094136,
+        3.692731
+      ],
+      "width": 1.685339,
+      "height": 1.685339,
+      "color": [
+        0.71699,
+        0.70982,
+        0.71699,
+        1
+      ],
+      "speed": 1.019787,
+      "frameOffset": 14.200975
+    },
+    {
+      "id": 404,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        9.761112,
+        3.059115,
+        3.706913
+      ],
+      "width": 1.597788,
+      "height": 1.597788,
+      "color": [
+        0.81474,
+        0.8066,
+        0.81474,
+        1
+      ],
+      "speed": 0.910275,
+      "frameOffset": 13.663062
+    },
+    {
+      "id": 405,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        10.411279,
+        3.043644,
+        3.744401
+      ],
+      "width": 1.55911,
+      "height": 1.55911,
+      "color": [
+        0.75063,
+        0.74313,
+        0.75063,
+        1
+      ],
+      "speed": 0.993695,
+      "frameOffset": 1.282861
+    },
+    {
+      "id": 406,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        11.13132,
+        3.02623,
+        3.648061
+      ],
+      "width": 1.515575,
+      "height": 1.515575,
+      "color": [
+        0.87586,
+        0.8671,
+        0.87586,
+        1
+      ],
+      "speed": 1.00397,
+      "frameOffset": 15.117292
+    },
+    {
+      "id": 407,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        11.819045,
+        3.113327,
+        3.659167
+      ],
+      "width": 1.733318,
+      "height": 1.733318,
+      "color": [
+        0.7625,
+        0.75487,
+        0.7625,
+        1
+      ],
+      "speed": 1.034455,
+      "frameOffset": 15.083642
+    },
+    {
+      "id": 408,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -11.935188,
+        3.316278,
+        4.536966
+      ],
+      "width": 1.690694,
+      "height": 1.690694,
+      "color": [
+        0.68233,
+        0.67551,
+        0.68233,
+        1
+      ],
+      "speed": 1.01841,
+      "frameOffset": 7.475702
+    },
+    {
+      "id": 409,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -11.144759,
+        3.298961,
+        4.539638
+      ],
+      "width": 1.647404,
+      "height": 1.647404,
+      "color": [
+        0.79345,
+        0.78551,
+        0.79345,
+        1
+      ],
+      "speed": 0.965837,
+      "frameOffset": 15.625555
+    },
+    {
+      "id": 410,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -10.485282,
+        3.353694,
+        4.608752
+      ],
+      "width": 1.784236,
+      "height": 1.784236,
+      "color": [
+        0.74879,
+        0.7413,
+        0.74879,
+        1
+      ],
+      "speed": 0.929573,
+      "frameOffset": 10.184523
+    },
+    {
+      "id": 411,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -9.718086,
+        3.313328,
+        4.620724
+      ],
+      "width": 1.683319,
+      "height": 1.683319,
+      "color": [
+        0.98801,
+        0.97813,
+        0.98801,
+        1
+      ],
+      "speed": 0.958825,
+      "frameOffset": 14.238924
+    },
+    {
+      "id": 412,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -9.014297,
+        3.330736,
+        4.643337
+      ],
+      "width": 1.72684,
+      "height": 1.72684,
+      "color": [
+        0.79573,
+        0.78777,
+        0.79573,
+        1
+      ],
+      "speed": 0.920544,
+      "frameOffset": 2.355037
+    },
+    {
+      "id": 413,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -8.230007,
+        3.358874,
+        4.579683
+      ],
+      "width": 1.797186,
+      "height": 1.797186,
+      "color": [
+        0.98043,
+        0.97062,
+        0.98043,
+        1
+      ],
+      "speed": 1.047416,
+      "frameOffset": 1.837591
+    },
+    {
+      "id": 414,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -7.59734,
+        3.338309,
+        4.532098
+      ],
+      "width": 1.745772,
+      "height": 1.745772,
+      "color": [
+        0.70241,
+        0.69539,
+        0.70241,
+        1
+      ],
+      "speed": 0.951921,
+      "frameOffset": 15.717123
+    },
+    {
+      "id": 415,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -6.855754,
+        3.279829,
+        4.656604
+      ],
+      "width": 1.599573,
+      "height": 1.599573,
+      "color": [
+        0.67783,
+        0.67105,
+        0.67783,
+        1
+      ],
+      "speed": 1.013748,
+      "frameOffset": 5.757574
+    },
+    {
+      "id": 416,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -6.136636,
+        3.317528,
+        4.536392
+      ],
+      "width": 1.693821,
+      "height": 1.693821,
+      "color": [
+        0.90159,
+        0.89258,
+        0.90159,
+        1
+      ],
+      "speed": 1.009753,
+      "frameOffset": 12.584392
+    },
+    {
+      "id": 417,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -5.342315,
+        3.282038,
+        4.534082
+      ],
+      "width": 1.605095,
+      "height": 1.605095,
+      "color": [
+        0.74659,
+        0.73913,
+        0.74659,
+        1
+      ],
+      "speed": 1.009075,
+      "frameOffset": 6.014281
+    },
+    {
+      "id": 418,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -4.676614,
+        3.34696,
+        4.574046
+      ],
+      "width": 1.767401,
+      "height": 1.767401,
+      "color": [
+        0.91628,
+        0.90712,
+        0.91628,
+        1
+      ],
+      "speed": 1.053783,
+      "frameOffset": 2.835995
+    },
+    {
+      "id": 419,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -3.943478,
+        3.268493,
+        4.650036
+      ],
+      "width": 1.571233,
+      "height": 1.571233,
+      "color": [
+        0.73686,
+        0.72949,
+        0.73686,
+        1
+      ],
+      "speed": 1.010878,
+      "frameOffset": 12.706931
+    },
+    {
+      "id": 420,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -3.267186,
+        3.351633,
+        4.621076
+      ],
+      "width": 1.779082,
+      "height": 1.779082,
+      "color": [
+        0.96015,
+        0.95054,
+        0.96015,
+        1
+      ],
+      "speed": 0.969137,
+      "frameOffset": 4.922463
+    },
+    {
+      "id": 421,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -2.54612,
+        3.346651,
+        4.670155
+      ],
+      "width": 1.766627,
+      "height": 1.766627,
+      "color": [
+        0.89977,
+        0.89078,
+        0.89977,
+        1
+      ],
+      "speed": 0.993238,
+      "frameOffset": 2.819709
+    },
+    {
+      "id": 422,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -1.836051,
+        3.265428,
+        4.56373
+      ],
+      "width": 1.563571,
+      "height": 1.563571,
+      "color": [
+        0.87876,
+        0.86997,
+        0.87876,
+        1
+      ],
+      "speed": 0.942051,
+      "frameOffset": 12.93936
+    },
+    {
+      "id": 423,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -1.020483,
+        3.259263,
+        4.631581
+      ],
+      "width": 1.548159,
+      "height": 1.548159,
+      "color": [
+        0.79558,
+        0.78763,
+        0.79558,
+        1
+      ],
+      "speed": 1.078031,
+      "frameOffset": 13.385808
+    },
+    {
+      "id": 424,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -0.400884,
+        3.250426,
+        4.612616
+      ],
+      "width": 1.526066,
+      "height": 1.526066,
+      "color": [
+        0.85481,
+        0.84626,
+        0.85481,
+        1
+      ],
+      "speed": 1.066457,
+      "frameOffset": 9.100244
+    },
+    {
+      "id": 425,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        0.420665,
+        3.246596,
+        4.606405
+      ],
+      "width": 1.51649,
+      "height": 1.51649,
+      "color": [
+        0.97555,
+        0.9658,
+        0.97555,
+        1
+      ],
+      "speed": 1.063078,
+      "frameOffset": 0.046467
+    },
+    {
+      "id": 426,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        1.022167,
+        3.257287,
+        4.588501
+      ],
+      "width": 1.543217,
+      "height": 1.543217,
+      "color": [
+        0.89928,
+        0.89029,
+        0.89928,
+        1
+      ],
+      "speed": 0.924298,
+      "frameOffset": 5.971193
+    },
+    {
+      "id": 427,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        1.851281,
+        3.344974,
+        4.624283
+      ],
+      "width": 1.762435,
+      "height": 1.762435,
+      "color": [
+        0.96111,
+        0.9515,
+        0.96111,
+        1
+      ],
+      "speed": 0.983492,
+      "frameOffset": 7.026685
+    },
+    {
+      "id": 428,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        2.479429,
+        3.253,
+        4.622617
+      ],
+      "width": 1.532501,
+      "height": 1.532501,
+      "color": [
+        0.85841,
+        0.84982,
+        0.85841,
+        1
+      ],
+      "speed": 0.927023,
+      "frameOffset": 11.181585
+    },
+    {
+      "id": 429,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        3.245402,
+        3.25321,
+        4.577643
+      ],
+      "width": 1.533025,
+      "height": 1.533025,
+      "color": [
+        0.6835,
+        0.67667,
+        0.6835,
+        1
+      ],
+      "speed": 1.038071,
+      "frameOffset": 15.536422
+    },
+    {
+      "id": 430,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        3.997073,
+        3.269146,
+        4.585409
+      ],
+      "width": 1.572864,
+      "height": 1.572864,
+      "color": [
+        0.9194,
+        0.91021,
+        0.9194,
+        1
+      ],
+      "speed": 0.941865,
+      "frameOffset": 14.035024
+    },
+    {
+      "id": 431,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        4.686834,
+        3.310088,
+        4.528101
+      ],
+      "width": 1.675219,
+      "height": 1.675219,
+      "color": [
+        0.90156,
+        0.89254,
+        0.90156,
+        1
+      ],
+      "speed": 1.027507,
+      "frameOffset": 8.310427
+    },
+    {
+      "id": 432,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        5.433273,
+        3.253778,
+        4.621487
+      ],
+      "width": 1.534444,
+      "height": 1.534444,
+      "color": [
+        0.8014,
+        0.79339,
+        0.8014,
+        1
+      ],
+      "speed": 1.080079,
+      "frameOffset": 12.803634
+    },
+    {
+      "id": 433,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        6.118219,
+        3.323814,
+        4.574217
+      ],
+      "width": 1.709535,
+      "height": 1.709535,
+      "color": [
+        0.87283,
+        0.8641,
+        0.87283,
+        1
+      ],
+      "speed": 0.997164,
+      "frameOffset": 9.537245
+    },
+    {
+      "id": 434,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        6.832454,
+        3.331255,
+        4.582808
+      ],
+      "width": 1.728138,
+      "height": 1.728138,
+      "color": [
+        0.82544,
+        0.81718,
+        0.82544,
+        1
+      ],
+      "speed": 1.022205,
+      "frameOffset": 14.405741
+    },
+    {
+      "id": 435,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        7.551463,
+        3.342983,
+        4.537685
+      ],
+      "width": 1.757458,
+      "height": 1.757458,
+      "color": [
+        0.72334,
+        0.7161,
+        0.72334,
+        1
+      ],
+      "speed": 1.056043,
+      "frameOffset": 5.463648
+    },
+    {
+      "id": 436,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        8.326251,
+        3.316849,
+        4.613526
+      ],
+      "width": 1.692123,
+      "height": 1.692123,
+      "color": [
+        0.84626,
+        0.83779,
+        0.84626,
+        1
+      ],
+      "speed": 0.959982,
+      "frameOffset": 14.250152
+    },
+    {
+      "id": 437,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        8.955966,
+        3.283039,
+        4.602198
+      ],
+      "width": 1.607596,
+      "height": 1.607596,
+      "color": [
+        0.70609,
+        0.69903,
+        0.70609,
+        1
+      ],
+      "speed": 1.046732,
+      "frameOffset": 8.58099
+    },
+    {
+      "id": 438,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        9.687238,
+        3.267142,
+        4.539726
+      ],
+      "width": 1.567856,
+      "height": 1.567856,
+      "color": [
+        0.70002,
+        0.69302,
+        0.70002,
+        1
+      ],
+      "speed": 0.913409,
+      "frameOffset": 14.326981
+    },
+    {
+      "id": 439,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        10.453461,
+        3.314707,
+        4.673543
+      ],
+      "width": 1.686769,
+      "height": 1.686769,
+      "color": [
+        0.89835,
+        0.88937,
+        0.89835,
+        1
+      ],
+      "speed": 0.913241,
+      "frameOffset": 0.893349
+    },
+    {
+      "id": 440,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        11.125422,
+        3.29597,
+        4.620428
+      ],
+      "width": 1.639924,
+      "height": 1.639924,
+      "color": [
+        0.79081,
+        0.7829,
+        0.79081,
+        1
+      ],
+      "speed": 0.932786,
+      "frameOffset": 5.60217
+    },
+    {
+      "id": 441,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        11.900232,
+        3.282847,
+        4.623007
+      ],
+      "width": 1.607117,
+      "height": 1.607117,
+      "color": [
+        0.76103,
+        0.75342,
+        0.76103,
+        1
+      ],
+      "speed": 1.027551,
+      "frameOffset": 4.792474
+    },
+    {
+      "id": 442,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        -11.928419,
+        3.496233,
+        5.563013
+      ],
+      "width": 1.590583,
+      "height": 1.590583,
+      "color": [
+        0.6976,
+        0.69063,
+        0.6976,
+        1
+      ],
+      "speed": 1.070696,
+      "frameOffset": 9.667193
+    },
+    {
+      "id": 443,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -11.121729,
+        3.516714,
+        5.505934
+      ],
+      "width": 1.641785,
+      "height": 1.641785,
+      "color": [
+        0.94244,
+        0.93302,
+        0.94244,
+        1
+      ],
+      "speed": 1.021125,
+      "frameOffset": 1.581714
+    },
+    {
+      "id": 444,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -10.380657,
+        3.498747,
+        5.591779
+      ],
+      "width": 1.596868,
+      "height": 1.596868,
+      "color": [
+        0.92193,
+        0.91272,
+        0.92193,
+        1
+      ],
+      "speed": 1.050262,
+      "frameOffset": 5.174961
+    },
+    {
+      "id": 445,
+      "atlasIndex": 2,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -9.754324,
+        3.509213,
+        5.550739
+      ],
+      "width": 1.623031,
+      "height": 1.623031,
+      "color": [
+        0.80705,
+        0.79898,
+        0.80705,
+        1
+      ],
+      "speed": 1.054126,
+      "frameOffset": 5.967706
+    },
+    {
+      "id": 446,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -9.037492,
+        3.530212,
+        5.521942
+      ],
+      "width": 1.675529,
+      "height": 1.675529,
+      "color": [
+        0.97797,
+        0.96819,
+        0.97797,
+        1
+      ],
+      "speed": 0.927682,
+      "frameOffset": 13.816526
+    },
+    {
+      "id": 447,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -8.292648,
+        3.510287,
+        5.449823
+      ],
+      "width": 1.625717,
+      "height": 1.625717,
+      "color": [
+        0.84999,
+        0.84149,
+        0.84999,
+        1
+      ],
+      "speed": 1.074984,
+      "frameOffset": 5.010121
+    },
+    {
+      "id": 448,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -7.55308,
+        3.480323,
+        5.523345
+      ],
+      "width": 1.550807,
+      "height": 1.550807,
+      "color": [
+        0.78794,
+        0.78006,
+        0.78794,
+        1
+      ],
+      "speed": 0.957521,
+      "frameOffset": 6.654897
+    },
+    {
+      "id": 449,
+      "atlasIndex": 1,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -6.858166,
+        3.565339,
+        5.456759
+      ],
+      "width": 1.763348,
+      "height": 1.763348,
+      "color": [
+        0.86825,
+        0.85956,
+        0.86825,
+        1
+      ],
+      "speed": 0.982257,
+      "frameOffset": 0.609875
+    },
+    {
+      "id": 450,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -6.079652,
+        3.517346,
+        5.501178
+      ],
+      "width": 1.643365,
+      "height": 1.643365,
+      "color": [
+        0.69052,
+        0.68361,
+        0.69052,
+        1
+      ],
+      "speed": 0.93516,
+      "frameOffset": 13.09389
+    },
+    {
+      "id": 451,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -5.349319,
+        3.52895,
+        5.468999
+      ],
+      "width": 1.672375,
+      "height": 1.672375,
+      "color": [
+        0.6799,
+        0.6731,
+        0.6799,
+        1
+      ],
+      "speed": 0.947478,
+      "frameOffset": 12.11294
+    },
+    {
+      "id": 452,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -4.692441,
+        3.529975,
+        5.453064
+      ],
+      "width": 1.674937,
+      "height": 1.674937,
+      "color": [
+        0.81028,
+        0.80218,
+        0.81028,
+        1
+      ],
+      "speed": 0.965604,
+      "frameOffset": 9.764188
+    },
+    {
+      "id": 453,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -4.017463,
+        3.50868,
+        5.472749
+      ],
+      "width": 1.6217,
+      "height": 1.6217,
+      "color": [
+        0.74839,
+        0.7409,
+        0.74839,
+        1
+      ],
+      "speed": 1.065404,
+      "frameOffset": 6.398682
+    },
+    {
+      "id": 454,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -3.180093,
+        3.482566,
+        5.509097
+      ],
+      "width": 1.556416,
+      "height": 1.556416,
+      "color": [
+        0.85487,
+        0.84632,
+        0.85487,
+        1
+      ],
+      "speed": 1.045053,
+      "frameOffset": 10.257748
+    },
+    {
+      "id": 455,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -2.525196,
+        3.570111,
+        5.538903
+      ],
+      "width": 1.775277,
+      "height": 1.775277,
+      "color": [
+        0.88835,
+        0.87947,
+        0.88835,
+        1
+      ],
+      "speed": 0.960951,
+      "frameOffset": 9.282152
+    },
+    {
+      "id": 456,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -1.82649,
+        3.570896,
+        5.484005
+      ],
+      "width": 1.777239,
+      "height": 1.777239,
+      "color": [
+        0.97884,
+        0.96906,
+        0.97884,
+        1
+      ],
+      "speed": 1.051116,
+      "frameOffset": 12.25869
+    },
+    {
+      "id": 457,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -1.137588,
+        3.559888,
+        5.548303
+      ],
+      "width": 1.749719,
+      "height": 1.749719,
+      "color": [
+        0.72438,
+        0.71714,
+        0.72438,
+        1
+      ],
+      "speed": 0.921339,
+      "frameOffset": 2.015634
+    },
+    {
+      "id": 458,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -0.368928,
+        3.487886,
+        5.504047
+      ],
+      "width": 1.569716,
+      "height": 1.569716,
+      "color": [
+        0.9374,
+        0.92803,
+        0.9374,
+        1
+      ],
+      "speed": 0.958595,
+      "frameOffset": 14.282862
+    },
+    {
+      "id": 459,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        0.35017,
+        3.472162,
+        5.548982
+      ],
+      "width": 1.530405,
+      "height": 1.530405,
+      "color": [
+        0.76399,
+        0.75635,
+        0.76399,
+        1
+      ],
+      "speed": 1.049457,
+      "frameOffset": 3.475287
+    },
+    {
+      "id": 460,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        1.06587,
+        3.503943,
+        5.552232
+      ],
+      "width": 1.609857,
+      "height": 1.609857,
+      "color": [
+        0.96834,
+        0.95866,
+        0.96834,
+        1
+      ],
+      "speed": 1.077343,
+      "frameOffset": 14.33575
+    },
+    {
+      "id": 461,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        1.75266,
+        3.521865,
+        5.539206
+      ],
+      "width": 1.654663,
+      "height": 1.654663,
+      "color": [
+        0.80385,
+        0.79581,
+        0.80385,
+        1
+      ],
+      "speed": 0.926092,
+      "frameOffset": 7.883443
+    },
+    {
+      "id": 462,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        2.4782,
+        3.501695,
+        5.582222
+      ],
+      "width": 1.604237,
+      "height": 1.604237,
+      "color": [
+        0.85616,
+        0.8476,
+        0.85616,
+        1
+      ],
+      "speed": 1.024167,
+      "frameOffset": 6.322998
+    },
+    {
+      "id": 463,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        3.229281,
+        3.484644,
+        5.536628
+      ],
+      "width": 1.561611,
+      "height": 1.561611,
+      "color": [
+        0.73518,
+        0.72783,
+        0.73518,
+        1
+      ],
+      "speed": 0.986397,
+      "frameOffset": 13.810061
+    },
+    {
+      "id": 464,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        3.915443,
+        3.517869,
+        5.593056
+      ],
+      "width": 1.644672,
+      "height": 1.644672,
+      "color": [
+        0.97288,
+        0.96315,
+        0.97288,
+        1
+      ],
+      "speed": 0.950594,
+      "frameOffset": 4.68514
+    },
+    {
+      "id": 465,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        4.633634,
+        3.470063,
+        5.472354
+      ],
+      "width": 1.525158,
+      "height": 1.525158,
+      "color": [
+        0.71695,
+        0.70978,
+        0.71695,
+        1
+      ],
+      "speed": 1.089334,
+      "frameOffset": 14.53398
+    },
+    {
+      "id": 466,
+      "atlasIndex": 0,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        5.391895,
+        3.501294,
+        5.452328
+      ],
+      "width": 1.603235,
+      "height": 1.603235,
+      "color": [
+        0.87846,
+        0.86967,
+        0.87846,
+        1
+      ],
+      "speed": 1.064751,
+      "frameOffset": 14.548648
+    },
+    {
+      "id": 467,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        6.073578,
+        3.550223,
+        5.484336
+      ],
+      "width": 1.725556,
+      "height": 1.725556,
+      "color": [
+        0.83653,
+        0.82817,
+        0.83653,
+        1
+      ],
+      "speed": 1.016711,
+      "frameOffset": 12.789836
+    },
+    {
+      "id": 468,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        6.899008,
+        3.493658,
+        5.492309
+      ],
+      "width": 1.584145,
+      "height": 1.584145,
+      "color": [
+        0.68931,
+        0.68241,
+        0.68931,
+        1
+      ],
+      "speed": 1.003543,
+      "frameOffset": 11.51141
+    },
+    {
+      "id": 469,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        7.502732,
+        3.578339,
+        5.538039
+      ],
+      "width": 1.795848,
+      "height": 1.795848,
+      "color": [
+        0.88264,
+        0.87381,
+        0.88264,
+        1
+      ],
+      "speed": 1.05668,
+      "frameOffset": 0.619315
+    },
+    {
+      "id": 470,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        8.336802,
+        3.489248,
+        5.571716
+      ],
+      "width": 1.573119,
+      "height": 1.573119,
+      "color": [
+        0.91114,
+        0.90203,
+        0.91114,
+        1
+      ],
+      "speed": 1.018638,
+      "frameOffset": 2.057631
+    },
+    {
+      "id": 471,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        8.999488,
+        3.529395,
+        5.446564
+      ],
+      "width": 1.673487,
+      "height": 1.673487,
+      "color": [
+        0.93127,
+        0.92196,
+        0.93127,
+        1
+      ],
+      "speed": 0.910658,
+      "frameOffset": 5.646394
+    },
+    {
+      "id": 472,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        9.716204,
+        3.578972,
+        5.473652
+      ],
+      "width": 1.79743,
+      "height": 1.79743,
+      "color": [
+        0.736,
+        0.72864,
+        0.736,
+        1
+      ],
+      "speed": 1.020653,
+      "frameOffset": 2.606591
+    },
+    {
+      "id": 473,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        10.403946,
+        3.466711,
+        5.587979
+      ],
+      "width": 1.516778,
+      "height": 1.516778,
+      "color": [
+        0.67302,
+        0.66629,
+        0.67302,
+        1
+      ],
+      "speed": 1.00195,
+      "frameOffset": 7.365964
+    },
+    {
+      "id": 474,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        11.142799,
+        3.506795,
+        5.484743
+      ],
+      "width": 1.616987,
+      "height": 1.616987,
+      "color": [
+        0.87847,
+        0.86968,
+        0.87847,
+        1
+      ],
+      "speed": 1.03547,
+      "frameOffset": 7.361377
+    },
+    {
+      "id": 475,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        11.920329,
+        3.46411,
+        5.514729
+      ],
+      "width": 1.510276,
+      "height": 1.510276,
+      "color": [
+        0.84544,
+        0.83698,
+        0.84544,
+        1
+      ],
+      "speed": 0.991744,
+      "frameOffset": 6.440354
+    },
+    {
+      "id": 476,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -11.931832,
+        3.739507,
+        6.480119
+      ],
+      "width": 1.648768,
+      "height": 1.648768,
+      "color": [
+        0.97817,
+        0.96838,
+        0.97817,
+        1
+      ],
+      "speed": 0.950076,
+      "frameOffset": 2.937098
+    },
+    {
+      "id": 477,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        -11.144404,
+        3.68384,
+        6.501303
+      ],
+      "width": 1.509599,
+      "height": 1.509599,
+      "color": [
+        0.81858,
+        0.81039,
+        0.81858,
+        1
+      ],
+      "speed": 1.004639,
+      "frameOffset": 9.163897
+    },
+    {
+      "id": 478,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -10.394674,
+        3.770322,
+        6.447331
+      ],
+      "width": 1.725804,
+      "height": 1.725804,
+      "color": [
+        0.77023,
+        0.76253,
+        0.77023,
+        1
+      ],
+      "speed": 1.025575,
+      "frameOffset": 4.740959
+    },
+    {
+      "id": 479,
+      "atlasIndex": 3,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -9.736317,
+        3.712939,
+        6.438743
+      ],
+      "width": 1.582347,
+      "height": 1.582347,
+      "color": [
+        0.95805,
+        0.94847,
+        0.95805,
+        1
+      ],
+      "speed": 1.071423,
+      "frameOffset": 7.187261
+    },
+    {
+      "id": 480,
+      "atlasIndex": 3,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -8.980252,
+        3.690653,
+        6.438081
+      ],
+      "width": 1.526632,
+      "height": 1.526632,
+      "color": [
+        0.9502,
+        0.94069,
+        0.9502,
+        1
+      ],
+      "speed": 1.069452,
+      "frameOffset": 12.359771
+    },
+    {
+      "id": 481,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -8.265684,
+        3.696173,
+        6.439024
+      ],
+      "width": 1.540433,
+      "height": 1.540433,
+      "color": [
+        0.77315,
+        0.76541,
+        0.77315,
+        1
+      ],
+      "speed": 1.050573,
+      "frameOffset": 15.776809
+    },
+    {
+      "id": 482,
+      "atlasIndex": 2,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -7.520934,
+        3.740558,
+        6.513432
+      ],
+      "width": 1.651394,
+      "height": 1.651394,
+      "color": [
+        0.70971,
+        0.70262,
+        0.70971,
+        1
+      ],
+      "speed": 0.980569,
+      "frameOffset": 14.533335
+    },
+    {
+      "id": 483,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -6.82725,
+        3.745629,
+        6.375469
+      ],
+      "width": 1.664071,
+      "height": 1.664071,
+      "color": [
+        0.94689,
+        0.93742,
+        0.94689,
+        1
+      ],
+      "speed": 0.966907,
+      "frameOffset": 7.253654
+    },
+    {
+      "id": 484,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        -6.126048,
+        3.789797,
+        6.369127
+      ],
+      "width": 1.774492,
+      "height": 1.774492,
+      "color": [
+        0.97807,
+        0.96829,
+        0.97807,
+        1
+      ],
+      "speed": 1.043012,
+      "frameOffset": 14.272569
+    },
+    {
+      "id": 485,
+      "atlasIndex": 0,
+      "clipIndex": 2,
+      "viewIndex": 0,
+      "position": [
+        -5.404471,
+        3.792091,
+        6.388947
+      ],
+      "width": 1.780227,
+      "height": 1.780227,
+      "color": [
+        0.9103,
+        0.90119,
+        0.9103,
+        1
+      ],
+      "speed": 1.024622,
+      "frameOffset": 11.980504
+    },
+    {
+      "id": 486,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        -4.726606,
+        3.724258,
+        6.422916
+      ],
+      "width": 1.610646,
+      "height": 1.610646,
+      "color": [
+        0.70855,
+        0.70146,
+        0.70855,
+        1
+      ],
+      "speed": 1.080066,
+      "frameOffset": 2.322511
+    },
+    {
+      "id": 487,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -3.93031,
+        3.733933,
+        6.451581
+      ],
+      "width": 1.634832,
+      "height": 1.634832,
+      "color": [
+        0.70329,
+        0.69625,
+        0.70329,
+        1
+      ],
+      "speed": 0.910862,
+      "frameOffset": 1.252273
+    },
+    {
+      "id": 488,
+      "atlasIndex": 3,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -3.262759,
+        3.773684,
+        6.423631
+      ],
+      "width": 1.73421,
+      "height": 1.73421,
+      "color": [
+        0.95917,
+        0.94958,
+        0.95917,
+        1
+      ],
+      "speed": 0.961325,
+      "frameOffset": 10.953436
+    },
+    {
+      "id": 489,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -2.562506,
+        3.784451,
+        6.419278
+      ],
+      "width": 1.761128,
+      "height": 1.761128,
+      "color": [
+        0.73744,
+        0.73006,
+        0.73744,
+        1
+      ],
+      "speed": 1.066861,
+      "frameOffset": 2.020713
+    },
+    {
+      "id": 490,
+      "atlasIndex": 1,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        -1.764226,
+        3.761349,
+        6.419465
+      ],
+      "width": 1.703373,
+      "height": 1.703373,
+      "color": [
+        0.78361,
+        0.77577,
+        0.78361,
+        1
+      ],
+      "speed": 1.017815,
+      "frameOffset": 3.277456
+    },
+    {
+      "id": 491,
+      "atlasIndex": 0,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        -1.128869,
+        3.751761,
+        6.455812
+      ],
+      "width": 1.679404,
+      "height": 1.679404,
+      "color": [
+        0.94601,
+        0.93655,
+        0.94601,
+        1
+      ],
+      "speed": 1.064849,
+      "frameOffset": 0.5932
+    },
+    {
+      "id": 492,
+      "atlasIndex": 1,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        -0.397259,
+        3.710914,
+        6.384538
+      ],
+      "width": 1.577286,
+      "height": 1.577286,
+      "color": [
+        0.84501,
+        0.83656,
+        0.84501,
+        1
+      ],
+      "speed": 0.999946,
+      "frameOffset": 14.888949
+    },
+    {
+      "id": 493,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        0.385092,
+        3.710633,
+        6.385642
+      ],
+      "width": 1.576582,
+      "height": 1.576582,
+      "color": [
+        0.70263,
+        0.6956,
+        0.70263,
+        1
+      ],
+      "speed": 0.989726,
+      "frameOffset": 7.348261
+    },
+    {
+      "id": 494,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        1.12059,
+        3.744926,
+        6.418891
+      ],
+      "width": 1.662316,
+      "height": 1.662316,
+      "color": [
+        0.74844,
+        0.74095,
+        0.74844,
+        1
+      ],
+      "speed": 1.072239,
+      "frameOffset": 15.625106
+    },
+    {
+      "id": 495,
+      "atlasIndex": 0,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        1.773835,
+        3.766866,
+        6.387269
+      ],
+      "width": 1.717165,
+      "height": 1.717165,
+      "color": [
+        0.74932,
+        0.74183,
+        0.74932,
+        1
+      ],
+      "speed": 0.91492,
+      "frameOffset": 4.562498
+    },
+    {
+      "id": 496,
+      "atlasIndex": 3,
+      "clipIndex": 4,
+      "viewIndex": 0,
+      "position": [
+        2.476413,
+        3.778904,
+        6.451215
+      ],
+      "width": 1.74726,
+      "height": 1.74726,
+      "color": [
+        0.92294,
+        0.91371,
+        0.92294,
+        1
+      ],
+      "speed": 1.073153,
+      "frameOffset": 15.062839
+    },
+    {
+      "id": 497,
+      "atlasIndex": 3,
+      "clipIndex": 3,
+      "viewIndex": 0,
+      "position": [
+        3.271426,
+        3.733103,
+        6.394965
+      ],
+      "width": 1.632757,
+      "height": 1.632757,
+      "color": [
+        0.71067,
+        0.70357,
+        0.71067,
+        1
+      ],
+      "speed": 1.064337,
+      "frameOffset": 7.105579
+    },
+    {
+      "id": 498,
+      "atlasIndex": 2,
+      "clipIndex": 1,
+      "viewIndex": 0,
+      "position": [
+        3.949655,
+        3.739847,
+        6.488616
+      ],
+      "width": 1.649617,
+      "height": 1.649617,
+      "color": [
+        0.72647,
+        0.7192,
+        0.72647,
+        1
+      ],
+      "speed": 0.966707,
+      "frameOffset": 0.117495
+    },
+    {
+      "id": 499,
+      "atlasIndex": 2,
+      "clipIndex": 0,
+      "viewIndex": 0,
+      "position": [
+        4.709902,
+        3.697261,
+        6.466337
+      ],
+      "width": 1.543153,
+      "height": 1.543153,
+      "color": [
+        0.963,
+        0.95337,
+        0.963,
+        1
+      ],
+      "speed": 1.034714,
+      "frameOffset": 3.615025
+    }
+  ]
+}

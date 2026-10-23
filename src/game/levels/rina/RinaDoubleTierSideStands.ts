@@ -215,8 +215,8 @@ export function createRinaDoubleTierSideStands(
   // legible against the current, near-black concert ambience.
   const seating = newStandMaterial(
     scene, "rinaDoubleStandSeatConcrete",
-    new Color3(0.17, 0.175, 0.19),
-    new Color3(0.009, 0.011, 0.016)
+    new Color3(0.115, 0.112, 0.108),
+    new Color3(0.003, 0.003, 0.004)
   );
   const darkVoid = newStandMaterial(
     scene, "rinaDoubleStandRecess",
@@ -225,13 +225,13 @@ export function createRinaDoubleTierSideStands(
   );
   const railing = newStandMaterial(
     scene, "rinaDoubleStandRails",
-    new Color3(0.21, 0.24, 0.28),
-    new Color3(0.022, 0.027, 0.034)
+    new Color3(0.15, 0.15, 0.15),
+    new Color3(0.006, 0.006, 0.007)
   );
   const edge = newStandMaterial(
     scene, "rinaDoubleStandEdge",
-    new Color3(0.22, 0.245, 0.28),
-    new Color3(0.027, 0.03, 0.038)
+    new Color3(0.15, 0.148, 0.145),
+    new Color3(0.007, 0.007, 0.008)
   );
 
   const structureParts: Mesh[] = [];

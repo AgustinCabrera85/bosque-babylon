@@ -31,17 +31,17 @@ export function createRinaStadiumGeometry(
   const concrete = standard(
     scene,
     "rinaStadiumConcrete",
-    new Color3(0.115, 0.12, 0.14)
+    new Color3(0.085, 0.082, 0.08)
   );
   const darkConcrete = standard(
     scene,
     "rinaStadiumDarkConcrete",
-    new Color3(0.045, 0.05, 0.06)
+    new Color3(0.035, 0.034, 0.035)
   );
   const aisle = standard(
     scene,
     "rinaStadiumAisle",
-    new Color3(0.14, 0.145, 0.16)
+    new Color3(0.095, 0.092, 0.09)
   );
   const ledRibbon = standard(
     scene,

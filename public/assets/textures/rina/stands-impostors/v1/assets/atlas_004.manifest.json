@@ -1,0 +1,119 @@
+{
+  "schema": "lo-realy-lo-otro/impostor-atlas/v1",
+  "generator": "Generador de impostores Babylon",
+  "generatedUtc": "2026-10-23T14:27:16.258Z",
+  "source": {
+    "file": "Female_Fan_05_NLA_INPLACE.glb",
+    "demo": false
+  },
+  "atlas": {
+    "file": "atlas_004.png",
+    "width": 4096,
+    "height": 2048,
+    "cellWidth": 256,
+    "cellHeight": 256,
+    "columns": 16,
+    "rows": 8,
+    "usedCells": 80,
+    "layout": "row-major",
+    "alpha": true
+  },
+  "capture": {
+    "initialYawDegrees": 0,
+    "elevationDegrees": 12,
+    "directions": 1,
+    "directionsDegrees": [
+      0
+    ],
+    "frameMargin": 1.25,
+    "orthographic": true,
+    "materialOverride": {
+      "mode": "all-opaque",
+      "materials": [
+        "tripo_mat_0df90688"
+      ],
+      "affectedCount": 1,
+      "bakedOnly": true
+    }
+  },
+  "bounds": {
+    "minY": 0,
+    "maxY": 0.99951,
+    "height": 0.99951,
+    "width": 0.8501,
+    "note": "Unidades del modelo. Si hay escalado al importar en el juego, aplicar el mismo factor al sprite."
+  },
+  "clips": [
+    {
+      "id": "00_fan_05_cheering_inplace",
+      "name": "fan_05_cheering_inplace",
+      "index": 0,
+      "sourceFromFrame": 0,
+      "sourceToFrame": 125.9999942779541,
+      "sourceFps": 60,
+      "durationSeconds": 2.1,
+      "playbackFps": 7.61905,
+      "frames": 16,
+      "views": 1,
+      "startCell": 0,
+      "loop": true
+    },
+    {
+      "id": "01_fan_05_cheering_alt_inplace",
+      "name": "fan_05_cheering_alt_inplace",
+      "index": 1,
+      "sourceFromFrame": 0,
+      "sourceToFrame": 328.00000190734863,
+      "sourceFps": 60,
+      "durationSeconds": 5.46667,
+      "playbackFps": 2.92683,
+      "frames": 16,
+      "views": 1,
+      "startCell": 16,
+      "loop": true
+    },
+    {
+      "id": "02_fan_05_excited_inplace",
+      "name": "fan_05_excited_inplace",
+      "index": 2,
+      "sourceFromFrame": 0,
+      "sourceToFrame": 648.0000114440918,
+      "sourceFps": 60,
+      "durationSeconds": 10.8,
+      "playbackFps": 1.48148,
+      "frames": 16,
+      "views": 1,
+      "startCell": 32,
+      "loop": true
+    },
+    {
+      "id": "03_fan_05_standing_clap_inplace",
+      "name": "fan_05_standing_clap_inplace",
+      "index": 3,
+      "sourceFromFrame": 0,
+      "sourceToFrame": 842.0000267028809,
+      "sourceFps": 60,
+      "durationSeconds": 14.03333,
+      "playbackFps": 1.14014,
+      "frames": 16,
+      "views": 1,
+      "startCell": 48,
+      "loop": true
+    },
+    {
+      "id": "04_fan_05_standing_idle_inplace",
+      "name": "fan_05_standing_idle_inplace",
+      "index": 4,
+      "sourceFromFrame": 0,
+      "sourceToFrame": 1230,
+      "sourceFps": 60,
+      "durationSeconds": 20.5,
+      "playbackFps": 0.78049,
+      "frames": 16,
+      "views": 1,
+      "startCell": 64,
+      "loop": true
+    }
+  ],
+  "cellFormula": "clip.startCell + viewIndex * clip.frames + frameIndex"
+}

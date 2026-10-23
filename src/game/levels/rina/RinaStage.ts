@@ -7,6 +7,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { RenderTargetTexture } from "@babylonjs/core/Materials/Textures/renderTargetTexture";
@@ -14,7 +15,8 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { MusicPlaybackState } from "../../MusicPlayer";
 import type { StagePyroShow } from "../../effects/StagePyro";
 import { RINA_CONCERT_MAP, RINA_CONCERT_SONG, RINA_PYRO_TIMING } from "./RinaConcertConfig";
-import { RINA_LEVEL_QUALITY, RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
+import { RINA_LEVEL_QUALITY, RINA_STAGE_SECURITY, RINA_STADIUM,
+  RINA_STADIUM_SCALE } from "./RinaLevelConfig";
 
 function material(
   scene: Scene,
@@ -318,6 +320,24 @@ export function createRinaStage(
   playerSpotBounce.setEnabled(false);
   const playerBounceFill = new Color3(0.38, 0.38, 0.38);
 
+  // Light the actors from the audience side and the stage side. Both are
+  // directional so the face turned away from each source stays in shadow.
+  const actorLight = new DirectionalLight(
+    "rinaActorBounce", new Vector3(0.55, -0.72, 0.42), scene
+  );
+  actorLight.diffuse = new Color3(0.48, 0.72, 1);
+  actorLight.specular = Color3.Black();
+  actorLight.intensity = 0.08;
+  actorLight.renderPriority = 5;
+  const actorStageRim = new DirectionalLight(
+    "rinaActorStageRim", new Vector3(-0.34, -0.74, -0.58), scene
+  );
+  actorStageRim.diffuse = new Color3(1, 0.34, 0.72);
+  actorStageRim.specular = Color3.Black();
+  actorStageRim.intensity = 0.06;
+  actorStageRim.renderPriority = 5;
+  const actorLights = [actorLight, actorStageRim];
+
   const audienceSpill = new SpotLight(
     "rinaAudienceSpill",
     new Vector3(0, trussY - 0.6, RINA_STADIUM.stage.centerZ + 3),
@@ -456,6 +476,7 @@ export function createRinaStage(
     singerLocalZ: number,
     singerYaw: number,
     playerWorldPosition: Vector3,
+    playerCameraWorldPosition: Vector3,
     pyro: StagePyroShow
   ) => {
     elapsed += dt;
@@ -628,18 +649,42 @@ export function createRinaStage(
           strobe * (onStage ? 0.08 : 0.12);
       }
     }
+    const toCamera = playerCameraWorldPosition.scale(1 / RINA_STADIUM_SCALE)
+      .subtract(playerLocalPosition);
+    toCamera.y = 0;
+    if (toCamera.lengthSquared() > 0.01) toCamera.normalize();
+    else toCamera.set(0, 0, -1);
     playerSpotBounce.position.set(
-      playerLocalPosition.x + 0.7,
-      playerLocalPosition.y + 2,
-      playerLocalPosition.z - 1.3
+      playerLocalPosition.x + toCamera.x * 1.4,
+      playerLocalPosition.y + 1.3,
+      playerLocalPosition.z + toCamera.z * 1.4
     );
-    if (playerSpotColor) {
+    const barrierDistance = Math.min(
+      Math.abs(playerLocalPosition.z - RINA_STAGE_SECURITY.catwalkFenceTipZ),
+      Math.abs(playerLocalPosition.z - RINA_STAGE_SECURITY.frontZ)
+    );
+    const barrierGlow = Math.abs(playerLocalPosition.x) < RINA_STADIUM.stage.width * 0.5 + 3
+      ? Math.max(0, 1 - barrierDistance / 6) : 0;
+    const spotBounce = (performanceTier === "mobile" ? 26 : 38) *
+      playerSpotHit * playerSpotHit *
+      (musicPresence * 0.35 + beatPulse * 0.9);
+    const barrierBounce = (performanceTier === "mobile" ? 5 : 7) *
+      barrierGlow * barrierGlow;
+    if (barrierBounce > spotBounce) {
+      playerSpotBounce.diffuse.copyFromFloats(0.94, 0.70, 0.35);
+    } else if (playerSpotColor) {
       playerSpotBounce.diffuse.copyFrom(playerSpotColor)
         .scaleInPlace(0.62).addInPlace(playerBounceFill);
     }
-    playerSpotBounce.intensity = (performanceTier === "mobile" ? 26 : 38) *
-      playerSpotHit * playerSpotHit *
-      (musicPresence * 0.35 + beatPulse * 0.9);
+    playerSpotBounce.intensity = spotBounce + barrierBounce;
+    actorLight.intensity = 0.08 +
+      musicPresence * (performanceTier === "mobile" ? 0.9 : 1.15) +
+      beatPulse * (performanceTier === "mobile" ? 0.35 : 0.5) +
+      cyanFlash * (performanceTier === "mobile" ? 0.55 : 0.8);
+    actorStageRim.intensity = 0.06 +
+      musicPresence * (performanceTier === "mobile" ? 0.45 : 0.62) +
+      beatPulse * (performanceTier === "mobile" ? 0.22 : 0.3) +
+      pinkFlash * (performanceTier === "mobile" ? 0.4 : 0.6);
 
     const chorus = playing
       ? RINA_CONCERT_SONG.choruses.findIndex(
@@ -708,7 +753,9 @@ export function createRinaStage(
     setPlayerLightMeshes(meshes: AbstractMesh[]) {
       playerSpotBounce.includedOnlyMeshes = meshes;
       playerSpotBounce.setEnabled(meshes.length > 0);
+      for (const light of actorLights) light.includedOnlyMeshes.push(...meshes);
     },
+    actorLights,
     singerLight: rinaKeyLight,
     update,
   };

@@ -4,27 +4,32 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import "@babylonjs/core/Meshes/thinInstanceMesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { Matrix } from "@babylonjs/core/Maths/math.vector";
+import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Scene } from "@babylonjs/core/scene";
+import type { Light } from "@babylonjs/core/Lights/light";
 import {
   getRinaSideStandAudienceAnchor,
   RINA_DOUBLE_TIER_PROFILE,
 } from "./RinaDoubleTierSideStands";
 import { RINA_BACK_STAND_LED_PROFILE } from "./RinaBackStandExit";
 import { RINA_STADIUM_SCALE } from "./RinaLevelConfig";
-import { RINA_CROWD_FANS, type RinaCrowdQuality } from "./crowd/RinaCrowdAssetManifest";
+import { RINA_ANIMATED_FAN_CLEARANCE, RINA_CROWD_FANS,
+  type RinaCrowdQuality } from "./crowd/RinaCrowdAssetManifest";
 import { RinaCrowdAssetRegistry } from "./crowd/RinaCrowdAssetRegistry";
 
 /**
  * UPDATE 06 — real procedural 3D people for NON-INTERACTIVE stadium seating.
  *
  * Three procedural mesh complexities remain as the fallback. A bounded subset
- * is replaced with posed GLB thin instances after the shared models load.
+ * is replaced with posed or animated GLB thin instances after the shared models load.
  *
  * IMPORTANT: source geometry is authored in LOCAL stadium units.  The stadium
  * root scales it by RINA_STADIUM_SCALE. Human height is therefore ~1.70 m
  * in world space, not 1.70 * RINA_STADIUM_SCALE.
  *
- * Never place these spectators into RinaCrowdPreview / EnemyManager.
+ * The 2K fan is reserved for the field crowd; the stands use its 1K version.
+ * Never place these spectators into EnemyManager.
  */
 export type RinaStandsCrowdTier = "desktop" | "mobile";
 export type RinaStandsCrowdLod = "near" | "middle" | "far";
@@ -58,6 +63,8 @@ type Prototype = {
   matrixData: Float32Array;
   lod: RinaStandsCrowdLod;
 };
+
+type CrowdCandidate = { prototype: Prototype; placement: Placement };
 
 export interface RinaStandsCrowdHandle {
   readonly root: TransformNode;
@@ -326,16 +333,22 @@ function lodForRow(tier: "side-lower" | "side-upper" | "rear-lower" | "rear-uppe
  * Build spectators from the *actual* seating formulas, preserving side aisles,
  * lower rear central EXIT opening and back-row stair strips.
  */
-export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): RinaStandsCrowdHandle {
+export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier,
+    actorLights: readonly Light[]): RinaStandsCrowdHandle {
   const root = new TransformNode("rinaStandsCrowdRoot", scene);
   const settings = RINA_STANDS_CROWD_CONFIG[tier];
   const random = lcg(0x51a0c26d);
   const prototypes = new Map<string, Prototype>();
-  const registry = new RinaCrowdAssetRegistry(scene);
-  const candidatePool: Record<RinaCrowdQuality, { prototype: Prototype; placement: Placement }[]> = {
+  const registry = new RinaCrowdAssetRegistry(scene, actorLights);
+  const candidatePool: Record<RinaCrowdQuality, CrowdCandidate[]> = {
     near: [], middle: [],
   };
-  const fanGroups: { mesh: Mesh; placements: Placement[]; matrixData: Float32Array; quality: RinaCrowdQuality }[] = [];
+  const fan04Candidates: Record<"side" | "rear", CrowdCandidate[]> = {
+    side: [], rear: [],
+  };
+  const fanGroups: { mesh: Mesh; placements: Placement[]; matrixData: Float32Array;
+    quality: RinaCrowdQuality; inverseMeshWorld?: Matrix }[] = [];
+  const animatedGroups: { clips: readonly AnimationGroup[]; playingIndex: number }[] = [];
   const spectatorsByVariant: Record<string, number> = {};
   let approximateBytes = 0;
   const materials: StandardMaterial[] = [];
@@ -362,14 +375,18 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
     });
   }
 
-  function place(lod: RinaStandsCrowdLod, x: number, y: number, z: number, yaw: number) {
+  function place(lod: RinaStandsCrowdLod, x: number, y: number, z: number, yaw: number,
+      section: "side" | "rear") {
     const index = Math.floor(random() * OUTFITS[lod].length);
     const proto = prototypes.get(`${lod}_${index}`)!;
     const scale = (0.91 + random() * 0.17) * (1.5 / RINA_STADIUM_SCALE);
     const placement = { x, y, z, yaw: yaw + (random() - 0.5) * 0.22,
       scale, phase: random() * Math.PI * 2 };
     proto.placements.push(placement);
-    if (lod !== "far") candidatePool[lod].push({ prototype: proto, placement });
+    const candidate = { prototype: proto, placement };
+    if (lod !== "far") candidatePool[lod].push(candidate);
+    if (section === "rear" && lod !== "near") fan04Candidates.rear.push(candidate);
+    if (section === "side" && lod === "middle") fan04Candidates.side.push(candidate);
     counts[lod]++;
     counts.total++;
   }
@@ -395,7 +412,7 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
           if (p.aislePositions.some(aisleZ => Math.abs(z - aisleZ) < p.aisleHalfWidth + RINA_STANDS_CROWD_CONFIG.aisleExtraClearance)) continue;
           const anchor = getRinaSideStandAudienceAnchor(side, standTier, row, z);
           const xOffset = (random() - 0.5) * (standTier === "lower" ? p.lowerTread : p.upperTread) * 0.11;
-          place(lod, anchor.x + side * xOffset, anchor.y, z, (random() - 0.5) * 0.15);
+          place(lod, anchor.x + side * xOffset, anchor.y, z, (random() - 0.5) * 0.15, "side");
         }
       }
     }
@@ -433,7 +450,7 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
         // Omit the rear-stand aisle/stair regions.
         if (Math.abs(Math.abs(x) - (rear.halfWidth - 8.5)) < 1.45) continue;
         if (standTier === "upper" && [-22, 0, 22].some(ax => Math.abs(x - ax) < 0.75)) continue;
-        place(lod, x, rowY, rowZ + (random() - 0.5) * 0.17, (random() - 0.5) * 0.21);
+        place(lod, x, rowY, rowZ + (random() - 0.5) * 0.17, (random() - 0.5) * 0.21, "rear");
       }
     }
   }
@@ -459,25 +476,101 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
   let elapsed = 0;
   let danceAccumulator = 0;
 
-  function evenlySelected(quality: RinaCrowdQuality, limit: number) {
-    const pool = candidatePool[quality];
+  function evenlySelected(pool: readonly CrowdCandidate[], limit: number) {
     const count = Math.min(limit, pool.length);
     return Array.from({ length: count }, (_, i) => pool[Math.floor((i + 0.5) * pool.length / count)]);
+  }
+
+  // Thin-instance transforms run after the imported mesh's own glTF parent
+  // transforms. Cancel those transforms so seating coordinates remain in
+  // stadium-local units even when the GLB has an Armature scale of 0.01.
+  const desired = Matrix.Identity();
+  const instanceMatrix = Matrix.Identity();
+  function writeAnimatedMatrix(buffer: Float32Array, offset: number, placement: Placement,
+      inverseMeshWorld: Matrix, bounce = 0, turn = 0) {
+    writeMatrix(buffer, offset, placement, bounce, turn);
+    Matrix.FromArrayToRef(buffer, offset, desired);
+    desired.multiplyToRef(inverseMeshWorld, instanceMatrix);
+    instanceMatrix.copyToArray(buffer, offset);
   }
 
   for (const quality of ["near", "middle"] as const) {
     const limit = quality === "near"
       ? (tier === "desktop" ? RINA_STANDS_CROWD_CONFIG.desktopFanNearLimit : 0)
       : (tier === "desktop" ? RINA_STANDS_CROWD_CONFIG.desktopFanMiddleLimit : RINA_STANDS_CROWD_CONFIG.mobileFanMiddleLimit);
-    if (!limit || RINA_CROWD_FANS.length === 0) continue;
-    const selected = evenlySelected(quality, limit);
-    for (const [fanIndex, fan] of RINA_CROWD_FANS.entries()) {
-      const members = selected.filter((_, i) => i % RINA_CROWD_FANS.length === fanIndex);
+    const eligibleFans = RINA_CROWD_FANS.filter(fan => quality !== "near" || fan.id !== "fan_04");
+    if (!limit || eligibleFans.length === 0) continue;
+    const selected = evenlySelected(candidatePool[quality], limit);
+    for (const [fanIndex, fan] of eligibleFans.entries()) {
+      let members = selected.filter((_, i) => i % eligibleFans.length === fanIndex);
+      if (fan.animationNames) {
+        const rearLimit = tier === "desktop" ? 48 : 12;
+        const sideLimit = tier === "desktop" ? 20 : 4;
+        members = [
+          ...evenlySelected(fan04Candidates.rear, rearLimit),
+          ...evenlySelected(fan04Candidates.side, sideLimit),
+        ];
+        // An animated pose can spread its arms into the adjacent seat. Keep
+        // the new models apart from each other and from the posed fan.
+        const occupied = selected.filter((_, i) => i % eligibleFans.length !== fanIndex)
+          .map(member => member.placement);
+        members = members.filter(member => {
+          const clear = occupied.every(other =>
+            Math.hypot(member.placement.x - other.x, member.placement.z - other.z) >= RINA_ANIMATED_FAN_CLEARANCE);
+          if (clear) occupied.push(member.placement);
+          return clear;
+        });
+      }
       if (members.length === 0) continue;
+      if (fan.animationNames) {
+        void registry.loadAnimated(fan, quality, 1).then(groups => {
+          if (!groups || disposed) return;
+          const removed = new Set(members.map(member => member.placement));
+          const touched = new Set(members.map(member => member.prototype));
+          for (const prototype of prototypes.values()) {
+            for (const placement of prototype.placements) {
+              if (members.some(member => Math.hypot(
+                placement.x - member.placement.x, placement.z - member.placement.z) < RINA_ANIMATED_FAN_CLEARANCE)) {
+                removed.add(placement);
+                touched.add(prototype);
+              }
+            }
+          }
+          for (const [index, group] of groups.entries()) {
+            const assigned = members.filter((_, memberIndex) => memberIndex % groups.length === index);
+            if (assigned.length === 0) continue;
+            const { mesh } = group;
+            mesh.computeWorldMatrix(true);
+            const inverseMeshWorld = mesh.getWorldMatrix().clone().invert();
+            const localHeight = mesh.getBoundingInfo().boundingBox.extendSize.y * 2;
+            const factor = fan.targetWorldHeight / (localHeight * RINA_STADIUM_SCALE);
+            const placements = assigned.map(({ placement }) => ({ ...placement,
+              scale: factor * (1 + (placement.scale - 1) * 0.25) }));
+            const matrixData = new Float32Array(placements.length * 16);
+            for (let i = 0; i < placements.length; i++) {
+              writeAnimatedMatrix(matrixData, i * 16, placements[i], inverseMeshWorld);
+            }
+            for (const node of group.roots) node.parent = root;
+            mesh.thinInstanceSetBuffer("matrix", matrixData, 16, quality !== "near");
+            mesh.thinInstanceRefreshBoundingInfo(true, true);
+            fanGroups.push({ mesh, placements, matrixData, quality, inverseMeshWorld });
+            const playingIndex = Math.floor(random() * group.clips.length);
+            group.clips[playingIndex].start(false);
+            animatedGroups.push({ clips: group.clips, playingIndex });
+          }
+          for (const prototype of touched) {
+            prototype.placements = prototype.placements.filter(placement => !removed.has(placement));
+            refreshPrototype(prototype);
+          }
+          spectatorsByVariant[`${fan.id}:${quality}`] = members.length;
+          approximateBytes += fan.variants[quality].bytes;
+        });
+        continue;
+      }
       void registry.loadPosed(fan, quality).then(mesh => {
         if (!mesh || disposed) return;
         mesh.parent = root;
-        const factor = fan.targetWorldHeight / (fan.variants[quality].posedHeight * RINA_STADIUM_SCALE);
+        const factor = fan.targetWorldHeight / (fan.variants[quality].posedHeight! * RINA_STADIUM_SCALE);
         // Keep only slight stature variation; the imported fan should remain
         // taller than Rina even when the procedural placeholder was shorter.
         const placements = members.map(({ placement }) => ({ ...placement,
@@ -508,7 +601,15 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
         activeRigs: registry.activeRigs, approximateBytes };
     },
     update(dt, beatPulse) {
-      if (disposed || tier === "mobile" || !root.isEnabled()) return;
+      if (disposed || !root.isEnabled()) return;
+      for (const group of animatedGroups) {
+        if (group.clips[group.playingIndex].isPlaying) continue;
+        // Choose a different clip each time a one-shot animation finishes.
+        const next = Math.floor(random() * (group.clips.length - 1));
+        group.playingIndex = next >= group.playingIndex ? next + 1 : next;
+        group.clips[group.playingIndex].start(false);
+      }
+      if (tier === "mobile") return;
       const safeDt = clamp(dt, 0, 0.05);
       elapsed += safeDt;
       danceAccumulator += safeDt;
@@ -531,9 +632,13 @@ export function createRinaStandsCrowd(scene: Scene, tier: RinaStandsCrowdTier): 
         for (let i = 0; i < group.placements.length; i++) {
           const spectator = group.placements[i];
           const phase = elapsed * 2.15 + spectator.phase;
-          writeMatrix(group.matrixData, i * 16, spectator,
-            Math.max(0, Math.sin(phase * 1.65)) * (0.011 + beat * 0.022),
-            Math.sin(phase) * 0.035);
+          const bounce = Math.max(0, Math.sin(phase * 1.65)) * (0.011 + beat * 0.022);
+          const sway = Math.sin(phase) * 0.035;
+          if (group.inverseMeshWorld) {
+            writeAnimatedMatrix(group.matrixData, i * 16, spectator, group.inverseMeshWorld, bounce, sway);
+          } else {
+            writeMatrix(group.matrixData, i * 16, spectator, bounce, sway);
+          }
         }
         group.mesh.thinInstanceBufferUpdated("matrix");
       }

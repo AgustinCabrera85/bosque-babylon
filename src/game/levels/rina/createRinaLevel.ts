@@ -132,7 +132,8 @@ export async function createRinaLevel(
     );
     const crowdPreview = createRinaCrowdPreview(
       scene,
-      context.performanceTier
+      context.performanceTier,
+      stage.actorLights
     );
     const stadiumRoot = new TransformNode("rinaStadiumRoot", scene);
     for (const mesh of scene.meshes) {
@@ -150,7 +151,9 @@ export async function createRinaLevel(
       light.range *= RINA_STADIUM_SCALE;
     }
     stadiumRoot.scaling.setAll(RINA_STADIUM_SCALE);
-    const standsCrowd = createRinaStandsCrowd(scene, context.performanceTier);
+    crowdPreview.root.parent = stadiumRoot;
+    cleanup.push(() => crowdPreview.dispose());
+    const standsCrowd = createRinaStandsCrowd(scene, context.performanceTier, stage.actorLights);
     standsCrowd.root.parent = stadiumRoot;
     cleanup.push(() => standsCrowd.dispose());
     const standsLedDetails = createRinaStandsLedDetails(scene, context.performanceTier);
@@ -335,7 +338,8 @@ export async function createRinaLevel(
       liveScreens.update();
       const beatPulse = stage.update(
         dt, music, rina.root.position.z / RINA_STADIUM_SCALE,
-        rina.root.rotation.y, player.position, pyro
+        rina.root.rotation.y, player.position,
+        Vector3.TransformCoordinates(player.camera.position, player.root.computeWorldMatrix(true)), pyro
       );
       stageArchitecture.update(dt, music, beatPulse);
       if (!reducedMotion.matches && music?.playing && beatPulse > 0) {

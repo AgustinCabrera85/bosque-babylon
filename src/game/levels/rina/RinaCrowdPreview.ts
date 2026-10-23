@@ -2,7 +2,13 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Scene } from "@babylonjs/core/scene";
+import type { Light } from "@babylonjs/core/Lights/light";
+import { RINA_ANIMATED_FAN_CLEARANCE, RINA_CROWD_FANS } from "./crowd/RinaCrowdAssetManifest";
+import { RinaCrowdAssetRegistry } from "./crowd/RinaCrowdAssetRegistry";
 import {
   RINA_LEVEL_QUALITY, RINA_STAGE_SECURITY, RINA_STADIUM, RINA_STADIUM_SCALE,
 } from "./RinaLevelConfig";
@@ -28,9 +34,14 @@ function isLane(x: number, z: number) {
  */
 export function createRinaCrowdPreview(
   scene: Scene,
-  performanceTier: "desktop" | "mobile"
+  performanceTier: "desktop" | "mobile",
+  actorLights: readonly Light[]
 ) {
   const material = new StandardMaterial("rinaCrowdPreviewMaterial", scene);
+  const animatedRoot = new TransformNode("rinaFieldAnimatedCrowdRoot", scene);
+  const registry = new RinaCrowdAssetRegistry(scene, actorLights);
+  const animatedGroups: { clips: readonly AnimationGroup[]; playingIndex: number }[] = [];
+  let disposed = false;
   material.diffuseColor = new Color3(0.075, 0.07, 0.09);
   material.emissiveColor = new Color3(0.015, 0.008, 0.022);
   material.specularColor = Color3.Black();
@@ -55,6 +66,7 @@ export function createRinaCrowdPreview(
     height: number;
     lean: number;
     jumpStart: number;
+    replaced: boolean;
   }[] = [];
   let attempts = 0;
 
@@ -79,6 +91,59 @@ export function createRinaCrowdPreview(
       height: 0.12 + Math.random() * 0.11,
       lean: (Math.random() - 0.5) * 0.11,
       jumpStart: -Infinity,
+      replaced: false,
+    });
+  }
+
+  // One 2K fan demonstrates the animation in a clear field lane. The stands
+  // population uses the 1K version of this model.
+  if (performanceTier === "desktop") {
+    const fan = RINA_CROWD_FANS.find(entry => entry.id === "fan_04")!;
+    // A fixed, easy-to-find example in the clear central lane ahead of spawn.
+    const showcase = spectators[0];
+    showcase.mesh.position.set(0, 0.84, -26);
+    showcase.mesh.rotation.y = Math.PI;
+    const fieldFans = [showcase];
+    void registry.loadAnimated(fan, "near", 1).then(groups => {
+      if (!groups || disposed) return;
+      for (const [index, group] of groups.entries()) {
+        const assigned = fieldFans.filter((_, targetIndex) => targetIndex % groups.length === index);
+        const mesh = group.mesh;
+        mesh.computeWorldMatrix(true);
+        const inverseMeshWorld = mesh.getWorldMatrix().clone().invert();
+        const localHeight = mesh.getBoundingInfo().boundingBox.extendSize.y * 2;
+        const baseScale = fan.targetWorldHeight / (localHeight * RINA_STADIUM_SCALE);
+        const matrices = new Float32Array(assigned.length * 16);
+        for (let i = 0; i < assigned.length; i++) {
+          const target = assigned[i];
+          const scale = baseScale;
+          const desired = Matrix.Compose(new Vector3(scale, scale, scale),
+            Quaternion.RotationAxis(Vector3.Up(), target.mesh.rotation.y),
+            new Vector3(target.mesh.position.x, 0, target.mesh.position.z));
+          const instance = Matrix.Identity();
+          desired.multiplyToRef(inverseMeshWorld, instance);
+          instance.copyToArray(matrices, i * 16);
+        }
+        for (const node of group.roots) node.parent = animatedRoot;
+        mesh.thinInstanceSetBuffer("matrix", matrices, 16, true);
+        mesh.thinInstanceRefreshBoundingInfo(true, true);
+        for (const target of assigned) {
+          target.replaced = true;
+          target.mesh.dispose();
+        }
+        const playingIndex = Math.floor(Math.random() * group.clips.length);
+        group.clips[playingIndex].start(false);
+        animatedGroups.push({ clips: group.clips, playingIndex });
+      }
+      for (const spectator of spectators) {
+        if (spectator.replaced) continue;
+        if (fieldFans.some(fanTarget => Math.hypot(
+          spectator.mesh.position.x - fanTarget.mesh.position.x,
+          spectator.mesh.position.z - fanTarget.mesh.position.z) < RINA_ANIMATED_FAN_CLEARANCE)) {
+          spectator.replaced = true;
+          spectator.mesh.dispose();
+        }
+      }
     });
   }
 
@@ -90,12 +155,20 @@ export function createRinaCrowdPreview(
   let animating = false;
 
   return {
+    root: animatedRoot,
     update(elapsed: number, beatPulse: number) {
+      if (disposed) return;
+      for (const group of animatedGroups) {
+        if (group.clips[group.playingIndex].isPlaying) continue;
+        const next = Math.floor(Math.random() * (group.clips.length - 1));
+        group.playingIndex = next >= group.playingIndex ? next + 1 : next;
+        group.clips[group.playingIndex].start(false);
+      }
       if (beatPulse >= 0.9 && previousBeatPulse < 0.9 &&
           elapsed - lastBeatAt > 0.18) {
         lastBeatAt = elapsed;
         for (const spectator of spectators) {
-          if (spectator.cohort === nextCohort) {
+          if (!spectator.replaced && spectator.cohort === nextCohort) {
             spectator.jumpStart = elapsed + spectator.delay;
           }
         }
@@ -107,6 +180,7 @@ export function createRinaCrowdPreview(
       if (elapsed > activeUntil) {
         if (animating) {
           for (const spectator of spectators) {
+            if (spectator.replaced) continue;
             spectator.mesh.position.y = 0.84;
             spectator.mesh.rotation.z = 0;
           }
@@ -117,6 +191,7 @@ export function createRinaCrowdPreview(
 
       animating = true;
       for (const spectator of spectators) {
+        if (spectator.replaced) continue;
         const progress = (elapsed - spectator.jumpStart) / jumpDuration;
         const jump = progress > 0 && progress < 1
           ? Math.sin(Math.PI * progress)
@@ -124,6 +199,15 @@ export function createRinaCrowdPreview(
         spectator.mesh.position.y = 0.84 + jump * spectator.height;
         spectator.mesh.rotation.z = jump * spectator.lean;
       }
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      registry.dispose();
+      animatedRoot.dispose();
+      for (const spectator of spectators) if (!spectator.mesh.isDisposed()) spectator.mesh.dispose();
+      source.dispose();
+      material.dispose();
     },
   };
 }

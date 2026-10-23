@@ -1,10 +1,10 @@
 # Público de las plateas de Rina
 
 `RinaCrowdAssetManifest.ts` registra las variantes de cada fan. El modelo
-rigged conserva pesos y huesos para futuras animaciones; la variante `posed`
-es una malla estática con una pose de concierto ya horneada. Solo se descarga
-la variante `posed` que necesita cada nivel de calidad. Una malla compartida
-usa thin instances, por lo que no hay un esqueleto por espectador.
+rigged conserva pesos y huesos; la variante `posed` es una malla estática con
+una pose de concierto ya horneada. Los fans sin clips descargan `posed`; los
+fans animados descargan el GLB rigged de la calidad correspondiente. Las
+thin instances comparten malla y, en los fans animados, rig por grupo.
 
 Para agregar `fan_02`:
 
@@ -20,5 +20,17 @@ Para agregar `fan_02`:
 
 Las dos variantes rigged de `fan_01` llegaron optimizadas y no se
 recomprimieron. Las variantes `posed` derivan de ellas y tienen el brazo
-izquierdo alzado y el derecho bajo. Hasta incorporar clips Mixamo o VAT,
-el fan mantiene esa pose y solo se balancea como figura completa.
+izquierdo alzado y el derecho bajo. Este fan mantiene esa pose y se balancea
+como figura completa.
+
+`fan_04` usa directamente sus archivos NLA optimizados: 1K para las plateas
+(hasta 68 en escritorio y 16 en móvil, con prioridad para la tribuna trasera,
+incluidas sus filas lejanas) y 2K para un ejemplar de
+prueba en el pasillo central del campo en escritorio. En móvil solo se carga 1K. Se reserva
+espacio alrededor de cada fan animado para sus movimientos. Cada calidad
+usa un grupo de thin instances con un rig compartido. Al acabar cada clip,
+elige aleatoriamente uno de los otros dos. Así los espectadores animados no
+necesitan un esqueleto por persona ni reproducen varias poses a la vez.
+Los modelos importados usan la respuesta PBR de Lautaro sin autoiluminación.
+Dos luces direccionales compartidas iluminan desde el público y el escenario;
+su intensidad sigue la música, mientras el lado opuesto conserva sombra.

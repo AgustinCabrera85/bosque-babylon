@@ -707,7 +707,10 @@ try {
           .map(mesh => ({ name: mesh.name, count: mesh.thinInstanceCount,
             emissive: mesh.material?.emissiveColor?.r,
             direct: mesh.material?.directIntensity,
-            textured: !!mesh.material?.emissiveTexture,
+            textured: !!mesh.material?.albedoTexture,
+            selfLit: !!mesh.material?.emissiveTexture,
+            actorLight: ['rinaActorBounce', 'rinaActorStageRim'].every(name =>
+              scene.getLightByName(name)?.includedOnlyMeshes.includes(mesh)),
             rigged: !!mesh.skeleton,
             height: mesh.getBoundingInfo().boundingBox.extendSize.y * 2,
             minMatrixScale: Math.min(...mesh.thinInstanceGetWorldMatrices().map(matrix => matrix.m[5])) }));
@@ -718,8 +721,8 @@ try {
     }
     assert.equal(fanAssets?.length, process.env.RINA_MOBILE_VERIFY ? 1 : 2,
       `Rina fan variants did not load: ${JSON.stringify(fanAssets)}; ${errors.join(' | ')}`);
-    assert.ok(fanAssets.every(fan => fan.count > 0 && fan.emissive > 0.03 && fan.emissive < 0.05 &&
-      fan.direct >= 4 && fan.textured && !fan.rigged &&
+    assert.ok(fanAssets.every(fan => fan.count > 0 && fan.emissive === 0 &&
+      fan.direct === 1 && fan.textured && !fan.selfLit && fan.actorLight && !fan.rigged &&
       fan.minMatrixScale * 1.091883 * 1.5 > heights.rina),
       `Rina fans are dark, small, or rigged per instance: ${JSON.stringify(fanAssets)}`);
     console.log(`Rina fan variants: ${JSON.stringify(fanAssets)}`);
@@ -733,7 +736,89 @@ try {
         .reduce((sum, mesh) => sum + Math.max(0, mesh.thinInstanceCount), 0);
       return { procedural: count('rinaStandsCrowd_'), fan: count('rinaCrowd_fan_01:') };
     })()`, true);
-    assert.equal(crowdTotals.fan, process.env.RINA_MOBILE_VERIFY ? 40 : 172);
+    assert.equal(crowdTotals.fan, process.env.RINA_MOBILE_VERIFY ? 20 : 92);
+    const animatedFans = await evaluate(`(async () => {
+      const storeUrl = performance.getEntriesByType('resource')
+        .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+      const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+      const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+        .find((item) => item.metadata?.rinaLevel);
+      const meshes = scene.meshes.filter(mesh => mesh.name.startsWith('rinaCrowd_fan_04:') &&
+        mesh.getTotalVertices() > 0);
+      return { meshes: meshes.map(mesh => ({ name: mesh.name, count: mesh.thinInstanceCount,
+        bones: mesh.skeleton?.bones.length, textured: !!mesh.material?.albedoTexture,
+        selfLit: !!mesh.material?.emissiveTexture,
+        actorLight: ['rinaActorBounce', 'rinaActorStageRim'].every(name =>
+          scene.getLightByName(name)?.includedOnlyMeshes.includes(mesh)),
+        height: mesh.getBoundingInfo().boundingBox.maximumWorld.y -
+          mesh.getBoundingInfo().boundingBox.minimumWorld.y,
+        rearCount: mesh.name.includes(':middle:') ? mesh.thinInstanceGetWorldMatrices()
+          .filter(matrix => matrix.multiply(mesh.getWorldMatrix()).getTranslation().z < -90).length : 0,
+        field: (() => { let node = mesh.parent; while (node) {
+          if (node.name === 'rinaFieldAnimatedCrowdRoot') return true; node = node.parent;
+        } return false; })() })),
+        playingNames: scene.animationGroups.filter(group =>
+          group.name.startsWith('rinaCrowd_fan_04:') && group.isPlaying)
+          .map(group => group.name) };
+    })()`, true);
+    assert.equal(animatedFans.meshes.length, process.env.RINA_MOBILE_VERIFY ? 1 : 2);
+    const middleAnimatedCount = animatedFans.meshes.filter(mesh => !mesh.field)
+      .reduce((sum, mesh) => sum + mesh.count, 0);
+    const rearAnimatedCount = animatedFans.meshes.reduce((sum, mesh) => sum + mesh.rearCount, 0);
+    assert.ok(middleAnimatedCount >= (process.env.RINA_MOBILE_VERIFY ? 8 : 40) &&
+      middleAnimatedCount <= (process.env.RINA_MOBILE_VERIFY ? 16 : 68) &&
+      rearAnimatedCount >= (process.env.RINA_MOBILE_VERIFY ? 5 : 25) &&
+      rearAnimatedCount > middleAnimatedCount / 2);
+    assert.ok(animatedFans.meshes.every(mesh => mesh.count > 0 && mesh.bones === 65 &&
+      mesh.textured && !mesh.selfLit && mesh.actorLight) &&
+      animatedFans.meshes.filter(mesh => mesh.field).reduce((sum, mesh) => sum + mesh.count, 0) ===
+        (process.env.RINA_MOBILE_VERIFY ? 0 : 1) &&
+      animatedFans.playingNames.length === animatedFans.meshes.length &&
+      ['near', 'middle'].every(quality => process.env.RINA_MOBILE_VERIFY && quality === 'near' ||
+        new Set(animatedFans.playingNames.filter(name => name.includes(`fan_04:${quality}:`))
+          .map(name => name.slice(name.lastIndexOf(':') + 1))).size === 1),
+      `Rina fan 04 animation groups did not load: ${JSON.stringify(animatedFans)}; ${errors.join(' | ')}`);
+    console.log(`Rina animated fans: ${JSON.stringify(animatedFans)}`);
+    const fanSeparation = await evaluate(`(async () => {
+      const storeUrl = performance.getEntriesByType('resource')
+        .find((entry) => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+      const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+      const scene = EngineStore.Instances.flatMap((engine) => engine.scenes)
+        .find((item) => item.metadata?.rinaLevel);
+      const positions = prefix => scene.meshes.filter(mesh => mesh.name.startsWith(prefix) &&
+        mesh.getTotalVertices() > 0 && mesh.thinInstanceCount > 0)
+        .flatMap(mesh => mesh.thinInstanceGetWorldMatrices().map(matrix => {
+          const position = matrix.multiply(mesh.getWorldMatrix()).getTranslation();
+          return [position.x, position.y, position.z];
+        }));
+      const fan04 = positions('rinaCrowd_fan_04:');
+      const fieldFan04 = positions('rinaCrowd_fan_04:near:');
+      const others = [...positions('rinaCrowd_fan_01:'), ...positions('rinaStandsCrowd_')];
+      const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      let closestFan = Infinity;
+      let closestOther = Infinity;
+      let duplicates = 0;
+      for (let i = 0; i < fan04.length; i++) {
+        for (let j = i + 1; j < fan04.length; j++) {
+          const d = distance(fan04[i], fan04[j]);
+          closestFan = Math.min(closestFan, d);
+          if (d < 0.05) duplicates++;
+        }
+        for (const other of others) {
+          const d = distance(fan04[i], other);
+          closestOther = Math.min(closestOther, d);
+          if (d < 0.05) duplicates++;
+        }
+      }
+      return { closestFan, closestOther, duplicates,
+        showcaseDistance: fieldFan04.length ? Math.min(...fieldFan04.map(position =>
+          Math.hypot(position[0], position[2] - (-26 * 1.5)))) : null };
+    })()`, true);
+    assert.equal(fanSeparation.duplicates, 0,
+      `Rina fan 04 has overlapping instance origins: ${JSON.stringify(fanSeparation)}`);
+    if (!process.env.RINA_MOBILE_VERIFY) assert.ok(fanSeparation.showcaseDistance < 0.1,
+      `Rina fan 04 showcase is not at the field test point: ${JSON.stringify(fanSeparation)}`);
+    console.log(`Rina fan separation: ${JSON.stringify(fanSeparation)}`);
     console.log(`Rina stands crowd: ${JSON.stringify(crowdTotals)}`);
     let concert;
     for (let i = 0; i < 120; i++) {
@@ -1054,6 +1139,10 @@ try {
         wash: scene.getLightByName('rinaStageWash')?.intensity,
         spill: scene.getLightByName('rinaAudienceSpill')?.intensity,
         spot: scene.getLightByName('rinaMovingSpot_0')?.intensity,
+        actorBounce: scene.getLightByName('rinaActorBounce')?.intensity,
+        actorRim: scene.getLightByName('rinaActorStageRim')?.intensity,
+        actorKeyDirectionZ: scene.getLightByName('rinaActorBounce')?.direction.z,
+        actorRimDirectionZ: scene.getLightByName('rinaActorStageRim')?.direction.z,
         screenLightLeft: scene.getLightByName('rinaScreenLight_-1')?.intensity,
         screenLight: scene.getLightByName('rinaScreenLight_1')?.intensity,
         singerLight: scene.getLightByName('rinaRinaKeyLight')?.intensity,
@@ -1093,6 +1182,8 @@ try {
     await songAudio(55.1);
     await delay(280);
     const chorus = await stageLights();
+    assert.ok(chorus.actorKeyDirectionZ > 0 && chorus.actorRimDirectionZ < 0,
+      `Rina actor lights do not illuminate from opposite sides: ${JSON.stringify(chorus)}`);
     assert.ok(chorus.flames > 0 && chorus.clouds === 0 &&
       chorus.pyroLightEnabled && chorus.pyroLight > 8 &&
       chorus.shaderReady && chorus.legacyFlames === 0 &&
@@ -1200,7 +1291,9 @@ try {
       quiet.screen > paused.screen * 2 &&
       quiet.spot > paused.spot * 2 &&
       quiet.screenLight > paused.screenLight * 2 &&
-      quiet.singerLight > paused.singerLight * 2,
+      quiet.singerLight > paused.singerLight * 2 &&
+      quiet.actorBounce > paused.actorBounce * 2 &&
+      quiet.actorRim > paused.actorRim * 2,
       `Rina stage lights did not fade during an audio pause: ${JSON.stringify({ quiet, paused })}`);
     assert.ok(Math.abs(paused.cameraRoll) < 0.00001,
       `Rina camera kept shaking after the song paused: ${paused.cameraRoll}`);

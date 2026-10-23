@@ -782,6 +782,9 @@ try {
       return EngineStore.Instances.flatMap(engine => engine.scenes)
         .find(item => item.metadata?.rinaLevel)?.metadata?.rinaLevel?.crowdSystem === 'field-maze';
     })()`, true);
+    // The field maze uses GLBs only on the pitch rim; its stands are sprites.
+    // These checks belong to the older GLB stands renderer.
+    if (!fieldMaze) {
     let fanAssets;
     for (let i = 0; i < 80; i++) {
       fanAssets = await evaluate(`(async () => {
@@ -1005,8 +1008,10 @@ try {
       `Rina fan 05 showcase is not beside fan 04: ${JSON.stringify(fanSeparation)}`);
     console.log(`Rina fan separation: ${JSON.stringify(fanSeparation)}`);
     console.log(`Rina stands crowd: ${JSON.stringify(crowdTotals)}`);
+    }
     if (fieldMaze) {
-      const expectedStatic = process.env.RINA_MOBILE_VERIFY ? 75 : 370;
+      const expectedStaticMin = process.env.RINA_MOBILE_VERIFY ? 75 : 300;
+      const expectedStaticMax = process.env.RINA_MOBILE_VERIFY ? 75 : 370;
       for (let attempt = 0; attempt < 100; attempt++) {
         const loadedStatic = await evaluate(`(async () => {
           const storeUrl = performance.getEntriesByType('resource')
@@ -1017,7 +1022,7 @@ try {
           return scene.meshes.filter(mesh => mesh.name.startsWith('rinaMazeRealStatic_'))
             .reduce((sum, mesh) => sum + mesh.thinInstanceCount, 0);
         })()`, true);
-        if (loadedStatic === expectedStatic) break;
+        if (loadedStatic >= expectedStaticMin && loadedStatic <= expectedStaticMax) break;
         await delay(250);
       }
       const maze = await evaluate(`(async () => {
@@ -1122,7 +1127,8 @@ try {
       console.log(`Rina field maze: ${JSON.stringify(maze)}`);
       assert.ok(maze.batches === 4 && maze.silhouettes >=
         (process.env.RINA_MOBILE_VERIFY ? 600 : 1500) &&
-        maze.staticVariants === 10 && maze.staticFans === expectedStatic &&
+        maze.staticVariants === 10 &&
+        maze.staticFans >= expectedStaticMin && maze.staticFans <= expectedStaticMax &&
         maze.staticRigs === 0 && maze.staticLighted &&
         maze.staticPlacementViolations === 0 &&
         maze.staticHeightRange[0] > 2.3 && maze.staticHeightRange[1] < 2.9 &&
@@ -1133,7 +1139,7 @@ try {
         maze.pocketsOpen && maze.stageApproachOpen && maze.sideBlocks &&
         maze.placementViolations === 0 && maze.catwalkOverlap === 0 &&
         maze.individualColliders === 0 &&
-        maze.fieldRigs === (process.env.RINA_MOBILE_VERIFY ? 0 : 3) &&
+        maze.fieldRigs === (process.env.RINA_MOBILE_VERIFY ? 0 : 5) &&
         maze.fieldRigHeights.every(rig =>
           rig.effectiveHeight >= 2.4 && rig.effectiveHeight <= 2.9) &&
         maze.fieldFanCount === (process.env.RINA_MOBILE_VERIFY ? 0 : 38),
@@ -1804,16 +1810,19 @@ try {
             staticVariants: staticMeshes.length,
             staticFans: staticMeshes.reduce((sum, mesh) => sum + mesh.thinInstanceCount, 0) };
         })()`, true);
-        if (afterReentry.rigs === (process.env.RINA_MOBILE_VERIFY ? 0 : 3) &&
+        if (afterReentry.rigs === (process.env.RINA_MOBILE_VERIFY ? 0 : 5) &&
             afterReentry.parent === 'rinaStadiumRoot' &&
-            afterReentry.staticFans === (process.env.RINA_MOBILE_VERIFY ? 75 : 370)) break;
+            afterReentry.staticVariants === 10 &&
+            afterReentry.staticFans >= (process.env.RINA_MOBILE_VERIFY ? 75 : 300) &&
+            afterReentry.staticFans <= (process.env.RINA_MOBILE_VERIFY ? 75 : 370)) break;
         await delay(250);
       }
       assert.ok(afterReentry.scenes === 1 && afterReentry.parent === 'rinaStadiumRoot' &&
-        afterReentry.rigs === (process.env.RINA_MOBILE_VERIFY ? 0 : 3) &&
+        afterReentry.rigs === (process.env.RINA_MOBILE_VERIFY ? 0 : 5) &&
         afterReentry.instances === (process.env.RINA_MOBILE_VERIFY ? 0 : 38) &&
         afterReentry.staticVariants === 10 &&
-        afterReentry.staticFans === (process.env.RINA_MOBILE_VERIFY ? 75 : 370),
+        afterReentry.staticFans >= (process.env.RINA_MOBILE_VERIFY ? 75 : 300) &&
+        afterReentry.staticFans <= (process.env.RINA_MOBILE_VERIFY ? 75 : 370),
       `Rina field crowd did not cleanly reload: ${JSON.stringify(afterReentry)}`);
       console.log(`Rina field crowd after reentry: ${JSON.stringify(afterReentry)}`);
     }

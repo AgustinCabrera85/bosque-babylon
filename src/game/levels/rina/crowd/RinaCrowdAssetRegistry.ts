@@ -100,6 +100,10 @@ export class RinaCrowdAssetRegistry {
           container.dispose();
           throw new Error(`Rina crowd ${key}: expected one skinned mesh and all registered clips`);
         }
+        // The glTF loader starts its first clip by default, including for an
+        // asset container that has not been added to the scene. Those source
+        // bones are invisible but keep animating alongside the visible clones.
+        for (const clip of container.animationGroups) clip.stop();
         lightFanMesh(source[0]);
         const entries: InstantiatedEntries[] = [];
         try {

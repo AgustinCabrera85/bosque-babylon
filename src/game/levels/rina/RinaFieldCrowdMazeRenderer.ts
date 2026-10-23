@@ -19,6 +19,8 @@ import { RINA_CROWD_FANS } from "./crowd/RinaCrowdAssetManifest";
 import { RinaCrowdAssetRegistry } from "./crowd/RinaCrowdAssetRegistry";
 import { RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
 import type { RinaFieldCrowdMazeLayout } from "./RinaFieldCrowdMazeLayout";
+import { RinaFieldCrowdMotionController } from "./RinaFieldCrowdMotion";
+import type { RinaFieldCrowdMotionPlacement } from "./RinaFieldCrowdMotion";
 
 /**
  * Rina field labyrinth renderer: a visually opaque crowd, not a sea of active
@@ -40,7 +42,7 @@ export const RINA_FIELD_CROWD_MAZE_RENDER_CONFIG = {
   // The outermost row is positioned AT the analytical border instead of .5m
   // behind it. This removes the visually empty strip that had collision.
   desktop: { spacing: 1.00, keep: 0.88, staticFansMax: 370,
-    animatedFansMax: 38, animatedRigKinds: 3 },
+    animatedFansMax: 38, animatedRigKinds: 5 },
   mobile: { spacing: 1.45, keep: 0.72, staticFansMax: 75,
     animatedFansMax: 0, animatedRigKinds: 0 },
   rimOffset: 0.13,
@@ -48,7 +50,10 @@ export const RINA_FIELD_CROWD_MAZE_RENDER_CONFIG = {
   rimDedupeDistance: 0.49,
   coreMargin: 0.86,
   proximityBetweenRigged: 2.4,
-  animatedFanIds: ["fan_01", "fan_03", "fan_05"],
+  proximityBetweenDetailed: 1.18,
+  proximityBetweenSameFan: 2.25,
+  proximityToSilhouette: 0.94,
+  animatedFanIds: ["fan_01", "fan_02", "fan_03", "fan_04", "fan_05"],
   // Pre-baked static snapshots of Mixamo in-place animations (no live rig).
   staticFanIds: ["fan_01", "fan_02", "fan_03", "fan_04", "fan_05"],
 } as const;
@@ -248,6 +253,7 @@ export function createRinaFieldCrowdMazeRenderer(
   const settings = RINA_FIELD_CROWD_MAZE_RENDER_CONFIG[performanceTier];
   const random = rng(0x20261023);
   const registry = new RinaCrowdAssetRegistry(scene, actorLights);
+  const crowdMotion = new RinaFieldCrowdMotionController(performanceTier);
   const crowdMaterials: StandardMaterial[] = [];
   const meshes: Mesh[] = [];
   const batches: FigurePlacement[][] = STYLES.map(() => []);
@@ -307,7 +313,11 @@ export function createRinaFieldCrowdMazeRenderer(
   function refreshSilhouetteBatches() {
     for (let i = 0; i < meshes.length; i++) {
       const visible = batches[i].filter(p => !replaced.has(p));
-      if (visible.length === 0) { meshes[i].setEnabled(false); continue; }
+      if (visible.length === 0) {
+        crowdMotion.untrack(meshes[i]);
+        meshes[i].setEnabled(false);
+        continue;
+      }
       meshes[i].setEnabled(true);
       const values = new Float32Array(visible.length * 16);
       for (let j = 0; j < visible.length; j++) {
@@ -316,9 +326,20 @@ export function createRinaFieldCrowdMazeRenderer(
           Quaternion.RotationAxis(Vector3.Up(), p.yaw),
           new Vector3(p.x, p.y, p.z)).copyToArray(values, j * 16);
       }
-      meshes[i].thinInstanceSetBuffer("matrix", values, 16, true);
+      meshes[i].thinInstanceSetBuffer("matrix", values, 16, false);
+      crowdMotion.trackCore(meshes[i], visible, values);
       meshes[i].thinInstanceRefreshBoundingInfo(true);
     }
+  }
+  function clearSilhouettesAround(models: readonly FigurePlacement[]) {
+    const radiusSquared = RINA_FIELD_CROWD_MAZE_RENDER_CONFIG.proximityToSilhouette ** 2;
+    for (const batch of batches) for (const silhouette of batch) {
+      if (models.some(model =>
+        (silhouette.x - model.x) ** 2 + (silhouette.z - model.z) ** 2 < radiusSquared)) {
+        replaced.add(silhouette);
+      }
+    }
+    refreshSilhouetteBatches();
   }
   refreshSilhouetteBatches();
 
@@ -358,22 +379,60 @@ export function createRinaFieldCrowdMazeRenderer(
     animatedRim.push(candidate);
   }
 
+  const detailedSpacingSquared = RINA_FIELD_CROWD_MAZE_RENDER_CONFIG.proximityBetweenDetailed ** 2;
   const staticRim = rim.filter(p => !animatedRim.some(a =>
-    Math.hypot(p.x - a.x, p.z - a.z) < .50));
-  const staticTotal = Math.min(settings.staticFansMax, staticRim.length);
-  const sampled = Array.from({length:staticTotal},(_,i)=>
-    staticRim[Math.floor((i + .5) * staticRim.length / staticTotal)]);
+    (p.x - a.x) ** 2 + (p.z - a.z) ** 2 < detailedSpacingSquared));
+  const sampled: FigurePlacement[] = [];
+  const farEnough = (candidate: FigurePlacement) => !sampled.some(p =>
+    (candidate.x - p.x) ** 2 + (candidate.z - p.z) ** 2 < detailedSpacingSquared);
+  // Prefer even coverage, then fill the remaining gaps. A dense rim grid is
+  // useful for silhouettes, but two detailed fans at adjacent grid points
+  // cross arms and look like one model with overlapping animation clips.
+  const preferredCount = Math.min(settings.staticFansMax, staticRim.length);
+  for (let i = 0; i < preferredCount; i++) {
+    const candidate = staticRim[Math.floor((i + .5) * staticRim.length / preferredCount)];
+    if (farEnough(candidate)) sampled.push(candidate);
+  }
+  for (const candidate of staticRim) {
+    if (sampled.length >= settings.staticFansMax) break;
+    if (farEnough(candidate)) sampled.push(candidate);
+  }
   const staticSources = RINA_FIELD_CROWD_MAZE_RENDER_CONFIG.staticFanIds.flatMap(id => [
     { id, filename: `${id}_static_pose_1k.glb` },
     { id, filename: `${id}_static_alt_1k.glb` },
   ]);
+  const positionsByFan = new Map<string, FigurePlacement[]>(
+    RINA_FIELD_CROWD_MAZE_RENDER_CONFIG.staticFanIds.map(id => [id, []]));
+  for (let i = 0; i < animatedRim.length; i++) {
+    positionsByFan.get(rigFans[i % rigFans.length].id)!.push(animatedRim[i]);
+  }
+  const staticMembers: FigurePlacement[][] = staticSources.map(() => []);
+  const sameFanSpacingSquared = RINA_FIELD_CROWD_MAZE_RENDER_CONFIG.proximityBetweenSameFan ** 2;
+  for (let i = 0; i < sampled.length; i++) {
+    const placement = sampled[i];
+    const fanIds = RINA_FIELD_CROWD_MAZE_RENDER_CONFIG.staticFanIds;
+    const eligible = fanIds.map((id, order) => ({ id, order,
+      positions: positionsByFan.get(id)!,
+    })).filter(candidate => candidate.positions.every(other =>
+      (placement.x - other.x) ** 2 + (placement.z - other.z) ** 2 >= sameFanSpacingSquared));
+    // If all five identities are already nearby, leave the procedural fan at
+    // this position instead of overlapping a duplicate detailed model.
+    if (!eligible.length) continue;
+    eligible.sort((a, b) => a.positions.length - b.positions.length ||
+      (a.order - i % fanIds.length + fanIds.length) % fanIds.length -
+      (b.order - i % fanIds.length + fanIds.length) % fanIds.length);
+    const chosen = eligible[0];
+    const poseIndex = chosen.positions.length % 2;
+    chosen.positions.push(placement);
+    staticMembers[chosen.order * 2 + poseIndex].push(placement);
+  }
 
   // Load ten static, textured GLB snapshots (five identities, two poses each). They are
   // already posed and contain no rig/AnimationGroups, so repeated thin
   // instances are cheap. We only hide fallback silhouettes after successful load.
   for (let fanIndex=0; fanIndex<staticSources.length; fanIndex++) {
     const {id,filename}=staticSources[fanIndex];
-    const members=sampled.filter((_,i)=>i % staticSources.length === fanIndex);
+    const members=staticMembers[fanIndex];
     if (!members.length) continue;
     void SceneLoader.LoadAssetContainerAsync(
       asset(STATIC_ASSET_DIR), filename, scene
@@ -415,20 +474,22 @@ export function createRinaFieldCrowdMazeRenderer(
       // applying it to translation would detach the mesh from its collider.
       const scaleBase=targetWorldHeight/height;
       const matrices=new Float32Array(members.length*16);
+      const posedPlacements: RinaFieldCrowdMotionPlacement[] = [];
       for(let i=0;i<members.length;i++) {
         const p=members[i];
         const scale=scaleBase*(.96+(.08*((i*17)%11)/11));
+        posedPlacements.push({ x: p.x, y: p.y, z: p.z, yaw: p.yaw, scale });
         const desired=Matrix.Compose(new Vector3(scale,scale,scale),
           Quaternion.RotationAxis(Vector3.Up(),p.yaw),
           new Vector3(p.x*RINA_STADIUM_SCALE,p.y*RINA_STADIUM_SCALE,
             p.z*RINA_STADIUM_SCALE));
         desired.multiply(inverseWorld).copyToArray(matrices,i*16);
       }
-      mesh.thinInstanceSetBuffer("matrix",matrices,16,true);
+      mesh.thinInstanceSetBuffer("matrix",matrices,16,false);
+      crowdMotion.trackBaked(mesh, posedPlacements, matrices, inverseWorld, RINA_STADIUM_SCALE);
       mesh.thinInstanceRefreshBoundingInfo(true,true);
-      for(const p of members) replaced.add(p);
+      clearSilhouettesAround(members);
       realStatic+=members.length;
-      refreshSilhouetteBatches();
     }).catch(error=>{
       console.warn(`Rina maze static fan ${filename}: using silhouette fallback`,error);
     });
@@ -436,12 +497,23 @@ export function createRinaFieldCrowdMazeRenderer(
 
   type AnimatedGroup = {clips:readonly AnimationGroup[];playingIndex:number};
   const animated:AnimatedGroup[]=[];
+  const playOnlyClip = (clips: readonly AnimationGroup[], index: number) => {
+    for (const clip of clips) clip.stop();
+    clips[index].start(false);
+  };
   rigFans.forEach((fan,index)=>{
     const members=animatedRim.filter((_,i)=>i%rigFans.length===index);
     if(!members.length)return;
     void registry.loadAnimated(fan,"middle",1).then(groups=>{
-      if(!groups || disposed)return;
-      for(const group of groups) {
+      if(!groups || disposed || scene.isDisposed)return;
+      for(let groupIndex=0; groupIndex<groups.length; groupIndex++) {
+        const group=groups[groupIndex];
+        const cohortMembers=members.filter((_,memberIndex)=>
+          memberIndex % groups.length === groupIndex);
+        if(!cohortMembers.length) {
+          group.mesh.setEnabled(false);
+          continue;
+        }
         const mesh=group.mesh;
         // The stadium root scales its children by 1.5. Include that parent
         // before taking the inverse, or the final fan becomes 1.5x too tall.
@@ -450,9 +522,9 @@ export function createRinaFieldCrowdMazeRenderer(
         const inverseWorld=mesh.getWorldMatrix().clone().invert();
         const height=Math.max(.001,mesh.getBoundingInfo().boundingBox.extendSize.y*2);
         const resize=fan.targetWorldHeight/height;
-        const vals=new Float32Array(members.length*16);
-        for(let i=0;i<members.length;i++) {
-          const p=members[i];
+        const vals=new Float32Array(cohortMembers.length*16);
+        for(let i=0;i<cohortMembers.length;i++) {
+          const p=cohortMembers[i];
           const worldWanted=Matrix.Compose(new Vector3(resize,resize,resize),
             Quaternion.RotationAxis(Vector3.Up(),p.yaw),
             new Vector3(p.x*RINA_STADIUM_SCALE,0,p.z*RINA_STADIUM_SCALE));
@@ -460,12 +532,11 @@ export function createRinaFieldCrowdMazeRenderer(
         }
         mesh.thinInstanceSetBuffer("matrix",vals,16,true);
         mesh.thinInstanceRefreshBoundingInfo(true,true);
-        const playingIndex=index%group.clips.length;
-        group.clips[playingIndex].start(false);
+        const playingIndex=(index+groupIndex)%group.clips.length;
+        playOnlyClip(group.clips, playingIndex);
         animated.push({clips:group.clips,playingIndex});
       }
-      for(const p of members)replaced.add(p);
-      refreshSilhouetteBatches();
+      clearSilhouettesAround(members);
     });
   });
 
@@ -477,18 +548,20 @@ export function createRinaFieldCrowdMazeRenderer(
         perimeterCandidates:rim.length,staticFans:realStatic,
         rigVariantsRequested:rigFans.length};
     },
-    update(_elapsed,_beatPulse) {
+    update(elapsed,beatPulse) {
       if(disposed || !root.isEnabled())return;
       for(const group of animated) {
         if(group.clips[group.playingIndex].isPlaying)continue;
         group.playingIndex=(group.playingIndex+1)%group.clips.length;
-        group.clips[group.playingIndex].start(false);
+        playOnlyClip(group.clips, group.playingIndex);
       }
+      crowdMotion.update(elapsed,beatPulse);
     },
     setEnabled(enabled) {if(!disposed)root.setEnabled(enabled);},
     dispose() {
       if(disposed)return;
       disposed=true;
+      crowdMotion.dispose();
       registry.dispose();
       for (const light of actorLights) {
         light.includedOnlyMeshes = light.includedOnlyMeshes.filter(mesh =>

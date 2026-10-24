@@ -49,6 +49,10 @@ try {
     if (message.method === "Runtime.consoleAPICalled" && message.params.type === "error") {
       errors.push(message.params.args.map(arg => arg.value ?? arg.description).join(" "));
     }
+    if (message.method === "Runtime.consoleAPICalled" && message.params.type === "warning" &&
+      message.params.args.some(arg => String(arg.value ?? arg.description).includes("Rina stage fireworks audio unavailable"))) {
+      errors.push(message.params.args.map(arg => arg.value ?? arg.description).join(" "));
+    }
     if (!message.id) return;
     pending.get(message.id)?.(message);
     pending.delete(message.id);
@@ -67,6 +71,9 @@ try {
   };
   await send("Page.enable");
   await send("Runtime.enable");
+  await send("Page.addScriptToEvaluateOnNewDocument", {
+    source: "performance.setResourceTimingBufferSize(20000)",
+  });
   await send("Emulation.setDeviceMetricsOverride", mobile
     ? { width: 650, height: 800, deviceScaleFactor: 1, mobile: true }
     : { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -231,6 +238,35 @@ try {
   assert.ok(stands.ready && stands.materials === 4 &&
     stands.spectators > (mobile ? 1000 : 2000),
     `Stands sprite shader or crowd batches are invalid: ${JSON.stringify(stands)}`);
+  const pyroAudio = await evaluate(`(async () => {
+    const paths = [1, 2].map(number => '/assets/audio/sfx/rina/fuegos_escenario_' + number + '.mp3');
+    const loaded = performance.getEntriesByType('resource').map(entry => entry.name);
+    const context = new AudioContext();
+    try {
+      const decoded = await Promise.all(paths.map(async path => {
+        const response = await fetch(path);
+        if (!response.ok) throw new Error(path + ' returned ' + response.status);
+        return context.decodeAudioData(await response.arrayBuffer());
+      }));
+      return { loadedByLevel: paths.every(path => loaded.some(url => url.endsWith(path))),
+        durations: decoded.map(buffer => buffer.duration),
+        channels: decoded.map(buffer => buffer.numberOfChannels),
+        peaks: decoded.map(buffer => {
+          const samples = buffer.getChannelData(0);
+          let peak = 0;
+          for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
+          return peak;
+        }) };
+    } finally {
+      await context.close();
+    }
+  })()`, true);
+  assert.ok(pyroAudio.loadedByLevel && pyroAudio.durations.every(seconds => seconds > 0) &&
+    pyroAudio.channels.every(channels => channels > 0) &&
+    pyroAudio.peaks.every(peak => peak > 0),
+    `Rina fireworks recordings did not load and decode: ${JSON.stringify(pyroAudio)}`);
+  assert.ok(!errors.some(error => error.includes("Rina stage fireworks audio unavailable")),
+    `Rina fireworks audio could not initialize: ${errors.join(" | ")}`);
   const fieldLighting = await evaluate(`(async () => {
     const resource = performance.getEntriesByType('resource')
       .find(item => item.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
@@ -274,7 +310,7 @@ try {
   assert.ok(!errors.some(error => /rinaStormSkybox|Rina skybox texture/i.test(error)),
     `Sky shader or texture error: ${errors.join(" | ")}`);
   console.log(JSON.stringify({ mode: mobile ? "mobile" : "desktop", first, strike, stadium,
-    stands,
+    stands, pyroAudio,
     fieldLighting, second,
     browserErrors: errors }, null, 2));
 } finally {

@@ -6,13 +6,12 @@ import {
 } from "./RinaFieldCrowdMusic";
 
 /**
- * Visual movement for FIELD silhouettes and GLB thin instances, not the stands.
+ * Visual movement for field GLB thin instances, not the stands.
  *
  * Animate only thin-instance MATRIX buffers. Do not touch layout nodes,
  * collision spans, model geometry, UVs, baked poses or the source GLBs.
  *
- * The rendering parent is rinaStadiumRoot (scale = 1.5). Procedural
- * silhouettes use stadium-LOCAL transforms; imported baked GLBs are
+ * The rendering parent is rinaStadiumRoot (scale = 1.5). Imported GLBs are
  * instanced using WORLD transforms compensated by inverseMeshWorld.
  */
 export type RinaFieldCrowdMotionPlacement = Readonly<{
@@ -21,19 +20,23 @@ export type RinaFieldCrowdMotionPlacement = Readonly<{
   z: number;
   yaw: number;
   scale: number;
+  /** Perimeter figures move more than silhouettes deep inside an island. */
+  intensity?: number;
+  driftX?: number;
+  driftZ?: number;
 }>;
 
 export const RINA_FIELD_CROWD_MOTION = {
   enabled: true,
-  desktop: { updatesPerSecond: 10, swayRadians: 0.044, yawRadians: 0.060,
-    bobLocal: 0.024, chorusJumpLocal: 0.16 },
+  desktop: { updatesPerSecond: 12, swayRadians: 0.09, yawRadians: 0.12,
+    bobLocal: 0.055, baseHopLocal: 0.09, chorusJumpLocal: 0.25,
+    horizontalDisplacement: 0.12 },
   mobile: { updatesPerSecond: 5, swayRadians: 0.022, yawRadians: 0.027,
-    bobLocal: 0.012, chorusJumpLocal: 0.10 },
-  // Reduce the motion of cheap interior silhouettes. Keep the edge expressive.
+    bobLocal: 0.012, baseHopLocal: 0.02, chorusJumpLocal: 0.10,
+    horizontalDisplacement: 0 },
+  // Legacy local-matrix track support; current field LOD uses baked tracks.
   coreIntensity: 0.62,
   rimIntensity: 1.0,
-  // No animated translation across X/Z: visual actor never leaves its collider.
-  horizontalDisplacement: 0,
 } as const;
 
 type Track = {
@@ -56,6 +59,7 @@ function hash01(x: number, z: number): number {
 function writeLocalMatrix(
   data: Float32Array, off: number, p: RinaFieldCrowdMotionPlacement,
   yaw: number, lean: number, verticalOffset: number,
+  horizontalX: number, horizontalZ: number,
 ): void {
   const sc = p.scale;
   const cy = Math.cos(yaw), sy = Math.sin(yaw);
@@ -73,9 +77,9 @@ function writeLocalMatrix(
   data[off + 9] = 0;
   data[off + 10] = cy * sc;
   data[off + 11] = 0;
-  data[off + 12] = p.x;
+  data[off + 12] = p.x + horizontalX;
   data[off + 13] = p.y + verticalOffset;
-  data[off + 14] = p.z;
+  data[off + 14] = p.z + horizontalZ;
   data[off + 15] = 1;
 }
 
@@ -99,8 +103,7 @@ export class RinaFieldCrowdMotionController {
   }
 
   /**
-   * Re-register after replacing a silhouette batch (e.g. when an imported
-   * static GLB successfully replaces one of the fallback silhouettes).
+   * Local-matrix track support for lightweight geometry.
    * Pass the SAME Float32Array used in mesh.thinInstanceSetBuffer("matrix").
    * That buffer must be created with staticBuffer=false.
    */
@@ -151,10 +154,10 @@ export class RinaFieldCrowdMotionController {
     for (const track of this.tracks.values()) {
       const { mesh, instances, matrices } = track;
       if (mesh.isDisposed() || !mesh.isEnabled()) continue;
-      const intensity = track.type === "core"
-        ? RINA_FIELD_CROWD_MOTION.coreIntensity : RINA_FIELD_CROWD_MOTION.rimIntensity;
       for (let i = 0; i < instances.length; i++) {
         const p = instances[i];
+        const intensity = p.intensity ?? (track.type === "core"
+          ? RINA_FIELD_CROWD_MOTION.coreIntensity : RINA_FIELD_CROWD_MOTION.rimIntensity);
         const seed = hash01(p.x, p.z);
         const phase = seed * 6.28318530718;
         // Variations in tempo prevent synchronized crowd motion.
@@ -169,27 +172,32 @@ export class RinaFieldCrowdMotionController {
         const yaw = p.yaw + this.conf.yawRadians * intensity * dance * sideToSide;
         const lift = Math.pow(Math.max(0, Math.sin(elapsedSeconds * (tempo * 1.7) + phase)), 2);
         const normalBob = this.conf.bobLocal * intensity * lift *
-          (0.15 + this.activity * 0.55 + this.pulse * 0.3);
+          (0.65 + this.activity * 0.35 + this.pulse * 0.2);
         // Every field spectator joins the refrain. Small per-person offsets
         // avoid a rigid wave while the 140 BPM grid keeps jumps on the song.
         let jumpArc = 0;
-        if (cue.playing && this.chorus > 0.005) {
-          const beat = (cue.songTime - RINA_FIELD_CROWD_BEAT_ORIGIN) /
-            RINA_FIELD_CROWD_BEAT_PERIOD + seed * 0.18;
-          const beatPhase = beat - Math.floor(beat);
-          jumpArc = Math.pow(Math.sin(Math.PI * beatPhase), 1.35);
-        }
+        const beat = (cue.playing
+          ? (cue.songTime - RINA_FIELD_CROWD_BEAT_ORIGIN) / RINA_FIELD_CROWD_BEAT_PERIOD
+          : elapsedSeconds / RINA_FIELD_CROWD_BEAT_PERIOD) + seed * 0.18;
+        const beatPhase = beat - Math.floor(beat);
+        jumpArc = Math.pow(Math.sin(Math.PI * beatPhase), 1.35);
         const jumpIntensity = track.type === "core" ? 0.82 : 1;
-        const bob = normalBob + this.conf.chorusJumpLocal * jumpIntensity *
-          this.chorus * jumpArc;
+        const bob = normalBob + intensity * jumpIntensity * jumpArc *
+          (this.conf.baseHopLocal + this.conf.chorusJumpLocal * this.chorus);
+        // Travel along the corridor edge, never toward the walking space.
+        const tide = Math.sin(elapsedSeconds * 1.7 - p.x * 0.22 - p.z * 0.13 + phase * 0.15);
+        const drift = this.conf.horizontalDisplacement * intensity * tide *
+          (0.65 + this.activity * 0.15 + this.chorus * 0.30);
+        const horizontalX = (p.driftX ?? 0) * drift;
+        const horizontalZ = (p.driftZ ?? 0) * drift;
         const offset = i * 16;
         if (track.type === "core") {
-          writeLocalMatrix(matrices, offset, p, yaw, sway, bob);
+          writeLocalMatrix(matrices, offset, p, yaw, sway, bob, horizontalX, horizontalZ);
         } else {
           // Match the existing V08: desired world transform * inverse mesh world.
           this.tempScale.setAll(p.scale);
-          this.tempPosition.set(p.x * track.stadiumScale,
-            (p.y + bob) * track.stadiumScale, p.z * track.stadiumScale);
+          this.tempPosition.set((p.x + horizontalX) * track.stadiumScale,
+            (p.y + bob) * track.stadiumScale, (p.z + horizontalZ) * track.stadiumScale);
           Quaternion.RotationYawPitchRollToRef(yaw, 0, sway, this.tempRotation);
           Matrix.ComposeToRef(this.tempScale, this.tempRotation, this.tempPosition, this.tempWorld);
           this.tempWorld.multiplyToRef(track.inverseMeshWorld!, this.tempInstance);

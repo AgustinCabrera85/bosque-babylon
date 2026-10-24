@@ -117,6 +117,8 @@ export const RINA_FIELD_MAZE_RESCUE_POCKETS: readonly RinaCrowdRescuePocket[] = 
 ];
 
 const CAP = 0.10;
+// Relative to the previous 0.74 scale: forty percent less walking width.
+export const RINA_FIELD_PASSAGE_WIDTH_SCALE = 0.74 * 0.60;
 function distanceToClearanceRectangle(x: number, z: number): number {
   // Preserve the security fence and catwalk gap used by the previous crowd.
   // The extra margin covers the width of silhouettes and animated arms.
@@ -139,7 +141,8 @@ function distanceToSegment(x: number, z: number, passage: RinaCrowdMazePassage):
 
 export function createRinaFieldCrowdMazeLayout(): RinaFieldCrowdMazeLayout {
   const passages = PATHS.map(([id, a, b, halfWidth, kind]) => ({
-    id, a: RINA_FIELD_MAZE_NODES[a], b: RINA_FIELD_MAZE_NODES[b], halfWidth, kind,
+    id, a: RINA_FIELD_MAZE_NODES[a], b: RINA_FIELD_MAZE_NODES[b],
+    halfWidth: halfWidth * RINA_FIELD_PASSAGE_WIDTH_SCALE, kind,
   }));
   // Dense crowd reaches the edge of the existing allowed field rectangle;
   // beyond this boundary the level's original exit/stage logic is untouched.

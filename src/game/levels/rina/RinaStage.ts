@@ -482,7 +482,8 @@ export function createRinaStage(
     singerYaw: number,
     playerWorldPosition: Vector3,
     playerCameraWorldPosition: Vector3,
-    pyro: StagePyroShow
+    pyro: StagePyroShow,
+    onPyroBurst?: () => void
   ) => {
     elapsed += dt;
 
@@ -713,6 +714,7 @@ export function createRinaStage(
     pyroCooldown = Math.max(0, pyroCooldown - dt);
     if (chorusStarted || (chorus >= 0 && beatDetected && pyroCooldown === 0)) {
       pyro.fireAll();
+      onPyroBurst?.();
       pyroLightAge = 0;
       // Allow the detached clouds to complete their smoke phase before the
       // next blast resets this emitter group.

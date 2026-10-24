@@ -164,6 +164,9 @@ export async function createRinaLevel(
     stadiumRoot.scaling.setAll(RINA_STADIUM_SCALE);
     crowdPreview.root.parent = stadiumRoot;
     cleanup.push(() => crowdPreview.dispose());
+    if (fieldCrowdMazeLayout && "ready" in crowdPreview) {
+      await crowdPreview.ready;
+    }
     const standsCrowd = await createRinaStandsSpriteCrowd(scene, context.performanceTier);
     standsCrowd.root.parent = stadiumRoot;
     cleanup.push(() => standsCrowd.dispose());
@@ -207,6 +210,16 @@ export async function createRinaLevel(
       }
     );
     cleanup.push(() => pyro.dispose());
+    const pyroAudio = context.musicPlayer
+      ? await context.musicPlayer.createRinaPyroAudio().catch(error => {
+          console.warn("Rina stage fireworks audio unavailable", error);
+          return null;
+        })
+      : null;
+    if (pyroAudio) cleanup.push(() => pyroAudio.dispose());
+    const playPyroBurst = () => pyroAudio?.trigger(
+      RINA_PYRO_TIMING.jetTravelTime + RINA_PYRO_TIMING.headExpandTime * 0.5
+    );
     const playerWorld = new RinaStadiumWorld(
       securityBarriers.collisionSpans,
       fieldCrowdMazeLayout
@@ -383,7 +396,8 @@ export async function createRinaLevel(
       const { beatPulse, strobe } = stage.update(
         dt, music, rina.root.position.z / RINA_STADIUM_SCALE,
         rina.root.rotation.y, player.position,
-        Vector3.TransformCoordinates(player.camera.position, player.root.computeWorldMatrix(true)), pyro
+        Vector3.TransformCoordinates(player.camera.position, player.root.computeWorldMatrix(true)),
+        pyro, playPyroBurst
       );
       strobePostProcess.update(strobe);
       stageArchitecture.update(dt, music, beatPulse);

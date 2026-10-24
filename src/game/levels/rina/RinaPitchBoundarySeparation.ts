@@ -6,6 +6,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Scene } from "@babylonjs/core/scene";
 import { RINA_STADIUM } from "./RinaLevelConfig";
 import { RINA_DOUBLE_TIER_PROFILE } from "./RinaDoubleTierSideStands";
+import { RINA_BACK_STAND_LED_PROFILE } from "./RinaBackStandExit";
 
 /**
  * UPDATE 01 — Visual pitch/stand separation.
@@ -42,6 +43,16 @@ export const RINA_PITCH_BOUNDARY_PROFILE = {
   mobileSegments: 10,
   desktopPostInterval: 4.4,
   mobilePostInterval: 6.4,
+} as const;
+
+export const RINA_REAR_APRON_PROFILE = {
+  standFrontZ: RINA_BACK_STAND_LED_PROFILE.rearZ - 3 +
+    RINA_BACK_STAND_LED_PROFILE.lowerRowDepth * 0.5,
+  fieldOverlapZ: -RINA_STADIUM.pitchLength * 0.5 + 0.65,
+  railZ: -RINA_STADIUM.pitchLength * 0.5 - 0.2,
+  halfWidth: RINA_STADIUM.pitchWidth * 0.5 +
+    RINA_DOUBLE_TIER_PROFILE.fieldMargin + RINA_DOUBLE_TIER_PROFILE.zCurve,
+  exitOpeningHalfWidth: RINA_BACK_STAND_LED_PROFILE.openingHalfWidth,
 } as const;
 
 export interface RinaPitchBoundaryMaterials {
@@ -238,6 +249,57 @@ export function createRinaPitchBoundarySeparation(
         0.42, 0.025, 0.22,
         side * (innerEdge + 1.5), 0.154, z
       );
+    }
+  }
+
+  // The rear lower rows begin beyond the pitch end. A low service apron fills
+  // that gap and overlaps the grass slightly so no dark seam remains visible.
+  const rear = RINA_REAR_APRON_PROFILE;
+  const apronStart = rear.standFrontZ - 0.24;
+  const apronDepth = rear.fieldOverlapZ - apronStart;
+  createPart(scene, assembly.lane, "rinaRearApronFloor",
+    rear.halfWidth * 2, p.laneThickness, apronDepth,
+    0, p.laneThickness * 0.5 + 0.014,
+    (apronStart + rear.fieldOverlapZ) * 0.5);
+
+  // Same curb, paired steel rails and post rhythm as the lateral plateas.
+  // The central opening aligns with the existing walkable exit tunnel.
+  const rearRailX = innerEdge;
+  const rearSpan = rearRailX - rear.exitOpeningHalfWidth;
+  const returnLength = p.zStart - rear.railZ;
+  for (const side of [-1, 1] as const) {
+    createPart(scene, assembly.lane, `rinaRearApronCornerFloor_${side}`,
+      rear.halfWidth - innerEdge + 0.12, p.laneThickness,
+      p.zStart - rear.fieldOverlapZ + 0.24,
+      side * (innerEdge + rear.halfWidth) * 0.5,
+      p.laneThickness * 0.5 + 0.014,
+      (rear.fieldOverlapZ + p.zStart) * 0.5);
+    const centerX = side * (rearRailX + rear.exitOpeningHalfWidth) * 0.5;
+    createPart(scene, assembly.curb, `rinaRearApronCurb_${side}`,
+      rearSpan, p.curbHeight, p.curbWidth,
+      centerX, p.curbHeight * 0.5 + 0.01, rear.railZ);
+    createPart(scene, assembly.curb, `rinaRearApronReturnCurb_${side}`,
+      p.curbWidth, p.curbHeight, returnLength,
+      side * rearRailX, p.curbHeight * 0.5 + 0.01,
+      (rear.railZ + p.zStart) * 0.5);
+    for (const [suffix, y, array, thickness] of [
+      ["mid", p.railMiddleY, assembly.rails, 0.045],
+      ["top", p.railTopY, assembly.brightRail, 0.062],
+    ] as const) {
+      createPart(scene, array, `rinaRearApronRail_${suffix}_${side}`,
+        rearSpan, thickness, thickness,
+        centerX, y, rear.railZ);
+      createPart(scene, array, `rinaRearApronReturnRail_${suffix}_${side}`,
+        thickness, thickness, returnLength,
+        side * rearRailX, y, (rear.railZ + p.zStart) * 0.5);
+    }
+    const postCount = Math.ceil(rearSpan / postInterval);
+    for (let n = 0; n <= postCount; n++) {
+      const x = side * (rear.exitOpeningHalfWidth + n * rearSpan / postCount);
+      const height = p.railTopY - p.railPostBottomY;
+      createPart(scene, assembly.rails, `rinaRearApronPost_${side}_${n}`,
+        p.railPostDiameter, height, p.railPostDiameter,
+        x, p.railPostBottomY + height * 0.5, rear.railZ);
     }
   }
 

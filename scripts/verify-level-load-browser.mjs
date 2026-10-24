@@ -1010,8 +1010,8 @@ try {
     console.log(`Rina stands crowd: ${JSON.stringify(crowdTotals)}`);
     }
     if (fieldMaze) {
-      const expectedStaticMin = process.env.RINA_MOBILE_VERIFY ? 75 : 300;
-      const expectedStaticMax = process.env.RINA_MOBILE_VERIFY ? 75 : 370;
+      const expectedStaticMin = process.env.RINA_MOBILE_VERIFY ? 1000 : 2500;
+      const expectedStaticMax = process.env.RINA_MOBILE_VERIFY ? 3000 : 6000;
       for (let attempt = 0; attempt < 100; attempt++) {
         const loadedStatic = await evaluate(`(async () => {
           const storeUrl = performance.getEntriesByType('resource')
@@ -1034,9 +1034,13 @@ try {
           .find(item => item.metadata?.rinaLevel);
         const layout = createRinaFieldCrowdMazeLayout();
         const silhouettes = scene.meshes.filter(mesh => mesh.name.startsWith('rinaMazeCore_'));
-        const positions = silhouettes.flatMap(mesh => mesh.thinInstanceGetWorldMatrices()
-          .map(matrix => matrix.getTranslation()));
         const staticMeshes = scene.meshes.filter(mesh => mesh.name.startsWith('rinaMazeRealStatic_'));
+        const staticSources = scene.meshes.filter(mesh => mesh.name.startsWith('rinaMazeLOD2Source_'));
+        const staticColors = staticMeshes.map(mesh =>
+          mesh._userThinInstanceBuffersStorage?.data.instanceColor);
+        const staticShades = staticMeshes.flatMap((mesh, index) =>
+          Array.from({ length: mesh.thinInstanceCount }, (_, i) =>
+            staticColors[index]?.[i * 4] ?? Number.NaN));
         const staticPlacements = staticMeshes.flatMap(mesh => mesh.thinInstanceGetWorldMatrices()
           .map(matrix => {
             const worldMatrix = matrix.multiply(mesh.getWorldMatrix());
@@ -1064,6 +1068,15 @@ try {
             meshYScale: Math.hypot(mesh.getWorldMatrix().m[4],
               mesh.getWorldMatrix().m[5], mesh.getWorldMatrix().m[6]) };
         });
+        const fieldRigPositions = fieldRigged.flatMap(mesh =>
+          mesh.thinInstanceGetWorldMatrices().map(matrix =>
+            matrix.multiply(mesh.getWorldMatrix()).getTranslation().scale(1 / 1.5)));
+        const fieldClips = ['fan_01', 'fan_02', 'fan_03', 'fan_04', 'fan_05'].map(id => {
+          const clips = scene.animationGroups.filter(group =>
+            group.name.startsWith('rinaCrowd_' + id + ':field-lod1:'));
+          return { id, count: clips.length, playing: clips.filter(clip => clip.isPlaying).length,
+            names: clips.map(clip => clip.name.slice(clip.name.lastIndexOf(':') + 1)) };
+        });
         const world = scene.metadata.playerWorld;
         const scale = scene.metadata.rinaLevel.stadiumScale;
         const isOpen = point => !layout.blocksPlayerLocal(point.x, point.z, 0.48);
@@ -1085,20 +1098,31 @@ try {
           }
         }
         return {
-          silhouettes: positions.length,
+          silhouettes: silhouettes.reduce((sum, mesh) => sum + mesh.thinInstanceCount, 0),
           batches: silhouettes.length,
-          staticVariants: staticMeshes.length,
+          staticVariants: new Set(staticMeshes.map(mesh =>
+            mesh.name.split(':')[0])).size,
+          staticSectors: staticMeshes.length,
+          visibleSources: staticSources.filter(mesh => mesh.isVisible).length,
           staticFans: staticMeshes.reduce((sum, mesh) => sum + mesh.thinInstanceCount, 0),
+          staticRim: staticPlacements.filter(p => p.margin < 0.35).length,
+          staticTinted: staticMeshes.every((mesh, index) =>
+            staticColors[index]?.length === mesh.thinInstanceCount * 4),
+          shadeRange: [Math.min(...staticShades), Math.max(...staticShades)],
           staticRigs: staticMeshes.filter(mesh => !!mesh.skeleton).length,
           staticLighted: staticMeshes.every(mesh => scene.lights.some(light =>
             light.includedOnlyMeshes.includes(mesh))),
           staticSample: staticPlacements.slice(0, 3),
           staticPlacementViolations: staticPlacements.filter(p =>
-            p.margin < .079 || p.margin > .36).length,
+            p.margin < .079).length,
           staticHeightRange: [Math.min(...staticPlacements.map(p => p.height)),
             Math.max(...staticPlacements.map(p => p.height))],
           fieldRigs: fieldRigged.length,
           fieldRigHeights,
+          staticRigMinDistance: fieldRigPositions.length ? staticPlacements.reduce((minimum, p) =>
+            fieldRigPositions.reduce((distance, rig) => Math.min(distance,
+              Math.hypot(p.x - rig.x, p.z - rig.z)), minimum), Infinity) : null,
+          fieldClips,
           fieldFanCount: fieldRigged.reduce((sum, mesh) => sum + mesh.thinInstanceCount, 0),
           paths: layout.passages.length,
           pockets: layout.rescuePockets.length,
@@ -1119,19 +1143,20 @@ try {
             !world.isColliding(layout.exitToStage.x * scale, layout.exitToStage.z * scale),
           sideBlocks: [-39, 39].every(x => world.isColliding(x * scale, 0)) &&
             world.isColliding(0, 0),
-          placementViolations: positions.filter(p => layout.marginToCrowd(p.x, p.z) < 0).length,
-          catwalkOverlap: positions.filter(p => Math.abs(p.x) < 4.6 && p.z > 14.9).length,
+          placementViolations: staticPlacements.filter(p => p.margin < 0).length,
+          catwalkOverlap: staticPlacements.filter(p => Math.abs(p.x) < 4.6 && p.z > 14.9).length,
           individualColliders: silhouettes.filter(mesh => mesh.checkCollisions).length,
         };
       })()`, true);
       console.log(`Rina field maze: ${JSON.stringify(maze)}`);
-      assert.ok(maze.batches === 4 && maze.silhouettes >=
-        (process.env.RINA_MOBILE_VERIFY ? 600 : 1500) &&
+      assert.ok(maze.batches === 0 && maze.silhouettes === 0 &&
         maze.staticVariants === 10 &&
+        maze.visibleSources === 0 && maze.staticSectors >= 10 &&
         maze.staticFans >= expectedStaticMin && maze.staticFans <= expectedStaticMax &&
-        maze.staticRigs === 0 && maze.staticLighted &&
+        maze.staticRigs === 0 && maze.staticLighted && maze.staticTinted &&
+        maze.shadeRange[0] < 0.3 && maze.shadeRange[1] > 0.85 &&
         maze.staticPlacementViolations === 0 &&
-        maze.staticHeightRange[0] > 2.3 && maze.staticHeightRange[1] < 2.9 &&
+        maze.staticHeightRange[0] > 2.25 && maze.staticHeightRange[1] < 3.1 &&
         maze.paths >= 28 &&
         maze.pockets === 4 && maze.loops >= 2 && maze.deadEnds >= 5 &&
         maze.connected && maze.spawnOpen && maze.passagesOpen &&
@@ -1140,9 +1165,18 @@ try {
         maze.placementViolations === 0 && maze.catwalkOverlap === 0 &&
         maze.individualColliders === 0 &&
         maze.fieldRigs === (process.env.RINA_MOBILE_VERIFY ? 0 : 5) &&
+        (process.env.RINA_MOBILE_VERIFY || maze.staticRigMinDistance >= 0.45) &&
+        maze.fieldClips.every((fan, index) => process.env.RINA_MOBILE_VERIFY
+          ? fan.count === 0 : fan.count === (index === 0 || index === 4 ? 5 : index === 3 ? 3 : 4) &&
+            fan.playing <= 1) &&
+        (process.env.RINA_MOBILE_VERIFY || maze.fieldClips.some(fan => fan.playing === 1)) &&
+        (process.env.RINA_MOBILE_VERIFY || maze.fieldClips[2].names.includes('fan_03_rallying_inplace')) &&
         maze.fieldRigHeights.every(rig =>
           rig.effectiveHeight >= 2.4 && rig.effectiveHeight <= 2.9) &&
-        maze.fieldFanCount === (process.env.RINA_MOBILE_VERIFY ? 0 : 38),
+        (process.env.RINA_MOBILE_VERIFY ? maze.fieldFanCount === 0 :
+          maze.fieldFanCount >= 700 && maze.fieldFanCount <= 1000 &&
+          maze.staticRim <= 100 &&
+          maze.fieldFanCount + maze.staticFans >= 3250),
       `Rina field crowd maze is blocked, visually misplaced, or too costly: ${JSON.stringify(maze)}`);
     }
     const crowdPerformance = await evaluate(`(async () => {
@@ -1165,7 +1199,7 @@ try {
       const median = values => values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
       const staticMeshes = scene.meshes.filter(mesh => mesh.name.startsWith('rinaMazeRealStatic_'));
       const staticAssets = performance.getEntriesByType('resource').filter(entry =>
-        /fan_0[1-5]_static_(pose|alt)_1k\.glb/.test(entry.name));
+        /(?:Fan_0[1-3]|Female_Fan_0[45])_LOD2_Static_.*_512\.glb/.test(entry.name));
       return { fps: median(fps), drawCalls: median(drawCalls),
         activeTriangles: scene.getActiveIndices() / 3,
         staticTriangles: staticMeshes.reduce((sum, mesh) =>
@@ -1175,6 +1209,37 @@ try {
         loadedResources: performance.getEntriesByType('resource').length };
     })()`, true);
     console.log(`Rina crowd performance (${fieldMaze ? 'maze' : 'preview'}): ${JSON.stringify(crowdPerformance)}`);
+    rinaCrowdRoundTrip: {
+    if (fieldMaze && process.env.RINA_LOD_ONLY_VERIFY) {
+      await evaluate("globalThis.__bosqueLevelDebug.load('sanctuary')", true);
+      await evaluate("globalThis.__bosqueLevelDebug.load('rina')", true);
+      const reloaded = await evaluate(`(async () => {
+        const storeUrl = performance.getEntriesByType('resource')
+          .find(entry => entry.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+        const { EngineStore } = await import(storeUrl ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+        const scenes = EngineStore.Instances.flatMap(engine => engine.scenes)
+          .filter(scene => scene.metadata?.rinaLevel && !scene.isDisposed);
+        const scene = scenes[0];
+        const staticMeshes = scene?.meshes.filter(mesh =>
+          mesh.name.startsWith('rinaMazeRealStatic_')) ?? [];
+        const rigs = scene?.meshes.filter(mesh => mesh.name.includes(':field-lod1:group_') &&
+          mesh.getTotalVertices() > 0) ?? [];
+        return { scenes: scenes.length, parent: scene?.getTransformNodeByName('rinaFieldCrowdMazeRoot')?.parent?.name,
+          staticFans: staticMeshes.reduce((sum, mesh) => sum + mesh.thinInstanceCount, 0),
+          animatedFans: rigs.reduce((sum, mesh) => sum + mesh.thinInstanceCount, 0),
+          liveScenes: globalThis.__bosqueLevelDebug.snapshot().liveScenes };
+      })()`, true);
+      assert.ok(reloaded.scenes === 1 && reloaded.liveScenes === 1 &&
+        reloaded.parent === 'rinaStadiumRoot' &&
+        reloaded.staticFans >= (process.env.RINA_MOBILE_VERIFY ? 1000 : 2500) &&
+        reloaded.staticFans <= (process.env.RINA_MOBILE_VERIFY ? 3000 : 6000) &&
+        (process.env.RINA_MOBILE_VERIFY ? reloaded.animatedFans === 0 :
+          reloaded.animatedFans >= 700 && reloaded.animatedFans <= 1000 &&
+          reloaded.animatedFans + reloaded.staticFans >= 3250),
+      `Rina LOD crowd did not cleanly reload: ${JSON.stringify(reloaded)}`);
+      console.log(`Rina LOD crowd after reload: ${JSON.stringify(reloaded)}`);
+      break rinaCrowdRoundTrip;
+    }
     if (fieldMaze && process.env.RINA_MAZE_CAPTURE) {
       await evaluate(`(async () => {
         const storeUrl = performance.getEntriesByType('resource')
@@ -1807,26 +1872,28 @@ try {
             parent: scene?.getTransformNodeByName('rinaFieldCrowdMazeRoot')?.parent?.name,
             rigs: fieldMeshes.length,
             instances: fieldMeshes.reduce((sum, mesh) => sum + mesh.thinInstanceCount, 0),
-            staticVariants: staticMeshes.length,
+            staticVariants: new Set(staticMeshes.map(mesh =>
+              mesh.name.split(':')[0])).size,
             staticFans: staticMeshes.reduce((sum, mesh) => sum + mesh.thinInstanceCount, 0) };
         })()`, true);
         if (afterReentry.rigs === (process.env.RINA_MOBILE_VERIFY ? 0 : 5) &&
             afterReentry.parent === 'rinaStadiumRoot' &&
             afterReentry.staticVariants === 10 &&
-            afterReentry.staticFans >= (process.env.RINA_MOBILE_VERIFY ? 75 : 300) &&
-            afterReentry.staticFans <= (process.env.RINA_MOBILE_VERIFY ? 75 : 370)) break;
+            afterReentry.staticFans >= (process.env.RINA_MOBILE_VERIFY ? 270 : 990) &&
+            afterReentry.staticFans <= (process.env.RINA_MOBILE_VERIFY ? 300 : 1100)) break;
         await delay(250);
       }
       assert.ok(afterReentry.scenes === 1 && afterReentry.parent === 'rinaStadiumRoot' &&
         afterReentry.rigs === (process.env.RINA_MOBILE_VERIFY ? 0 : 5) &&
         afterReentry.instances === (process.env.RINA_MOBILE_VERIFY ? 0 : 38) &&
         afterReentry.staticVariants === 10 &&
-        afterReentry.staticFans >= (process.env.RINA_MOBILE_VERIFY ? 75 : 300) &&
-        afterReentry.staticFans <= (process.env.RINA_MOBILE_VERIFY ? 75 : 370),
+        afterReentry.staticFans >= (process.env.RINA_MOBILE_VERIFY ? 270 : 990) &&
+        afterReentry.staticFans <= (process.env.RINA_MOBILE_VERIFY ? 300 : 1100),
       `Rina field crowd did not cleanly reload: ${JSON.stringify(afterReentry)}`);
       console.log(`Rina field crowd after reentry: ${JSON.stringify(afterReentry)}`);
     }
   }
+    }
   const constructors = await evaluate(`(async () => ({
     spot: typeof (await import('/node_modules/@babylonjs/core/Lights/spotLight.js')).SpotLight,
     particles: typeof (await import('/node_modules/@babylonjs/core/Particles/particleSystem.js')).ParticleSystem,

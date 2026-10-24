@@ -19,7 +19,8 @@ export interface AnimatedRinaCrowdGroup {
   readonly clips: readonly AnimationGroup[];
 }
 
-export const RINA_FIELD_FAN_DIRECT_INTENSITY = 0.5;
+export const RINA_FIELD_FAN_DIRECT_INTENSITY = 0.20;
+const fieldAlbedo = new WeakMap<PBRMaterial, Color3>();
 
 /** Match the source GLB's PBR submaterials while keeping the player separate. */
 export function prepareRinaCrowdMaterial(material: Material | null, fieldLighting = false): void {
@@ -31,7 +32,14 @@ export function prepareRinaCrowdMaterial(material: Material | null, fieldLightin
     entry.emissiveTexture = null;
     entry.emissiveColor = Color3.Black();
     entry.directIntensity = fieldLighting ? RINA_FIELD_FAN_DIRECT_INTENSITY : 1;
-    if (fieldLighting) entry.specularIntensity = Math.min(entry.specularIntensity, 0.45);
+    if (fieldLighting) {
+      // The same material can be prepared by the source mesh and its rig clones.
+      // Cache its authored color so repeated preparation never compounds the tint.
+      if (!fieldAlbedo.has(entry)) fieldAlbedo.set(entry, entry.albedoColor.clone());
+      entry.albedoColor = fieldAlbedo.get(entry)!.scale(0.68);
+      entry.environmentIntensity = Math.min(entry.environmentIntensity, 0.20);
+      entry.specularIntensity = Math.min(entry.specularIntensity, 0.18);
+    }
     entry.maxSimultaneousLights = 6;
   }
 }
@@ -51,6 +59,7 @@ export class RinaCrowdAssetRegistry {
   private readonly animatedLoads = new Map<string, Promise<readonly AnimatedRinaCrowdGroup[] | null>>();
   private readonly containers = new Map<string, AssetContainer>();
   private readonly animatedEntries: InstantiatedEntries[] = [];
+  private readonly litMeshes: Mesh[] = [];
   private disposed = false;
 
   constructor(private readonly scene: Scene, private readonly actorLights: readonly Light[] = [],
@@ -81,6 +90,7 @@ export class RinaCrowdAssetRegistry {
         mesh.name = `rinaCrowd_${key}`;
         lightFanMesh(mesh, this.fieldLighting);
         for (const light of this.actorLights) light.includedOnlyMeshes.push(mesh);
+        this.litMeshes.push(mesh);
         return mesh;
       })
       .catch(error => {
@@ -92,11 +102,11 @@ export class RinaCrowdAssetRegistry {
   }
 
   loadAnimated(fan: RinaCrowdFanAsset, quality: RinaCrowdQuality,
-    groupCount = 3): Promise<readonly AnimatedRinaCrowdGroup[] | null> {
-    const key = `${fan.id}:${quality}`;
+    groupCount = 3, riggedPathOverride?: string): Promise<readonly AnimatedRinaCrowdGroup[] | null> {
+    const key = riggedPathOverride ? `${fan.id}:field-lod1` : `${fan.id}:${quality}`;
     const existing = this.animatedLoads.get(key);
     if (existing) return existing;
-    const path = fan.variants[quality].riggedPath;
+    const path = riggedPathOverride ?? fan.variants[quality].riggedPath;
     const slash = path.lastIndexOf("/");
     const load = SceneLoader.LoadAssetContainerAsync(asset(path.slice(0, slash + 1)),
       path.slice(slash + 1), this.scene)
@@ -107,7 +117,8 @@ export class RinaCrowdAssetRegistry {
         }
         const source = container.meshes.filter(mesh => mesh instanceof Mesh && mesh.getTotalVertices() > 0) as Mesh[];
         const names = fan.animationNames ?? [];
-        if (source.length !== 1 || container.skeletons.length !== 1 || names.length === 0 ||
+        if (source.length !== 1 || container.skeletons.length !== 1 ||
+            !source[0].skeleton || names.length === 0 ||
             names.some(name => !container.animationGroups.some(group => group.name === name))) {
           container.dispose();
           throw new Error(`Rina crowd ${key}: expected one skinned mesh and all registered clips`);
@@ -129,10 +140,11 @@ export class RinaCrowdAssetRegistry {
               .find(node => node instanceof Mesh && node.getTotalVertices() > 0) as Mesh | undefined;
             if (!mesh || !mesh.skeleton) throw new Error(`Rina crowd ${key}: missing cloned rig`);
             mesh.name = `rinaCrowd_${key}:group_${i}`;
-            lightFanMesh(mesh, this.fieldLighting);
-            for (const light of this.actorLights) light.includedOnlyMeshes.push(mesh);
             const clips = names.map(name => instance.animationGroups.find(group => group.name.endsWith(`:${name}`)));
             if (clips.some(clip => !clip)) throw new Error(`Rina crowd ${key}: missing cloned animation`);
+            lightFanMesh(mesh, this.fieldLighting);
+            for (const light of this.actorLights) light.includedOnlyMeshes.push(mesh);
+            this.litMeshes.push(mesh);
             return { mesh, roots: instance.rootNodes,
               clips: clips as AnimationGroup[] };
           });
@@ -146,6 +158,7 @@ export class RinaCrowdAssetRegistry {
         }
       })
       .catch(error => {
+        if (riggedPathOverride) throw error;
         console.warn(`Rina crowd asset ${key} unavailable; keeping procedural spectators`, error);
         return null;
       });
@@ -168,6 +181,10 @@ export class RinaCrowdAssetRegistry {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const light of this.actorLights) {
+      light.includedOnlyMeshes = light.includedOnlyMeshes.filter(mesh =>
+        !this.litMeshes.some(lit => lit === mesh));
+    }
     for (const entry of this.animatedEntries) this.disposeEntry(entry);
     this.animatedEntries.length = 0;
     for (const container of this.containers.values()) container.dispose();

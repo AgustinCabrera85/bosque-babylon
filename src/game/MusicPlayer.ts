@@ -1,4 +1,5 @@
 import { asset } from "../utils/asset";
+import { loadRinaPyroAudio, type RinaPyroAudioHandle } from "./audio/RinaPyroAudio";
 
 const MASTER_VOLUME_KEY = "bosque.masterVolume";
 const MUSIC_VOLUME_KEY = "bosque.musicVolume";
@@ -83,6 +84,7 @@ export type MusicPlayerHandle = {
   updateListenerPosition: (position: WorldPosition) => void;
   getMusicPlaybackState: () => MusicPlaybackState;
   getSfxVolume: () => number;
+  createRinaPyroAudio: () => Promise<RinaPyroAudioHandle | null>;
   dispose: () => void;
 };
 
@@ -711,6 +713,17 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
 
   return {
     getSfxVolume: () => getEffectiveVolume("sfx"),
+    async createRinaPyroAudio() {
+      if (disposed) return null;
+      const context = ensureAudioContext();
+      if (!sfxGain) return null;
+      const audio = await loadRinaPyroAudio(context, sfxGain);
+      if (disposed) {
+        audio.dispose();
+        return null;
+      }
+      return audio;
+    },
     getMusicPlaybackState() {
       const playing = !music.paused && !music.ended &&
         music.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&

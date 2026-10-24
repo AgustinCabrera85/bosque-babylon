@@ -38,6 +38,8 @@ import { createRinaStageSecurityBarriers } from "./RinaStageSecurityBarriers";
 import { createRinaStandsLedDetails } from "./RinaStandsLedDetails";
 import { createRinaStandsSpriteCrowd } from "./RinaStandsSpriteCrowd";
 import { createRinaStrobePostProcess } from "./RinaStrobePostProcess";
+import { createRinaStormSkybox } from "./RinaStormSkybox";
+import { createRinaDesktopSkyStorm } from "./RinaDesktopSkyStorm";
 
 function createRinaLevelHud() {
   const root = document.createElement("div");
@@ -245,6 +247,24 @@ export async function createRinaLevel(
     // for the recital. With isometric disabled, V cycles third <-> first.
     player.setIsometricViewAllowed(false);
     player.setViewMode("third");
+    // Keep the camera-following dome outside the scaled stadium hierarchy.
+    player.camera.maxZ = Math.max(player.camera.maxZ, 600);
+    const stormSky = createRinaStormSkybox(scene, {
+      performanceTier: context.performanceTier,
+      exposure: context.performanceTier === "desktop" ? 0.48 : 0.62,
+      yawDegrees: 0,
+      horizonBlend: 0.48,
+    });
+    glow.addExcludedMesh(stormSky.mesh);
+    stormSky.update(player.camera.globalPosition, 0);
+    cleanup.push(() => stormSky.dispose());
+    const desktopSkyStorm = context.performanceTier === "desktop"
+      ? await createRinaDesktopSkyStorm(scene, stormSky)
+      : null;
+    if (desktopSkyStorm) {
+      for (const mesh of desktopSkyStorm.meshes) glow.addExcludedMesh(mesh);
+      cleanup.push(() => desktopSkyStorm.dispose());
+    }
     const strobePostProcess = createRinaStrobePostProcess(scene, player.camera);
     cleanup.push(() => strobePostProcess.dispose());
     cleanup.push(setupPlayerViewControls(player));
@@ -377,6 +397,8 @@ export async function createRinaLevel(
         player.camera.position.y += Math.sin(phase * 1.37 + 0.6) * 0.006 * strength;
         player.camera.rotation.z += Math.sin(phase * 0.73 + 0.5) * 0.0015 * strength;
       }
+      stormSky.update(player.camera.globalPosition, dt);
+      desktopSkyStorm?.update(player.camera.globalPosition, dt);
       crowdPreview.update(elapsed, beatPulse);
       standsCrowd.update(dt, beatPulse);
       enemyManager.update(dt);

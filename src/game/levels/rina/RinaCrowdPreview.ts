@@ -39,7 +39,7 @@ export function createRinaCrowdPreview(
 ) {
   const material = new StandardMaterial("rinaCrowdPreviewMaterial", scene);
   const animatedRoot = new TransformNode("rinaFieldAnimatedCrowdRoot", scene);
-  const registry = new RinaCrowdAssetRegistry(scene, actorLights);
+  const registry = new RinaCrowdAssetRegistry(scene, actorLights, true);
   const animatedGroups: { clips: readonly AnimationGroup[]; playingIndex: number }[] = [];
   let disposed = false;
   material.diffuseColor = new Color3(0.075, 0.07, 0.09);

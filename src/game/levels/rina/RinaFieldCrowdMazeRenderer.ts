@@ -2,7 +2,6 @@ import "@babylonjs/core/Meshes/thinInstanceMesh";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
-import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
@@ -14,9 +13,8 @@ import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import "@babylonjs/loaders/glTF";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { asset } from "../../../utils/asset";
-import { patchCharacterMaterial } from "../../CharacterPresentation";
 import { RINA_CROWD_FANS } from "./crowd/RinaCrowdAssetManifest";
-import { RinaCrowdAssetRegistry } from "./crowd/RinaCrowdAssetRegistry";
+import { prepareRinaCrowdMaterial, RinaCrowdAssetRegistry } from "./crowd/RinaCrowdAssetRegistry";
 import { RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
 import type { RinaFieldCrowdMazeLayout } from "./RinaFieldCrowdMazeLayout";
 import { RinaFieldCrowdMotionController } from "./RinaFieldCrowdMotion";
@@ -252,7 +250,7 @@ export function createRinaFieldCrowdMazeRenderer(
   const root = new TransformNode("rinaFieldCrowdMazeRoot", scene);
   const settings = RINA_FIELD_CROWD_MAZE_RENDER_CONFIG[performanceTier];
   const random = rng(0x20261023);
-  const registry = new RinaCrowdAssetRegistry(scene, actorLights);
+  const registry = new RinaCrowdAssetRegistry(scene, actorLights, true);
   const crowdMotion = new RinaFieldCrowdMotionController(performanceTier);
   const crowdMaterials: StandardMaterial[] = [];
   const meshes: Mesh[] = [];
@@ -454,13 +452,7 @@ export function createRinaFieldCrowdMazeRenderer(
       mesh.receiveShadows=false;
       mesh.alwaysSelectAsActiveMesh=true;
       // Use the same directional PBR response as the animated field fans.
-      patchCharacterMaterial(mesh.material, "lautaro");
-      if (mesh.material instanceof PBRMaterial) {
-        mesh.material.emissiveTexture = null;
-        mesh.material.emissiveColor = Color3.Black();
-        mesh.material.directIntensity = 1;
-        mesh.material.maxSimultaneousLights = 6;
-      }
+      prepareRinaCrowdMaterial(mesh.material, true);
       for (const light of actorLights) light.includedOnlyMeshes.push(mesh);
       // No bone or texture transformation: new static asset has its original
       // texture and a baked skeleton pose in local mesh coordinates.

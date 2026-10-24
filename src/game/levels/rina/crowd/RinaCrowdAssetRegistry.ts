@@ -5,6 +5,7 @@ import type { AssetContainer, InstantiatedEntries } from "@babylonjs/core/assetC
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import type { Material } from "@babylonjs/core/Materials/material";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { Light } from "@babylonjs/core/Lights/light";
 import type { Scene } from "@babylonjs/core/scene";
@@ -18,20 +19,30 @@ export interface AnimatedRinaCrowdGroup {
   readonly clips: readonly AnimationGroup[];
 }
 
-function lightFanMesh(mesh: Mesh): void {
+export const RINA_FIELD_FAN_DIRECT_INTENSITY = 0.5;
+
+/** Match the source GLB's PBR submaterials while keeping the player separate. */
+export function prepareRinaCrowdMaterial(material: Material | null, fieldLighting = false): void {
+  patchCharacterMaterial(material, "lautaro");
+  if (!material) return;
+  const subMaterials = (material as Material & { subMaterials?: Array<Material | null> }).subMaterials;
+  for (const entry of subMaterials?.length ? subMaterials : [material]) {
+    if (!(entry instanceof PBRMaterial)) continue;
+    entry.emissiveTexture = null;
+    entry.emissiveColor = Color3.Black();
+    entry.directIntensity = fieldLighting ? RINA_FIELD_FAN_DIRECT_INTENSITY : 1;
+    if (fieldLighting) entry.specularIntensity = Math.min(entry.specularIntensity, 0.45);
+    entry.maxSimultaneousLights = 6;
+  }
+}
+
+function lightFanMesh(mesh: Mesh, fieldLighting: boolean): void {
   mesh.isPickable = false;
   mesh.checkCollisions = false;
   mesh.receiveShadows = false;
   mesh.alwaysSelectAsActiveMesh = true;
-  // Share Lautaro's PBR response. The stage lights supply illumination;
-  // the albedo must not emit light on its own between light cues.
-  patchCharacterMaterial(mesh.material, "lautaro");
-  if (mesh.material instanceof PBRMaterial) {
-    mesh.material.emissiveTexture = null;
-    mesh.material.emissiveColor = Color3.Black();
-    mesh.material.directIntensity = 1;
-    mesh.material.maxSimultaneousLights = 6;
-  }
+  // Field fans receive a softer spotlight response; stand fans retain theirs.
+  prepareRinaCrowdMaterial(mesh.material, fieldLighting);
 }
 
 /** One registry per scene. Concurrent callers share the same in-flight load. */
@@ -42,7 +53,8 @@ export class RinaCrowdAssetRegistry {
   private readonly animatedEntries: InstantiatedEntries[] = [];
   private disposed = false;
 
-  constructor(private readonly scene: Scene, private readonly actorLights: readonly Light[] = []) {}
+  constructor(private readonly scene: Scene, private readonly actorLights: readonly Light[] = [],
+    private readonly fieldLighting = false) {}
 
   loadPosed(fan: RinaCrowdFanAsset, quality: RinaCrowdQuality): Promise<Mesh | null> {
     const key = `${fan.id}:${quality}`;
@@ -67,7 +79,7 @@ export class RinaCrowdAssetRegistry {
         this.containers.set(key, container);
         const mesh = meshes[0];
         mesh.name = `rinaCrowd_${key}`;
-        lightFanMesh(mesh);
+        lightFanMesh(mesh, this.fieldLighting);
         for (const light of this.actorLights) light.includedOnlyMeshes.push(mesh);
         return mesh;
       })
@@ -104,7 +116,7 @@ export class RinaCrowdAssetRegistry {
         // asset container that has not been added to the scene. Those source
         // bones are invisible but keep animating alongside the visible clones.
         for (const clip of container.animationGroups) clip.stop();
-        lightFanMesh(source[0]);
+        lightFanMesh(source[0], this.fieldLighting);
         const entries: InstantiatedEntries[] = [];
         try {
           for (let i = 0; i < groupCount; i++) {
@@ -117,7 +129,7 @@ export class RinaCrowdAssetRegistry {
               .find(node => node instanceof Mesh && node.getTotalVertices() > 0) as Mesh | undefined;
             if (!mesh || !mesh.skeleton) throw new Error(`Rina crowd ${key}: missing cloned rig`);
             mesh.name = `rinaCrowd_${key}:group_${i}`;
-            lightFanMesh(mesh);
+            lightFanMesh(mesh, this.fieldLighting);
             for (const light of this.actorLights) light.includedOnlyMeshes.push(mesh);
             const clips = names.map(name => instance.animationGroups.find(group => group.name.endsWith(`:${name}`)));
             if (clips.some(clip => !clip)) throw new Error(`Rina crowd ${key}: missing cloned animation`);

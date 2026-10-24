@@ -23,6 +23,8 @@ export type CornerMaterialSet = Readonly<{
 export interface RinaStadiumCornerOptions {
   performanceTier: "desktop" | "mobile";
   materials: CornerMaterialSet;
+  /** Mirror the rear pavilions to the stage end without changing their design. */
+  end?: "rear" | "stage";
 }
 
 export interface RinaStadiumCornerHandle {
@@ -444,6 +446,8 @@ export function createRinaStadiumCornerConnectors(
   scene: Scene, options: RinaStadiumCornerOptions
 ): RinaStadiumCornerHandle {
   const p = RINA_CORNER_PAVILION_PROFILE;
+  const stageEnd = options.end === "stage";
+  const prefix = stageEnd ? "rinaStageCornerV3" : "rinaCornerV3";
   if (p.towerCenterAbsX - p.towerWidth * 0.5 <
       RINA_STADIUM.pitchWidth * 0.5 + p.pitchSafetyMargin ||
       p.towerCenterZ + p.towerDepth * 0.5 > -RINA_STADIUM.pitchLength * 0.5) {
@@ -453,22 +457,32 @@ export function createRinaStadiumCornerConnectors(
   const mobile = options.performanceTier === "mobile";
   for (const side of [-1, 1] as const) createPavilion(scene, parts, side, mobile);
 
-  const frame = localMaterial(scene, "rinaCornerV3ConcreteStructure",
+  const frame = localMaterial(scene, `${prefix}ConcreteStructure`,
     new Color3(0.14, 0.15, 0.17), new Color3(0.018, 0.020, 0.027));
-  const slabs = localMaterial(scene, "rinaCornerV3FloorMaterial",
+  const slabs = localMaterial(scene, `${prefix}FloorMaterial`,
     new Color3(0.17, 0.18, 0.20), new Color3(0.019, 0.022, 0.029));
-  const steel = localMaterial(scene, "rinaCornerV3Steel",
+  const steel = localMaterial(scene, `${prefix}Steel`,
     new Color3(0.19, 0.21, 0.23), new Color3(0.026, 0.030, 0.035));
-  const dark = localMaterial(scene, "rinaCornerV3Recess",
+  const dark = localMaterial(scene, `${prefix}Recess`,
     new Color3(0.018, 0.021, 0.029), new Color3(0.006, 0.008, 0.013));
   const ownMaterials = [frame, slabs, steel, dark];
   const groups = [
-    mergeGroup("rinaCornerV3_LoadBearingFrame", parts.structure, frame),
-    mergeGroup("rinaCornerV3_BalconiesAndBridges", parts.floors, slabs),
-    mergeGroup("rinaCornerV3_RailsAndBracing", parts.steel, steel),
-    mergeGroup("rinaCornerV3_CoreWindows", parts.dark, dark),
-    mergeGroup("rinaCornerV3_LEDTrim", parts.trim, options.materials.ledRibbon),
+    mergeGroup(`${prefix}_LoadBearingFrame`, parts.structure, frame),
+    mergeGroup(`${prefix}_BalconiesAndBridges`, parts.floors, slabs),
+    mergeGroup(`${prefix}_RailsAndBracing`, parts.steel, steel),
+    mergeGroup(`${prefix}_CoreWindows`, parts.dark, dark),
+    mergeGroup(`${prefix}_LEDTrim`, parts.trim, options.materials.ledRibbon),
   ].filter((mesh): mesh is Mesh => mesh !== null);
+  if (stageEnd) {
+    // Merged source geometry is already in local stadium coordinates. Reflect
+    // its transform across the pitch centre so tower and bridge endpoints stay
+    // aligned with the +Z ends of the two existing side stands.
+    for (const mesh of groups) {
+      mesh.position.z *= -1;
+      mesh.scaling.z *= -1;
+      mesh.computeWorldMatrix(true);
+    }
+  }
   let disposed = false;
   return {
     meshes: groups,

@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   plugins: [{
@@ -26,6 +27,12 @@ export default defineConfig({
     ],
   },
   build: {
-    sourcemap: false
+    sourcemap: false,
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        stormLab: fileURLToPath(new URL('./experiments/storm-fx-lab/index.html', import.meta.url)),
+      },
+    },
   }
 });

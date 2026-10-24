@@ -6,8 +6,10 @@ import { createRinaStadiumGrassMaterial } from "./RinaStadiumGrassMaterial";
 import { createRinaDoubleTierSideStands } from "./RinaDoubleTierSideStands";
 import { createRinaBackStandWithExit } from "./RinaBackStandExit";
 import { createRinaStadiumCornerConnectors } from "./RinaStadiumCornerConnectors";
+import { createRinaNorthStageStands } from "./RinaNorthStageStands";
+import { createRinaStadiumPerimeterWall } from "./RinaStadiumPerimeterWall";
 import { createRinaPitchBoundarySeparation } from "./RinaPitchBoundarySeparation";
-import { RINA_LEVEL_QUALITY, RINA_STADIUM } from "./RinaLevelConfig";
+import { RINA_STADIUM } from "./RinaLevelConfig";
 
 function standard(
   scene: Scene,
@@ -26,7 +28,6 @@ export function createRinaStadiumGeometry(
   scene: Scene,
   performanceTier: "desktop" | "mobile"
 ) {
-  const quality = RINA_LEVEL_QUALITY[performanceTier];
   const grass = createRinaStadiumGrassMaterial(scene, performanceTier);
   const concrete = standard(
     scene,
@@ -119,8 +120,6 @@ export function createRinaStadiumGeometry(
     endline.material = lineMaterial;
   }
 
-  const sideTierDepth = 4.6;
-  const tierRise = 1.65;
   // All measurements remain local to rinaStadiumRoot, which scales them once.
   createRinaDoubleTierSideStands(scene, performanceTier, {
     concrete,
@@ -145,27 +144,13 @@ export function createRinaStadiumGeometry(
     performanceTier,
     materials: { concrete, darkConcrete, aisle, ledRibbon },
   });
-
-  // Upper tiers behind the stage. The lower north stand is visually occupied
-  // by the production/stage footprint.
-  const northUpperBaseZ = RINA_STADIUM.pitchLength / 2 + 7;
-  for (let tier = 4; tier < quality.standTiers + 3; tier += 1) {
-    const terrace = MeshBuilder.CreateBox(
-      `rinaNorthUpperStand_${tier}`,
-      {
-        width: RINA_STADIUM.pitchWidth + 38,
-        height: tierRise + 0.25,
-        depth: sideTierDepth,
-      },
-      scene
-    );
-    terrace.position.set(
-      0,
-      0.65 + tier * tierRise,
-      northUpperBaseZ + (tier - 4) * sideTierDepth
-    );
-    terrace.material = tier % 3 === 0 ? aisle : darkConcrete;
-  }
+  createRinaStadiumCornerConnectors(scene, {
+    performanceTier,
+    materials: { concrete, darkConcrete, aisle, ledRibbon },
+    end: "stage",
+  });
+  createRinaNorthStageStands(scene, { concrete, darkConcrete, aisle, ledRibbon });
+  createRinaStadiumPerimeterWall(scene);
 
   const tunnelDepth =
     RINA_STADIUM.exitTunnel.endZ - RINA_STADIUM.exitTunnel.startZ + 5;

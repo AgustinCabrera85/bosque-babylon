@@ -399,8 +399,8 @@ export async function createRinaLevel(
       }
       stormSky.update(player.camera.globalPosition, dt);
       desktopSkyStorm?.update(player.camera.globalPosition, dt);
-      crowdPreview.update(elapsed, beatPulse);
-      standsCrowd.update(dt, beatPulse);
+      crowdPreview.update(elapsed, beatPulse, music);
+      standsCrowd.update(dt, beatPulse, music);
       enemyManager.update(dt);
       context.musicPlayer?.updateListenerPosition(player.position);
 

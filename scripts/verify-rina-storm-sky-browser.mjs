@@ -210,6 +210,27 @@ try {
     stadium.stageCornerBounds.every(bounds => bounds.minZ > 70) &&
     stadium.stageCornerBounds.some(bounds => bounds.maxZ > 95),
     `Stage-end stands are disconnected or obstruct the stage: ${JSON.stringify(stadium)}`);
+  const standsState = `async () => {
+    const resource = performance.getEntriesByType('resource')
+      .find(item => item.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
+    const { EngineStore } = await import(resource ?? '/node_modules/@babylonjs/core/Engines/engineStore.js');
+    const scene = EngineStore.Instances.flatMap(engine => engine.scenes)
+      .find(item => item.metadata?.rinaLevel);
+    const batches = scene.meshes.filter(mesh => mesh.name.startsWith('rinaStandsSprite_'));
+    return { batches: batches.length,
+      spectators: batches.reduce((count, mesh) => count + mesh.thinInstanceCount, 0),
+      ready: batches.every(mesh => mesh.material?.isReady(mesh, true)),
+      materials: new Set(batches.map(mesh => mesh.material?.name)).size };
+  }`;
+  let stands;
+  for (let i = 0; i < 100; i++) {
+    stands = await evaluate(`(${standsState})()`, true);
+    if (stands.ready) break;
+    await delay(100);
+  }
+  assert.ok(stands.ready && stands.materials === 4 &&
+    stands.spectators > (mobile ? 1000 : 2000),
+    `Stands sprite shader or crowd batches are invalid: ${JSON.stringify(stands)}`);
   const fieldLighting = await evaluate(`(async () => {
     const resource = performance.getEntriesByType('resource')
       .find(item => item.name.includes('/node_modules/@babylonjs/core/Engines/engineStore.js'))?.name;
@@ -253,6 +274,7 @@ try {
   assert.ok(!errors.some(error => /rinaStormSkybox|Rina skybox texture/i.test(error)),
     `Sky shader or texture error: ${errors.join(" | ")}`);
   console.log(JSON.stringify({ mode: mobile ? "mobile" : "desktop", first, strike, stadium,
+    stands,
     fieldLighting, second,
     browserErrors: errors }, null, 2));
 } finally {

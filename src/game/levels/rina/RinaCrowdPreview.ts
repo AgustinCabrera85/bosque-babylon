@@ -7,11 +7,16 @@ import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Light } from "@babylonjs/core/Lights/light";
+import type { MusicPlaybackState } from "../../MusicPlayer";
 import { RINA_ANIMATED_FAN_CLEARANCE, RINA_CROWD_FANS } from "./crowd/RinaCrowdAssetManifest";
 import { RinaCrowdAssetRegistry } from "./crowd/RinaCrowdAssetRegistry";
 import {
   RINA_LEVEL_QUALITY, RINA_STAGE_SECURITY, RINA_STADIUM, RINA_STADIUM_SCALE,
 } from "./RinaLevelConfig";
+import {
+  getRinaFieldCrowdClipPools, getRinaFieldCrowdCue,
+  RINA_FIELD_CROWD_BEAT_ORIGIN, RINA_FIELD_CROWD_BEAT_PERIOD,
+} from "./RinaFieldCrowdMusic";
 
 function isLane(x: number, z: number) {
   const verticalLane = Math.abs(x) < 2.6 || Math.abs(x - 17) < 2.2 || Math.abs(x + 17) < 2.2;
@@ -40,7 +45,13 @@ export function createRinaCrowdPreview(
   const material = new StandardMaterial("rinaCrowdPreviewMaterial", scene);
   const animatedRoot = new TransformNode("rinaFieldAnimatedCrowdRoot", scene);
   const registry = new RinaCrowdAssetRegistry(scene, actorLights, true);
-  const animatedGroups: { clips: readonly AnimationGroup[]; playingIndex: number }[] = [];
+  const animatedGroups: {
+    clips: readonly AnimationGroup[];
+    playingIndex: number;
+    chorusMode: boolean | null;
+    calmClips: readonly number[];
+    chorusClips: readonly number[];
+  }[] = [];
   let disposed = false;
   material.diffuseColor = new Color3(0.075, 0.07, 0.09);
   material.emissiveColor = new Color3(0.015, 0.008, 0.022);
@@ -127,7 +138,9 @@ export function createRinaCrowdPreview(
           target.mesh.dispose();
           const playingIndex = Math.floor(Math.random() * group.clips.length);
           group.clips[playingIndex].start(false);
-          animatedGroups.push({ clips: group.clips, playingIndex });
+          const pools = getRinaFieldCrowdClipPools(group.clips.map(clip => clip.name));
+          animatedGroups.push({ clips: group.clips, playingIndex, chorusMode: null,
+            calmClips: pools.calm, chorusClips: pools.chorus });
         }
         for (const spectator of spectators) {
           if (spectator.replaced || showcases.some(entry => entry.target === spectator)) continue;
@@ -150,13 +163,20 @@ export function createRinaCrowdPreview(
 
   return {
     root: animatedRoot,
-    update(elapsed: number, beatPulse: number) {
+    update(elapsed: number, beatPulse: number, music: MusicPlaybackState | null) {
       if (disposed) return;
+      const cue = getRinaFieldCrowdCue(music);
+      const inChorus = cue.chorus >= 0.55;
       for (const group of animatedGroups) {
-        if (group.clips[group.playingIndex].isPlaying) continue;
-        const next = Math.floor(Math.random() * (group.clips.length - 1));
-        group.playingIndex = next >= group.playingIndex ? next + 1 : next;
-        group.clips[group.playingIndex].start(false);
+        const pool = inChorus ? group.chorusClips : group.calmClips;
+        if (group.chorusMode !== inChorus || !group.clips[group.playingIndex].isPlaying) {
+          const current = pool.indexOf(group.playingIndex);
+          const next = group.chorusMode !== inChorus ? pool[0] : pool[(current + 1) % pool.length];
+          for (const clip of group.clips) clip.stop();
+          group.playingIndex = next;
+          group.chorusMode = inChorus;
+          group.clips[next].start(false);
+        }
       }
       if (beatPulse >= 0.9 && previousBeatPulse < 0.9 &&
           elapsed - lastBeatAt > 0.18) {
@@ -170,6 +190,20 @@ export function createRinaCrowdPreview(
         activeUntil = elapsed + jumpDuration + 0.08;
       }
       previousBeatPulse = beatPulse;
+
+      if (cue.chorus > 0.01) {
+        animating = true;
+        for (const spectator of spectators) {
+          if (spectator.replaced) continue;
+          const beat = (cue.songTime - RINA_FIELD_CROWD_BEAT_ORIGIN) /
+            RINA_FIELD_CROWD_BEAT_PERIOD + spectator.delay * 2;
+          const phase = beat - Math.floor(beat);
+          const jump = Math.pow(Math.sin(Math.PI * phase), 1.35) * cue.chorus;
+          spectator.mesh.position.y = 0.84 + jump * spectator.height;
+          spectator.mesh.rotation.z = jump * spectator.lean;
+        }
+        return;
+      }
 
       if (elapsed > activeUntil) {
         if (animating) {

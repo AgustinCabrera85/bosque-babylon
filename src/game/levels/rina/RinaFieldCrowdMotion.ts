@@ -1,8 +1,12 @@
 import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import {
+  RINA_FIELD_CROWD_BEAT_ORIGIN, RINA_FIELD_CROWD_BEAT_PERIOD,
+  type RinaFieldCrowdCue,
+} from "./RinaFieldCrowdMusic";
 
 /**
- * No-rig crowd movement for the FIELD maze, not the stadium stands.
+ * Visual movement for FIELD silhouettes and GLB thin instances, not the stands.
  *
  * Animate only thin-instance MATRIX buffers. Do not touch layout nodes,
  * collision spans, model geometry, UVs, baked poses or the source GLBs.
@@ -21,8 +25,10 @@ export type RinaFieldCrowdMotionPlacement = Readonly<{
 
 export const RINA_FIELD_CROWD_MOTION = {
   enabled: true,
-  desktop: { updatesPerSecond: 10, swayRadians: 0.044, yawRadians: 0.060, bobLocal: 0.024 },
-  mobile: { updatesPerSecond: 5, swayRadians: 0.022, yawRadians: 0.027, bobLocal: 0.012 },
+  desktop: { updatesPerSecond: 10, swayRadians: 0.044, yawRadians: 0.060,
+    bobLocal: 0.024, chorusJumpLocal: 0.16 },
+  mobile: { updatesPerSecond: 5, swayRadians: 0.022, yawRadians: 0.027,
+    bobLocal: 0.012, chorusJumpLocal: 0.10 },
   // Reduce the motion of cheap interior silhouettes. Keep the edge expressive.
   coreIntensity: 0.62,
   rimIntensity: 1.0,
@@ -83,6 +89,8 @@ export class RinaFieldCrowdMotionController {
   private previousElapsed: number | null = null;
   private lastUpload = -Infinity;
   private pulse = 0;
+  private activity = 0.12;
+  private chorus = 0;
   private disposed = false;
   private readonly conf: typeof RINA_FIELD_CROWD_MOTION.desktop | typeof RINA_FIELD_CROWD_MOTION.mobile;
 
@@ -109,7 +117,7 @@ export class RinaFieldCrowdMotionController {
   }
 
   /**
-   * Imported static, posed GLB thin instances. `scale` is already the actual
+   * Imported posed or rigged GLB thin instances. `scale` is already the actual
    * WORLD desired scale (the same number used by the existing renderer).
    * `inverseMeshWorld` is measured AFTER parenting to the stadium root.
    */
@@ -128,13 +136,15 @@ export class RinaFieldCrowdMotionController {
   untrack(mesh: Mesh): void { this.tracks.delete(mesh); }
 
   /** `elapsedSeconds` is the absolute level time, not deltaTime. */
-  update(elapsedSeconds: number, beatPulse: number): void {
+  update(elapsedSeconds: number, beatPulse: number, cue: RinaFieldCrowdCue): void {
     if (this.disposed || !RINA_FIELD_CROWD_MOTION.enabled || !Number.isFinite(elapsedSeconds)) return;
     const dt = this.previousElapsed === null
       ? 0 : Math.max(0, Math.min(0.05, elapsedSeconds - this.previousElapsed));
     this.previousElapsed = elapsedSeconds;
     // Capture short stage beats even when the matrix upload is throttled.
     this.pulse = Math.max(clamp01(beatPulse), this.pulse * Math.exp(-5.5 * dt));
+    this.activity += (cue.activity - this.activity) * Math.min(1, dt * 4.5);
+    this.chorus += (cue.chorus - this.chorus) * Math.min(1, dt * 7);
     if (elapsedSeconds - this.lastUpload < 1 / this.conf.updatesPerSecond) return;
     this.lastUpload = elapsedSeconds;
 
@@ -153,11 +163,25 @@ export class RinaFieldCrowdMotionController {
         const sideToSide = Math.sin(elapsedSeconds * (tempo * 0.48) + phase * 0.72);
         // Spatial traveling wave across islands, stronger on a musical beat.
         const wave = Math.sin(elapsedSeconds * 2.1 - p.x * 0.18 - p.z * 0.10);
-        const sway = this.conf.swayRadians * intensity *
+        const dance = 0.3 + this.activity * 1.35;
+        const sway = this.conf.swayRadians * intensity * dance *
           (body * 0.68 + wave * 0.32 * this.pulse);
-        const yaw = p.yaw + this.conf.yawRadians * intensity * sideToSide;
+        const yaw = p.yaw + this.conf.yawRadians * intensity * dance * sideToSide;
         const lift = Math.pow(Math.max(0, Math.sin(elapsedSeconds * (tempo * 1.7) + phase)), 2);
-        const bob = this.conf.bobLocal * intensity * lift * (0.35 + 0.65 * this.pulse);
+        const normalBob = this.conf.bobLocal * intensity * lift *
+          (0.15 + this.activity * 0.55 + this.pulse * 0.3);
+        // Every field spectator joins the refrain. Small per-person offsets
+        // avoid a rigid wave while the 140 BPM grid keeps jumps on the song.
+        let jumpArc = 0;
+        if (cue.playing && this.chorus > 0.005) {
+          const beat = (cue.songTime - RINA_FIELD_CROWD_BEAT_ORIGIN) /
+            RINA_FIELD_CROWD_BEAT_PERIOD + seed * 0.18;
+          const beatPhase = beat - Math.floor(beat);
+          jumpArc = Math.pow(Math.sin(Math.PI * beatPhase), 1.35);
+        }
+        const jumpIntensity = track.type === "core" ? 0.82 : 1;
+        const bob = normalBob + this.conf.chorusJumpLocal * jumpIntensity *
+          this.chorus * jumpArc;
         const offset = i * 16;
         if (track.type === "core") {
           writeLocalMatrix(matrices, offset, p, yaw, sway, bob);

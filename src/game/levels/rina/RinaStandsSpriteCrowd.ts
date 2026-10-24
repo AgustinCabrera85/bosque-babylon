@@ -5,9 +5,14 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
+import type { MusicPlaybackState } from "../../MusicPlayer";
 import { loadRinaStandsSpriteAssets, type StandsSpriteAssets } from "./crowd/RinaStandsSpriteAtlas";
 import { createRinaStandsSpritePlacements, type SpritePlacement,
   type StandsSector } from "./crowd/RinaStandsSpritePlacements";
+import {
+  getRinaFieldCrowdClipPools, getRinaFieldCrowdCue,
+  RINA_FIELD_CROWD_BEAT_ORIGIN, RINA_FIELD_CROWD_BEAT_PERIOD,
+} from "./RinaFieldCrowdMusic";
 
 const VERTEX = `
 precision highp float;
@@ -25,6 +30,10 @@ uniform vec3 cameraLocal;
 uniform vec2 atlasGrid;
 uniform float elapsedTime;
 uniform float playbackSpeed;
+uniform float chorusLevel;
+uniform float songTime;
+uniform float beatPulse;
+uniform float jumpHeight;
 varying vec2 vAtlasUv;
 varying vec4 vColor;
 void main(void) {
@@ -36,11 +45,23 @@ void main(void) {
   float width = length(world0.xyz);
   float height = length(world1.xyz);
   vec3 localPosition = center + right * position.x * width + vec3(0.0, position.y * height, 0.0);
+  if (chorusLevel > 0.001) {
+    float beatPhase = fract((songTime - ${RINA_FIELD_CROWD_BEAT_ORIGIN.toFixed(5)}) /
+      ${RINA_FIELD_CROWD_BEAT_PERIOD.toFixed(8)} + fract(spriteMotion.y * 0.618034));
+    float jumpArc = pow(max(0.0, sin(3.14159265 * beatPhase)), 1.35);
+    float jumpVariation = 0.84 + 0.16 * fract(spriteMotion.x * 17.23 + spriteMotion.y * 0.23);
+    localPosition.y += jumpArc * chorusLevel * jumpVariation * jumpHeight *
+      (0.9 + 0.1 * clamp(beatPulse, 0.0, 1.0));
+  }
   gl_Position = viewProjection * world * vec4(localPosition, 1.0);
 
-  float frame = mod(floor(elapsedTime * spriteClip.z * playbackSpeed * spriteMotion.x
-    + spriteMotion.y), spriteClip.y);
-  float cell = spriteClip.x + spriteClip.w * spriteClip.y + frame;
+  float energetic = step(0.55, chorusLevel);
+  vec4 activeClip = vec4(mix(spriteClip.x, spriteMotion.z, energetic),
+    spriteClip.y, mix(spriteClip.z, spriteMotion.w, energetic), spriteClip.w);
+  float speed = playbackSpeed * mix(1.0, 1.22, chorusLevel);
+  float frame = mod(floor(elapsedTime * activeClip.z * speed * spriteMotion.x
+    + spriteMotion.y), activeClip.y);
+  float cell = activeClip.x + activeClip.w * activeClip.y + frame;
   float column = mod(cell, atlasGrid.x);
   float row = floor(cell / atlasGrid.x);
   // With Babylon's invertY upload, each source cell is bottom-up in UV space.
@@ -73,7 +94,7 @@ export type RinaStandsSpriteDiagnostics = {
 export type RinaStandsSpriteCrowdHandle = {
   root: TransformNode;
   diagnostics: RinaStandsSpriteDiagnostics;
-  update(dt: number, beatPulse: number): void;
+  update(dt: number, beatPulse: number, music: MusicPlaybackState | null): void;
   dispose(): void;
 };
 
@@ -90,11 +111,12 @@ function makeQuad(scene: Scene, name: string): Mesh {
 }
 
 function makeMaterial(scene: Scene, atlas: StandsSpriteAssets["atlases"][number], index: number,
-    playbackSpeed: number): ShaderMaterial {
+    playbackSpeed: number, jumpHeight: number): ShaderMaterial {
   const material = new ShaderMaterial(`rinaStandsSpriteAtlas_${index}`, scene,
     { vertexSource: VERTEX, fragmentSource: FRAGMENT }, {
       attributes: ["position", "spriteClip", "spriteMotion", "spriteColor"],
-      uniforms: ["world", "viewProjection", "cameraLocal", "atlasGrid", "elapsedTime", "playbackSpeed"],
+      uniforms: ["world", "viewProjection", "cameraLocal", "atlasGrid", "elapsedTime",
+        "playbackSpeed", "chorusLevel", "songTime", "beatPulse", "jumpHeight"],
       samplers: ["atlasTexture"],
       needAlphaBlending: false,
       needAlphaTesting: true,
@@ -104,10 +126,15 @@ function makeMaterial(scene: Scene, atlas: StandsSpriteAssets["atlases"][number]
   material.setTexture("atlasTexture", atlas.texture);
   material.setVector2("atlasGrid", { x: atlas.columns, y: atlas.rows });
   material.setFloat("playbackSpeed", playbackSpeed);
+  material.setFloat("chorusLevel", 0);
+  material.setFloat("songTime", 0);
+  material.setFloat("beatPulse", 0);
+  material.setFloat("jumpHeight", jumpHeight);
   return material;
 }
 
-function fillBatch(mesh: Mesh, placements: readonly SpritePlacement[], assets: StandsSpriteAssets): void {
+function fillBatch(mesh: Mesh, placements: readonly SpritePlacement[], assets: StandsSpriteAssets,
+    clipPools: readonly ReturnType<typeof getRinaFieldCrowdClipPools>[] | null): void {
   const count = placements.length;
   const matrices = new Float32Array(count * 16);
   const clips = new Float32Array(count * 4);
@@ -123,10 +150,28 @@ function fillBatch(mesh: Mesh, placements: readonly SpritePlacement[], assets: S
     matrices[m + 13] = p.y;
     matrices[m + 14] = p.z;
     matrices[m + 15] = 1;
-    const clip = assets.atlases[p.spectator.atlasIndex].clips[p.spectator.clipIndex];
+    const atlas = assets.atlases[p.spectator.atlasIndex];
+    let calm = atlas.clips[p.spectator.clipIndex];
+    let chorus = calm;
+    if (clipPools) {
+      const pools = clipPools[p.spectator.atlasIndex];
+      const seedValue = Math.sin(p.x * 12.9898 + p.y * 37.719 + p.z * 78.233) * 43758.5453;
+      const seed = seedValue - Math.floor(seedValue);
+      const variant = Math.floor(seed * 65536);
+      const calmOptions = pools.calm.filter(index =>
+        atlas.clips[index].views > p.spectator.viewIndex);
+      calm = atlas.clips[calmOptions.length
+        ? calmOptions[variant % calmOptions.length] : p.spectator.clipIndex];
+      const chorusOptions = pools.chorus.filter(index =>
+        atlas.clips[index].views > p.spectator.viewIndex &&
+        atlas.clips[index].frames === calm.frames);
+      chorus = chorusOptions.length
+        ? atlas.clips[chorusOptions[(variant * 7 + 3) % chorusOptions.length]] : calm;
+    }
     const a = i * 4;
-    clips.set([clip.startCell, clip.frames, clip.playbackFps, p.spectator.viewIndex], a);
-    motion.set([p.spectator.speed, p.spectator.frameOffset, 0, 0], a);
+    clips.set([calm.startCell, calm.frames, calm.playbackFps, p.spectator.viewIndex], a);
+    motion.set([p.spectator.speed, p.spectator.frameOffset,
+      chorus.startCell, chorus.playbackFps], a);
     const [r, g, b, alpha] = p.spectator.color;
     colors[a] = r * p.brightness;
     colors[a + 1] = g * p.brightness;
@@ -149,6 +194,8 @@ export async function createRinaStandsSpriteCrowd(scene: Scene,
   const meshes: Mesh[] = [];
   try {
     const placements = createRinaStandsSpritePlacements(tier, assets.spectators);
+    const clipPools = tier === "desktop" ? assets.atlases.map(atlas =>
+      getRinaFieldCrowdClipPools(atlas.clips.map(clip => clip.name))) : null;
     const groups = new Map<string, SpritePlacement[]>();
     const spectatorsBySector = {
       "rear-lower": 0, "rear-upper": 0,
@@ -161,13 +208,14 @@ export async function createRinaStandsSpriteCrowd(scene: Scene,
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(p);
     });
-    assets.atlases.forEach((atlas, i) => materials.push(makeMaterial(scene, atlas, i, assets.playbackSpeed)));
+    assets.atlases.forEach((atlas, i) => materials.push(makeMaterial(
+      scene, atlas, i, assets.playbackSpeed, tier === "desktop" ? 0.15 : 0)));
     for (const [key, members] of groups) {
       const atlasIndex = members[0].spectator.atlasIndex;
       const mesh = makeQuad(scene, `rinaStandsSprite_${key.replace("/", "_")}`);
       mesh.material = materials[atlasIndex];
       mesh.parent = root;
-      fillBatch(mesh, members, assets);
+      fillBatch(mesh, members, assets, clipPools);
       meshes.push(mesh);
     }
     const diagnostics: RinaStandsSpriteDiagnostics = {
@@ -183,10 +231,11 @@ export async function createRinaStandsSpriteCrowd(scene: Scene,
     const inverse = root.getWorldMatrix().clone();
     return {
       root, diagnostics,
-      update(dt, _beatPulse) {
+      update(dt, beatPulse, music) {
         if (disposed) return;
         const start = performance.now();
         elapsed += Math.max(0, dt);
+        const cue = tier === "desktop" ? getRinaFieldCrowdCue(music) : null;
         root.computeWorldMatrix(true);
         inverse.copyFrom(root.getWorldMatrix()).invert();
         const cameraLocal = scene.activeCamera
@@ -194,6 +243,11 @@ export async function createRinaStandsSpriteCrowd(scene: Scene,
           : Vector3.Zero();
         materials.forEach(material => {
           material.setFloat("elapsedTime", elapsed);
+          if (cue) {
+            material.setFloat("chorusLevel", cue.chorus);
+            material.setFloat("songTime", cue.songTime);
+            material.setFloat("beatPulse", beatPulse);
+          }
           material.setVector3("cameraLocal", cameraLocal);
         });
         diagnostics.updateMillisecondsAverage += (performance.now() - start

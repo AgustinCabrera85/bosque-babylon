@@ -12,6 +12,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import "@babylonjs/loaders/glTF";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
+import type { MusicPlaybackState } from "../../MusicPlayer";
 import { asset } from "../../../utils/asset";
 import { RINA_CROWD_FANS } from "./crowd/RinaCrowdAssetManifest";
 import { prepareRinaCrowdMaterial, RinaCrowdAssetRegistry } from "./crowd/RinaCrowdAssetRegistry";
@@ -19,6 +20,7 @@ import { RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
 import type { RinaFieldCrowdMazeLayout } from "./RinaFieldCrowdMazeLayout";
 import { RinaFieldCrowdMotionController } from "./RinaFieldCrowdMotion";
 import type { RinaFieldCrowdMotionPlacement } from "./RinaFieldCrowdMotion";
+import { getRinaFieldCrowdClipPools, getRinaFieldCrowdCue } from "./RinaFieldCrowdMusic";
 
 /**
  * Rina field labyrinth renderer: a visually opaque crowd, not a sea of active
@@ -31,7 +33,7 @@ import type { RinaFieldCrowdMotionPlacement } from "./RinaFieldCrowdMotion";
 export interface RinaFieldCrowdMazeRenderHandle {
   readonly root: TransformNode;
   readonly stats: Readonly<{ silhouettes: number; perimeterCandidates: number; staticFans: number; rigVariantsRequested: number }>;
-  update(elapsed: number, beatPulse: number): void;
+  update(elapsed: number, beatPulse: number, music: MusicPlaybackState | null): void;
   setEnabled(enabled: boolean): void;
   dispose(): void;
 }
@@ -487,7 +489,13 @@ export function createRinaFieldCrowdMazeRenderer(
     });
   }
 
-  type AnimatedGroup = {clips:readonly AnimationGroup[];playingIndex:number};
+  type AnimatedGroup = {
+    clips: readonly AnimationGroup[];
+    playingIndex: number;
+    chorusMode: boolean | null;
+    calmClips: readonly number[];
+    chorusClips: readonly number[];
+  };
   const animated:AnimatedGroup[]=[];
   const playOnlyClip = (clips: readonly AnimationGroup[], index: number) => {
     for (const clip of clips) clip.stop();
@@ -522,11 +530,15 @@ export function createRinaFieldCrowdMazeRenderer(
             new Vector3(p.x*RINA_STADIUM_SCALE,0,p.z*RINA_STADIUM_SCALE));
           worldWanted.multiply(inverseWorld).copyToArray(vals,i*16);
         }
-        mesh.thinInstanceSetBuffer("matrix",vals,16,true);
+        mesh.thinInstanceSetBuffer("matrix",vals,16,false);
         mesh.thinInstanceRefreshBoundingInfo(true,true);
+        crowdMotion.trackBaked(mesh, cohortMembers.map(p => ({ ...p, scale: resize })),
+          vals, inverseWorld, RINA_STADIUM_SCALE);
+        const pools = getRinaFieldCrowdClipPools(group.clips.map(clip => clip.name));
         const playingIndex=(index+groupIndex)%group.clips.length;
         playOnlyClip(group.clips, playingIndex);
-        animated.push({clips:group.clips,playingIndex});
+        animated.push({ clips: group.clips, playingIndex, chorusMode: null,
+          calmClips: pools.calm, chorusClips: pools.chorus });
       }
       clearSilhouettesAround(members);
     });
@@ -540,14 +552,23 @@ export function createRinaFieldCrowdMazeRenderer(
         perimeterCandidates:rim.length,staticFans:realStatic,
         rigVariantsRequested:rigFans.length};
     },
-    update(elapsed,beatPulse) {
+    update(elapsed,beatPulse,music) {
       if(disposed || !root.isEnabled())return;
+      const cue = getRinaFieldCrowdCue(music);
+      const inChorus = cue.chorus >= 0.55;
       for(const group of animated) {
-        if(group.clips[group.playingIndex].isPlaying)continue;
-        group.playingIndex=(group.playingIndex+1)%group.clips.length;
-        playOnlyClip(group.clips, group.playingIndex);
+        const pool = inChorus ? group.chorusClips : group.calmClips;
+        if (group.chorusMode !== inChorus) {
+          group.chorusMode = inChorus;
+          group.playingIndex = pool[0];
+          playOnlyClip(group.clips, group.playingIndex);
+        } else if (!group.clips[group.playingIndex].isPlaying) {
+          const current = pool.indexOf(group.playingIndex);
+          group.playingIndex = pool[(current + 1) % pool.length];
+          playOnlyClip(group.clips, group.playingIndex);
+        }
       }
-      crowdMotion.update(elapsed,beatPulse);
+      crowdMotion.update(elapsed,beatPulse,cue);
     },
     setEnabled(enabled) {if(!disposed)root.setEnabled(enabled);},
     dispose() {

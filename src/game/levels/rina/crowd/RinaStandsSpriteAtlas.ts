@@ -19,6 +19,7 @@ export type StandsSpectator = {
 
 export type StandsClip = {
   index: number;
+  name: string;
   startCell: number;
   frames: number;
   views: number;
@@ -104,7 +105,8 @@ export async function loadRinaStandsSpriteAssets(scene: Scene): Promise<StandsSp
       requireValid(layout.atlases[i].atlas.endsWith(info.file), `atlas ${i + 1}: file mismatch`);
       requireValid(Array.isArray(clips) && clips.length > 0, `atlas ${i + 1}: no clips`);
       clips.forEach((clip, j) => {
-        requireValid(clip.index === j && Number.isInteger(clip.startCell) && Number.isInteger(clip.frames)
+        requireValid(clip.index === j && typeof clip.name === "string" && clip.name.length > 0
+          && Number.isInteger(clip.startCell) && Number.isInteger(clip.frames)
           && clip.frames > 0 && Number.isInteger(clip.views) && clip.views > 0
           && Number.isFinite(clip.playbackFps) && clip.playbackFps > 0
           && clip.startCell + clip.frames * clip.views <= info.usedCells

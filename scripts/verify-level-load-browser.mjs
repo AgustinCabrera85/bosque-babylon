@@ -1055,7 +1055,7 @@ try {
               sourceHeight };
           }));
         const fieldRigged = scene.meshes.filter(mesh => mesh.name.startsWith('rinaCrowd_fan_') &&
-          mesh.getTotalVertices() > 0 && (() => { let parent = mesh.parent;
+          mesh.getTotalVertices() > 0 && mesh.thinInstanceCount > 0 && (() => { let parent = mesh.parent;
             while (parent) { if (parent.name === 'rinaFieldCrowdMazeRoot') return true;
               parent = parent.parent; } return false; })());
         const fieldRigHeights = fieldRigged.map(mesh => {
@@ -1073,7 +1073,7 @@ try {
             matrix.multiply(mesh.getWorldMatrix()).getTranslation().scale(1 / 1.5)));
         const fieldClips = ['fan_01', 'fan_02', 'fan_03', 'fan_04', 'fan_05'].map(id => {
           const clips = scene.animationGroups.filter(group =>
-            group.name.startsWith('rinaCrowd_' + id + ':field-lod1:'));
+            group.name.startsWith('rinaCrowd_' + id + ':field-lod1:group_0:'));
           return { id, count: clips.length, playing: clips.filter(clip => clip.isPlaying).length,
             names: clips.map(clip => clip.name.slice(clip.name.lastIndexOf(':') + 1)) };
         });
@@ -1167,7 +1167,9 @@ try {
         maze.fieldRigs === (process.env.RINA_MOBILE_VERIFY ? 0 : 5) &&
         (process.env.RINA_MOBILE_VERIFY || maze.staticRigMinDistance >= 0.45) &&
         maze.fieldClips.every((fan, index) => process.env.RINA_MOBILE_VERIFY
-          ? fan.count === 0 : fan.count === (index === 0 || index === 4 ? 5 : index === 3 ? 3 : 4) &&
+          ? fan.count === (index === 0 ? 5 : index === 1 || index === 2 ? 4 : 0) &&
+            fan.playing <= 1
+          : fan.count === (index === 0 || index === 4 ? 5 : index === 3 ? 3 : 4) &&
             fan.playing <= 1) &&
         (process.env.RINA_MOBILE_VERIFY || maze.fieldClips.some(fan => fan.playing === 1)) &&
         (process.env.RINA_MOBILE_VERIFY || maze.fieldClips[2].names.includes('fan_03_rallying_inplace')) &&
@@ -1863,7 +1865,7 @@ try {
             .filter(item => item.metadata?.rinaLevel);
           const scene = scenes[0];
           const fieldMeshes = scene?.meshes.filter(mesh => mesh.name.startsWith('rinaCrowd_fan_') &&
-            mesh.getTotalVertices() > 0 && (() => { let parent = mesh.parent;
+            mesh.getTotalVertices() > 0 && mesh.thinInstanceCount > 0 && (() => { let parent = mesh.parent;
               while (parent) { if (parent.name === 'rinaFieldCrowdMazeRoot') return true;
                 parent = parent.parent; } return false; })()) ?? [];
           const staticMeshes = scene?.meshes.filter(mesh =>

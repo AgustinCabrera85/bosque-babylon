@@ -116,7 +116,24 @@ export const RINA_FIELD_MAZE_RESCUE_POCKETS: readonly RinaCrowdRescuePocket[] = 
   { id: "rina-rescue-east-upper", label: "Este / cuarta extracción", point: RINA_FIELD_MAZE_NODES.rescueEastUpper, radius: 2.6 },
 ];
 
+// These two junctions used to leave sharp invisible crowd corners in the
+// player's path. Both the collision and visible rim fans read marginToCrowd,
+// so rounding the turns clears the geometry and the nearby spectators alike.
+const TURN_CLEARANCES = [
+  { point: RINA_FIELD_MAZE_NODES.west2, radius: 2.8 },
+  { point: RINA_FIELD_MAZE_NODES.middle1, radius: 3.7 },
+] as const;
+// Small notches remove the empty triangular tips visible beside the player's
+// right foot at the two reported turns. The long corridor widths stay narrow.
+const CORNER_RELIEFS = [
+  { point: P(-14, -12.55), radius: 1.5 },
+  { point: P(8.55, -10.9), radius: 1.45 },
+] as const;
+
 const CAP = 0.10;
+// Keep the passage visually narrow while avoiding a collision band far ahead
+// of the first visible row of spectators (the rim is at margin +0.13).
+const PLAYER_CROWD_COLLISION_INSET = 0.14;
 // Relative to the previous 0.74 scale: forty percent less walking width.
 export const RINA_FIELD_PASSAGE_WIDTH_SCALE = 0.74 * 0.60;
 function distanceToClearanceRectangle(x: number, z: number): number {
@@ -157,6 +174,12 @@ export function createRinaFieldCrowdMazeLayout(): RinaFieldCrowdMazeLayout {
     for (const seg of passages) best = Math.min(best, distanceToSegment(x, z, seg) - seg.halfWidth);
     for (const pocket of RINA_FIELD_MAZE_RESCUE_POCKETS)
       best = Math.min(best, Math.hypot(x - pocket.point.x, z - pocket.point.z) - pocket.radius);
+    for (const turn of TURN_CLEARANCES)
+      best = Math.min(best,
+        Math.hypot(x - turn.point.x, z - turn.point.z) - turn.radius);
+    for (const relief of CORNER_RELIEFS)
+      best = Math.min(best,
+        Math.hypot(x - relief.point.x, z - relief.point.z) - relief.radius);
     best = Math.min(best, distanceToClearanceRectangle(x, z));
     return best;
   };
@@ -175,7 +198,8 @@ export function createRinaFieldCrowdMazeLayout(): RinaFieldCrowdMazeLayout {
       if (!insideBounds(x, z)) return false;
       // The crowd edge is visible at the corridor border. Keep a small
       // clearance for Lautaro without creating a wide invisible wall.
-      return marginToCrowd(x, z) > -Math.min(Math.max(0, clearance), 0.32);
+      return marginToCrowd(x, z) > -Math.min(
+        Math.max(0, clearance), PLAYER_CROWD_COLLISION_INSET);
     },
   };
 }

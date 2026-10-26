@@ -13,7 +13,7 @@ export type RinaStageAudioEnvelope = Readonly<{
   energy: number;
   bass: number;
 }>;
-import { RINA_STADIUM } from "./RinaLevelConfig";
+import { RINA_STAGE_STAIRS, RINA_STADIUM } from "./RinaLevelConfig";
 import { createRinaStageSpeakers } from "./RinaStageSpeakers";
 
 /**
@@ -318,20 +318,19 @@ export function createRinaStageArchitecture(
       runway.width - 0.54, 0.035, 0.065, i % 2 ? cyan : magenta);
   }
 
-  // Symmetric visible stairs at the sides of the existing catwalk.
-  // They are cosmetic until stadium navigation is extended in iteration 2.
-  const stairCount = mobile ? 6 : 8;
+  // Symmetric stairs share their dimensions with the walkable surface.
+  const stairCount = RINA_STAGE_STAIRS.steps[quality];
   for (const side of [-1, 1]) {
     for (let i = 0; i < stairCount; i++) {
       const stepH = mainDeckY * (i + 1) / stairCount;
-      const stepD = 0.8;
+      const stepD = RINA_STAGE_STAIRS.stepDepth;
       const stepZ = stage.frontZ - (stairCount - i - 0.5) * stepD;
-      box(`rinaV2Stair_${side}_${i}`, side * 9.0,
-        stepH / 2, stepZ, 4.3, stepH, stepD,
+      box(`rinaV2Stair_${side}_${i}`, side * RINA_STAGE_STAIRS.centerX,
+        stepH / 2, stepZ, RINA_STAGE_STAIRS.width, stepH, stepD,
         stageFloor);
-      box(`rinaV2StairNose_${side}_${i}`, side * 9.0,
+      box(`rinaV2StairNose_${side}_${i}`, side * RINA_STAGE_STAIRS.centerX,
         stepH + 0.035, stepZ - stepD / 2 + 0.10,
-        4.1, 0.075, 0.11, i % 2 ? cyan : magenta);
+        RINA_STAGE_STAIRS.width - 0.2, 0.075, 0.11, i % 2 ? cyan : magenta);
     }
   }
 

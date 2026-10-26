@@ -31,6 +31,14 @@ export const RINA_STADIUM = {
   },
 } as const;
 
+/** Shared dimensions for the visible stairs, fence openings, and player surface. */
+export const RINA_STAGE_STAIRS = {
+  centerX: 9,
+  width: 4.3,
+  stepDepth: 0.8,
+  steps: { desktop: 8, mobile: 6 },
+} as const;
+
 export const RINA_STAGE_SECURITY = {
   frontZ: RINA_STADIUM.stage.frontZ - 7.75,
   catwalkFenceHalfWidth: RINA_STADIUM.stage.catwalk.width * 0.5 + 1.15,

@@ -9,6 +9,7 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { StagePyroShow } from "../../effects/StagePyro";
+import { RinaElectricSurfaceFX } from "../../effects/RinaElectricSurfaceFX";
 import { PlayerController } from "../../PlayerController";
 import { setupPlayerViewControls } from "../../PlayerViewControls";
 import { setupMobileControls } from "../../MobileControls";
@@ -22,11 +23,13 @@ import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
 import { createRinaCrowdPreview } from "./RinaCrowdPreview";
 import { createRinaFieldCrowdMazeLayout } from "./RinaFieldCrowdMazeLayout";
 import { createRinaFieldCrowdMazeRenderer } from "./RinaFieldCrowdMazeRenderer";
+import { createRinaFieldCollisionDebug } from "./RinaFieldCollisionDebug";
 import { createRinaCornerTowerSpotlights } from "./RinaCornerTowerSpotlights";
 import { createRinaGuitarist } from "./RinaGuitarist";
 import { createRinaDrummer } from "./RinaDrummer";
 import { RINA_CONCERT_SONG, RINA_PYRO_TIMING } from "./RinaConcertConfig";
 import { createRinaLiveScreens } from "./RinaLiveScreens";
+import { createRinaAudiencePhoneIntegration } from "./RinaAudiencePhoneIntegration";
 import { attachRinaMicrophone } from "./RinaMicrophone";
 import { createRinaPerformance } from "./RinaPerformance";
 import { RINA_LEVEL_QUALITY, RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
@@ -217,12 +220,22 @@ export async function createRinaLevel(
         })
       : null;
     if (pyroAudio) cleanup.push(() => pyroAudio.dispose());
-    const playPyroBurst = () => pyroAudio?.trigger(
-      RINA_PYRO_TIMING.jetTravelTime + RINA_PYRO_TIMING.headExpandTime * 0.5
-    );
+    const audienceAudio = context.musicPlayer
+      ? await context.musicPlayer.createRinaAudienceAudio().catch(error => {
+          console.warn("Rina audience audio unavailable", error);
+          return null;
+        })
+      : null;
+    if (audienceAudio) cleanup.push(() => audienceAudio.dispose());
+    const playPyroBurst = () => {
+      const delay = RINA_PYRO_TIMING.jetTravelTime + RINA_PYRO_TIMING.headExpandTime * 0.5;
+      pyroAudio?.trigger(delay);
+      audienceAudio?.triggerPyro(delay);
+    };
     const playerWorld = new RinaStadiumWorld(
       securityBarriers.collisionSpans,
-      fieldCrowdMazeLayout
+      fieldCrowdMazeLayout,
+      context.performanceTier,
     );
 
     context.onProgress(
@@ -252,9 +265,29 @@ export async function createRinaLevel(
       RINA_STADIUM.playerSpawn.z * RINA_STADIUM_SCALE
     );
     await player.loadCharacter();
+    const collisionDebug = import.meta.env.DEV && fieldCrowdMazeLayout
+      ? createRinaFieldCollisionDebug(scene, stadiumRoot, fieldCrowdMazeLayout, playerWorld)
+      : null;
+    if (collisionDebug) cleanup.push(() => collisionDebug.dispose());
     stage.setPlayerLightMeshes(
       scene.getTransformNodeByName("playerRoot")?.getChildMeshes(false) ?? []
     );
+    const rinaElectricFX = new RinaElectricSurfaceFX(scene, {
+      createPointLight: false,
+    });
+    cleanup.push(() => rinaElectricFX.dispose());
+    rinaElectricFX.attach(player.getAvatarMeshes());
+    // The stadium glow blows out the thin filaments into a white silhouette.
+    for (const mesh of scene.meshes) {
+      if (mesh instanceof Mesh && mesh.name.startsWith("rinaElectricFX_")) {
+        glow.addExcludedMesh(mesh);
+      }
+    }
+    // Temporary visual check until Rina has a confirmed electric-hit event.
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("rinaElectricDebug")) {
+      rinaElectricFX.setImpactProvider(() => player.position);
+      rinaElectricFX.startContinuous();
+    }
 
     // This level intentionally supports only the immersive cameras discussed
     // for the recital. With isometric disabled, V cycles third <-> first.
@@ -304,17 +337,17 @@ export async function createRinaLevel(
     const guitarist = await createRinaGuitarist(scene, stage.actorLights);
     if (guitarist) {
       cleanup.push(() => guitarist.dispose());
-      for (const mesh of guitarist.meshes) glow.addExcludedMesh(mesh);
     }
     const drummer = await createRinaDrummer(scene, stage.actorLights);
     if (drummer) {
       cleanup.push(() => drummer.dispose());
-      for (const mesh of drummer.meshes) glow.addExcludedMesh(mesh);
     }
     const rinaMeshes = rina.root.getChildMeshes(false).filter(
       (mesh): mesh is Mesh => mesh instanceof Mesh && mesh.getTotalVertices() > 0
     );
-    for (const mesh of rinaMeshes) glow.addExcludedMesh(mesh);
+    // The performers must write their silhouettes into the glow layer's depth
+    // buffer, or LEDs and light shafts behind them bleed across their bodies.
+    // Their imported materials have no emissive contribution of their own.
     const rinaFill = new HemisphericLight(
       "rinaPortraitFill",
       new Vector3(0, 1, -0.25),
@@ -339,6 +372,22 @@ export async function createRinaLevel(
     );
     const liveScreens = createRinaLiveScreens(scene, rina, context.performanceTier);
     stage.setLiveFeed(liveScreens.feed);
+    const phoneStageMeshes = [
+      ...rinaMeshes,
+      scene.getMeshByName("rinaMainStage"),
+      scene.getMeshByName("rinaStageCatwalk"),
+      scene.getMeshByName("rinaStageCenterTower"),
+      ...scene.meshes.filter(mesh => mesh.name.startsWith("rinaStageCenterLed_")),
+    ].filter((mesh): mesh is Mesh => mesh instanceof Mesh);
+    const audiencePhones = await createRinaAudiencePhoneIntegration(
+      scene, context.performanceTier,
+      "phoneRigs" in crowdPreview ? crowdPreview.phoneRigs : [],
+      phoneStageMeshes, rina.root.position,
+    );
+    if ("setPhoneScreenTexture" in crowdPreview) {
+      crowdPreview.setPhoneScreenTexture(audiencePhones.phones.feed);
+    }
+    cleanup.push(() => audiencePhones.dispose());
     for (const material of scene.materials) {
       if ("maxSimultaneousLights" in material &&
           typeof material.maxSimultaneousLights === "number") {
@@ -390,7 +439,10 @@ export async function createRinaLevel(
       elapsed += dt;
 
       player.update(dt, playerWorld);
+      collisionDebug?.update(player.position);
+      rinaElectricFX.update(dt);
       const music = context.musicPlayer?.getMusicPlaybackState() ?? null;
+      audienceAudio?.update(music);
       performance.update(dt, music);
       liveScreens.update();
       const { beatPulse, strobe } = stage.update(
@@ -414,6 +466,7 @@ export async function createRinaLevel(
       stormSky.update(player.camera.globalPosition, dt);
       desktopSkyStorm?.update(player.camera.globalPosition, dt);
       crowdPreview.update(elapsed, beatPulse, music);
+      audiencePhones.update(dt, rina.root.position);
       standsCrowd.update(dt, beatPulse, music);
       enemyManager.update(dt);
       context.musicPlayer?.updateListenerPosition(player.position);
@@ -457,6 +510,7 @@ export async function createRinaLevel(
               ambientTrack: null,
               waterfallArea: null,
             });
+            audienceAudio?.start();
           }, 0);
           cleanup.push(() => window.clearTimeout(startMusicTimer));
         });

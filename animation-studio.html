@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Animation Studio · Bosque Babylon</title>
+  <link rel="stylesheet" href="/src/debug/studio/studio.css" />
+</head>
+<body>
+  <header class="studio-header">
+    <div class="studio-brand"><span class="brand-mark">◈</span><div><strong>BOSQUE BABYLON</strong><small>ANIMATION STUDIO <b>V2</b> · DEV TOOL</small></div></div>
+    <div id="studioStatus" class="studio-status">Cargá un personaje GLB con rig para comenzar.</div>
+    <div class="header-actions"><button id="saveProject">Guardar sesión</button><button id="openProject">Abrir sesión / animación</button><button id="exportRuntime" class="primary">Exportar para el juego</button></div>
+  </header>
+  <div class="studio-grid">
+    <aside class="sidebar left-sidebar">
+      <div class="section-heading"><span>01</span> PERSONAJE / RIG</div>
+      <div class="row two"><button id="loadLautaro">Lautaro</button><button id="loadSofia">Sofía</button></div>
+      <button id="loadHermanoMayor">Hermano Mayor</button>
+      <div class="row two"><button id="loadFan01">Fan 01</button><button id="loadFan02">Fan 02</button><button id="loadFan03">Fan 03</button></div>
+      <div class="row two"><button id="loadFan04">Fan 04</button><button id="loadFan05">Fan 05</button></div>
+      <label id="fanVariantRow" class="hidden">Variante del fan / LOD<select id="fanVariant"></select></label>
+      <div id="fanVariantInfo" class="help hidden"></div>
+      <label class="file-label" for="modelInput">+ Importar mi GLB (rigged)</label><input id="modelInput" type="file" accept=".glb,model/gltf-binary" />
+      <div class="help">Podés arrastrar archivos .glb directamente al visor.</div>
+      <label>Animación original<select id="baseAnimation"><option value="">Sin animación</option></select></label>
+      <div class="row compact"><label>Escala del modelo<input id="modelScale" type="number" value="1" min="0.001" max="100" step="0.05" /></label><label>Mostrar rig<input id="showSkeleton" type="checkbox" /></label></div>
+      <div class="section-heading space-top"><span>02</span> ANIMACIÓN PROCEDURAL</div>
+      <label>Vista previa<select id="proceduralView"><option value="session">Sesión / JSON abierto</option><option value="rina-photo" disabled>Rina · foto con celular (acción del juego)</option><option value="boss-pickup" disabled>Hermano Mayor · recoger hacha</option><option value="boss-attack" disabled>Hermano Mayor · atacar con hacha</option></select></label>
+      <button id="openProcedural">Abrir JSON procedural / runtime</button>
+      <button id="replayPhoto" disabled>Repetir foto</button>
+      <button id="bakePhoto" class="primary" disabled>Convertir foto en keyframes editables</button>
+      <div class="row two"><button id="analyzeAnimation">Analizar animación</button><button id="exportAnalysis">Exportar diagnóstico</button></div>
+      <div id="animationAnalysis" class="analysis-results help">El análisis revisa saltos de articulaciones, tamaño del celular y contacto de los dedos. Seleccioná un resultado para ir a ese keyframe.</div>
+      <div id="photoWorkflow" class="help">Para corregir la foto: cargá un fan con rig, elegí la acción de Rina y convertí el movimiento en keyframes. Después ajustá cada pose y exportá la sesión.</div>
+      <div id="proceduralInfo" class="help">Abrí un JSON procedural para verlo y editarlo en la línea de tiempo, o previsualizá la acción de foto del juego en un fan con rig.</div>
+      <div class="section-heading space-top"><span>03</span> HUESOS</div>
+      <input id="boneSearch" type="search" placeholder="Buscar: RightHand, spine, head..." />
+      <div id="boneList" class="bone-list"><div class="empty">Importá un rig para ver sus huesos</div></div>
+      <div class="help">Elegí un hueso y rotalo con los anillos del visor. También podés usar los campos XYZ a la derecha.</div>
+    </aside>
+    <main class="work-area">
+      <div class="viewport-wrap" id="dropZone">
+        <canvas id="studioCanvas" aria-label="Visor 3D interactivo" tabindex="0"></canvas>
+        <div class="viewport-overlay"><span class="eyebrow">EDITOR 3D</span><span id="viewportHint">Click: seleccionar articulación / objeto · Arrastrar: orbitar · Rueda: zoom</span></div>
+        <div id="multiViewLabels" class="multi-view-labels hidden"><span>Perspectiva · editable</span><span>Frente</span><span>Costado</span><span>Manos y pantalla · desde el público</span></div>
+        <div id="viewportEmpty" class="viewport-empty"><strong>Tu personaje, tus animaciones</strong><p>Importá un GLB con skeleton para editar poses sobre su animación original.<br />Los cambios se convierten en offsets procedurales.</p><label for="modelInput" class="file-label large">Elegir GLB</label></div>
+        <div id="busyOverlay" class="busy hidden">Cargando recursos 3D…</div>
+        <div class="viewport-tools"><button id="focusCamera" title="Centrar cámara">Encuadrar</button><button id="viewFront">Frente</button><button id="viewSide">Lateral</button><button id="viewBack">Espalda</button><button id="toggleMultiView">4 vistas</button><button id="toggleInspection">Ocultar controles 3D</button></div>
+      </div>
+      <div class="timeline-panel">
+        <div class="timeline-top">
+          <div class="row"><button id="rewind" title="Volver a 0">◀|</button><button id="playPause" class="primary">▶ Reproducir</button><button id="stepBack">−1f</button><button id="stepForward">+1f</button><label class="inline">Loop<input id="loop" type="checkbox" checked /></label></div>
+          <div class="row"><label class="inline">Duración <input id="duration" type="number" min="0.1" max="600" step="0.1" value="3" /></label><label class="inline">FPS <select id="fps"><option>24</option><option selected>30</option><option>60</option></select></label><label class="inline">Tiempo <input id="timeInput" type="number" min="0" max="3" step="0.033333" value="0" /></label></div>
+        </div>
+        <div class="timeline-ruler"><span>0s</span><span id="timelineEnd">3s</span></div>
+        <div class="track-wrap"><input id="timeSlider" type="range" min="0" max="3" step="0.001" value="0" aria-label="Posición en timeline" /><div id="keyTrack" class="key-track"></div></div>
+        <div class="timeline-actions"><div class="row"><button id="captureKey" class="primary">◆ Capturar keyframe</button><button id="deleteKey">Eliminar keyframe</button><label class="inline">Auto-key <input id="autoKey" type="checkbox" checked /></label><label class="inline">Suavizado <select id="easing"><option value="smooth">Smooth</option><option value="linear">Linear</option></select></label></div><span id="keyCount" class="counter">0 keys</span></div>
+        <div id="keyList" class="key-list"><span class="help">Creá keyframes en distintos tiempos para generar una animación.</span></div>
+      </div>
+    </main>
+    <aside class="sidebar right-sidebar">
+      <div class="section-heading"><span>04</span> INSPECTOR</div>
+      <div id="selectionTitle" class="selection-title">Ninguna selección</div>
+      <div id="boneInspector">
+        <div class="field-title">Rotación aditiva del hueso · grados</div>
+        <div class="xyz"><label>X<input id="boneRotX" type="number" min="-360" max="360" step="1" value="0" /></label><label>Y<input id="boneRotY" type="number" min="-360" max="360" step="1" value="0" /></label><label>Z<input id="boneRotZ" type="number" min="-360" max="360" step="1" value="0" /></label></div>
+        <div class="row"><button id="resetBone">Resetear hueso</button><button id="resetAllBones">Limpiar pose</button></div>
+        <div class="help">Los valores son diferencias respecto del movimiento original, no reemplazan el rig ni los clips Mixamo.</div>
+      </div>
+      <div class="section-heading space-top"><span>05</span> AJUSTE DE MANOS</div>
+      <div class="row two"><button id="targetRightHand">Mover mano derecha</button><button id="targetLeftHand">Mover mano izquierda</button></div>
+      <div class="xyz"><label>X<input id="handTargetX" type="number" step="0.01" /></label><label>Y<input id="handTargetY" type="number" step="0.01" /></label><label>Z<input id="handTargetZ" type="number" step="0.01" /></label></div>
+      <button id="applyHandTarget">Aplicar posición de la mano</button>
+      <div class="row two"><button id="showRightFingers">Dedos derechos</button><button id="showLeftFingers">Dedos izquierdos</button></div>
+      <div id="poseGuide" class="pose-guide">Seleccioná un fan con rig. En la foto, las manos deben quedar frente a la cara y a ambos lados del celular; la pantalla mira al fan y la cámara a Rina. Ajustá primero los brazos, luego muñecas, dedos y celular. Capturá cada cambio en el tiempo elegido.</div>
+      <div class="section-heading space-top"><span>06</span> OBJETOS / ACCESORIOS</div>
+      <div class="row two"><button id="addBox">+ Caja</button><button id="addSphere">+ Esfera</button></div>
+      <label class="file-label" for="propInput">+ Importar accesorio .glb</label><input id="propInput" type="file" accept=".glb,model/gltf-binary" />
+      <div id="propList" class="prop-list"><span class="help">Sin objetos adjuntos.</span></div>
+      <label>Vincular objeto a<select id="propBone"><option value="">Raíz del personaje</option></select></label>
+      <div class="row"><button id="gizmoMove" class="tool selected">Mover</button><button id="gizmoRotate" class="tool">Rotar</button><button id="gizmoScale" class="tool">Escalar</button><button id="removeProp" class="danger">Eliminar</button></div>
+      <div id="propInspector" class="disabled-inspector">
+        <div class="field-title">Posición local</div><div class="xyz"><label>X<input id="posX" type="number" step="0.01" /></label><label>Y<input id="posY" type="number" step="0.01" /></label><label>Z<input id="posZ" type="number" step="0.01" /></label></div>
+        <div class="field-title">Rotación local · grados</div><div class="xyz"><label>X<input id="rotX" type="number" step="1" /></label><label>Y<input id="rotY" type="number" step="1" /></label><label>Z<input id="rotZ" type="number" step="1" /></label></div>
+        <div class="field-title">Escala local</div><div class="xyz"><label>X<input id="scaleX" type="number" step="0.01" /></label><label>Y<input id="scaleY" type="number" step="0.01" /></label><label>Z<input id="scaleZ" type="number" step="0.01" /></label></div>
+      </div>
+      <div class="section-heading space-top"><span>07</span> EXPORTAR</div>
+      <label>ID de animación<input id="animationName" type="text" value="pose_corrections" /></label>
+      <button id="exportAnimationOnly">Exportar ProceduralAnimationDefinition</button>
+      <p class="help">El archivo runtime incluye los keyframes de huesos y las pistas de accesorios. El JSON de animación simple es compatible con el <code>ProceduralAnimationPlayer</code> existente.</p>
+      <details><summary>¿Cómo se integra?</summary><p class="help">No cambia el GLB original. El juego reproduce una animación base y suma offsets en los huesos. Los accesorios siguen sus huesos y pueden interpolar su posición y orientación.</p></details>
+    </aside>
+  </div>
+  <input id="sessionInput" class="hidden" type="file" accept=".json,application/json" />
+  <script type="module" src="/src/debug/studio/main.ts"></script>
+</body>
+</html>

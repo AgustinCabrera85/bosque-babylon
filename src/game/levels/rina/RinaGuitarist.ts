@@ -2,6 +2,7 @@ import "@babylonjs/loaders/glTF";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Material } from "@babylonjs/core/Materials/material";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -42,6 +43,12 @@ export async function createRinaGuitarist(scene: Scene, actorLights: readonly Li
   for (const node of container.rootNodes) node.parent = root;
   body.name = "rinaGuitaristBody";
   guitar.name = "rinaGuitaristGuitar";
+  if (body.material) {
+    // The GLB marks the body BLEND although its color texture has no alpha.
+    body.material.transparencyMode = Material.MATERIAL_OPAQUE;
+    body.material.alpha = 1;
+    body.material.forceDepthWrite = true;
+  }
   for (const mesh of meshes) {
     mesh.isPickable = false;
     mesh.checkCollisions = false;

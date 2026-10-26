@@ -1,6 +1,7 @@
 import "@babylonjs/core/Meshes/thinInstanceMesh";
 import "@babylonjs/loaders/glTF";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -10,6 +11,7 @@ import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Light } from "@babylonjs/core/Lights/light";
 import type { Scene } from "@babylonjs/core/scene";
+import type { BaseTexture } from "@babylonjs/core/Materials/Textures/baseTexture";
 import type { MusicPlaybackState } from "../../MusicPlayer";
 import { asset } from "../../../utils/asset";
 import { RINA_CROWD_FANS } from "./crowd/RinaCrowdAssetManifest";
@@ -24,16 +26,29 @@ import { getRinaFieldCrowdClipPools, getRinaFieldCrowdCue } from "./RinaFieldCro
 /** Field-only crowd. All positions come from the same layout used by collision. */
 export interface RinaFieldCrowdMazeRenderHandle {
   readonly root: TransformNode;
+  /** Individually animated hero spectators reserved for hand-held phones. */
+  readonly phoneRigs: readonly RinaFieldPhoneRig[];
   /** Resolves once LOD assets and their thin instance buffers are ready. */
   readonly ready: Promise<void>;
   readonly stats: Readonly<{
     silhouettes: number; perimeterCandidates: number; staticFans: number;
     rigVariantsRequested: number; lod2Rim: number; lod2Core: number;
     lod1Animated: number; trianglesEstimated: number; sectors: number;
+    recordingPhones: number;
   }>;
   update(elapsed: number, beatPulse: number, music: MusicPlaybackState | null): void;
+  /** Reuses the one low-resolution stage capture used by the animated fans. */
+  setPhoneScreenTexture(texture: BaseTexture | null): void;
   setEnabled(enabled: boolean): void;
   dispose(): void;
+}
+
+export interface RinaFieldPhoneRig {
+  readonly id: string;
+  readonly fanId: string;
+  readonly mesh: Mesh;
+  readonly clips: readonly AnimationGroup[];
+  setPhotoActionActive(active: boolean): void;
 }
 
 export const RINA_FIELD_CROWD_MAZE_RENDER_CONFIG = {
@@ -42,7 +57,7 @@ export const RINA_FIELD_CROWD_MAZE_RENDER_CONFIG = {
   desktop: { spacing: 1.00, keep: 0.88, staticFansMax: 6000,
     animatedFansMax: 1000, animatedRigKinds: 5 },
   mobile: { spacing: 1.45, keep: 0.72, staticFansMax: 3000,
-    animatedFansMax: 0, animatedRigKinds: 0 },
+    animatedFansMax: 0, animatedRigKinds: 3 },
   rimOffset: 0.13,
   rimSpacing: 0.72,
   rimDedupeDistance: 0.49,
@@ -52,8 +67,6 @@ export const RINA_FIELD_CROWD_MAZE_RENDER_CONFIG = {
   proximityBetweenSameFan: 2.25,
 } as const;
 
-/** Markers at the actual analytical collision boundary, useful while tuning. */
-export const DEBUG_RINA_MAZE_COLLISION = false;
 /** Local development switch. Off fails visibly instead of restoring procedural people. */
 export const USE_FIELD_CROWD_LOD = true;
 
@@ -62,6 +75,18 @@ type FigurePlacement = CrowdFootprint & { y: number; yaw: number; scale: number;
 type StaticSource = {
   fanId: string; filename: string; container: AssetContainer; mesh: Mesh;
   worldHeight: number; triangles: number;
+};
+
+// Measured from the matching LOD2 baked vertices. LOD1 and LOD2 preserve
+// vertex order, so the LOD1 hand weights identify each static palm/fingers.
+// Coordinates are relative to model height, with Y measured from its feet.
+// Use only poses where an open hand can touch the frame without hiding the
+// display; the rally fist and low cheer hands remain phone-free.
+const RECORDING_PHONE_GRIPS: Readonly<Record<string, readonly [number, number, number]>> = {
+  "fan_02:clap": [-0.094, 0.977, 0.095], // right edge between thumb and index
+  "fan_03:cheer": [-0.160, 0.975, -0.075], // right thumb and index on the edge
+  "fan_04:cheer": [0.086, 1.003, -0.061], // left edge between thumb and index
+  "fan_04:clap": [-0.112, 0.952, 0.212], // right edge between thumb and index
 };
 
 function rng(seed: number) {
@@ -170,8 +195,22 @@ export function createRinaFieldCrowdMazeRenderer(
   const motion = new RinaFieldCrowdMotionController(performanceTier);
   const staticContainers: AssetContainer[] = [];
   const staticBatches: Mesh[] = [];
+  const recordingPhoneMeshes: Mesh[] = [];
+  const recordingPhoneBodyMaterial = new StandardMaterial("rinaIslandPhoneBody", scene);
+  recordingPhoneBodyMaterial.diffuseColor = new Color3(0.012, 0.016, 0.02);
+  recordingPhoneBodyMaterial.specularColor = new Color3(0.04, 0.04, 0.05);
+  const recordingPhoneScreenMaterial = new StandardMaterial("rinaIslandPhoneScreen", scene);
+  recordingPhoneScreenMaterial.diffuseColor = Color3.White();
+  recordingPhoneScreenMaterial.specularColor = Color3.Black();
+  recordingPhoneScreenMaterial.emissiveColor = Color3.Black();
+  recordingPhoneScreenMaterial.disableLighting = true;
+  recordingPhoneScreenMaterial.backFaceCulling = false;
+  recordingPhoneScreenMaterial.fogEnabled = false;
+  const phoneRigs: RinaFieldPhoneRig[] = [];
+  const usedPhoneRim: FigurePlacement[] = [];
   let disposed = false;
   let staticFans = 0, lod2Rim = 0, lod2Core = 0, lod1Animated = 0;
+  let recordingPhones = 0;
   let trianglesEstimated = 0;
 
   // Keep the old deterministic placement sequence, including its style draw.
@@ -200,28 +239,28 @@ export function createRinaFieldCrowdMazeRenderer(
       yaw: (random() - .5) * .34, scale: .95 + random() * .11, style });
   }
 
-  if (DEBUG_RINA_MAZE_COLLISION) {
-    const eps = .08;
-    const lines = rim.map(p => {
-      const gx = layout.marginToCrowd(p.x + eps, p.z) - layout.marginToCrowd(p.x - eps, p.z);
-      const gz = layout.marginToCrowd(p.x, p.z + eps) - layout.marginToCrowd(p.x, p.z - eps);
-      const size = Math.max(.00001, Math.hypot(gx, gz));
-      const offset = RINA_FIELD_CROWD_MAZE_RENDER_CONFIG.rimOffset + .32;
-      const x = p.x - gx / size * offset, z = p.z - gz / size * offset;
-      return [new Vector3(x, .10, z), new Vector3(x, .75, z)];
-    });
-    const debug = MeshBuilder.CreateLineSystem("rinaMazeBoundaryDebug", { lines }, scene);
-    debug.color = new Color3(1, .10, .12);
-    debug.isPickable = false;
-    debug.parent = root;
+  // The rim is the visible edge of the real crowd. These slots stay out of
+  // the thin-instance batches so each phone has its own animated skeleton.
+  const phoneTargets = [
+    { x: -3, z: -32 }, { x: 9, z: -24 }, { x: -11, z: -17 },
+    { x: 8, z: -9 }, { x: -6, z: -2 }, { x: 12, z: 5 },
+    { x: -12, z: 12 }, { x: 7, z: 19 },
+  ];
+  const phoneRim: FigurePlacement[] = [];
+  for (const target of phoneTargets.slice(0, performanceTier === "mobile" ? 3 : 8)) {
+    const candidate = [...rim].sort((a, b) =>
+      (a.x - target.x) ** 2 + (a.z - target.z) ** 2 -
+      ((b.x - target.x) ** 2 + (b.z - target.z) ** 2))
+      .find(p => spaced(p, phoneRim, 4));
+    if (candidate) phoneRim.push(candidate);
   }
-
-  // A few shared rigs occupy distinct rim slots. Unavailable LOD1 assets do
-  // not reserve those positions: LOD2 will fill the space instead.
+  // A few shared rigs occupy other distinct rim slots. Unavailable LOD1
+  // assets do not reserve those positions: LOD2 fills the space instead.
   const animatedRim: FigurePlacement[] = [];
   for (let i = 0; i < rim.length && animatedRim.length < settings.animatedFansMax; i++) {
     const candidate = rim[(i * 37) % rim.length];
-    if (spaced(candidate, animatedRim, RINA_FIELD_CROWD_MAZE_RENDER_CONFIG.proximityBetweenRigged)) {
+    if (spaced(candidate, animatedRim, RINA_FIELD_CROWD_MAZE_RENDER_CONFIG.proximityBetweenRigged)
+      && spaced(candidate, phoneRim, 0.8)) {
       animatedRim.push(candidate);
     }
   }
@@ -229,6 +268,7 @@ export function createRinaFieldCrowdMazeRenderer(
   type AnimatedGroup = {
     clips: readonly AnimationGroup[]; playingIndex: number; chorusMode: boolean | null;
     calmClips: readonly number[]; chorusClips: readonly number[];
+    photoActionActive?: boolean;
   };
   const animated: AnimatedGroup[] = [];
   const playOnlyClip = (clips: readonly AnimationGroup[], index: number) => {
@@ -272,14 +312,14 @@ export function createRinaFieldCrowdMazeRenderer(
   const ready = (async () => {
     const staticRequests = RINA_FIELD_CROWD_LODS.flatMap(fan =>
       fan.static.map(filename => loadStaticSource(fan.id, filename)));
-    const rigRequests = performanceTier === "mobile" ? [] :
-      RINA_FIELD_CROWD_LODS.slice(0, settings.animatedRigKinds).map(async fanLod => {
+    const rigRequests = RINA_FIELD_CROWD_LODS.slice(0, settings.animatedRigKinds).map(async (fanLod, index) => {
         const fan = RINA_CROWD_FANS.find(item => item.id === fanLod.id);
         if (!fan) return null;
         try {
-          const groups = await registry.loadAnimated(fan, "middle", 1,
+          const groups = await registry.loadAnimated(fan, "middle",
+            performanceTier === "mobile" ? 1 : index < 3 ? 3 : 2,
             `${RINA_FIELD_CROWD_LOD_DIR}${fanLod.animated}`);
-          return groups?.[0] ? { fan, group: groups[0] } : null;
+          return groups?.[0] ? { fan, groups } : null;
         } catch (error) {
           console.warn(`Rina field LOD1 ${fanLod.animated} unavailable`, error);
           return null;
@@ -292,13 +332,14 @@ export function createRinaFieldCrowdMazeRenderer(
     const sources = staticResults.filter((source): source is StaticSource => source !== null);
     if (!sources.length) throw new Error("Rina field crowd: no LOD2 models loaded");
     const rigs = rigResults.filter((result): result is NonNullable<typeof result> => result !== null);
-    const activeAnimated = rigs.length ? animatedRim : [];
+    const activeAnimated = performanceTier === "mobile" ? [] : rigs.length ? animatedRim : [];
     const rigSlots = new Map<string, FigurePlacement[]>();
     for (const { fan } of rigs) rigSlots.set(fan.id, []);
     for (let i = 0; i < activeAnimated.length; i++) {
       rigSlots.get(rigs[i % rigs.length].fan.id)!.push(activeAnimated[i]);
     }
-    for (const { fan, group } of rigs) {
+    for (const { fan, groups } of rigs) {
+      const group = groups[0];
       const members = rigSlots.get(fan.id)!;
       if (!members.length) { group.mesh.setEnabled(false); continue; }
       for (const node of group.roots) node.parent = root;
@@ -330,13 +371,54 @@ export function createRinaFieldCrowdMazeRenderer(
       trianglesEstimated += members.length * Math.floor((mesh.getIndices()?.length ?? 0) / 3);
     }
 
+    for (let i = 0; i < phoneRim.length; i++) {
+      const rig = rigs[i % rigs.length];
+      if (!rig) break;
+      const group = rig.groups[performanceTier === "mobile"
+        ? 0 : 1 + Math.floor(i / rigs.length)];
+      if (!group) continue;
+      const p = phoneRim[i];
+      const mesh = group.mesh;
+      const height = Math.max(.001, mesh.getBoundingInfo().boundingBox.extendSize.y * 2);
+      const placement = new TransformNode(`rinaPhoneFanPlacement_${rig.fan.id}`, scene);
+      placement.parent = root;
+      placement.position.set(p.x, 0, p.z);
+      placement.rotation.y = p.yaw;
+      for (const node of group.roots) node.parent = placement;
+      // The GLB has an Armature node scaled to 0.01. Measure its composed
+      // world matrix after parenting; sizing from raw mesh bounds alone would
+      // make the fan and its hand bones a hundred times too small.
+      mesh.computeWorldMatrix(true);
+      const matrix = mesh.getWorldMatrix().m;
+      const importedHeight = height * Math.hypot(matrix[4], matrix[5], matrix[6]);
+      placement.scaling.setAll(rig.fan.targetWorldHeight / Math.max(.001, importedHeight));
+      const pools = getRinaFieldCrowdClipPools(group.clips.map(clip => clip.name));
+      playOnlyClip(group.clips, pools.calm[0]);
+      const animatedGroup: AnimatedGroup = { clips: group.clips,
+        playingIndex: pools.calm[0], chorusMode: null,
+        calmClips: pools.calm, chorusClips: pools.chorus };
+      animated.push(animatedGroup);
+      phoneRigs.push({ id: `${rig.fan.id}-${i}`, fanId: rig.fan.id,
+        mesh, clips: group.clips,
+        setPhotoActionActive(active) {
+          if (animatedGroup.photoActionActive === active) return;
+          animatedGroup.photoActionActive = active;
+          if (active) group.clips[animatedGroup.playingIndex].pause();
+          else group.clips[animatedGroup.playingIndex].play(false);
+        } });
+      usedPhoneRim.push(p);
+      lod1Animated++;
+      trianglesEstimated += Math.floor((mesh.getIndices()?.length ?? 0) / 3);
+    }
+
     // The previous 1100-person cap sampled only the rim and the first thin
     // strip of the core, leaving most of the former procedural crowd empty.
     // Use the original deterministic slots throughout the field. Only the
     // slots replaced by a rigged fan are removed to avoid double characters.
     const replacementRadius = 0.65;
-    const selectedRim = rim.filter(p => spaced(p, activeAnimated, replacementRadius));
-    const selectedCore = core.filter(p => spaced(p, activeAnimated, replacementRadius));
+    const reserved = [...activeAnimated, ...usedPhoneRim];
+    const selectedRim = rim.filter(p => spaced(p, reserved, replacementRadius));
+    const selectedCore = core.filter(p => spaced(p, reserved, replacementRadius));
     if (selectedRim.length + selectedCore.length > settings.staticFansMax) {
       throw new Error(`Rina field crowd has ${selectedRim.length + selectedCore.length} LOD2 slots, ` +
         `exceeding the configured ${performanceTier} ceiling of ${settings.staticFansMax}`);
@@ -367,6 +449,62 @@ export function createRinaFieldCrowdMazeRenderer(
     };
     assign(selectedRim, "rim");
     assign(selectedCore, "core");
+
+    const addRecordingPhones = (source: StaticSource,
+      placements: readonly FigurePlacement[], grip: readonly [number, number, number]) => {
+      // The LOD2 crowd is a baked mesh. These particular variants already
+      // have raised hands; put a phone against one palm and move it with the same
+      // foot-pivot sway as its owner. One body and one display draw all copies.
+      if (!placements.length) return;
+      // The phone lives under stadiumRoot (scale 1.5), while the imported
+      // fan's thin-instance matrix cancels that parent scale. Match the
+      // fan's final world height before applying the shared parent transform.
+      const height = source.worldHeight / RINA_STADIUM_SCALE;
+      const width = height * 0.045;
+      const phoneHeight = height * 0.083;
+      const bounds = source.mesh.getBoundingInfo().boundingBox;
+      const modelHeight = Math.max(0.001, bounds.maximum.y - bounds.minimum.y);
+      const centerX = grip[0] * height;
+      const centerY = (bounds.minimum.y + grip[1] * modelHeight) * height / modelHeight;
+      const centerZ = grip[2] * height;
+      const body = MeshBuilder.CreateBox(`rinaIslandPhoneBody_${source.fanId}_${source.filename}`,
+        { width, height: phoneHeight, depth: height * 0.005 }, scene);
+      body.position.set(centerX, centerY, centerZ);
+      body.bakeCurrentTransformIntoVertices();
+      body.material = recordingPhoneBodyMaterial;
+      const screen = MeshBuilder.CreatePlane(`rinaIslandPhoneScreen_${source.fanId}_${source.filename}`,
+        { width: width * 0.87, height: phoneHeight * 0.87 }, scene);
+      // The spectator is behind the device (-Z); the camera faces Rina (+Z).
+      screen.position.set(centerX, centerY, centerZ - height * 0.0031);
+      screen.bakeCurrentTransformIntoVertices();
+      screen.material = recordingPhoneScreenMaterial;
+      for (const mesh of [body, screen]) {
+        mesh.parent = root;
+        mesh.isPickable = false;
+        mesh.checkCollisions = false;
+        mesh.receiveShadows = false;
+        mesh.alwaysSelectAsActiveMesh = true;
+        const matrices = new Float32Array(placements.length * 16);
+        for (let i = 0; i < placements.length; i++) {
+          const p = placements[i];
+          const scale = .97 + (p.scale - .92) / .17 * .06;
+          Matrix.Compose(new Vector3(scale, scale, scale),
+            Quaternion.RotationAxis(Vector3.Up(), p.yaw),
+            new Vector3(p.x, 0, p.z)).copyToArray(matrices, i * 16);
+        }
+        mesh.thinInstanceSetBuffer("matrix", matrices, 16, false);
+        mesh.thinInstanceRefreshBoundingInfo(true, true);
+        motion.trackCore(mesh, placements.map(p => {
+          const depth = Math.max(0, Math.min(1,
+            (layout.marginToCrowd(p.x, p.z) - 0.35) / 4.0));
+          const smoothDepth = depth * depth * (3 - 2 * depth);
+          return { ...p, scale: .97 + (p.scale - .92) / .17 * .06,
+            intensity: 1.35 - 0.95 * smoothDepth };
+        }), matrices);
+        recordingPhoneMeshes.push(mesh);
+      }
+      recordingPhones += placements.length;
+    };
 
     for (const [source, regions] of bySource) {
       const members = [...regions.rim, ...regions.core];
@@ -415,27 +553,45 @@ export function createRinaFieldCrowdMazeRenderer(
       for (const light of actorLights) light.includedOnlyMeshes.push(mesh);
       staticBatches.push(mesh);
       trianglesEstimated += members.length * source.triangles;
+
+      // Only baked poses with a genuinely raised palm get a phone. Other
+      // cheer poses keep their original animation without a floating device.
+      const pose = /_Static_(cheer|clap|rally)_/.exec(source.filename)?.[1];
+      const grip = pose && RECORDING_PHONE_GRIPS[`${source.fanId}:${pose}`];
+      if (grip) {
+        const chance = performanceTier === "mobile" ? 0.38 : 0.55;
+        const withPhones = regions.core.filter(p => {
+          const n = Math.sin(p.x * 37.719 + p.z * 113.53 + source.fanId.length * 17) * 43758.5453;
+          return n - Math.floor(n) < chance;
+        });
+        addRecordingPhones(source, withPhones, grip);
+      }
     }
     lod2Rim = selectedRim.length;
     lod2Core = selectedCore.length;
     staticFans = lod2Rim + lod2Core;
     console.info("Rina field crowd LOD", { coreCandidates: core.length, rimCandidates: rim.length,
       lod1Animated, lod2Rim, lod2Core,
-      sectors: staticBatches.length, trianglesEstimated, lego: 0 });
+      sectors: staticBatches.length, trianglesEstimated, recordingPhones, lego: 0 });
   })();
 
   return {
-    root, ready,
+    root, ready, phoneRigs,
+    setPhoneScreenTexture(texture) {
+      if (!disposed) recordingPhoneScreenMaterial.emissiveTexture = texture;
+    },
     get stats() {
       return { silhouettes: 0, perimeterCandidates: rim.length, staticFans,
         rigVariantsRequested: settings.animatedRigKinds, lod2Rim, lod2Core,
-        lod1Animated, trianglesEstimated, sectors: staticBatches.length };
+        lod1Animated, trianglesEstimated, sectors: staticBatches.length,
+        recordingPhones };
     },
     update(elapsed, beatPulse, music) {
       if (disposed || !root.isEnabled()) return;
       const cue = getRinaFieldCrowdCue(music);
       const inChorus = cue.chorus >= .55;
       for (const group of animated) {
+        if (group.photoActionActive) continue;
         const pool = inChorus ? group.chorusClips : group.calmClips;
         if (group.chorusMode !== inChorus) {
           group.chorusMode = inChorus;
@@ -458,6 +614,9 @@ export function createRinaFieldCrowdMazeRenderer(
         light.includedOnlyMeshes = light.includedOnlyMeshes.filter(mesh =>
           !staticBatches.some(batch => batch === mesh));
       }
+      for (const mesh of recordingPhoneMeshes) mesh.dispose(false, false);
+      recordingPhoneBodyMaterial.dispose(false, false);
+      recordingPhoneScreenMaterial.dispose(false, false);
       for (const container of staticContainers) container.dispose();
       registry.dispose();
       root.dispose(false, false);

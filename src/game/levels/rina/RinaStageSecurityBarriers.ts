@@ -7,7 +7,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import { asset } from "../../../utils/asset";
-import { RINA_STAGE_SECURITY, RINA_STADIUM } from "./RinaLevelConfig";
+import { RINA_STAGE_SECURITY, RINA_STAGE_STAIRS, RINA_STADIUM } from "./RinaLevelConfig";
 
 const MODEL_FILE = "vallado_shaded.glb";
 const MODEL_ROOT = "assets/models/rina/";
@@ -17,8 +17,8 @@ export const RINA_STAGE_BARRIER_PROFILE = {
   frontOffsetFromStage: RINA_STADIUM.stage.frontZ - RINA_STAGE_SECURITY.frontZ,
   innerWingStart: RINA_STAGE_SECURITY.catwalkFenceHalfWidth,
   catwalkTipZ: RINA_STAGE_SECURITY.catwalkFenceTipZ,
-  stairCenterX: 9,
-  stairWidth: 4.3,
+  stairCenterX: RINA_STAGE_STAIRS.centerX,
+  stairWidth: RINA_STAGE_STAIRS.width,
   stairGapExtra: 1.42,
   outerWingEnd: RINA_STADIUM.stage.width * 0.5 - 2.1,
   innerReturnEndOffset: 1.6,

@@ -1,5 +1,6 @@
 import { asset } from "../utils/asset";
 import { loadRinaPyroAudio, type RinaPyroAudioHandle } from "./audio/RinaPyroAudio";
+import { loadRinaAudienceAudio, type RinaAudienceAudioHandle } from "./audio/RinaAudienceAudio";
 
 const MASTER_VOLUME_KEY = "bosque.masterVolume";
 const MUSIC_VOLUME_KEY = "bosque.musicVolume";
@@ -85,6 +86,7 @@ export type MusicPlayerHandle = {
   getMusicPlaybackState: () => MusicPlaybackState;
   getSfxVolume: () => number;
   createRinaPyroAudio: () => Promise<RinaPyroAudioHandle | null>;
+  createRinaAudienceAudio: () => Promise<RinaAudienceAudioHandle | null>;
   dispose: () => void;
 };
 
@@ -201,6 +203,7 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   let waterfallArea: WaterfallAudioArea | null = null;
   let waterfallProximity = 0;
   let disposed = false;
+  const rinaAudienceAudio = new Set<RinaAudienceAudioHandle>();
   const abortController = new AbortController();
   const signal = abortController.signal;
 
@@ -545,6 +548,8 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
   }
 
   function prepareForLevelTransition() {
+    for (const audience of rinaAudienceAudio) audience.dispose();
+    rinaAudienceAudio.clear();
     clearAmbientReplayTimer();
     setFootstepMode("idle");
     skyEyeMusicActive = false;
@@ -583,6 +588,9 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
       ambient.volume = effectiveVolume;
       ambient.muted = effectiveVolume <= 0;
       updateWaterfallVolume();
+      for (const audience of rinaAudienceAudio) {
+        audience.setVolume(getEffectiveVolume("ambient"));
+      }
       if (save) localStorage.setItem(AMBIENT_VOLUME_KEY, String(next));
       renderBinding(ambientSlider, next);
     }
@@ -722,6 +730,18 @@ export function setupMusicPlayer(): MusicPlayerHandle | null {
         audio.dispose();
         return null;
       }
+      return audio;
+    },
+    async createRinaAudienceAudio() {
+      if (disposed) return null;
+      const context = ensureAudioContext();
+      const audio = await loadRinaAudienceAudio(context, context.destination);
+      if (disposed) {
+        audio.dispose();
+        return null;
+      }
+      audio.setVolume(getEffectiveVolume("ambient"));
+      rinaAudienceAudio.add(audio);
       return audio;
     },
     getMusicPlaybackState() {

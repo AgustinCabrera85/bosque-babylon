@@ -2,9 +2,10 @@ import "@babylonjs/loaders/glTF";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Material } from "@babylonjs/core/Materials/material";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Light } from "@babylonjs/core/Lights/light";
 import type { Scene } from "@babylonjs/core/scene";
 import { asset } from "../../../utils/asset";
@@ -31,9 +32,8 @@ export async function createRinaDrummer(scene: Scene, actorLights: readonly Ligh
   );
   const body = meshes.find(mesh => mesh.name.includes("tripo_node_"));
   const kit = meshes.filter(mesh => mesh !== body);
-  const armature = container.transformNodes.find(node => node.name === "Armature");
   const playing = container.animationGroups.find(group => group.name === "Tocando");
-  if (!body?.skeleton || kit.length === 0 || !armature || !playing) {
+  if (!body?.skeleton || kit.length === 0 || !playing) {
     container.dispose();
     throw new Error("Rina drummer: expected a skinned musician, drum kit and Tocando clip");
   }
@@ -41,11 +41,15 @@ export async function createRinaDrummer(scene: Scene, actorLights: readonly Ligh
   container.addAllToScene();
   const root = new TransformNode("rinaDrummerRoot", scene);
   for (const node of container.rootNodes) node.parent = root;
-  // The source rig faces away from the audience while the drum front faces it.
-  // Turn the rig around its own pivot without moving the static drum kit.
-  armature.rotationQuaternion = Quaternion.RotationAxis(Vector3.Up(), Math.PI)
-    .multiply(armature.rotationQuaternion ?? Quaternion.Identity());
+  // Rotate the performer and drum kit together below. An extra armature turn
+  // would cancel that audience-facing yaw for the performer alone.
   body.name = "rinaDrummerBody";
+  if (body.material) {
+    // The source body is incorrectly tagged BLEND despite an RGB color map.
+    body.material.transparencyMode = Material.MATERIAL_OPAQUE;
+    body.material.alpha = 1;
+    body.material.forceDepthWrite = true;
+  }
   kit.forEach((mesh, index) => { mesh.name = `rinaDrumKit_${index}`; });
   playing.name = "rinaDrummerTocando";
   for (const mesh of meshes) {

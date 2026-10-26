@@ -15,6 +15,9 @@ const PORTAL_SCALE = 18;
 const PORTAL_BASE_Y = 2.05;
 const PLAYER_RADIUS = 0.45;
 
+/** Narrowest clear span between the lower stone uprights, in arch-local X. */
+export const PORTAL_CLEAR_OPENING = { left: -0.135, right: 0.145 } as const;
+
 export function collidesWithPortalStone(
   stop: SanctuaryStop, worldX: number, worldZ: number,
   additionalClearance = 0, minY?: number, maxY?: number,

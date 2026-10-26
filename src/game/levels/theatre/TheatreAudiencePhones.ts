@@ -50,6 +50,8 @@ export type TheatrePhoneHolder = {
   scale?: number;          // default 1; source phone is already ~14.4 cm tall
   /** Call your EXISTING additive Mixamo/procedural upper-body pose logic here. */
   onPoseWeight?: (weight: number, phase: PhotoPhase) => void;
+  /** Fired once when this phone actually takes a photo. */
+  onShutter?: () => void;
 };
 
 export type TheatrePhonesOptions = {
@@ -78,6 +80,8 @@ export type TheatrePhonesHandle = {
   setEnabled(enabled: boolean): void;
   /** Forces a shot for QA / debug; omit id to use the first phone. */
   triggerPhoto(id?: string): void;
+  /** Permanently removes one phone holder after its spectator leaves the scene. */
+  retire(id: string): void;
   setFeedEnabled(enabled: boolean): void;
   setFeedRefreshFrames(frames: number): void;
   setFeedResolution(width: number, height: number): void;
@@ -96,6 +100,7 @@ type RuntimeHolder = {
   phaseDuration: number;
   flashed: boolean;
   flashRemaining: number;
+  retired: boolean;
 };
 
 function createRandom(seed: number) {
@@ -150,6 +155,7 @@ export async function createTheatreAudiencePhones(
       setStageMeshes() {},
       setEnabled() {},
       triggerPhoto() {},
+      retire() {},
       setFeedEnabled() {},
       setFeedRefreshFrames() {},
       setFeedResolution() {},
@@ -297,6 +303,7 @@ export async function createTheatreAudiencePhones(
         phaseDuration: 0.6 + random() * 14, // stagger first poses
         flashed: false,
         flashRemaining: 0,
+        retired: false,
       };
       runtimes.push(runtime);
       wrapper.setEnabled(false);
@@ -323,6 +330,7 @@ export async function createTheatreAudiencePhones(
       if (!litPhone || litPhone.flashRemaining <= 0) {
         litPhone = phone;
       }
+      phone.descriptor.onShutter?.();
     };
 
     const update = (dtSeconds: number) => {
@@ -330,6 +338,7 @@ export async function createTheatreAudiencePhones(
       const dt = Math.max(0, Math.min(0.1, dtSeconds));
       flashCooldown = Math.max(0, flashCooldown - dt);
       for (const phone of runtimes) {
+        if (phone.retired) continue;
         phone.timeInPhase += dt;
         if (phone.phase === "shot" && !phone.flashed) {
           if (flashCooldown > 0) phone.timeInPhase = 0;
@@ -414,11 +423,26 @@ export async function createTheatreAudiencePhones(
       },
       triggerPhoto(id) {
         if (disposed || !enabled) return;
-        const candidate = id ? runtimes.find((item) => item.descriptor.id === id) : runtimes[0];
-        if (!candidate) return;
+        const candidate = id ? runtimes.find((item) => item.descriptor.id === id)
+          : runtimes.find(item => !item.retired);
+        if (!candidate || candidate.retired) return;
         setPhase(candidate, "raise", 0.95 + random() * 0.20);
         candidate.wrapper.setEnabled(true);
         candidate.descriptor.onPoseWeight?.(0, "raise");
+      },
+      retire(id) {
+        const candidate = runtimes.find(item => item.descriptor.id === id);
+        if (!candidate || candidate.retired) return;
+        candidate.retired = true;
+        candidate.phase = "idle";
+        candidate.flashRemaining = 0;
+        candidate.wrapper.setEnabled(false);
+        candidate.flare.setEnabled(false);
+        candidate.descriptor.onPoseWeight?.(0, "idle");
+        if (litPhone === candidate) {
+          light.intensity = 0;
+          litPhone = undefined;
+        }
       },
       setFeedEnabled(value) {
         if (!rtt || disposed || feedEnabled === value) return;

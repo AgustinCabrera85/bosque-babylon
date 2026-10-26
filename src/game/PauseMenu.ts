@@ -195,7 +195,8 @@ export function setupPauseMenu({
     const locked = document.pointerLockElement === canvas;
     const overlayOpen =
       document.body.classList.contains("inventory-open") ||
-      document.body.classList.contains("inspector-open");
+      document.body.classList.contains("inspector-open") ||
+      document.body.classList.contains("sanctuary-portal-confirm-open");
     if (wasPointerLocked && !locked && !paused && !overlayOpen) {
       ignoreEscapeUntil = performance.now() + 250;
       setPaused(true);

@@ -543,6 +543,21 @@ export class PlayerController {
     });
   }
 
+  /** Advance an authored walk while gameplay input is locked for a short cinematic. */
+  driveCinematicWalkTo(
+    x: number, y: number, z: number,
+    facingYaw: number, deltaTime: number, walking: boolean,
+  ) {
+    if (!this.cinematicSequenceActive) return;
+    this.root.position.set(x, y, z);
+    const turn = Math.atan2(Math.sin(facingYaw - this.yaw), Math.cos(facingYaw - this.yaw));
+    this.yaw += turn * Math.min(1, deltaTime * 7);
+    this.applyCameraRig();
+    this.playAnimation(walking ? "walk" : "idle", true, 0.18);
+    this.updateMovementSfx(walking ? "walk" : "idle");
+    this.updateAnimationFade(deltaTime);
+  }
+
   onViewModeChange(listener: (mode: ViewMode) => void) {
     this.viewModeListeners.add(listener);
     listener(this.viewMode);
@@ -751,12 +766,14 @@ export class PlayerController {
         roll,
         fieldOfView,
       };
-      return;
+    } else {
+      this.cinematicCameraState.worldPosition.copyFrom(worldPosition);
+      this.cinematicCameraState.worldTarget.copyFrom(worldTarget);
+      this.cinematicCameraState.roll = roll;
+      this.cinematicCameraState.fieldOfView = fieldOfView;
     }
-    this.cinematicCameraState.worldPosition.copyFrom(worldPosition);
-    this.cinematicCameraState.worldTarget.copyFrom(worldTarget);
-    this.cinematicCameraState.roll = roll;
-    this.cinematicCameraState.fieldOfView = fieldOfView;
+    // Externally driven cinematics do not run PlayerController.update().
+    this.positionCinematicCamera();
   }
 
   /** Restores gameplay and blends from the last cinematic frame to the player rig. */
@@ -1853,21 +1870,7 @@ export class PlayerController {
     this.configureCameraProjection();
     if (this.cinematicCameraState) {
       this.resetThirdPersonCameraCollisionState();
-      this.root.computeWorldMatrix(true);
-      const inverse = this.root.getWorldMatrix().clone().invert();
-      this.camera.position.copyFrom(
-        Vector3.TransformCoordinates(
-          this.cinematicCameraState.worldPosition,
-          inverse
-        )
-      );
-      const localTarget = Vector3.TransformCoordinates(
-        this.cinematicCameraState.worldTarget,
-        inverse
-      );
-      this.lookAtLocal(localTarget);
-      this.camera.rotation.z = this.cinematicCameraState.roll;
-      this.camera.fov = this.cinematicCameraState.fieldOfView;
+      this.positionCinematicCamera();
       return;
     }
     if (this.neckGrabCameraActive) {
@@ -1926,6 +1929,19 @@ export class PlayerController {
       Vector3.TransformCoordinates(terrainSafePosition, inverse)
     );
     this.orientCameraForView(target);
+  }
+
+  private positionCinematicCamera() {
+    const framing = this.cinematicCameraState;
+    if (!framing) return;
+    this.root.computeWorldMatrix(true);
+    const inverse = this.root.getWorldMatrix().clone().invert();
+    this.camera.position.copyFrom(
+      Vector3.TransformCoordinates(framing.worldPosition, inverse)
+    );
+    this.lookAtLocal(Vector3.TransformCoordinates(framing.worldTarget, inverse));
+    this.camera.rotation.z = framing.roll;
+    this.camera.fov = framing.fieldOfView;
   }
 
   private beginNeckGrabSideCamera(attackerPosition: Vector3) {

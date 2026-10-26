@@ -61,8 +61,10 @@ export async function createRinaAudiencePhoneIntegration(
   candidates: readonly RinaFieldPhoneRig[],
   stageMeshes: readonly AbstractMesh[],
   singerPosition: Vector3,
+  onPhotoTaken?: (worldFootPosition: Vector3, candidate: RinaFieldPhoneRig) => void,
 ): Promise<{ phones: TheatrePhonesHandle; update(dt: number, target: Vector3): void; dispose(): void }> {
   const poses: PhonePose[] = [];
+  const photographerPosition = Vector3.Zero();
   const holders = candidates.flatMap(candidate => {
     const required = ["rightShoulder", "rightArm", "rightForeArm", "rightHand",
       "rightHandThumb1", "rightHandIndex1", "rightHandMiddle1",
@@ -95,6 +97,10 @@ export async function createRinaAudiencePhoneIntegration(
     return [{ id: candidate.id, handAnchor: anchor,
       scale: fanHeight / 1.6,
       positionOffset: grip.anchor.clone(), rotationOffset: grip.rotation.clone(),
+      onShutter() {
+        candidate.getWorldFootPositionToRef(photographerPosition);
+        onPhotoTaken?.(photographerPosition, candidate);
+      },
       onPoseWeight(weight: number, phase: PhotoPhase) {
         pose.weight = weight;
         pose.phase = phase;

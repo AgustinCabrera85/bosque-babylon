@@ -13,6 +13,8 @@ import {
   hasReachedForestCrossingTrigger,
 } from "../src/game/levels/HermanoMayorForestCrossingCinematic";
 import { hasCrossedLuminousLevelExitPortal } from "../src/game/levels/LuminousLevelExitPortal";
+import { hasLeftSanctuaryPortalApproach, isAtSanctuaryPortalApproach } from "../src/game/levels/sanctuary/SanctuaryPortalAccess";
+import { SANCTUARY_STOPS } from "../src/game/levels/sanctuary/SanctuaryLayout";
 
 type FakeScene = {
   isDisposed: boolean;
@@ -32,6 +34,22 @@ const createScene = (): FakeScene => ({
 });
 
 const scenes: FakeScene[] = [];
+
+for (const stop of SANCTUARY_STOPS) {
+  const x = stop.x + stop.side * 49;
+  const z = stop.z + 8;
+  const inFront = x - stop.side * 5;
+  assert.equal(isAtSanctuaryPortalApproach(stop, inFront, z),
+    stop.destination !== null, `${stop.id} must only prompt when a chapter exists`);
+  assert.equal(isAtSanctuaryPortalApproach(stop, x + stop.side * 1, z), false,
+    `${stop.id} must not prompt from behind`);
+  assert.equal(isAtSanctuaryPortalApproach(stop, inFront, z + stop.side * 3), false,
+    `${stop.id} must not prompt beside its stone upright`);
+  assert.equal(isAtSanctuaryPortalApproach(stop, x - stop.side * 9, z), false,
+    `${stop.id} must wait until the player approaches`);
+  assert.equal(hasLeftSanctuaryPortalApproach(stop, inFront, z), false);
+  assert.equal(hasLeftSanctuaryPortalApproach(stop, x - stop.side * 9, z), true);
+}
 const disposedByLevel = new Map<LevelId, number>();
 const createLevel = (id: LevelId): GameLevel => {
   const scene = createScene();

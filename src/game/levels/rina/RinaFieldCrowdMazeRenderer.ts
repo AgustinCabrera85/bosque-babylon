@@ -48,7 +48,9 @@ export interface RinaFieldPhoneRig {
   readonly fanId: string;
   readonly mesh: Mesh;
   readonly clips: readonly AnimationGroup[];
+  getWorldFootPositionToRef(result: Vector3): void;
   setPhotoActionActive(active: boolean): void;
+  retire(): void;
 }
 
 export const RINA_FIELD_CROWD_MAZE_RENDER_CONFIG = {
@@ -269,6 +271,7 @@ export function createRinaFieldCrowdMazeRenderer(
     clips: readonly AnimationGroup[]; playingIndex: number; chorusMode: boolean | null;
     calmClips: readonly number[]; chorusClips: readonly number[];
     photoActionActive?: boolean;
+    retired?: boolean;
   };
   const animated: AnimatedGroup[] = [];
   const playOnlyClip = (clips: readonly AnimationGroup[], index: number) => {
@@ -398,13 +401,26 @@ export function createRinaFieldCrowdMazeRenderer(
         playingIndex: pools.calm[0], chorusMode: null,
         calmClips: pools.calm, chorusClips: pools.chorus };
       animated.push(animatedGroup);
+      let retired = false;
       phoneRigs.push({ id: `${rig.fan.id}-${i}`, fanId: rig.fan.id,
         mesh, clips: group.clips,
+        getWorldFootPositionToRef(result) {
+          placement.computeWorldMatrix(true);
+          result.copyFrom(placement.getAbsolutePosition());
+        },
         setPhotoActionActive(active) {
+          if (retired) return;
           if (animatedGroup.photoActionActive === active) return;
           animatedGroup.photoActionActive = active;
           if (active) group.clips[animatedGroup.playingIndex].pause();
           else group.clips[animatedGroup.playingIndex].play(false);
+        },
+        retire() {
+          if (retired) return;
+          retired = true;
+          animatedGroup.retired = true;
+          for (const clip of group.clips) clip.stop();
+          placement.setEnabled(false);
         } });
       usedPhoneRim.push(p);
       lod1Animated++;
@@ -591,7 +607,7 @@ export function createRinaFieldCrowdMazeRenderer(
       const cue = getRinaFieldCrowdCue(music);
       const inChorus = cue.chorus >= .55;
       for (const group of animated) {
-        if (group.photoActionActive) continue;
+        if (group.photoActionActive || group.retired) continue;
         const pool = inChorus ? group.chorusClips : group.calmClips;
         if (group.chorusMode !== inChorus) {
           group.chorusMode = inChorus;

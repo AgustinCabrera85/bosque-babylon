@@ -21,6 +21,7 @@ export class RinaController extends BaseEnemyController {
   private readonly lighting: RinaMaterialLighting;
   private readonly scene: Scene;
   private readonly eyeObserver: Observer<Scene>;
+  private focusTarget: Vector3 | null = null;
 
   constructor(
     context: EnemyControllerContext,
@@ -45,13 +46,13 @@ export class RinaController extends BaseEnemyController {
     this.look = new HermanoMayorLookAction(
       context.scene, this.root, this.asset.meshes, {}, { allowBodyTurn: false }
     );
-    this.look.setTargetProvider(() => this.getPlayerPosition?.() ?? null);
+    this.look.setTargetProvider(() => this.focusTarget ?? this.getPlayerPosition?.() ?? null);
     this.lighting = new RinaMaterialLighting(this.asset.materials, this.root, config.height);
     // Resolve the eyes after the shared head overlay updates the animated pose.
     this.eyeObserver = context.scene.onAfterAnimationsObservable.add(() => {
       if (!this.enabled) return;
       this.eyes.update(
-        this.getPlayerPosition?.() ?? null,
+        this.focusTarget ?? this.getPlayerPosition?.() ?? null,
         Math.min(context.scene.getEngine().getDeltaTime() * 0.001, 0.05)
       );
     });
@@ -59,6 +60,14 @@ export class RinaController extends BaseEnemyController {
 
   /** Standing height including any spawn-time root scale. */
   get height() { return this.config.height * Math.abs(this.root.scaling.y); }
+
+  /** Overrides the usual player gaze while a scripted action has a target. */
+  public setFocusTarget(target: Vector3 | null) {
+    if (target) {
+      if (this.focusTarget) this.focusTarget.copyFrom(target);
+      else this.focusTarget = target.clone();
+    } else this.focusTarget = null;
+  }
 
   public async initialize() {
     this.assertUsable();

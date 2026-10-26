@@ -37,6 +37,7 @@ export type SanctuaryGeometry = {
   orbs: Map<SanctuaryPillarId, OrbVisual>;
   cloudMode: SanctuaryCloudMode;
   waterMode: "reflective" | "lightweight";
+  triggerPortalRipple(id: string, playerPosition: Vector3): void;
   update(dt: number, elapsed: number, progress: SanctuaryProgress, playerPosition: Vector3): void;
 };
 
@@ -921,6 +922,7 @@ export async function createSanctuaryGeometry(scene: Scene, progress: SanctuaryP
     orbs,
     cloudMode: clouds.mode,
     waterMode: water.quality,
+    triggerPortalRipple(id, playerPosition) { levelPortals.triggerRipple(id, playerPosition); },
     update(dt, elapsed, currentProgress, playerPosition) {
       portalFloorLight.update(elapsed);
       portalInnerFloorLight.update(elapsed);

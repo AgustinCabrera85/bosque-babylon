@@ -1,6 +1,7 @@
 export type LevelTransitionOverlayHandle = {
   readonly isActive: boolean;
-  cover(): Promise<void>;
+  cover(options?: { tone?: "white" | "black"; durationMs?: number; liquidTint?: string }): Promise<void>;
+  handoff(): void;
   reveal(): Promise<void>;
   dispose(): void;
 };
@@ -30,7 +31,7 @@ function waitForOpacityTransition(element: HTMLElement, fallbackMs: number) {
   });
 }
 
-/** Full-screen white bridge that can safely cover asynchronous level loading. */
+/** Opaque bridge for level changes. It can reveal a loading screen underneath. */
 export function setupLevelTransitionOverlay(): LevelTransitionOverlayHandle {
   const overlay = document.createElement("div");
   overlay.id = "levelTransitionOverlay";
@@ -56,17 +57,28 @@ export function setupLevelTransitionOverlay(): LevelTransitionOverlayHandle {
       return active && !disposed;
     },
 
-    async cover() {
+    async cover(options = {}) {
       if (disposed || active) return;
       active = true;
       setDocumentBusy(true);
+      overlay.classList.toggle("black", options.tone === "black");
+      overlay.style.setProperty("--portal-cover-duration", `${options.durationMs ?? COVER_DURATION_MS}ms`);
+      overlay.style.setProperty("--portal-liquid-tint", options.liquidTint ?? "#b974f2");
       overlay.setAttribute("aria-hidden", "false");
       overlay.classList.remove("covered", "revealing");
       overlay.classList.add("active");
       await nextFrame();
       if (disposed) return;
       overlay.classList.add("covered");
-      await waitForOpacityTransition(overlay, COVER_DURATION_MS);
+      await waitForOpacityTransition(overlay, options.durationMs ?? COVER_DURATION_MS);
+    },
+
+    handoff() {
+      if (disposed || !active) return;
+      overlay.classList.remove("active", "covered", "revealing");
+      overlay.setAttribute("aria-hidden", "true");
+      active = false;
+      setDocumentBusy(false);
     },
 
     async reveal() {

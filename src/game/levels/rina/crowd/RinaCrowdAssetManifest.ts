@@ -6,6 +6,7 @@ export const RINA_ANIMATED_FAN_CLEARANCE = 1.8;
 export interface RinaCrowdFanAsset {
   readonly id: string;
   readonly type: "spectator";
+  readonly gender: "male" | "female";
   readonly targetWorldHeight: number;
   /** Present on fans whose original rig should animate in the stands. */
   readonly animationNames?: readonly string[];
@@ -26,6 +27,7 @@ export const RINA_CROWD_FANS: readonly RinaCrowdFanAsset[] = [
   {
     id: "fan_01",
     type: "spectator",
+    gender: "male",
     // Lautaro is about 2.68 m tall in this level.
     targetWorldHeight: 2.65,
     animationNames: [
@@ -53,6 +55,7 @@ export const RINA_CROWD_FANS: readonly RinaCrowdFanAsset[] = [
   {
     id: "fan_02",
     type: "spectator",
+    gender: "male",
     targetWorldHeight: 2.55,
     animationNames: [
       "fan_02_happy_idle_inplace",
@@ -78,6 +81,7 @@ export const RINA_CROWD_FANS: readonly RinaCrowdFanAsset[] = [
   {
     id: "fan_03",
     type: "spectator",
+    gender: "male",
     targetWorldHeight: 2.80,
     animationNames: [
       "fan_03_happy_idle_inplace",
@@ -103,6 +107,7 @@ export const RINA_CROWD_FANS: readonly RinaCrowdFanAsset[] = [
   {
     id: "fan_04",
     type: "spectator",
+    gender: "female",
     targetWorldHeight: 2.50,
     animationNames: [
       "fan_04_cheering_inplace",
@@ -127,6 +132,7 @@ export const RINA_CROWD_FANS: readonly RinaCrowdFanAsset[] = [
   {
     id: "fan_05",
     type: "spectator",
+    gender: "female",
     targetWorldHeight: 2.50,
     animationNames: [
       "fan_05_cheering_inplace",

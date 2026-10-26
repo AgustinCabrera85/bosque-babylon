@@ -4,10 +4,13 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
+import { Engine } from "@babylonjs/core/Engines/engine";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { Material } from "@babylonjs/core/Materials/material";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { StagePyroShow } from "../../effects/StagePyro";
 import { RinaElectricSurfaceFX } from "../../effects/RinaElectricSurfaceFX";
 import { PlayerController } from "../../PlayerController";
@@ -32,6 +35,8 @@ import { createRinaLiveScreens } from "./RinaLiveScreens";
 import { createRinaAudiencePhoneIntegration } from "./RinaAudiencePhoneIntegration";
 import { attachRinaMicrophone } from "./RinaMicrophone";
 import { createRinaPerformance } from "./RinaPerformance";
+import { RinaSingingPointAction } from "./RinaSingingPointAction";
+import { RinaPhotoAbsorption } from "./RinaPhotoAbsorption";
 import { RINA_LEVEL_QUALITY, RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
 import { createRinaStadiumGeometry } from "./RinaStadiumGeometry";
 import { RinaStadiumWorld } from "./RinaStadiumWorld";
@@ -345,6 +350,63 @@ export async function createRinaLevel(
     const rinaMeshes = rina.root.getChildMeshes(false).filter(
       (mesh): mesh is Mesh => mesh instanceof Mesh && mesh.getTotalVertices() > 0
     );
+    const leftHand = rina.rig.getJointNode("leftHand");
+    if (!leftHand) throw new Error("Rina's left hand is required for her electric attack");
+    const rinaHandElectricFX = new RinaElectricSurfaceFX(scene, {
+      regionRadius: 0.42,
+      parameters: {
+        colorHex: "#9637F2", emission: 0.78, halo: 0.2,
+        lightIntensity: 1.2, lightRange: 0.95,
+      },
+    });
+    cleanup.push(() => rinaHandElectricFX.dispose());
+    rinaHandElectricFX.attach(rinaMeshes);
+    // GlowLayer reads emissive colour without the shader's world-space hand
+    // mask. Exclude the skinned clones so it cannot light Rina's whole body.
+    for (const mesh of scene.meshes) {
+      if (mesh instanceof Mesh && mesh.name.startsWith("rinaElectricFX_")) {
+        glow.addExcludedMesh(mesh);
+      }
+    }
+    rinaHandElectricFX.setImpactProvider(() => {
+      leftHand.computeWorldMatrix(true);
+      return leftHand.getAbsolutePosition();
+    });
+    const handHaloTexture = new DynamicTexture(
+      "rinaElectricHandHaloTexture", { width: 64, height: 64 }, scene, false
+    );
+    const haloContext = handHaloTexture.getContext();
+    const haloGradient = haloContext.createRadialGradient(32, 32, 1, 32, 32, 32);
+    haloGradient.addColorStop(0, "rgba(226,167,255,0.96)");
+    haloGradient.addColorStop(0.25, "rgba(158,64,246,0.66)");
+    haloGradient.addColorStop(0.6, "rgba(112,28,194,0.22)");
+    haloGradient.addColorStop(1, "rgba(112,28,194,0)");
+    haloContext.fillStyle = haloGradient;
+    haloContext.fillRect(0, 0, 64, 64);
+    handHaloTexture.hasAlpha = true;
+    handHaloTexture.update(false);
+    const handHaloMaterial = new StandardMaterial("rinaElectricHandHaloMaterial", scene);
+    handHaloMaterial.disableLighting = true;
+    handHaloMaterial.diffuseTexture = handHaloTexture;
+    handHaloMaterial.useAlphaFromDiffuseTexture = true;
+    handHaloMaterial.emissiveColor = Color3.FromHexString("#9637F2");
+    handHaloMaterial.disableDepthWrite = true;
+    handHaloMaterial.backFaceCulling = false;
+    handHaloMaterial.alphaMode = Engine.ALPHA_ADD;
+    handHaloMaterial.transparencyMode = Material.MATERIAL_ALPHABLEND;
+    const handHalo = MeshBuilder.CreatePlane(
+      "rinaElectricHandHalo", { size: 0.78 }, scene
+    );
+    handHalo.billboardMode = Mesh.BILLBOARDMODE_ALL;
+    handHalo.material = handHaloMaterial;
+    handHalo.isPickable = false;
+    handHalo.setEnabled(false);
+    glow.addExcludedMesh(handHalo);
+    cleanup.push(() => {
+      handHalo.dispose(false, false);
+      handHaloMaterial.dispose(false, false);
+      handHaloTexture.dispose();
+    });
     // The performers must write their silhouettes into the glow layer's depth
     // buffer, or LEDs and light shafts behind them bleed across their bodies.
     // Their imported materials have no emissive contribution of their own.
@@ -365,11 +427,37 @@ export async function createRinaLevel(
       blendingSpeed: 0.06,
       speedRatio: 0.96,
     });
+    const singingPoint = new RinaSingingPointAction(scene, rina);
+    cleanup.push(() => singingPoint.dispose());
+    let handEffectRunning = false;
     const performance = createRinaPerformance(
       rina,
       stage.rinaPosition.scale(RINA_STADIUM_SCALE),
-      stage.catwalkSingerPosition.scale(RINA_STADIUM_SCALE)
+      stage.catwalkSingerPosition.scale(RINA_STADIUM_SCALE),
+      singingPoint
     );
+    // The phone shutter passes its NPC's world foot position here.
+    scene.metadata ??= {};
+    const photoAttack = {
+      lastShutterFanId: null as string | null,
+      lastReactedFanId: null as string | null,
+      trigger: (photographerWorldPosition: Vector3, force = false) =>
+        performance.pointAtPhotographer(photographerWorldPosition, force),
+      get active() { return singingPoint.active; },
+      get pointing() { return singingPoint.pointing; },
+      get weight() { return singingPoint.blendWeight; },
+      get elapsed() { return singingPoint.attackElapsed; },
+    };
+    scene.metadata.rinaPhotoAttack = photoAttack;
+    if (import.meta.env.DEV) {
+      const previewPoint = (event: KeyboardEvent) => {
+        if (event.code === "F10" && !event.repeat) {
+          performance.pointAtPhotographer(player.position, true);
+        }
+      };
+      window.addEventListener("keydown", previewPoint);
+      cleanup.push(() => window.removeEventListener("keydown", previewPoint));
+    }
     const liveScreens = createRinaLiveScreens(scene, rina, context.performanceTier);
     stage.setLiveFeed(liveScreens.feed);
     const phoneStageMeshes = [
@@ -379,11 +467,48 @@ export async function createRinaLevel(
       scene.getMeshByName("rinaStageCenterTower"),
       ...scene.meshes.filter(mesh => mesh.name.startsWith("rinaStageCenterLed_")),
     ].filter((mesh): mesh is Mesh => mesh instanceof Mesh);
+    let absorption: RinaPhotoAbsorption | null = null;
     const audiencePhones = await createRinaAudiencePhoneIntegration(
       scene, context.performanceTier,
       "phoneRigs" in crowdPreview ? crowdPreview.phoneRigs : [],
       phoneStageMeshes, rina.root.position,
+      (photographerWorldPosition, candidate) => {
+        photoAttack.lastShutterFanId = candidate.id;
+        if (photoAttack.trigger(photographerWorldPosition)) {
+          photoAttack.lastReactedFanId = candidate.id;
+          absorption?.start(candidate);
+        }
+      },
     );
+    absorption = new RinaPhotoAbsorption(scene, rina, singingPoint, glow,
+      id => audiencePhones.phones.retire(id), rinaMeshes);
+    const photoAbsorption = absorption;
+    cleanup.push(() => photoAbsorption.dispose());
+    scene.metadata.rinaAbsorption = {
+      get phase() { return photoAbsorption.phase; },
+      get victimId() { return photoAbsorption.activeVictimId; },
+      get color() { return photoAbsorption.activeColor; },
+      get chargeElapsed() { return photoAbsorption.chargeElapsed; },
+      get arcVisible() { return photoAbsorption.arcVisible; },
+      get arcEndpoints() { return photoAbsorption.arcEndpoints?.map(point => point.asArray()) ?? null; },
+      get arcMidpoint() { return photoAbsorption.arcMidpoint?.asArray() ?? null; },
+      get victimTarget() { return photoAbsorption.victimTarget?.asArray() ?? null; },
+      get lastTransformationAt() { return photoAbsorption.lastTransformationAt; },
+      get orbPosition() { return photoAbsorption.orbPosition?.asArray() ?? null; },
+      get lastAbsorbedId() { return photoAbsorption.lastAbsorbedId; },
+      get lastAbsorbedColor() { return photoAbsorption.lastAbsorbedColor; },
+      triggerFan(id: string) {
+        const candidate = "phoneRigs" in crowdPreview
+          ? crowdPreview.phoneRigs.find(rig => rig.id === id) : null;
+        if (!candidate || !photoAbsorption.canStart(candidate)) return false;
+        const position = Vector3.Zero();
+        candidate.getWorldFootPositionToRef(position);
+        if (!photoAttack.trigger(position, true)) return false;
+        if (!photoAbsorption.start(candidate)) return false;
+        photoAttack.lastReactedFanId = candidate.id;
+        return true;
+      },
+    };
     if ("setPhoneScreenTexture" in crowdPreview) {
       crowdPreview.setPhoneScreenTexture(audiencePhones.phones.feed);
     }
@@ -444,6 +569,26 @@ export async function createRinaLevel(
       const music = context.musicPlayer?.getMusicPlaybackState() ?? null;
       audienceAudio?.update(music);
       performance.update(dt, music);
+      const handEnergy = singingPoint.blendWeight;
+      rinaHandElectricFX.setStrength(handEnergy);
+      if (handEnergy > 0.02 && !handEffectRunning) {
+        rinaHandElectricFX.startContinuous();
+        handEffectRunning = true;
+      } else if (!singingPoint.active && handEffectRunning) {
+        rinaHandElectricFX.stop(0.3);
+        handEffectRunning = false;
+      }
+      rinaHandElectricFX.update(dt);
+      photoAbsorption.update(dt);
+      handHalo.setEnabled(handEnergy > 0.01);
+      if (handEnergy > 0.01) {
+        leftHand.computeWorldMatrix(true);
+        handHalo.position.copyFrom(leftHand.getAbsolutePosition());
+        const pulse = 0.78 + 0.22 * Math.sin(elapsed * 15) +
+          0.1 * Math.sin(elapsed * 31);
+        handHalo.visibility = Math.min(1, handEnergy * Math.max(0.4, pulse) * 1.25);
+        handHalo.scaling.setAll(0.96 + 0.12 * Math.sin(elapsed * 15 + 0.3));
+      }
       liveScreens.update();
       const { beatPulse, strobe } = stage.update(
         dt, music, rina.root.position.z / RINA_STADIUM_SCALE,

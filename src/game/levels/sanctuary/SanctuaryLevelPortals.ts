@@ -4,7 +4,7 @@ import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial";
 import { Constants } from "@babylonjs/core/Engines/constants";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Vector2, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
@@ -16,7 +16,7 @@ import type { SanctuaryStop } from "./SanctuaryLayout";
 import { createSanctuaryForestPortal, FOREST_PORTAL_PANEL } from "./SanctuaryForestPortal";
 import { createSanctuaryRinaPortalV2 } from "./SanctuaryRinaPortalV2";
 import { SanctuaryPortalStoneContact } from "./SanctuaryPortalStoneContact";
-import { PORTAL_STONE_BLOCKS } from "./SanctuaryPortalCollisions";
+import { PORTAL_CLEAR_OPENING, PORTAL_STONE_BLOCKS } from "./SanctuaryPortalCollisions";
 
 const VERTEX = `
 precision highp float;
@@ -30,6 +30,79 @@ void main(void) {
   vUV = uv;
   vWorld = (world * vec4(position, 1.0)).xyz;
   gl_Position = worldViewProjection * vec4(position, 1.0);
+}
+`;
+
+// The ripple begins around the entering avatar, then travels across the
+// portal. Coordinates are scaled to the opening's physical width and height
+// so a head, shoulders, arms and legs form one continuous wave origin.
+const ENTRY_RIPPLE_SILHOUETTE = `
+float capsuleDistance(vec2 p, vec2 a, vec2 b, float radius) {
+  vec2 ab = b - a;
+  return length(p - a - ab * clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0)) - radius;
+}
+float silhouetteDistance(vec2 uv, vec2 impact) {
+  vec2 p = vec2((uv.x - impact.x) * 0.3333, uv.y - impact.y);
+  float head = length(p - vec2(0.0, 0.066)) - 0.019;
+  float torso = capsuleDistance(p, vec2(0.0, 0.035), vec2(0.0, -0.034), 0.026);
+  float leftArm = capsuleDistance(p, vec2(-0.022, 0.026), vec2(-0.048, -0.030), 0.011);
+  float rightArm = capsuleDistance(p, vec2(0.022, 0.026), vec2(0.048, -0.030), 0.011);
+  float leftLeg = capsuleDistance(p, vec2(-0.014, -0.033), vec2(-0.023, -0.106), 0.012);
+  float rightLeg = capsuleDistance(p, vec2(0.014, -0.033), vec2(0.023, -0.106), 0.012);
+  return min(min(min(head, torso), min(leftArm, rightArm)), min(leftLeg, rightLeg));
+}
+`;
+
+const ENTRY_RIPPLE_VERTEX = `
+precision highp float;
+attribute vec3 position;
+attribute vec2 uv;
+uniform mat4 worldViewProjection;
+uniform float uTime;
+uniform float uStrength;
+uniform float uDepth;
+uniform vec2 uImpact;
+varying vec2 vUV;
+${ENTRY_RIPPLE_SILHOUETTE}
+void main(void) {
+  vUV = uv;
+  float distanceFromBody = max(silhouetteDistance(uv, uImpact), 0.0);
+  float front = distanceFromBody - max(0.0, uTime - 0.09) * 0.38;
+  float wave = exp(-pow(front / 0.014, 2.0));
+  float wake = exp(-pow((front + 0.043) / 0.020, 2.0));
+  float edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+  float fixedFrame = smoothstep(0.0, 0.06, edge);
+  vec3 displaced = position;
+  displaced.z -= uDepth * uStrength * fixedFrame *
+    (wave + wake * 0.35);
+  gl_Position = worldViewProjection * vec4(displaced, 1.0);
+}
+`;
+
+const ENTRY_RIPPLE_FRAGMENT = `
+precision highp float;
+varying vec2 vUV;
+uniform float uTime;
+uniform float uStrength;
+uniform vec3 uTint;
+uniform vec2 uImpact;
+${ENTRY_RIPPLE_SILHOUETTE}
+void main(void) {
+  float signedBodyDistance = silhouetteDistance(vUV, uImpact);
+  float distanceFromBody = max(signedBodyDistance, 0.0);
+  float front = distanceFromBody - max(0.0, uTime - 0.09) * 0.38;
+  float first = exp(-pow(front / 0.011, 2.0));
+  float second = exp(-pow((front + 0.047) / 0.014, 2.0));
+  float third = exp(-pow((front + 0.096) / 0.019, 2.0));
+  float bodyHalo = exp(-pow((signedBodyDistance - 0.014) / 0.010, 2.0)) *
+    exp(-uTime * 2.7);
+  float waves = first + second * 0.42 + third * 0.16;
+  float edge = min(min(vUV.x, 1.0 - vUV.x), min(vUV.y, 1.0 - vUV.y));
+  float aperture = smoothstep(0.0, 0.045, edge);
+  float alpha = clamp((waves * 0.46 + bodyHalo * 0.43) *
+    uStrength * aperture, 0.0, 0.68);
+  vec3 color = uTint * (0.65 + first * 0.35);
+  gl_FragColor = vec4(color, alpha);
 }
 `;
 
@@ -245,6 +318,63 @@ function createLevelPortalSurface(scene: Scene, name: string, parent: TransformN
   return mesh;
 }
 
+function createEntryRippleSurface(scene: Scene, name: string, parent: TransformNode) {
+  const columns = 28;
+  const rows = 44;
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  for (let row = 0; row <= rows; row++) {
+    const v = row / rows;
+    const y = FOREST_PORTAL_PANEL.bottom +
+      (FOREST_PORTAL_PANEL.top - FOREST_PORTAL_PANEL.bottom) * v;
+    for (let column = 0; column <= columns; column++) {
+      const u = column / columns;
+      positions.push(PORTAL_CLEAR_OPENING.left +
+        (PORTAL_CLEAR_OPENING.right - PORTAL_CLEAR_OPENING.left) * u, y, 0);
+      uvs.push(u, v);
+      if (row === rows || column === columns) continue;
+      const a = row * (columns + 1) + column;
+      const b = a + columns + 1;
+      indices.push(a, a + 1, b, a + 1, b + 1, b);
+    }
+  }
+  const mesh = new Mesh(name, scene);
+  const data = new VertexData();
+  data.positions = positions;
+  data.uvs = uvs;
+  data.indices = indices;
+  data.applyToMesh(mesh);
+  mesh.parent = parent;
+  mesh.isPickable = false;
+  mesh.checkCollisions = false;
+  return mesh;
+}
+
+function createEntryRipple(scene: Scene, root: TransformNode, stop: SanctuaryStop) {
+  const mesh = createEntryRippleSurface(scene, `${stop.id}_entryLiquidRipple`, root);
+  mesh.position.z = 0.012;
+  mesh.alphaIndex = 1003;
+  mesh.isVisible = false;
+  const material = new ShaderMaterial(`${stop.id}_entryLiquidRippleMaterial`, scene,
+    { vertexSource: ENTRY_RIPPLE_VERTEX, fragmentSource: ENTRY_RIPPLE_FRAGMENT },
+    { attributes: ["position", "uv"], uniforms: ["world", "worldViewProjection",
+      "uTime", "uStrength", "uDepth", "uTint", "uImpact"], needAlphaBlending: true });
+  material.backFaceCulling = false;
+  material.disableDepthWrite = true;
+  material.fogEnabled = false;
+  material.setColor3("uTint", stop.id === "libre-de-culpas"
+    ? new Color3(0.48, 0.78, 0.88)
+    : stop.id === "rina" ? new Color3(0.88, 0.38, 1)
+      : new Color3(1, 0.36, 0.53));
+  material.setFloat("uTime", 0);
+  material.setFloat("uStrength", 0);
+  material.setFloat("uDepth", 0.018);
+  material.setVector2("uImpact", new Vector2(0.5, 0.11));
+  mesh.material = material;
+  return { mesh, material, elapsed: -1 };
+}
+
 function createLockedPlaceholder(scene: Scene, root: TransformNode, id: string) {
   const mesh = createLevelPortalSurface(scene, `${id}_lockedVeil`, root);
   mesh.position.z = 0.03;
@@ -434,6 +564,7 @@ export async function createSanctuaryLevelPortals(scene: Scene, stops: readonly 
 
   const vortexMaterials: ShaderMaterial[] = [];
   const veils: { stop: SanctuaryStop; mesh: Mesh; material: ShaderMaterial;
+    entryRipple: ReturnType<typeof createEntryRipple> | null;
     light: PointLight; contactLights: PointLight[];
     stoneContacts: SanctuaryPortalStoneContact[];
     edgeGlow: ReturnType<typeof createPortalEdgeGlow>;
@@ -509,6 +640,7 @@ export async function createSanctuaryLevelPortals(scene: Scene, stops: readonly 
     }
     const { mesh: veil, material: veilMaterial } =
       createLockedPlaceholder(scene, root, stop.id);
+    const entryRipple = stop.destination ? createEntryRipple(scene, root, stop) : null;
     const edgeGlow = createPortalEdgeGlow(scene, root, stop);
     const light = new PointLight(`${stop.id}_portalInnerStoneLight`,
       new Vector3(root.position.x - stop.side * 0.8, 9.2, root.position.z), scene);
@@ -554,13 +686,33 @@ export async function createSanctuaryLevelPortals(scene: Scene, stops: readonly 
     }
     const floorSpill = createFloorSpill(scene, stop, root.position.x);
     const lightVolume = createLightVolume(scene, stop, root.position.x);
-    veils.push({ stop, mesh: veil, material: veilMaterial, light, contactLights,
+    veils.push({ stop, mesh: veil, material: veilMaterial, entryRipple, light, contactLights,
       stoneContacts, edgeGlow,
       floorSpill, lightVolume,
       opacity: 1, near: false });
   });
 
   return {
+    triggerRipple(id: string, playerPosition: Vector3) {
+      const veil = veils.find((candidate) => candidate.stop.id === id);
+      const ripple = veil?.entryRipple;
+      if (!ripple) return;
+      const stop = veil.stop;
+      const localX = stop.side * (playerPosition.z - (stop.z + 8)) / 18;
+      const u = (localX - PORTAL_CLEAR_OPENING.left) /
+        (PORTAL_CLEAR_OPENING.right - PORTAL_CLEAR_OPENING.left);
+      const localY = (playerPosition.y - 0.7 - 2.05) / 18;
+      const v = (localY - FOREST_PORTAL_PANEL.bottom) /
+        (FOREST_PORTAL_PANEL.top - FOREST_PORTAL_PANEL.bottom);
+      ripple.elapsed = 0;
+      ripple.mesh.isVisible = true;
+      ripple.material.setVector2("uImpact", new Vector2(
+        Math.max(0.14, Math.min(0.86, u)),
+        Math.max(0.11, Math.min(0.76, v)),
+      ));
+      ripple.material.setFloat("uTime", 0);
+      ripple.material.setFloat("uStrength", 0.35);
+    },
     update(elapsed: number, dt: number, playerPosition: Vector3) {
       const camera = scene.activeCamera?.globalPosition ?? Vector3.Zero();
       vortexMaterials.forEach((material, index) => {
@@ -568,6 +720,17 @@ export async function createSanctuaryLevelPortals(scene: Scene, stops: readonly 
         material.setVector3("uCameraPosition", camera);
       });
       for (const veil of veils) {
+        const ripple = veil.entryRipple;
+        if (ripple && ripple.elapsed >= 0) {
+          ripple.elapsed += dt;
+          const phase = Math.min(1, ripple.elapsed / 1.15);
+          ripple.material.setFloat("uTime", ripple.elapsed);
+          ripple.material.setFloat("uStrength", Math.sin(phase * Math.PI) * 1.5);
+          if (phase >= 1) {
+            ripple.mesh.isVisible = false;
+            ripple.elapsed = -1;
+          }
+        }
         const dx = playerPosition.x - (veil.stop.x + veil.stop.side * 49);
         const dz = playerPosition.z - (veil.stop.z + 8);
         const distanceSquared = dx * dx + dz * dz;

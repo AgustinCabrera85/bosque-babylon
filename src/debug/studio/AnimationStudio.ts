@@ -474,9 +474,11 @@ export class AnimationStudio {
           if(rotation)this.photoBaseRotations.set(bone.name,rotation.clone());
         }
       });
+      const photoMesh=model.mesh;
       const preview=await createRinaAudiencePhoneIntegration(this.scene,"desktop",[
-        {id:`studio-${fanId}`,fanId,mesh:model.mesh,clips:model.groups,
-          setPhotoActionActive:()=>{}},
+        {id:`studio-${fanId}`,fanId,mesh:photoMesh,clips:model.groups,
+          getWorldFootPositionToRef:result=>{result.copyFrom(photoMesh.getAbsolutePosition());},
+          setPhotoActionActive:()=>{},retire:()=>{}},
       ],[],this.photoTarget);
       if(this.disposed||ticket!==this.generation||this.current!==model){preview.dispose();return;}
       this.photoPreview=preview;

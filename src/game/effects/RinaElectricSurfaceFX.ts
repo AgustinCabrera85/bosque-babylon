@@ -80,6 +80,8 @@ export interface RinaElectricSurfaceFXOptions {
   atlasUrl?: string;
   /** Reject transparent or facial meshes as needed without modifying them. */
   includeMesh?: (mesh: Mesh) => boolean;
+  /** Limit the surface effect to a moving point, such as Rina's hand. */
+  regionRadius?: number;
   parameters?: Partial<ElectricSurfaceParameters>;
 }
 
@@ -187,6 +189,8 @@ const ELECTRIC_FRAGMENT_BODY = /* glsl */ `
     float flicker = 0.82 + 0.18 * abs(sin(uArcTime * 37.0 + vElectricRest.y * 23.0));
     float strength = clamp(uArcPulse * reveal * flicker, 0.0, 1.0);
     float coverage = clamp((edge * 0.72 + halo * 0.20) * strength, 0.0, 1.0);
+    coverage *= 1.0 - smoothstep(uArcRegionRadius * 0.55,
+      uArcRegionRadius, distance(vElectricWorld, uArcImpact));
     if (coverage < 0.018) discard;
     vec3 energyColor = mix(uArcColor, vec3(1.0, 0.96, 1.0), core * 0.89);
     energyColor *= (0.45 + uArcEmission * 0.65) * (0.55 + core * 1.2);
@@ -228,6 +232,7 @@ function makeMaterial(
     uArcNoiseWarp: 0.42, uArcLayerSecondary: 0.74,
     uArcLayerTertiary: 0.20, uArcMicroDensity: 1.95,
     uArcMicroScale: 2.65, uArcMicroBlend: 0.66,
+    uArcRegionRadius: 100000.0,
   };
   for (const [key, value] of Object.entries(defaults)) {
     material.AddUniform(key, "float", value);
@@ -271,11 +276,13 @@ export class RinaElectricSurfaceFX {
   private readonly atlas: Texture;
   private readonly light: PointLight | null;
   private readonly includeMesh: (mesh: Mesh) => boolean;
+  private readonly regionRadius: number;
   private readonly overlays: Overlay[] = [];
   private mode: Mode = "off";
   private time = 0;
   private modeElapsed = 0;
   private pulse = 0;
+  private strength = 1;
   private fadeFrom = 0;
   private growthSeconds = 0.75;
   private holdSeconds = 0.52;
@@ -290,6 +297,8 @@ export class RinaElectricSurfaceFX {
     this.scene = scene;
     this.parameters = { ...RINA_ELECTRIC_THIN_CHAOTIC, ...options.parameters };
     this.includeMesh = options.includeMesh ?? ((mesh) => !DEFAULT_SKIP_MESH.test(mesh.name));
+    this.regionRadius = options.regionRadius && options.regionRadius > 0
+      ? options.regionRadius : 100000;
     this.atlas = new Texture(
       options.atlasUrl ?? asset(DEFAULT_ATLAS),
       scene, true, false, Texture.BILINEAR_SAMPLINGMODE,
@@ -378,6 +387,10 @@ export class RinaElectricSurfaceFX {
     Object.assign(this.parameters, patch);
     if (this.light) this.light.range = this.parameters.lightRange;
   }
+  /** Envelope for a gesture that raises and lowers while the shader stays active. */
+  setStrength(strength: number): void {
+    this.strength = clamp(strength, 0, 1);
+  }
   startContinuous(): void {
     this.assertUsable();
     this.mode = "continuous";
@@ -438,7 +451,7 @@ export class RinaElectricSurfaceFX {
       strength = this.fadeFrom * (1 - clamp(this.modeElapsed / this.fadeSeconds, 0, 1));
       if (strength <= 0.001) { this.stop(0); return; }
     }
-    this.pulse = clamp(strength, 0, 1);
+    this.pulse = clamp(strength * this.strength, 0, 1);
     this.setVisualVisibility(true);
     const phase = this.time * 7.8;
     const frameA = Math.floor(phase) % 16;
@@ -460,6 +473,7 @@ export class RinaElectricSurfaceFX {
       setFloat(m, "uArcThickness", clamp(p.thickness, 0, 1));
       setFloat(m, "uArcHalo", p.halo);
       setFloat(m, "uArcPulse", this.pulse);
+      setFloat(m, "uArcRegionRadius", this.regionRadius);
       setFloat(m, "uArcDebug", this.showDiagnostic ? 1 : 0);
       setFloat(m, "uArcProgress", progress);
       setFloat(m, "uArcRadius", p.propagationRadius);

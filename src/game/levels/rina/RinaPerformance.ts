@@ -2,6 +2,7 @@ import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { MusicPlaybackState } from "../../MusicPlayer";
 import type { RinaController } from "../../enemies/rina";
 import { RINA_CONCERT_SONG } from "./RinaConcertConfig";
+import type { RinaSingingPointAction } from "./RinaSingingPointAction";
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
@@ -16,13 +17,21 @@ function smoothstep(value: number) {
 export function createRinaPerformance(
   rina: RinaController,
   stagePosition: Vector3,
-  catwalkPosition: Vector3
+  catwalkPosition: Vector3,
+  pointAction: RinaSingingPointAction
 ) {
   let mouthOpen = 0;
   let mouthO = 0;
   let mouthWide = 0;
+  let heldPosition: Vector3 | null = null;
 
   return {
+    /** Called at the fan's shutter event with that fan's world foot position. */
+    pointAtPhotographer(target: Vector3, force = false) {
+      if (!pointAction.pointAtPhotographer(target, force)) return false;
+      heldPosition = rina.root.position.clone();
+      return true;
+    },
     update(dt: number, music: MusicPlaybackState | null) {
       const validTrack = music?.track === RINA_CONCERT_SONG.track;
       const time = validTrack ? music.currentTime : 0;
@@ -52,19 +61,41 @@ export function createRinaPerformance(
         }
       }
 
-      rina.root.position.set(
-        stagePosition.x + (catwalkPosition.x - stagePosition.x) * progress,
-        stagePosition.y,
-        stagePosition.z + (catwalkPosition.z - stagePosition.z) * progress
-      );
+      const timedX =
+        stagePosition.x + (catwalkPosition.x - stagePosition.x) * progress;
+      const timedZ = stagePosition.z +
+        (catwalkPosition.z - stagePosition.z) * progress;
+      if (heldPosition) {
+        if (!pointAction.active) {
+          const dx = timedX - heldPosition.x;
+          const dz = timedZ - heldPosition.z;
+          const distance = Math.hypot(dx, dz);
+          if (distance < 0.04) {
+            heldPosition = null;
+          } else {
+            const step = Math.min(distance, Math.max(0, dt) * 3.2);
+            heldPosition.x += dx / distance * step;
+            heldPosition.z += dz / distance * step;
+          }
+        }
+      }
+      rina.root.position.set(heldPosition?.x ?? timedX,
+        stagePosition.y, heldPosition?.z ?? timedZ);
       // Face the audience when singing. Turn toward the stage for the return
       // walk, then face the audience again before the next verse.
-      rina.root.rotation.y = movement === "return"
+      const recovering = !pointAction.active && heldPosition !== null;
+      const baseYaw = recovering &&
+        Math.hypot(timedX - rina.root.position.x, timedZ - rina.root.position.z) > 0.3
+        ? Math.atan2(timedX - rina.root.position.x,
+            timedZ - rina.root.position.z)
+        : movement === "return"
         ? Math.PI * (1 - smoothstep(returnProgress / 0.13) +
             smoothstep((returnProgress - 0.87) / 0.13))
         : Math.PI;
+      rina.root.rotation.y = baseYaw;
+      pointAction.update(dt, baseYaw);
 
-      if (movement && music?.playing) {
+      if (!pointAction.active && ((movement && music?.playing) || recovering)) {
         rina.animations.playWalkAndSing();
       } else if (rina.animations.current !== "sing") {
         rina.animations.play("sing", {

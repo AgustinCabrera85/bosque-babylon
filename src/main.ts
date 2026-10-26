@@ -275,21 +275,74 @@ async function start() {
       activeDebug?.dispose();
       activeDebug = scene ? debugBootstrap?.bootstrapDebug(scene) ?? null : null;
     },
-    onLevelTransitionRequested: async ({ entryPoint, load }) => {
-      if (entryPoint === "rina-portal" || entryPoint === "rina-return") {
-        showLoading();
-        setLoading(0.02, entryPoint === "rina-portal"
+    onLevelTransitionRequested: async ({ fromLevel, entryPoint, load }) => {
+      const sanctuaryPortal = fromLevel === "sanctuary" &&
+        (entryPoint === "rina-portal" ||
+          entryPoint === "libre-de-culpas-portal" ||
+          entryPoint === "teatro-portal");
+      if (sanctuaryPortal) {
+        if (portalTransitionPending) return;
+        portalTransitionPending = true;
+        pauseMenu.setPaused(false);
+        inventory.close();
+        itemInspector.close();
+        const chapterLoading = entryPoint === "rina-portal"
           ? "Entrando al estadio de Rina..."
-          : "Volviendo al Santuario...");
+          : entryPoint === "teatro-portal"
+            ? "Entrando al teatro..."
+            : "Entrando al bosque...";
+        const liquidTint = entryPoint === "rina-portal" ? "#d351ff"
+          : entryPoint === "teatro-portal" ? "#ff537a" : "#63c9d9";
+        try {
+          // Let the portal membrane deform while the sanctuary is still rendered.
+          await wait(420);
+          await levelTransitionOverlay.cover({
+            tone: "black", durationMs: 650, liquidTint,
+          });
+          showLoading();
+          setLoading(0.02, chapterLoading);
+          levelTransitionOverlay.handoff();
+          const loaded = await load();
+          await new Promise<void>((resolve) => {
+            loaded.scene.onAfterRenderObservable.addOnce(() => resolve());
+          });
+          if (loaded.playOpeningSequence) {
+            await playOpeningPresentation(loaded.playOpeningSequence);
+          } else {
+            hideLoading();
+          }
+        } catch (error) {
+          showLoading();
+          setLoading(1, "No se pudo cambiar de nivel");
+          levelTransitionOverlay.handoff();
+          throw error;
+        } finally {
+          portalTransitionPending = false;
+        }
+        return;
+      }
+      if (entryPoint === "rina-return") {
+        showLoading();
+        setLoading(0.02, "Volviendo al Santuario...");
         const loaded = await load();
         await new Promise<void>((resolve) => {
           loaded.scene.onAfterRenderObservable.addOnce(() => resolve());
         });
-        hideLoading();
+        if (loaded.playOpeningSequence) {
+          await playOpeningPresentation(loaded.playOpeningSequence);
+        } else {
+          hideLoading();
+        }
         return;
       }
       if (entryPoint !== "forest-exit-portal") {
-        await load();
+        const loaded = await load();
+        if (loaded.playOpeningSequence) {
+          await new Promise<void>((resolve) => {
+            loaded.scene.onAfterRenderObservable.addOnce(() => resolve());
+          });
+          await playOpeningPresentation(loaded.playOpeningSequence);
+        }
         return;
       }
       if (portalTransitionPending) return;
@@ -299,10 +352,12 @@ async function start() {
       itemInspector.close();
       hideLoading();
 
+      let opening: (() => Promise<void>) | undefined;
       try {
         await levelTransitionOverlay.cover();
         const minimumWhiteHold = wait(2000);
         const loaded = await load();
+        opening = loaded.playOpeningSequence;
         await new Promise<void>((resolve) => {
           loaded.scene.onAfterRenderObservable.addOnce(() => resolve());
         });
@@ -323,6 +378,7 @@ async function start() {
           portalTransitionPending = false;
         }
       }
+      if (opening) await playOpeningPresentation(opening);
     },
     onTransitionError: (error) => {
       console.error("No se pudo cambiar de nivel", error);
@@ -476,12 +532,20 @@ async function start() {
     const deltaSeconds = engine.getDeltaTime() / 1000;
     input.update(deltaSeconds);
     const levelTransitionActive = levelTransitionOverlay.isActive;
+    const sanctuaryPortalConfirmOpen =
+      document.body.classList.contains("sanctuary-portal-confirm-open");
+    const sanctuaryPortalTraversing =
+      document.body.classList.contains("sanctuary-portal-traversing");
     const modalWasOpen =
-      pauseMenu.isPaused() || itemInspector.isOpen() || inventory.isOpen();
+      pauseMenu.isPaused() || itemInspector.isOpen() || inventory.isOpen() ||
+      sanctuaryPortalConfirmOpen;
 
     let modalActionHandled = false;
-    if (!levelTransitionActive && input.wasPressed("cancel")) {
-      if (itemInspector.isOpen()) {
+    if (!levelTransitionActive && !sanctuaryPortalTraversing && input.wasPressed("cancel")) {
+      if (sanctuaryPortalConfirmOpen) {
+        window.dispatchEvent(new Event("bosque:sanctuary-portal-cancel"));
+        modalActionHandled = true;
+      } else if (itemInspector.isOpen()) {
         itemInspector.close();
         modalActionHandled = true;
       } else if (inventory.isOpen()) {
@@ -494,6 +558,8 @@ async function start() {
     }
     if (
       !levelTransitionActive &&
+      !sanctuaryPortalTraversing &&
+      !sanctuaryPortalConfirmOpen &&
       !modalActionHandled &&
       input.wasPressed("pause")
     ) {
@@ -504,6 +570,8 @@ async function start() {
     if (
       !modalActionHandled &&
       !levelTransitionActive &&
+      !sanctuaryPortalTraversing &&
+      !sanctuaryPortalConfirmOpen &&
       input.wasPressed("inventory") &&
       !pauseMenu.isPaused() &&
       !itemInspector.isOpen()
@@ -520,7 +588,8 @@ async function start() {
       modalWasOpen ||
       pauseMenu.isPaused() ||
       itemInspector.isOpen() ||
-      inventory.isOpen();
+      inventory.isOpen() ||
+      sanctuaryPortalConfirmOpen;
     const cinematicActive =
       document.body.classList.contains("opening-sequence-active") ||
       document.body.classList.contains("sky-eye-cinematic-active");
@@ -531,6 +600,7 @@ async function start() {
       pauseMenu.isPaused() ||
       itemInspector.isOpen() ||
       inventory.isOpen() ||
+      sanctuaryPortalConfirmOpen ||
       cinematicActive ||
       loadingActive ||
       levelTransitionActive ||
@@ -551,7 +621,13 @@ async function start() {
       levelManager.render();
       return;
     }
-    if (gameplayBlocked) return;
+    if (gameplayBlocked) {
+      if (sanctuaryPortalConfirmOpen) {
+        levelManager.update(0);
+        levelManager.render();
+      }
+      return;
+    }
     levelManager.update(deltaSeconds);
     levelManager.render();
   });

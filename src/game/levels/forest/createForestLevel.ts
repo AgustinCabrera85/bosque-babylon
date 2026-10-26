@@ -21,7 +21,8 @@ export async function createForestLevel(
     context.inventory,
     context.input,
     context.playerStats,
-    context.entryPoint === "initial",
+    context.entryPoint === "initial" ||
+      context.entryPoint === "libre-de-culpas-portal",
     context.cursorController,
     {
       entryPoint: context.entryPoint,

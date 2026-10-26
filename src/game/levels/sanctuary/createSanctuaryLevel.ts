@@ -11,6 +11,8 @@ import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
 import { createSanctuaryGeometry } from "./SanctuaryGeometry";
 import { createSanctuaryShadowHands } from "./SanctuaryShadowHands";
 import { collidesWithPortalStone } from "./SanctuaryPortalCollisions";
+import { hasLeftSanctuaryPortalApproach, isAtSanctuaryPortalApproach } from "./SanctuaryPortalAccess";
+import { createSanctuaryPortalPrompt } from "./SanctuaryPortalPrompt";
 import {
   readSanctuaryProgress,
   SANCTUARY_CONFIG as CFG,
@@ -25,6 +27,25 @@ import {
 
 type VoyageState = "sailing" | "moored" | "ashore";
 type RoutePoint = { x: number; z: number };
+type PortalWalk = {
+  stop: SanctuaryStop;
+  startX: number;
+  startZ: number;
+  endX: number;
+  endZ: number;
+  y: number;
+  elapsed: number;
+  duration: number;
+  cameraStart: Vector3;
+  cameraStartTarget: Vector3;
+  cameraStartFov: number;
+  cameraEnd: Vector3;
+  cameraEndTarget: Vector3;
+  cameraEndFov: number;
+  rippleTriggered: boolean;
+};
+const PORTAL_CAMERA_SETTLE_SECONDS = 0.6;
+const PORTAL_CAMERA_DISTANCE = 27;
 const BOAT_START: RoutePoint = { x: 0, z: CFG.boatStartZ };
 const boatDockX = (stop: SanctuaryStop) => stop.x - stop.side * 16;
 const ROUTE: RoutePoint[] = [
@@ -153,6 +174,9 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     context.onProgress(.62, "Reconociendo las columnas cautivas...");
     const hud = createSanctuaryHud();
     cleanup.push(hud.dispose);
+    const portalPrompt = createSanctuaryPortalPrompt(context.canvas, context.input);
+    cleanup.push(portalPrompt.dispose);
+    cleanup.push(() => document.body.classList.remove("sanctuary-portal-traversing"));
 
     const rinaReturnIndex = context.entryPoint === "rina-return"
       ? SANCTUARY_STOPS.findIndex((stop) => stop.id === "rina") : -1;
@@ -195,6 +219,7 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     scene.metadata.playerWorld = playerWorld;
     scene.metadata.playerStats = context.playerStats;
     scene.metadata.sanctuary = { prototype: true, routeLength: ROUTE.length, clouds: geometry.cloudMode, water: geometry.waterMode, version: "0.2" };
+    scene.metadata.sanctuaryPortalPrompt = portalPrompt;
 
     const movePlayerOntoBoat = () => {
       player.position.set(geometry.boatRoot.position.x,
@@ -230,9 +255,20 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     };
     if (import.meta.env.DEV) {
       const debugWindow = window as Window & {
-        __bosqueSanctuaryDebug?: { teleportToPortal(): void; teleportToStop(index: number): void };
+        __bosqueSanctuaryDebug?: {
+          teleportToPortal(): void;
+          teleportToStop(index: number): void;
+          getScene(): Scene;
+          getPlayerPosition(): Vector3;
+          getPlayerAnimationName(): string | null;
+          isPlayerCinematic(): boolean;
+        };
       };
       const debug = {
+        getScene() { return scene; },
+        getPlayerPosition() { return player.position; },
+        getPlayerAnimationName() { return player.currentAnimationName; },
+        isPlayerCinematic() { return player.isCinematicSequenceActive; },
         teleportToStop(index: number) {
           if (!Number.isInteger(index) || index < 0 || index >= SANCTUARY_STOPS.length) return;
           targetIndex = index;
@@ -264,10 +300,93 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
       return Math.hypot(player.position.x - p.x, player.position.z - p.z) < 13;
     };
     let transitionRequested = false;
+    let portalWalk: PortalWalk | null = null;
+    let declinedStopId: string | null = null;
+    const openPortalPrompt = (stop: SanctuaryStop) => {
+      if (!stop.destination || transitionRequested || portalPrompt.isOpen) return;
+      player.settleLocomotionToIdle();
+      portalPrompt.show(stop.id, stop.title, () => {
+        if (!player.beginCinematicSequence()) {
+          declinedStopId = stop.id;
+          return;
+        }
+        const endX = stop.x + stop.side * 49 + stop.side * 0.85;
+        const endZ = stop.z + 8;
+        const distance = Math.hypot(endX - player.position.x, endZ - player.position.z);
+        player.camera.computeWorldMatrix();
+        const cameraStart = player.camera.globalPosition.clone();
+        const portalX = stop.x + stop.side * 49;
+        const portalY = 10.5;
+        const aspect = context.canvas.clientWidth /
+          Math.max(1, context.canvas.clientHeight);
+        portalWalk = {
+          stop, startX: player.position.x, startZ: player.position.z,
+          endX, endZ, y: player.position.y, elapsed: 0,
+          duration: Math.max(1.15, Math.min(2.4, distance / 3.2)),
+          cameraStart,
+          cameraStartTarget: cameraStart.add(
+            player.camera.getDirection(Vector3.Forward()).scale(20)),
+          cameraStartFov: player.camera.fov,
+          cameraEnd: new Vector3(portalX - stop.side * PORTAL_CAMERA_DISTANCE,
+            portalY, endZ),
+          cameraEndTarget: new Vector3(portalX, portalY, endZ),
+          cameraEndFov: Math.max(0.96, Math.min(1.18,
+            2 * Math.atan(9.5 / (PORTAL_CAMERA_DISTANCE * aspect)))),
+          rippleTriggered: false,
+        };
+        document.body.classList.add("sanctuary-portal-traversing");
+        hud.setText(`Entrando a ${stop.title}...`);
+      }, () => {
+        declinedStopId = stop.id;
+        player.settleLocomotionToIdle();
+      });
+    };
 
     const update = (unclampedDt: number) => {
       const dt = Math.min(.05, Math.max(0, unclampedDt));
+      if (portalPrompt.isOpen) {
+        portalPrompt.update();
+        return;
+      }
       elapsed += dt;
+      if (portalWalk) {
+        const walk = portalWalk;
+        walk.elapsed = Math.min(PORTAL_CAMERA_SETTLE_SECONDS + walk.duration,
+          walk.elapsed + dt);
+        const cameraT = clamp01(walk.elapsed / PORTAL_CAMERA_SETTLE_SECONDS);
+        const smoothCameraT = cameraT * cameraT * (3 - 2 * cameraT);
+        const walkT = clamp01((walk.elapsed - PORTAL_CAMERA_SETTLE_SECONDS) /
+          walk.duration);
+        const x = walk.startX + (walk.endX - walk.startX) * walkT;
+        const z = walk.startZ + (walk.endZ - walk.startZ) * walkT;
+        player.driveCinematicWalkTo(x, walk.y, z,
+          Math.atan2(walk.stop.side, 0), dt,
+          cameraT >= 1 && walkT < 1);
+        player.setCinematicCamera(
+          Vector3.Lerp(walk.cameraStart, walk.cameraEnd, smoothCameraT),
+          Vector3.Lerp(walk.cameraStartTarget, walk.cameraEndTarget, smoothCameraT),
+          0,
+          walk.cameraStartFov +
+            (walk.cameraEndFov - walk.cameraStartFov) * smoothCameraT,
+        );
+        if (!walk.rippleTriggered && walkT >= 0.68) {
+          geometry.triggerPortalRipple(walk.stop.id, player.position);
+          walk.rippleTriggered = true;
+        }
+        if (!transitionRequested && walkT >= 0.78) {
+          transitionRequested = true;
+          context.requestLevelTransition(walk.stop.destination!, `${walk.stop.id}-portal`);
+        }
+        geometry.update(dt, elapsed, progress, player.position);
+        shadowHands?.update(elapsed);
+        context.musicPlayer?.updateListenerPosition(player.position);
+        return;
+      }
+      if (transitionRequested) {
+        geometry.update(dt, elapsed, progress, player.position);
+        shadowHands?.update(elapsed);
+        return;
+      }
       refreshProgressSeconds += dt;
       if (refreshProgressSeconds > 1.5) {
         progress = readSanctuaryProgress();
@@ -302,20 +421,22 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
         const nearPortal = stop && closeEnoughToPortal(stop);
         if (atGate) {
           hud.setText("El portal del Santuario permanece sellado. El desenlace se implementará más adelante.");
-        } else if (nearPortal && stop.destination === "rina") {
-          hud.setText(`${stop.title}  ·  ${context.input.getActionBindingLabel("interact") ?? "E"}: atravesar portal`);
+        } else if (nearPortal && stop.destination) {
+          hud.setText(`${stop.title}  ·  Acércate frente al portal para entrar`);
         } else if (nearPortal) {
           hud.setText(`${stop.title}  ·  El portal aún no responde.`);
         } else {
           hud.setText(`${stop?.title ?? ""}  ·  ${context.input.getActionBindingLabel("interact") ?? "E"}: volver a la balsa`);
         }
-        if (context.input.wasPressed("interact")) {
-          if (nearPortal && stop.destination === "rina" && !transitionRequested) {
-            transitionRequested = true;
-            context.requestLevelTransition(stop.destination, `${stop.id}-portal`);
-          } else if (!nearPortal) {
-            embarked = embark();
-          }
+        if (declinedStopId && (!stop || stop.id !== declinedStopId ||
+            hasLeftSanctuaryPortalApproach(stop, player.position.x, player.position.z))) {
+          declinedStopId = null;
+        }
+        if (stop?.destination && !transitionRequested && declinedStopId !== stop.id &&
+            isAtSanctuaryPortalApproach(stop, player.position.x, player.position.z)) {
+          openPortalPrompt(stop);
+        } else if (!nearPortal && context.input.wasPressed("interact")) {
+          embarked = embark();
         }
         geometry.update(dt, elapsed, progress, player.position);
         if (embarked) movePlayerOntoBoat();

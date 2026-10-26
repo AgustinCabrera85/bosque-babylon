@@ -92,6 +92,7 @@ const LIGHT_ORB_CORE_FRAGMENT_SHADER = `
   uniform float opacity;
   uniform float burstProgress;
   uniform float burstStrength;
+  uniform vec3 orbTint;
 
   float filament(float wave, float width) {
     return 1.0 - smoothstep(width, width + 0.05, abs(sin(wave)));
@@ -177,7 +178,7 @@ const LIGHT_ORB_CORE_FRAGMENT_SHADER = `
       burstBand * burstEnvelope * 0.18
     );
     alpha *= 1.0 - burstProgress * 0.32;
-    gl_FragColor = vec4(color * energy, clamp(alpha, 0.0, 1.0));
+    gl_FragColor = vec4(color * orbTint * energy, clamp(alpha, 0.0, 1.0));
   }
 `;
 
@@ -196,6 +197,7 @@ const LIGHT_ORB_SHELL_FRAGMENT_SHADER = `
   uniform float burstProgress;
   uniform float burstStrength;
   uniform float haloStrength;
+  uniform vec3 orbTint;
 
   void main(void) {
     vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
@@ -245,7 +247,7 @@ const LIGHT_ORB_SHELL_FRAGMENT_SHADER = `
     float alpha = opacity * (0.008 + shell + corona);
     if (alpha < 0.008) discard;
     gl_FragColor = vec4(
-      color * (0.82 + shell * 1.38 + corona * 1.12),
+      color * orbTint * (0.82 + shell * 1.38 + corona * 1.12),
       clamp(alpha, 0.0, 0.82)
     );
   }
@@ -1429,6 +1431,7 @@ export class PlayerAttackSystem {
           "opacity",
           "burstProgress",
           "burstStrength",
+          "orbTint",
         ],
         needAlphaBlending: true,
       }
@@ -1439,6 +1442,7 @@ export class PlayerAttackSystem {
     material.setFloat("opacity", options.opacity ?? 0.62);
     material.setFloat("burstProgress", options.burstProgress ?? 0);
     material.setFloat("burstStrength", options.burstStrength ?? 0);
+    material.setColor3("orbTint", Color3.White());
     this.configureOrbShader(material);
     return material;
   }
@@ -1474,6 +1478,7 @@ export class PlayerAttackSystem {
           "burstProgress",
           "burstStrength",
           "haloStrength",
+          "orbTint",
         ],
         needAlphaBlending: true,
       }
@@ -1485,6 +1490,7 @@ export class PlayerAttackSystem {
     material.setFloat("burstProgress", options.burstProgress ?? 0);
     material.setFloat("burstStrength", options.burstStrength ?? 0);
     material.setFloat("haloStrength", options.haloStrength ?? 0);
+    material.setColor3("orbTint", Color3.White());
     this.configureOrbShader(material);
     return material;
   }
@@ -1508,4 +1514,70 @@ export class PlayerAttackSystem {
     burst.innerMaterial.dispose();
     burst.outerMaterial.dispose();
   }
+}
+
+/** Lautaro's orb visual, also used for Rina's coloured absorption orbs. */
+export function createLightOrbVisual(scene: Scene, name: string, tint: Color3) {
+  const root = new TransformNode(name, scene);
+  const commonUniforms = ["world", "worldViewProjection", "cameraPosition", "time",
+    "charge", "motionBoost", "opacity", "burstProgress", "burstStrength", "orbTint"];
+  const makeMaterial = (part: "core" | "aura") => {
+    const material = new ShaderMaterial(`${name}:${part}Material`, scene, {
+      vertexSource: LIGHT_ORB_VERTEX_SHADER,
+      fragmentSource: part === "core"
+        ? LIGHT_ORB_CORE_FRAGMENT_SHADER : LIGHT_ORB_SHELL_FRAGMENT_SHADER,
+    }, {
+      attributes: ["position", "normal"],
+      uniforms: part === "core" ? commonUniforms : [...commonUniforms, "haloStrength"],
+      needAlphaBlending: true,
+    });
+    material.setFloat("time", 0);
+    material.setFloat("charge", 0.85);
+    material.setFloat("motionBoost", 1.2);
+    material.setFloat("opacity", part === "core" ? 0.72 : 0.58);
+    material.setFloat("burstProgress", 0);
+    material.setFloat("burstStrength", 0);
+    if (part === "aura") material.setFloat("haloStrength", 0.75);
+    material.setColor3("orbTint", tint);
+    material.alphaMode = Engine.ALPHA_ADD;
+    material.transparencyMode = BabylonMaterial.MATERIAL_ALPHABLEND;
+    material.backFaceCulling = false;
+    material.disableDepthWrite = true;
+    material.needDepthPrePass = false;
+    return material;
+  };
+  const coreMaterial = makeMaterial("core");
+  const auraMaterial = makeMaterial("aura");
+  const core = MeshBuilder.CreateSphere(`${name}:core`,
+    { diameter: PROJECTILE_CORE_DIAMETER, segments: 12 }, scene);
+  const aura = MeshBuilder.CreateSphere(`${name}:aura`,
+    { diameter: PROJECTILE_SHELL_DIAMETER, segments: 12 }, scene);
+  for (const [index, mesh] of [core, aura].entries()) {
+    mesh.parent = root;
+    mesh.material = index === 0 ? coreMaterial : auraMaterial;
+    mesh.isPickable = false;
+    mesh.applyFog = false;
+    mesh.alwaysSelectAsActiveMesh = true;
+    mesh.renderingGroupId = LIGHT_ORB_RENDERING_GROUP;
+    mesh.alphaIndex = index;
+  }
+  return {
+    root, core, aura, coreMaterial, auraMaterial,
+    update(time: number) {
+      coreMaterial.setFloat("time", time);
+      auraMaterial.setFloat("time", time);
+      aura.scaling.setAll(1 + Math.sin(time * 17) * 0.035);
+    },
+    setBurst(progress: number, strength: number) {
+      for (const material of [coreMaterial, auraMaterial]) {
+        material.setFloat("burstProgress", progress);
+        material.setFloat("burstStrength", strength);
+      }
+    },
+    dispose() {
+      root.dispose(false, false);
+      coreMaterial.dispose();
+      auraMaterial.dispose();
+    },
+  };
 }

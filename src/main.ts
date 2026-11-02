@@ -10,8 +10,11 @@ import { setupCharacterSelection } from "./game/CharacterSelection";
 import { InputManager } from "./game/input/InputManager";
 import { LevelManager } from "./game/runtime/LevelManager";
 import { LevelRegistry } from "./game/runtime/LevelRegistry";
+import { findPortalRoute } from "./game/runtime/PortalRoutes";
 import type { LevelId, PerformanceTier } from "./game/runtime/LevelTypes";
 import { GameSession } from "./game/runtime/GameSession";
+import { setupForestLoadingArtwork } from "./game/ui/ForestLoadingArtwork";
+import { setupRinaLoadingArtwork } from "./game/ui/RinaLoadingArtwork";
 import { setupLevelTransitionOverlay } from "./game/runtime/LevelTransitionOverlay";
 import { setupInputPrompts } from "./game/input/InputPrompts";
 import { setupGamepadFeedback } from "./game/input/GamepadFeedback";
@@ -29,6 +32,8 @@ const renderCanvas = canvas;
 const loadingScreen = document.getElementById("loadingScreen");
 const loadingText = document.getElementById("loadingText");
 const loadingBar = document.getElementById("loadingBar");
+const forestLoadingArtwork = loadingScreen ? setupForestLoadingArtwork(loadingScreen) : null;
+const rinaLoadingArtwork = loadingScreen ? setupRinaLoadingArtwork(loadingScreen) : null;
 const openingSequence = document.getElementById("openingSequence");
 const openingQuote = document.getElementById("openingQuote");
 
@@ -44,16 +49,22 @@ function setLoading(value: number, text: string) {
   lastLoadingStage = text;
   if (loadingText) loadingText.textContent = text;
   if (loadingBar) loadingBar.style.width = `${Math.round(value * 100)}%`;
+  forestLoadingArtwork?.setProgress(value);
+  rinaLoadingArtwork?.setProgress(value);
 }
 
 function hideLoading() {
   if (!loadingScreen) return;
   loadingScreen.classList.add("hidden");
   loadingScreen.setAttribute("aria-hidden", "true");
+  forestLoadingArtwork?.setActive(false);
+  rinaLoadingArtwork?.setActive(false);
 }
 
-function showLoading() {
+function showLoading(level: LevelId | null = null) {
   if (!loadingScreen) return;
+  forestLoadingArtwork?.setActive(level === "forest");
+  rinaLoadingArtwork?.setActive(level === "rina");
   loadingScreen.classList.remove("hidden");
   loadingScreen.setAttribute("aria-hidden", "false");
 }
@@ -214,7 +225,15 @@ async function start() {
     selection?.setAttribute("aria-hidden", "true");
   }
   document.body.classList.remove("character-selecting");
-  showLoading();
+  const requestedLevel = import.meta.env.DEV
+    ? new URLSearchParams(window.location.search).get("level")
+    : null;
+  const initialLevelId: LevelId = requestedLevel === "rina"
+    ? "rina"
+    : requestedLevel === "sanctuary"
+    ? "sanctuary"
+    : requestedLevel === "theatre" ? "theatre" : "forest";
+  showLoading(initialLevelId);
   const inputPrompts = setupInputPrompts(input);
   const pauseMenu = setupPauseMenu({
     canvas: renderCanvas,
@@ -275,32 +294,24 @@ async function start() {
       activeDebug?.dispose();
       activeDebug = scene ? debugBootstrap?.bootstrapDebug(scene) ?? null : null;
     },
-    onLevelTransitionRequested: async ({ fromLevel, entryPoint, load }) => {
-      const sanctuaryPortal = fromLevel === "sanctuary" &&
-        (entryPoint === "rina-portal" ||
-          entryPoint === "libre-de-culpas-portal" ||
-          entryPoint === "teatro-portal");
-      if (sanctuaryPortal) {
+    onLevelTransitionRequested: async ({ fromLevel, toLevel, entryPoint, load }) => {
+      const portalRoute = findPortalRoute(fromLevel, toLevel, entryPoint);
+      if (portalRoute?.presentation === "liquid") {
         if (portalTransitionPending) return;
         portalTransitionPending = true;
         pauseMenu.setPaused(false);
         inventory.close();
         itemInspector.close();
-        const chapterLoading = entryPoint === "rina-portal"
-          ? "Entrando al estadio de Rina..."
-          : entryPoint === "teatro-portal"
-            ? "Entrando al teatro..."
-            : "Entrando al bosque...";
-        const liquidTint = entryPoint === "rina-portal" ? "#d351ff"
-          : entryPoint === "teatro-portal" ? "#ff537a" : "#63c9d9";
         try {
+          forestLoadingArtwork?.setActive(toLevel === "forest");
+          rinaLoadingArtwork?.setActive(toLevel === "rina");
           // Let the portal membrane deform while the sanctuary is still rendered.
           await wait(420);
           await levelTransitionOverlay.cover({
-            tone: "black", durationMs: 650, liquidTint,
+            tone: "black", durationMs: 650, liquidTint: portalRoute.liquidTint,
           });
-          showLoading();
-          setLoading(0.02, chapterLoading);
+          showLoading(toLevel);
+          setLoading(0.02, portalRoute.loadingText ?? "Entrando al portal...");
           levelTransitionOverlay.handoff();
           const loaded = await load();
           await new Promise<void>((resolve) => {
@@ -321,7 +332,7 @@ async function start() {
         }
         return;
       }
-      if (entryPoint === "rina-return") {
+      if (portalRoute?.presentation === "return") {
         showLoading();
         setLoading(0.02, "Volviendo al Santuario...");
         const loaded = await load();
@@ -335,7 +346,7 @@ async function start() {
         }
         return;
       }
-      if (entryPoint !== "forest-exit-portal") {
+      if (portalRoute?.presentation !== "white") {
         const loaded = await load();
         if (loaded.playOpeningSequence) {
           await new Promise<void>((resolve) => {
@@ -397,7 +408,7 @@ async function start() {
     pauseMenu.setPaused(false);
     inventory.close();
     itemInspector.close();
-    showLoading();
+    showLoading(request.level);
     setLoading(0.02, "Regresando al último recuerdo...");
     void (async () => {
       let restarted = false;
@@ -436,14 +447,6 @@ async function start() {
     onCharacterSelectionReturnRequested
   );
 
-  const requestedLevel = import.meta.env.DEV
-    ? new URLSearchParams(window.location.search).get("level")
-    : null;
-  const initialLevelId: LevelId = requestedLevel === "rina"
-    ? "rina"
-    : requestedLevel === "sanctuary"
-    ? "sanctuary"
-    : requestedLevel === "theatre" ? "theatre" : "forest";
   if (import.meta.env.DEV) {
     const debugWindow = window as Window & {
       __bosqueLevelDebug?: {
@@ -463,7 +466,7 @@ async function start() {
         pauseMenu.setPaused(false);
         inventory.close();
         itemInspector.close();
-        showLoading();
+        showLoading(level);
         setLoading(0.02, `Cargando ${level}...`);
         try {
           const loaded = await levelManager.loadLevel(level, entryPoint);
@@ -512,6 +515,8 @@ async function start() {
       onCharacterSelectionReturnRequested
     );
     levelManager.dispose();
+    forestLoadingArtwork?.dispose();
+    rinaLoadingArtwork?.dispose();
     levelTransitionOverlay.dispose();
     gamepadFeedback.dispose();
     unsubscribeCursorDevice();

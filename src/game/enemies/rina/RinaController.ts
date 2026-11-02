@@ -1,7 +1,7 @@
 import { MixamoProceduralRig } from "../../animation/MixamoProceduralRig";
 import { HermanoMayorLookAction } from "../boss/HermanoMayorLookAction";
 import { BaseEnemyController } from "../core/EnemyController";
-import type { EnemyControllerContext, EnemySpawnOptions } from "../core/EnemyTypes";
+import type { EnemyAttackHit, EnemyControllerContext, EnemySpawnOptions } from "../core/EnemyTypes";
 import { RinaAnimationController } from "./RinaAnimations";
 import { RINA_SOURCE_HEIGHT, RINA_TYPE, type RinaConfig } from "./RinaConfig";
 import { RinaFacialExpressions } from "./RinaFacialExpressions";
@@ -90,6 +90,11 @@ export class RinaController extends BaseEnemyController {
 
   public update(_deltaTimeSeconds: number) {
     this.lighting.update();
+  }
+
+  public override receiveAttack(hit: EnemyAttackHit) {
+    if (this.metadata.invulnerableNarrativeEncounter === true) return;
+    super.receiveAttack(hit);
   }
 
   public override setEnabled(enabled: boolean) {

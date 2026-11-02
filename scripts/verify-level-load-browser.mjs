@@ -1349,7 +1349,8 @@ try {
               blocksRight: world?.isColliding(18 * scale, frontZ, 0, 0, 1.8),
               leftStairOpen: !world?.isColliding(-9 * scale, frontZ, 0, 0, 1.8),
               rightStairOpen: !world?.isColliding(9 * scale, frontZ, 0, 0, 1.8),
-              clearAbove: !world?.isColliding(18 * scale, frontZ, 0, 2.1, 2.5),
+              // The shortest field fan's collision top is 2.425m.
+              clearAbove: !world?.isColliding(18 * scale, frontZ, 0, 2.5, 2.9),
               catwalkSidesBlock: [-1, 1].every((side) =>
                 world?.isColliding(side * 4.2 * scale, 20 * scale, 0, 0, 1.8)),
               catwalkTipBlocks: world?.isColliding(0, 15.65 * scale, 0, 0, 1.8),

@@ -13,6 +13,7 @@ import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import type { Scene } from "@babylonjs/core/scene";
 import { asset } from "../../../utils/asset";
 import type { SanctuaryStop } from "./SanctuaryLayout";
+import { getSanctuaryPortalRoute } from "../../runtime/PortalRoutes";
 import { createSanctuaryForestPortal, FOREST_PORTAL_PANEL } from "./SanctuaryForestPortal";
 import { createSanctuaryRinaPortalV2 } from "./SanctuaryRinaPortalV2";
 import { SanctuaryPortalStoneContact } from "./SanctuaryPortalStoneContact";
@@ -640,7 +641,7 @@ export async function createSanctuaryLevelPortals(scene: Scene, stops: readonly 
     }
     const { mesh: veil, material: veilMaterial } =
       createLockedPlaceholder(scene, root, stop.id);
-    const entryRipple = stop.destination ? createEntryRipple(scene, root, stop) : null;
+    const entryRipple = getSanctuaryPortalRoute(stop.id) ? createEntryRipple(scene, root, stop) : null;
     const edgeGlow = createPortalEdgeGlow(scene, root, stop);
     const light = new PointLight(`${stop.id}_portalInnerStoneLight`,
       new Vector3(root.position.x - stop.side * 0.8, 9.2, root.position.z), scene);

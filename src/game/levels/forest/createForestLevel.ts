@@ -4,6 +4,7 @@ import {
   requestCheckpointRestart,
 } from "../../runtime/CheckpointRestart";
 import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
+import { getLevelExitPortalRoute } from "../../runtime/PortalRoutes";
 
 export async function createForestLevel(
   context: LevelCreateContext
@@ -38,7 +39,8 @@ export async function createForestLevel(
         exitTransitionRequested = true;
         // Do not dispose the forest scene from inside its render callback.
         queueMicrotask(() => {
-          context.requestLevelTransition("theatre", "forest-exit-portal");
+          const route = getLevelExitPortalRoute("forest");
+          context.requestLevelTransition(route.to, route.entryPoint);
         });
       },
     }

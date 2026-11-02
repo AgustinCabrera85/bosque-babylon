@@ -4,7 +4,6 @@ export type SanctuaryPillarId = "libre-de-culpas" | "rina" | "fortaleza" | "teat
 export interface SanctuaryStop {
   id: SanctuaryPillarId;
   title: string;
-  destination: "forest" | "theatre" | "rina" | null;
   z: number;
   x: number;
   side: -1 | 1;
@@ -12,11 +11,11 @@ export interface SanctuaryStop {
 }
 
 export const SANCTUARY_STOPS: readonly SanctuaryStop[] = [
-  { id: "libre-de-culpas", title: "Libre de culpas", destination: "forest", z: -80, x: -90, side: -1, height: 340 },
-  { id: "rina", title: "La Sombra de Rina", destination: "rina", z: 155, x: 90, side: 1, height: 390 },
-  { id: "fortaleza", title: "La Fortaleza Inquebrantable", destination: null, z: 385, x: -80, side: -1, height: 450 },
-  { id: "teatro", title: "El libro que ensayaba a los hombres", destination: "theatre", z: 620, x: 88, side: 1, height: 520 },
-  { id: "encadenado", title: "Encadenado a la oscuridad", destination: null, z: 850, x: -85, side: -1, height: 590 },
+  { id: "libre-de-culpas", title: "Libre de culpas", z: -80, x: -90, side: -1, height: 340 },
+  { id: "rina", title: "La Sombra de Rina", z: 155, x: 90, side: 1, height: 390 },
+  { id: "fortaleza", title: "La Fortaleza Inquebrantable", z: 385, x: -80, side: -1, height: 450 },
+  { id: "teatro", title: "El libro que ensayaba a los hombres", z: 620, x: 88, side: 1, height: 520 },
+  { id: "encadenado", title: "Encadenado a la oscuridad", z: 850, x: -85, side: -1, height: 590 },
 ];
 
 export const SANCTUARY_CONFIG = {

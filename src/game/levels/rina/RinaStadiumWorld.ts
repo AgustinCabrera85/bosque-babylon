@@ -3,11 +3,15 @@ import type { PlayerStairSurfaceInfo, PlayerWorldQuery } from "../../PlayerWorld
 import { RINA_STAGE_STAIRS, RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
 import type { RinaFieldCrowdMazeLayout } from "./RinaFieldCrowdMazeLayout";
 import type { RinaStageBarrierCollisionSpan } from "./RinaStageSecurityBarriers";
+import { RINA_FIELD_CROWD_MIN_WORLD_HEIGHT } from "./crowd/RinaCrowdAssetManifest";
 
 const FIELD_HALF_WIDTH = RINA_STADIUM.pitchWidth / 2;
 const FIELD_HALF_LENGTH = RINA_STADIUM.pitchLength / 2;
 export const RINA_PLAYER_COLLISION_CLEARANCE_LOCAL = 0.72 / RINA_STADIUM_SCALE;
 const PLAYER_CLEARANCE = RINA_PLAYER_COLLISION_CLEARANCE_LOCAL;
+const CROWD_COLLISION_TOP_LOCAL =
+  (RINA_STADIUM.fieldY + RINA_FIELD_CROWD_MIN_WORLD_HEIGHT) / RINA_STADIUM_SCALE;
+const CROWD_COLLISION_BOTTOM_LOCAL = RINA_STADIUM.fieldY / RINA_STADIUM_SCALE;
 
 function insideExitTunnel(x: number, z: number, clearance = 0) {
   return (
@@ -103,7 +107,13 @@ export class RinaStadiumWorld implements PlayerWorldQuery {
   }
 
   /** The same solid-crowd boundary used by the player's collision query. */
-  crowdBlocksPlayerLocal(x: number, z: number, clearance = PLAYER_CLEARANCE): boolean {
+  crowdBlocksPlayerLocal(
+    x: number, z: number, clearance = PLAYER_CLEARANCE,
+    minY = -Infinity, maxY = Infinity
+  ): boolean {
+    if (minY >= CROWD_COLLISION_TOP_LOCAL || maxY <= CROWD_COLLISION_BOTTOM_LOCAL) {
+      return false;
+    }
     return this.fieldCrowdMaze?.blocksPlayerLocal(x, z, clearance) === true;
   }
 
@@ -146,6 +156,23 @@ export class RinaStadiumWorld implements PlayerWorldQuery {
     };
   }
 
+  /** Projectiles are not feet on the walkable surface. Only the solid obstacles block them. */
+  isProjectileBlocked(position: Vector3, radius: number) {
+    const localX = position.x / RINA_STADIUM_SCALE;
+    const localZ = position.z / RINA_STADIUM_SCALE;
+    const localRadius = radius / RINA_STADIUM_SCALE;
+    return hitsStageBarrier(
+      localX, localZ, localRadius,
+      (position.y - radius) / RINA_STADIUM_SCALE,
+      (position.y + radius) / RINA_STADIUM_SCALE,
+      this.barrierSpans
+    ) || this.crowdBlocksPlayerLocal(
+      localX, localZ, localRadius,
+      (position.y - radius) / RINA_STADIUM_SCALE,
+      (position.y + radius) / RINA_STADIUM_SCALE
+    );
+  }
+
   isColliding(x: number, z: number, additionalClearance = 0, minY = -Infinity, maxY = Infinity) {
     const localX = x / RINA_STADIUM_SCALE;
     const localZ = z / RINA_STADIUM_SCALE;
@@ -154,12 +181,13 @@ export class RinaStadiumWorld implements PlayerWorldQuery {
     const localFeetY = minY / RINA_STADIUM_SCALE;
     const firstRise = RINA_STADIUM.stage.height / this.stairCount;
     const onRaisedDeck = localFeetY >= RINA_STADIUM.stage.height - firstRise - 0.1;
+    const aboveCrowd = localFeetY >= CROWD_COLLISION_TOP_LOCAL;
     const supported = insideStageStairs(localX, localZ, this.stairCount, localClearance) ||
       (onRaisedDeck && (
         insideStageDeck(localX, localZ, localClearance) ||
         insideCatwalkDeck(localX, localZ, localClearance)
       )) ||
-      (localFeetY <= firstRise + 0.15 && (
+      ((localFeetY <= firstRise + 0.15 || aboveCrowd) && (
         insideField(localX, localZ, localClearance) ||
         insideExitTunnel(localX, localZ, localClearance)
       ));
@@ -168,7 +196,10 @@ export class RinaStadiumWorld implements PlayerWorldQuery {
         localX, localZ, radius,
         minY / RINA_STADIUM_SCALE, maxY / RINA_STADIUM_SCALE,
         this.barrierSpans
-      ) || this.crowdBlocksPlayerLocal(localX, localZ, radius) || !supported;
+      ) || this.crowdBlocksPlayerLocal(
+        localX, localZ, radius,
+        minY / RINA_STADIUM_SCALE, maxY / RINA_STADIUM_SCALE
+      ) || !supported;
   }
 
   resolveCameraPosition(_origin: Vector3, desired: Vector3) {

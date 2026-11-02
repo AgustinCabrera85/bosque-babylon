@@ -1,4 +1,5 @@
 import type { SanctuaryStop } from "./SanctuaryLayout";
+import { getSanctuaryPortalRoute } from "../../runtime/PortalRoutes";
 import { PORTAL_CLEAR_OPENING } from "./SanctuaryPortalCollisions";
 
 const PORTAL_SCALE = 18;
@@ -8,7 +9,7 @@ export const PORTAL_PROMPT_RESET_DISTANCE = 8.4;
 
 /** Only the walkable space in front of an unlocked portal offers entry. */
 export function isAtSanctuaryPortalApproach(stop: SanctuaryStop, x: number, z: number): boolean {
-  if (!stop.destination) return false;
+  if (!getSanctuaryPortalRoute(stop.id)) return false;
   const portalX = stop.x + stop.side * 49;
   const portalZ = stop.z + 8;
   const frontDistance = stop.side * (portalX - x);

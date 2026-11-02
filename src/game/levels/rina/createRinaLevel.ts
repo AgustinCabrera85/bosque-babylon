@@ -14,6 +14,7 @@ import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTextur
 import { StagePyroShow } from "../../effects/StagePyro";
 import { RinaElectricSurfaceFX } from "../../effects/RinaElectricSurfaceFX";
 import { PlayerController } from "../../PlayerController";
+import { PlayerAttackSystem } from "../../PlayerAttackSystem";
 import { setupPlayerViewControls } from "../../PlayerViewControls";
 import { setupMobileControls } from "../../MobileControls";
 import { EnemyManager } from "../../enemies/core/EnemyManager";
@@ -23,6 +24,7 @@ import {
   spawnRina,
 } from "../../enemies/rina";
 import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
+import { getLevelExitPortalRoute } from "../../runtime/PortalRoutes";
 import { createRinaCrowdPreview } from "./RinaCrowdPreview";
 import { createRinaFieldCrowdMazeLayout } from "./RinaFieldCrowdMazeLayout";
 import { createRinaFieldCrowdMazeRenderer } from "./RinaFieldCrowdMazeRenderer";
@@ -542,6 +544,18 @@ export async function createRinaLevel(
     exitMarker.parent = stadiumRoot;
     exitMarker.material = exitMarkerMaterial;
 
+    const attackSystem = new PlayerAttackSystem(scene, player, enemyManager, {
+      input: context.input,
+      stats: context.playerStats,
+      getLightSourcePositions: () => [exitMarker.getAbsolutePosition()],
+      findUnlitCandleSegmentHit: () => null,
+      relightCandle: () => false,
+      getGroundHeight: (x, z) => playerWorld.getWalkableSurfaceHeight(x, z),
+      isBlocked: (position, radius) =>
+        playerWorld.isProjectileBlocked(position, radius),
+    });
+    cleanup.push(() => attackSystem.dispose());
+
     const hud = createRinaLevelHud();
     cleanup.push(hud.dispose);
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -564,6 +578,7 @@ export async function createRinaLevel(
       elapsed += dt;
 
       player.update(dt, playerWorld);
+      attackSystem.update(dt);
       collisionDebug?.update(player.position);
       rinaElectricFX.update(dt);
       const music = context.musicPlayer?.getMusicPlaybackState() ?? null;
@@ -631,7 +646,8 @@ export async function createRinaLevel(
           context.input.wasPressed("interact")
         ) {
           transitionRequested = true;
-          context.requestLevelTransition("sanctuary", "rina-return");
+          const route = getLevelExitPortalRoute("rina");
+          context.requestLevelTransition(route.to, route.entryPoint);
         }
       } else {
         hud.setText(`La Sombra de Rina  ·  ${context.input.getActionBindingLabel("changeCamera") ?? "V"}: tercera / primera persona`);

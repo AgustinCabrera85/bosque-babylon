@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { LevelManager } from "../src/game/runtime/LevelManager";
 import { LevelRegistry } from "../src/game/runtime/LevelRegistry";
+import {
+  findPortalRoute,
+  getLevelExitPortalRoute,
+  getSanctuaryArrivalStop,
+  getSanctuaryPortalRoute,
+} from "../src/game/runtime/PortalRoutes";
 import type {
   GameLevel,
   LevelCreateContext,
@@ -40,7 +46,7 @@ for (const stop of SANCTUARY_STOPS) {
   const z = stop.z + 8;
   const inFront = x - stop.side * 5;
   assert.equal(isAtSanctuaryPortalApproach(stop, inFront, z),
-    stop.destination !== null, `${stop.id} must only prompt when a chapter exists`);
+    getSanctuaryPortalRoute(stop.id) !== null, `${stop.id} must only prompt when a chapter exists`);
   assert.equal(isAtSanctuaryPortalApproach(stop, x + stop.side * 1, z), false,
     `${stop.id} must not prompt from behind`);
   assert.equal(isAtSanctuaryPortalApproach(stop, inFront, z + stop.side * 3), false,
@@ -49,6 +55,16 @@ for (const stop of SANCTUARY_STOPS) {
     `${stop.id} must wait until the player approaches`);
   assert.equal(hasLeftSanctuaryPortalApproach(stop, inFront, z), false);
   assert.equal(hasLeftSanctuaryPortalApproach(stop, x - stop.side * 9, z), true);
+}
+assert.equal(getSanctuaryPortalRoute("libre-de-culpas")?.to, "forest");
+assert.equal(getSanctuaryPortalRoute("rina")?.to, "rina");
+assert.equal(getSanctuaryPortalRoute("teatro")?.to, "theatre");
+for (const [level, stopId] of [["forest", "libre-de-culpas"], ["rina", "rina"]] as const) {
+  const exit = getLevelExitPortalRoute(level);
+  assert.equal(exit.to, "sanctuary");
+  assert.equal(getSanctuaryArrivalStop(exit.entryPoint), stopId);
+  assert.equal(findPortalRoute(level, exit.to, exit.entryPoint), exit);
+  assert.ok(SANCTUARY_STOPS.some((stop) => stop.id === stopId));
 }
 const disposedByLevel = new Map<LevelId, number>();
 const createLevel = (id: LevelId): GameLevel => {
@@ -124,6 +140,7 @@ portalRegistry.register("forest", async () => async (context) => {
   return createLevel("forest");
 });
 portalRegistry.register("theatre", async () => async () => createLevel("theatre"));
+portalRegistry.register("sanctuary", async () => async () => createLevel("sanctuary"));
 const portalManager = new LevelManager({
   registry: portalRegistry,
   context: {
@@ -142,8 +159,8 @@ const portalManager = new LevelManager({
   musicPlayer: null,
   async onLevelTransitionRequested(request) {
     assert.equal(request.fromLevel, "forest");
-    assert.equal(request.toLevel, "theatre");
-    assert.equal(request.entryPoint, "forest-exit-portal");
+    assert.equal(request.toLevel, "sanctuary");
+    assert.equal(request.entryPoint, "forest-return");
     portalTransitionOrder.push("covered");
     await request.load();
     portalTransitionOrder.push("revealed");
@@ -151,9 +168,10 @@ const portalManager = new LevelManager({
   },
 });
 await portalManager.loadLevel("forest");
-requestPortalTransition("theatre", "forest-exit-portal");
+const forestExit = getLevelExitPortalRoute("forest");
+requestPortalTransition(forestExit.to, forestExit.entryPoint);
 await portalTransitionFinished;
-assert.equal(portalManager.currentLevelId, "theatre");
+assert.equal(portalManager.currentLevelId, "sanctuary");
 assert.deepEqual(portalTransitionOrder, ["covered", "revealed"]);
 portalManager.dispose();
 

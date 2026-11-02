@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 566 35" width="566" height="35" role="img">
+<defs>
+<linearGradient id="frameStroke" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbc5fb"/><stop offset=".47" stop-color="#b74aa7"/><stop offset="1" stop-color="#b64eab"/></linearGradient>
+<linearGradient id="inside" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#08000b"/><stop offset=".5" stop-color="#15011d"/><stop offset="1" stop-color="#09000d"/></linearGradient>
+<filter id="outlineGlow" x="-50%" y="-180%" width="200%" height="460%"><feGaussianBlur stdDeviation="2.7"/></filter>
+</defs>
+
+<g id="frame-empty">
+ <rect x="9" y="9" width="548" height="17" rx="8.5" fill="none" stroke="#f154df" stroke-width="3.4" filter="url(#outlineGlow)" opacity=".64"/>
+ <rect id="bar-interior" x="9" y="9" width="548" height="17" rx="8.5" fill="url(#inside)" opacity=".95"/>
+ <rect id="bar-border" x="9" y="9" width="548" height="17" rx="8.5" fill="none" stroke="url(#frameStroke)" stroke-width="1.45"/>
+ <rect x="11" y="10.5" width="544" height="13.5" rx="6.5" fill="none" stroke="#df54c5" stroke-width=".35" opacity=".45"/>
+</g>
+
+</svg>

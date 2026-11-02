@@ -14,7 +14,10 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { BaseTexture } from "@babylonjs/core/Materials/Textures/baseTexture";
 import type { MusicPlaybackState } from "../../MusicPlayer";
 import { asset } from "../../../utils/asset";
-import { RINA_CROWD_FANS } from "./crowd/RinaCrowdAssetManifest";
+import {
+  RINA_CROWD_FANS,
+  RINA_FIELD_CROWD_MIN_STATIC_SCALE,
+} from "./crowd/RinaCrowdAssetManifest";
 import { prepareRinaCrowdMaterial, RinaCrowdAssetRegistry } from "./crowd/RinaCrowdAssetRegistry";
 import { RINA_FIELD_CROWD_LODS, RINA_FIELD_CROWD_LOD_DIR } from "./crowd/RinaFieldCrowdLODManifest";
 import { RINA_STADIUM, RINA_STADIUM_SCALE } from "./RinaLevelConfig";
@@ -542,7 +545,7 @@ export function createRinaFieldCrowdMazeRenderer(
       const motionPlacements: RinaFieldCrowdMotionPlacement[] = [];
       for (let i = 0; i < members.length; i++) {
         const p = members[i];
-        const scale = baseScale * (.97 + (p.scale - .92) / .17 * .06);
+        const scale = baseScale * (RINA_FIELD_CROWD_MIN_STATIC_SCALE + (p.scale - .92) / .17 * .06);
         const depth = Math.max(0, Math.min(1,
           (layout.marginToCrowd(p.x, p.z) - 0.35) / 4.0));
         const smoothDepth = depth * depth * (3 - 2 * depth);

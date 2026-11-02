@@ -157,3 +157,9 @@ export const RINA_CROWD_FANS: readonly RinaCrowdFanAsset[] = [
     },
   },
 ];
+
+/** Lowest scale used by the static field spectators. Keep collision below even the shortest one. */
+export const RINA_FIELD_CROWD_MIN_STATIC_SCALE = 0.97;
+export const RINA_FIELD_CROWD_MIN_WORLD_HEIGHT =
+  Math.min(...RINA_CROWD_FANS.map(fan => fan.targetWorldHeight)) *
+  RINA_FIELD_CROWD_MIN_STATIC_SCALE;

@@ -8,6 +8,7 @@ import { PlayerController } from "../../PlayerController";
 import { setupPlayerViewControls } from "../../PlayerViewControls";
 import { setupMobileControls } from "../../MobileControls";
 import type { GameLevel, LevelCreateContext } from "../../runtime/LevelTypes";
+import { getSanctuaryArrivalStop, getSanctuaryPortalRoute } from "../../runtime/PortalRoutes";
 import { createSanctuaryGeometry } from "./SanctuaryGeometry";
 import { createSanctuaryShadowHands } from "./SanctuaryShadowHands";
 import { collidesWithPortalStone } from "./SanctuaryPortalCollisions";
@@ -178,16 +179,20 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     cleanup.push(portalPrompt.dispose);
     cleanup.push(() => document.body.classList.remove("sanctuary-portal-traversing"));
 
-    const rinaReturnIndex = context.entryPoint === "rina-return"
-      ? SANCTUARY_STOPS.findIndex((stop) => stop.id === "rina") : -1;
-    let targetIndex = rinaReturnIndex >= 0 ? rinaReturnIndex : 0;
-    let state: VoyageState = rinaReturnIndex >= 0 ? "ashore" : "sailing";
-    let boatFrom: RoutePoint = rinaReturnIndex >= 0 ? ROUTE[rinaReturnIndex] : BOAT_START;
-    let routeT = rinaReturnIndex >= 0 ? 1 : 0;
+    const arrivalStop = getSanctuaryArrivalStop(context.entryPoint);
+    const arrivalIndex = arrivalStop
+      ? SANCTUARY_STOPS.findIndex((stop) => stop.id === arrivalStop) : -1;
+    if (arrivalStop && arrivalIndex < 0) {
+      throw new Error(`Sanctuary arrival stop ${arrivalStop} is missing from the layout`);
+    }
+    let targetIndex = arrivalIndex >= 0 ? arrivalIndex : 0;
+    let state: VoyageState = arrivalIndex >= 0 ? "ashore" : "sailing";
+    let boatFrom: RoutePoint = arrivalIndex >= 0 ? ROUTE[arrivalIndex] : BOAT_START;
+    let routeT = arrivalIndex >= 0 ? 1 : 0;
     let routeDuration = Math.hypot(ROUTE[0].x - BOAT_START.x, ROUTE[0].z - BOAT_START.z) / CFG.boatSpeed;
-    if (rinaReturnIndex >= 0) {
-      geometry.boatRoot.position.x = ROUTE[rinaReturnIndex].x;
-      geometry.boatRoot.position.z = ROUTE[rinaReturnIndex].z;
+    if (arrivalIndex >= 0) {
+      geometry.boatRoot.position.x = ROUTE[arrivalIndex].x;
+      geometry.boatRoot.position.z = ROUTE[arrivalIndex].z;
     }
     let elapsed = 0;
     let refreshProgressSeconds = 0;
@@ -206,8 +211,8 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     const raftRiderZ = -1.2; // Stand in the open floor space between the cross seats.
     player.position.set(0, geometry.boatRoot.position.y + CFG.boatDeckY + CFG.eyeHeight,
       CFG.boatStartZ + raftRiderZ);
-    if (rinaReturnIndex >= 0) {
-      const stop = SANCTUARY_STOPS[rinaReturnIndex];
+    if (arrivalIndex >= 0) {
+      const stop = SANCTUARY_STOPS[arrivalIndex];
       player.position.set(stop.x + stop.side * 24,
         2.05 + CFG.eyeHeight, stop.z - 10);
     }
@@ -303,7 +308,7 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
     let portalWalk: PortalWalk | null = null;
     let declinedStopId: string | null = null;
     const openPortalPrompt = (stop: SanctuaryStop) => {
-      if (!stop.destination || transitionRequested || portalPrompt.isOpen) return;
+      if (!getSanctuaryPortalRoute(stop.id) || transitionRequested || portalPrompt.isOpen) return;
       player.settleLocomotionToIdle();
       portalPrompt.show(stop.id, stop.title, () => {
         if (!player.beginCinematicSequence()) {
@@ -375,7 +380,8 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
         }
         if (!transitionRequested && walkT >= 0.78) {
           transitionRequested = true;
-          context.requestLevelTransition(walk.stop.destination!, `${walk.stop.id}-portal`);
+          const route = getSanctuaryPortalRoute(walk.stop.id);
+          if (route) context.requestLevelTransition(route.to, route.entryPoint);
         }
         geometry.update(dt, elapsed, progress, player.position);
         shadowHands?.update(elapsed);
@@ -421,7 +427,7 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
         const nearPortal = stop && closeEnoughToPortal(stop);
         if (atGate) {
           hud.setText("El portal del Santuario permanece sellado. El desenlace se implementará más adelante.");
-        } else if (nearPortal && stop.destination) {
+        } else if (nearPortal && getSanctuaryPortalRoute(stop.id)) {
           hud.setText(`${stop.title}  ·  Acércate frente al portal para entrar`);
         } else if (nearPortal) {
           hud.setText(`${stop.title}  ·  El portal aún no responde.`);
@@ -432,7 +438,7 @@ export async function createSanctuaryLevel(context: LevelCreateContext): Promise
             hasLeftSanctuaryPortalApproach(stop, player.position.x, player.position.z))) {
           declinedStopId = null;
         }
-        if (stop?.destination && !transitionRequested && declinedStopId !== stop.id &&
+        if (stop && getSanctuaryPortalRoute(stop.id) && !transitionRequested && declinedStopId !== stop.id &&
             isAtSanctuaryPortalApproach(stop, player.position.x, player.position.z)) {
           openPortalPrompt(stop);
         } else if (!nearPortal && context.input.wasPressed("interact")) {

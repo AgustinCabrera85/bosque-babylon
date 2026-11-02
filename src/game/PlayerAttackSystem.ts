@@ -516,7 +516,7 @@ export class PlayerAttackSystem {
   public startCharging = () => {
     if (this.disposed || this.charging) return false;
     if (this.ammo <= 0) {
-      this.showMessage("Sin luz: acercate a una llama", 1.8);
+      this.showMessage("Sin luz: acercate a una fuente de luz", 1.8);
       return false;
     }
     if (!this.player.beginChargedThrow()) {
@@ -662,7 +662,7 @@ export class PlayerAttackSystem {
     document.body.classList.add("desktop-orb-mode");
     this.dom.root?.classList.add("orb-mode");
     this.showMessage(
-      this.ammo > 0 ? this.getIdleMessage() : "Sin luz: acercate a una llama",
+      this.ammo > 0 ? this.getIdleMessage() : "Sin luz: acercate a una fuente de luz",
       0
     );
     this.renderHud();

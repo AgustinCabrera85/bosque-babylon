@@ -1,0 +1,13 @@
+export { DIMENSIONAL_FX_CATALOG, DIMENSIONAL_SHADER_IDS, getDimensionalFX } from './catalog';
+export type { DimensionalFXId, DimensionalKind, DimensionalLevel } from './catalog';
+export type { DimensionalFXParams, DimensionalFXParamsPatch } from './params';
+export { defaultDimensionalParams } from './params';
+export type { CosmicQuality, DarknessVariant } from './source';
+export { COSMIC_APERTURE,DARKNESS_APERTURE,evaluateAperture } from './controllers';
+export type { ApertureSettings,ApertureFrame } from './controllers';
+export { createDimensionalSurface,createDimensionalPostProcess,createDimensionalProjection } from './DimensionalFXRuntime';
+export type { DimensionalFXHandle,DimensionalFXOptions,MeshProjection } from './DimensionalFXRuntime';
+export { WarpConnectionFX,WARP_OPTIONS } from './WarpConnectionFX';
+export { EtherealMeshFX,ETHEREAL_OPTIONS } from './EtherealMeshFX';
+export { RorschachTextFX,INK_PRESETS } from './RorschachTextFX';
+export type { InkTextSettings } from './RorschachTextFX';

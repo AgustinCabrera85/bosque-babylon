@@ -1,0 +1,134 @@
+{
+  "name": "Bosque Babylon / Dimensional FX",
+  "integrationRevision": "0.1.0-candidate",
+  "basedOnLab": "v0.13",
+  "catalogCount": 20,
+  "cataloguedShadertoyCount": 17,
+  "userApprovedAtLastAudit": 16,
+  "ids": [
+    "lsySzd",
+    "ldBfDR",
+    "Ms2fWW",
+    "XsXSWS",
+    "MdfGRX",
+    "XsjXR1",
+    "ttlXRf",
+    "4l2GW1",
+    "wslcDf",
+    "XlBXRK",
+    "4t2cR1",
+    "XsKGRW",
+    "NsS3Dt",
+    "lX2GzD",
+    "4XVBzK",
+    "ldySzW",
+    "ldK3RW"
+  ],
+  "notes": "Visual approvals are not runtime / compatibility certification; Rina lX2GzD still unapproved. Controllers from v0.13 have not been reaudited.",
+  "sources": [
+    {
+      "path": "shaders/4XVBzK.frag.glsl",
+      "sha256": "f76ce9fed22d7484423d95249927b8802da061393d2bd281d11c057f6c97b4a4"
+    },
+    {
+      "path": "shaders/4l2GW1.frag.glsl",
+      "sha256": "4e1809c5aecbf5e659696772b07a77e0aec49d79a9e4a91dd41d9843c62e6bec"
+    },
+    {
+      "path": "shaders/4t2cR1.frag.glsl",
+      "sha256": "5a45d555521f6e02a3248341a5d8e83e181e7a7fdeabef7a67e8dfa2c143de78"
+    },
+    {
+      "path": "shaders/MdfGRX.frag.glsl",
+      "sha256": "4d3874845ddcacdfa470f7987b8c85983a8af1abf4939aa9eb8efd8158edf302"
+    },
+    {
+      "path": "shaders/Ms2fWW.frag.glsl",
+      "sha256": "d375c532219854553f53edf2a1964c4b3032437d24dc8cd5531659053678336e"
+    },
+    {
+      "path": "shaders/NsS3Dt.frag.glsl",
+      "sha256": "f68d5f06755de6cad3970a56901514db7ea8e2354a9b3bdd199b9c7855ca8ab2"
+    },
+    {
+      "path": "shaders/XlBXRK.frag.glsl",
+      "sha256": "aa9c9687dad63b484727dde13c4188beee5d7f9560108542600b9586aaa820cb"
+    },
+    {
+      "path": "shaders/XsKGRW.frag.glsl",
+      "sha256": "b49497df028331e9b761eb0c005050e6b0ba48af66c93f9a1b8327169b27822f"
+    },
+    {
+      "path": "shaders/XsXSWS.frag.glsl",
+      "sha256": "b59f7f821b6ef19983bba3d48953f48649daf6833949a4400239f5aaafc8ee3d"
+    },
+    {
+      "path": "shaders/XsjXR1.frag.glsl",
+      "sha256": "d8e417ff1986262021e9b3335cc981182f4963386f4a91d11ef8da14826746c0"
+    },
+    {
+      "path": "shaders/common.glsl",
+      "sha256": "e480d5378e86ae558808920e62db36a9f937a9c9a6ec589319eb429c16b0af91"
+    },
+    {
+      "path": "shaders/ethereal.definitions.glsl",
+      "sha256": "f0d73b039ef73eb22ae4c6cd3fa5f58502f95914def7b56c2baa971e9fbc9c8b"
+    },
+    {
+      "path": "shaders/ethereal.fragment.inject.glsl",
+      "sha256": "74622f7b054935e0808895524efc6226aeadb9702e20a2467cbc34a9cba32dd7"
+    },
+    {
+      "path": "shaders/ethereal.vertex.inject.glsl",
+      "sha256": "3d719a316dde09a71da86a6979c52365a3e7156960e061184155c2fe9708514e"
+    },
+    {
+      "path": "shaders/lX2GzD.frag.glsl",
+      "sha256": "b7c7baf185ab602473bd65f7d8b122f68329345564b972f2ffe70bd08c2a4273"
+    },
+    {
+      "path": "shaders/ldBfDR.frag.glsl",
+      "sha256": "28bbcc4c210fae6e5f6489d5410d0ab1ea2953687907aea73014f47471dbb683"
+    },
+    {
+      "path": "shaders/ldK3RW.frag.glsl",
+      "sha256": "e525b6c43bdb64d4d19b4ea9393417e9d7e376399de8a7af29c7fc84a7c88a9d"
+    },
+    {
+      "path": "shaders/ldySzW.frag.glsl",
+      "sha256": "d7852c2c2408d62793d0c1b025e73dbf0efe24b3505f6f2ef69449c2d7f874d9"
+    },
+    {
+      "path": "shaders/legacy/4XVBzK.v0.12.frag.glsl",
+      "sha256": "4e17f4fa45401ba9b2e59a91026f9061bca35e5242597f05b394b86e6d214209"
+    },
+    {
+      "path": "shaders/legacy/4t2cR1.v0.10.frag.glsl",
+      "sha256": "7940571fa936c93a6d8b350e89cdfd166080a4c67a1d184f729425e0fbc6832d"
+    },
+    {
+      "path": "shaders/lsySzd.frag.glsl",
+      "sha256": "1279fd06e0aba8c05ec74bcb357ae167355549d6ed882f7cfdbb1d0070d61700"
+    },
+    {
+      "path": "shaders/text/rorschach-text.frag.glsl",
+      "sha256": "0df6fe96ddb9b68e8954d25fbbc1fb7de2ab647102984579f9d97ee8e5dad295"
+    },
+    {
+      "path": "shaders/ttlXRf.frag.glsl",
+      "sha256": "93c86b3d4c498ca4d4c5522484749739408c2fcfffab3c8e4221f1078d5b655e"
+    },
+    {
+      "path": "shaders/warp.fragment.glsl",
+      "sha256": "509b8ce2f045842fd63a20e47a21b7b763e9114e5fa45fde01e7919188e359cf"
+    },
+    {
+      "path": "shaders/warp.vertex.glsl",
+      "sha256": "b1c7bce68e915f57597ae906700a8fe9bbaaa76e18199e6f09e18c9615a8b39f"
+    },
+    {
+      "path": "shaders/wslcDf.frag.glsl",
+      "sha256": "1ede9a3f8533dc12ec0299b0c9f2a0145ffbf95dd3161ee4b313c7643571c261"
+    }
+  ]
+}
